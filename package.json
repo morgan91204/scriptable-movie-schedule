@@ -1,0 +1,16 @@
+{
+  "name": "scriptable-movie-schedule",
+  "version": "1.0.0",
+  "description": "電影行程：選影城、日期、電影、場次，一鍵加入 iOS 行事曆（Scriptable）",
+  "scripts": {
+    "build": "./build.sh",
+    "test": "node test/run.mjs vs"
+  },
+  "devDependencies": {
+    "@types/scriptable-ios": "^1.7.9",
+    "esbuild": "^0.28.2",
+    "linkedom": "^0.18.15",
+    "typescript": "^7.0.2"
+  },
+  "private": true
+}

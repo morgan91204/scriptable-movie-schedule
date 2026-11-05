@@ -1,0 +1,4 @@
+{
+  "compilerOptions": { "target": "ES2020", "lib": ["ES2022", "DOM", "DOM.Iterable"], "types": [], "strict": true, "noEmit": true, "skipLibCheck": true },
+  "files": ["src/parsers.ts"]
+}

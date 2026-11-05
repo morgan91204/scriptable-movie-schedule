@@ -1,0 +1,20 @@
+import { tap, dump, saved, closeUI } from "./mock.mjs";
+const driver = (async () => {
+  await tap(/搜尋影城/);
+  await tap(/^搜尋$/, { q: "西門" });
+  await dump("搜尋西門");
+  await tap(/樂聲影城/);
+  await dump("樂聲：日期");
+  await tap(/明天/);
+  await dump("樂聲：片單");
+  await tap(/^即刻狂飆/);
+  await dump("即刻狂飆場次");
+  await tap(/^00:50/);
+  await dump("確認頁（凌晨場）");
+  await tap(/加入行事曆/);
+  closeUI();
+})().catch((e) => { console.error("❌", e.message); process.exit(1); });
+await import("../dist/app.mjs");
+await driver;
+for (const e of saved) console.log("\n寫入：", e.title, e.startDate.toISOString(), "→", e.endDate.toISOString(), "\n" + e.notes);
+process.exit(0);

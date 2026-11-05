@@ -1,0 +1,27 @@
+import { tap, dump, saved, closeUI } from "./mock.mjs";
+const driver = (async () => {
+  await dump("首頁");
+  await tap(/^宜蘭縣/);
+  await dump("宜蘭縣");
+  await tap(/新月豪華影城/);
+  await dump("新月：日期");
+  await tap(/今天/);
+  await dump("新月：片單");
+  await tap(/分｜/);
+  await dump("場次");
+  await tap(/^\d\d:\d\d/);
+  await dump("確認頁");
+  await tap(/加入行事曆/);
+  await tap(/再新增一部/);
+  await tap(/搜尋影城/);
+  await tap(/^搜尋$/, { q: "威尼斯" });
+  await tap(/威尼斯影城/);
+  await tap(/今天/);
+  await tap(/致遙不可及/);
+  await dump("威尼斯：多版本場次");
+  closeUI();
+})().catch((e) => { console.error("❌", e.message); process.exit(1); });
+await import("../dist/app.mjs");
+await driver;
+for (const e of saved) console.log("\n寫入：", e.title, e.startDate.toISOString(), "→", e.endDate.toISOString(), "|", e.location, "\n" + e.notes);
+process.exit(0);
