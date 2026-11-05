@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.05-2227
+// @movie-schedule-app 電影行程 v2026.11.05-2241
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/jsx.tsx
@@ -1274,13 +1274,21 @@ async function findExtras(title, slug) {
     const v = vz ? { ...vz, zh: true } : pickVideo(all?.results || []);
     return { poster: hit.p ? "https://image.tmdb.org/t/p/w500" + hit.p : "", v, err: v ? "" : "TMDB 沒有這部片的預告" };
   })().catch((e) => ({ err: "TMDB " + errText(e) }));
+  const atErr = [];
   const atJob = posterJob.then(async (poster2) => {
     const id = (poster2.match(/\/photo\d*\/(f\w+)\//) || [])[1];
-    if (!id) return null;
+    if (!id) {
+      atErr.push(poster2 ? "海報不是開眼的，對不到開眼電影頁" : "場次通沒有這部片的海報");
+      return null;
+    }
     const html = await getText(`https://www.atmovies.com.tw/movie/${id}/`);
     const key = (html.match(/youtube\.com\/embed\/([A-Za-z0-9_-]{11})/) || [])[1];
+    if (!key) atErr.push("開眼電影頁沒有預告");
     return key ? { key, name: "開眼電影網預告" } : null;
-  }).catch(() => null);
+  }).catch((e) => {
+    atErr.push("開眼 " + errText(e));
+    return null;
+  });
   const [poster, t, at] = await Promise.all([posterJob, tmdbJob, atJob]);
   out.poster = poster || (t && "poster" in t ? t.poster : "") || "";
   const tv = t && "v" in t ? t.v : null;
@@ -1289,7 +1297,7 @@ async function findExtras(title, slug) {
     out.trailer = `https://www.youtube.com/watch?v=${pick.key}`;
     out.trailerName = String(pick.name || "預告片");
   }
-  if (t?.err && !pick) out.err = t.err;
+  if (!pick) out.err = [t?.err, ...atErr].filter(Boolean).join("；") || "找不到預告";
   return out;
 }
 async function fillRuntimes(movies) {
@@ -1505,12 +1513,32 @@ async function findRatings(title, en) {
     return out;
   }
   const imdbJob = (async () => {
+    const url = `https://www.imdb.com/title/${who.id}/`;
+    try {
+      const r2 = await platform().fetchText(`https://p.media-imdb.com/static-content/documents/v1/title/${who.id}/ratings%3Fjsonp=imdb.rating.run:imdb.api.title.ratings/data.json`, { "User-Agent": UA });
+      const j = JSON.parse(r2.body.replace(/^[^{]*/, "").replace(/\)\s*$/, ""));
+      const score2 = Number(j?.resource?.rating) || 0;
+      if (score2) {
+        out.imdb = { score: score2, votes: Number(j.resource.ratingCount) || 0, url };
+        return;
+      }
+      errs.push("IMDb 沒有評分");
+    } catch (e) {
+      errs.push("IMDb 評分檔 " + errText(e));
+    }
     const q = `{ title(id:"${who.id}"){ ratingsSummary{aggregateRating voteCount} } }`;
-    const r = await platform().fetchText(`${IMDB_GQL}?query=${encodeURIComponent(q)}`, { "content-type": "application/json", "x-imdb-client-name": "imdb-web-next-localized" });
+    const r = await platform().fetchText(`${IMDB_GQL}?query=${encodeURIComponent(q)}`, {
+      "User-Agent": UA,
+      "content-type": "application/json",
+      "x-imdb-client-name": "imdb-web-next-localized",
+      Referer: "https://www.imdb.com/"
+    });
     const t = JSON.parse(r.body)?.data?.title;
     const score = Number(t?.ratingsSummary?.aggregateRating) || 0;
-    if (score) out.imdb = { score, votes: Number(t.ratingsSummary.voteCount) || 0, url: `https://www.imdb.com/title/${who.id}/` };
-    else if (!t) errs.push("IMDb 評分 " + r.status + " " + r.body.slice(0, 60));
+    if (score) {
+      out.imdb = { score, votes: Number(t.ratingsSummary.voteCount) || 0, url };
+      errs.pop();
+    } else errs.push("IMDb 評分 " + r.status + " " + r.body.slice(0, 60));
   })().catch((e) => errs.push("IMDb 評分 " + errText(e)));
   const rtJob = (async () => {
     if (!who.name) return;
@@ -1566,19 +1594,19 @@ async function checkLatest(current2) {
   }
 }
 var CINEMA_APPS = [
-  { re: /威秀|MUVIE|^vscinemas/i, name: "威秀影城", id: "6761522320" },
-  { re: /秀泰|^showtimes/i, name: "秀泰影城", id: "1152850053" },
-  { re: /國賓|^ambassador/i, name: "國賓看電影", id: "435465064" },
-  { re: /新光影城|^skcinemas/i, name: "新光影城", id: "6747376383" },
-  { re: /美麗新/, name: "美麗新影城", id: "581548701" },
-  { re: /美麗華|^miramar/i, name: "美麗華影城", id: "1446574681" },
-  { re: /喜樂時代|^centuryasia/i, name: "喜樂時代影城", id: "6751645458" },
-  { re: /樂聲|^lux$/i, name: "樂聲影城", id: "833368283" },
-  { re: /百老匯/, name: "龍祥百老匯影城", id: "6446755867" }
+  { re: /威秀|MUVIE|^vscinemas/i, name: "威秀影城", id: "6761522320", schemes: ["vscinemas", "vieshow", "vieshowcinemas"] },
+  { re: /秀泰|^showtimes/i, name: "秀泰影城", id: "1152850053", schemes: ["showtimes", "showtimescinema", "maimaishowtimes"] },
+  { re: /國賓|^ambassador/i, name: "國賓看電影", id: "435465064", schemes: ["ambassador", "ambassadorlookmovie", "ambassadortheatres"] },
+  { re: /新光影城|^skcinemas/i, name: "新光影城", id: "6747376383", schemes: ["skcinemas", "skcinema"] },
+  { re: /美麗新/, name: "美麗新影城", id: "581548701", schemes: ["miramarcinemas", "miramarcinemasbookingonline"] },
+  { re: /美麗華|^miramar/i, name: "美麗華影城", id: "1446574681", schemes: ["miramar", "mirmar", "miramarcinema"] },
+  { re: /喜樂時代|^centuryasia/i, name: "喜樂時代影城", id: "6751645458", schemes: ["centuryasia", "century-asia"] },
+  { re: /樂聲|^lux$/i, name: "樂聲影城", id: "833368283", schemes: ["luxcinema", "lux"] },
+  { re: /百老匯/, name: "龍祥百老匯影城", id: "6446755867", schemes: ["broadwaycinemas", "broadway"] }
 ];
 function cinemaApp(c) {
   const a = CINEMA_APPS.find((x) => x.re.test(c.name) || x.re.test(c.id));
-  return a ? { name: a.name, id: a.id, url: `itms-apps://apps.apple.com/tw/app/id${a.id}` } : null;
+  return a ? { name: a.name, id: a.id, url: `itms-apps://apps.apple.com/tw/app/id${a.id}`, schemes: a.schemes } : null;
 }
 async function bookingUrl(p) {
   if (p.booking) return p.booking;
@@ -1624,7 +1652,7 @@ var App = class {
     this.loadingText = "讀取中…";
     // ── 事件迴圈 ──
     // 背景查 GitHub 上的最新版本（首頁顯示是否為最新版）
-    this.latest = checkLatest("2026.11.05-2227");
+    this.latest = checkLatest("2026.11.05-2241");
     // ── 搜尋 ──
     this.query = "";
     this.tmdbStatus = "";
@@ -1728,11 +1756,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.05-2227"}`);
+          Pasteboard.copy(`版本 ${"2026.11.05-2241"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.05-2227"}`,
+      `版本 ${"2026.11.05-2241"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }

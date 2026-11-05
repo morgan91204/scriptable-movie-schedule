@@ -548,15 +548,23 @@ async function findExtras(title: string, slug?: string): Promise<MovieExtras> {
     return { poster: hit.p ? "https://image.tmdb.org/t/p/w500" + hit.p : "", v, err: v ? "" : "TMDB 沒有這部片的預告" };
   })().catch((e) => ({ err: "TMDB " + errText(e) }));
   // 開眼電影網的電影頁有 YouTube 預告（不需要金鑰）：海報網址裡就有開眼的電影編號
+  const atErr: string[] = [];
   const atJob = posterJob
     .then(async (poster) => {
       const id = (poster.match(/\/photo\d*\/(f\w+)\//) || [])[1];
-      if (!id) return null;
+      if (!id) {
+        atErr.push(poster ? "海報不是開眼的，對不到開眼電影頁" : "場次通沒有這部片的海報");
+        return null;
+      }
       const html = await getText(`https://www.atmovies.com.tw/movie/${id}/`);
       const key = (html.match(/youtube\.com\/embed\/([A-Za-z0-9_-]{11})/) || [])[1];
+      if (!key) atErr.push("開眼電影頁沒有預告");
       return key ? { key, name: "開眼電影網預告" } : null;
     })
-    .catch(() => null);
+    .catch((e) => {
+      atErr.push("開眼 " + errText(e));
+      return null;
+    });
   const [poster, t, at] = await Promise.all([posterJob, tmdbJob, atJob]);
   out.poster = poster || (t && "poster" in t ? t.poster : "") || "";
   // 預告來源順序：TMDB 中文預告 → 開眼 → TMDB 其他語言 → YouTube 搜尋
@@ -566,7 +574,7 @@ async function findExtras(title: string, slug?: string): Promise<MovieExtras> {
     out.trailer = `https://www.youtube.com/watch?v=${pick.key}`;
     out.trailerName = String(pick.name || "預告片");
   }
-  if (t?.err && !pick) out.err = t.err;
+  if (!pick) out.err = [t?.err, ...atErr].filter(Boolean).join("；") || "找不到預告";
   return out;
 }
 
@@ -885,12 +893,34 @@ async function findRatings(title: string, en?: string): Promise<Ratings> {
   }
   // IMDb 評分與爛番茄同時查
   const imdbJob = (async () => {
+    const url = `https://www.imdb.com/title/${who.id}/`;
+    // 1) IMDb 的公開評分檔（不需要特殊標頭，手機上最穩）
+    try {
+      const r = await platform().fetchText(`https://p.media-imdb.com/static-content/documents/v1/title/${who.id}/ratings%3Fjsonp=imdb.rating.run:imdb.api.title.ratings/data.json`, { "User-Agent": UA });
+      const j = JSON.parse(r.body.replace(/^[^{]*/, "").replace(/\)\s*$/, ""));
+      const score = Number(j?.resource?.rating) || 0;
+      if (score) {
+        out.imdb = { score, votes: Number(j.resource.ratingCount) || 0, url };
+        return;
+      }
+      errs.push("IMDb 沒有評分");
+    } catch (e) {
+      errs.push("IMDb 評分檔 " + errText(e));
+    }
+    // 2) 備用：IMDb GraphQL（需要特定標頭）
     const q = `{ title(id:"${who.id}"){ ratingsSummary{aggregateRating voteCount} } }`;
-    const r = await platform().fetchText(`${IMDB_GQL}?query=${encodeURIComponent(q)}`, { "content-type": "application/json", "x-imdb-client-name": "imdb-web-next-localized" });
+    const r = await platform().fetchText(`${IMDB_GQL}?query=${encodeURIComponent(q)}`, {
+      "User-Agent": UA,
+      "content-type": "application/json",
+      "x-imdb-client-name": "imdb-web-next-localized",
+      Referer: "https://www.imdb.com/",
+    });
     const t = JSON.parse(r.body)?.data?.title;
     const score = Number(t?.ratingsSummary?.aggregateRating) || 0;
-    if (score) out.imdb = { score, votes: Number(t.ratingsSummary.voteCount) || 0, url: `https://www.imdb.com/title/${who.id}/` };
-    else if (!t) errs.push("IMDb 評分 " + r.status + " " + r.body.slice(0, 60));
+    if (score) {
+      out.imdb = { score, votes: Number(t.ratingsSummary.voteCount) || 0, url };
+      errs.pop();
+    } else errs.push("IMDb 評分 " + r.status + " " + r.body.slice(0, 60));
   })().catch((e) => errs.push("IMDb 評分 " + errText(e)));
   const rtJob = (async () => {
     if (!who.name) return;
@@ -961,23 +991,24 @@ export async function checkLatest(current: string): Promise<{ latest: string; is
 // ───────────────────────── 訂票 ─────────────────────────
 
 /** 各連鎖的官方 App（App Store 台灣區 ID）。順序有意義：美麗新要在美麗華前面 */
-export const CINEMA_APPS: { re: RegExp; name: string; id: string }[] = [
-  { re: /威秀|MUVIE|^vscinemas/i, name: "威秀影城", id: "6761522320" },
-  { re: /秀泰|^showtimes/i, name: "秀泰影城", id: "1152850053" },
-  { re: /國賓|^ambassador/i, name: "國賓看電影", id: "435465064" },
-  { re: /新光影城|^skcinemas/i, name: "新光影城", id: "6747376383" },
-  { re: /美麗新/, name: "美麗新影城", id: "581548701" },
-  { re: /美麗華|^miramar/i, name: "美麗華影城", id: "1446574681" },
-  { re: /喜樂時代|^centuryasia/i, name: "喜樂時代影城", id: "6751645458" },
-  { re: /樂聲|^lux$/i, name: "樂聲影城", id: "833368283" },
-  { re: /百老匯/, name: "龍祥百老匯影城", id: "6446755867" },
+// schemes：可能的 App 網址開頭（從 App 的 bundle id 推測，官方沒有公開）；Scripting 版會逐一試開，有裝就直接進 App
+export const CINEMA_APPS: { re: RegExp; name: string; id: string; schemes: string[] }[] = [
+  { re: /威秀|MUVIE|^vscinemas/i, name: "威秀影城", id: "6761522320", schemes: ["vscinemas", "vieshow", "vieshowcinemas"] },
+  { re: /秀泰|^showtimes/i, name: "秀泰影城", id: "1152850053", schemes: ["showtimes", "showtimescinema", "maimaishowtimes"] },
+  { re: /國賓|^ambassador/i, name: "國賓看電影", id: "435465064", schemes: ["ambassador", "ambassadorlookmovie", "ambassadortheatres"] },
+  { re: /新光影城|^skcinemas/i, name: "新光影城", id: "6747376383", schemes: ["skcinemas", "skcinema"] },
+  { re: /美麗新/, name: "美麗新影城", id: "581548701", schemes: ["miramarcinemas", "miramarcinemasbookingonline"] },
+  { re: /美麗華|^miramar/i, name: "美麗華影城", id: "1446574681", schemes: ["miramar", "mirmar", "miramarcinema"] },
+  { re: /喜樂時代|^centuryasia/i, name: "喜樂時代影城", id: "6751645458", schemes: ["centuryasia", "century-asia"] },
+  { re: /樂聲|^lux$/i, name: "樂聲影城", id: "833368283", schemes: ["luxcinema", "lux"] },
+  { re: /百老匯/, name: "龍祥百老匯影城", id: "6446755867", schemes: ["broadwaycinemas", "broadway"] },
 ];
 
 /** 這間影城的官方 App（沒有就回傳 null） */
-export function cinemaApp(c: Cinema): { name: string; id: string; url: string } | null {
+export function cinemaApp(c: Cinema): { name: string; id: string; url: string; schemes: string[] } | null {
   const a = CINEMA_APPS.find((x) => x.re.test(c.name) || x.re.test(c.id));
   // itms-apps:// 直接打開 App Store 的 App 頁：已安裝會顯示「打開」，沒安裝可以直接下載
-  return a ? { name: a.name, id: a.id, url: `itms-apps://apps.apple.com/tw/app/id${a.id}` } : null;
+  return a ? { name: a.name, id: a.id, url: `itms-apps://apps.apple.com/tw/app/id${a.id}`, schemes: a.schemes } : null;
 }
 
 /** 訂票網頁：場次頁給的官方訂票連結 → 影城官網 → 時刻表 */

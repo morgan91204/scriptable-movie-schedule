@@ -213,6 +213,18 @@ function Home() {
   </NavigationStack>
 }
 
+/** 以 App 訂票：先試已知的 App 網址（有裝就直接開），都不行才開 App Store 頁 */
+async function openCinemaApp(c: Cinema) {
+  const app = cinemaApp(c)
+  if (!app) return
+  for (const scheme of app.schemes) {
+    try {
+      if (await Safari.openURL(scheme + "://")) return
+    } catch (_) {}
+  }
+  await Safari.openURL(app.url)
+}
+
 /** 地址列：點一下用設定的地圖導航，長按跳出「複製地址」 */
 function AddressRow({ name, address, title }: { name: string; address: string; title?: string }) {
   const [settings] = useSettings()
@@ -629,7 +641,7 @@ function ConfirmPage({ pick }: { pick: Pick }) {
 
     <Section footer={cinemaApp(pick.cinema) ? <Text>{`App 訂票會打開 App Store 的「${cinemaApp(pick.cinema)!.name}」頁面：已安裝點「打開」，沒安裝可以直接下載。`}</Text> : <Text>這間影城沒有官方 App，請用瀏覽器訂票。</Text>}>
       <Button title={"以瀏覽器訂票"} systemImage={"globe"} action={async () => Safari.openURL(await bookingUrl(pick))} />
-      {cinemaApp(pick.cinema) ? <Button title={`以 App 訂票（${cinemaApp(pick.cinema)!.name}）`} systemImage={"iphone"} action={() => Safari.openURL(cinemaApp(pick.cinema)!.url)} /> : null}
+      {cinemaApp(pick.cinema) ? <Button title={`以 App 訂票（${cinemaApp(pick.cinema)!.name}）`} systemImage={"iphone"} action={() => openCinemaApp(pick.cinema)} /> : null}
     </Section>
 
     <Section>
