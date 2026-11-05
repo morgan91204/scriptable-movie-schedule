@@ -1,7 +1,7 @@
 // 只給本機型別檢查用（不會放進 Scripting 腳本資料夾）。Scripting 沒有公開 .d.ts，這裡把元件放寬成 any。
 declare module "scripting" {
   type C = (props: any) => any
-  export const Button: C, ContentUnavailableView: C, Form: C, HStack: C, Image: C, Label: C, LabeledContent: C, List: C,
+  export const Button: C, ContentUnavailableView: C, Form: C, Group: C, HStack: C, Image: C, Label: C, LabeledContent: C, List: C,
     NavigationLink: C, NavigationStack: C, Picker: C, ProgressView: C, Section: C, Spacer: C, Text: C, TextField: C,
     Toggle: C, VStack: C
   export const Navigation: { present(o: { element: any }): Promise<void>; useDismiss(): () => void }

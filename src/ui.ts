@@ -30,7 +30,7 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .item .ico{font-size:20px;width:26px;text-align:center;flex:none}
 .item .body{flex:1;min-width:0}
 .item .title{font-size:16px;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
-.item .sub{font-size:13px;color:var(--fg2);margin-top:2px;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.item .sub{font-size:13px;color:var(--fg2);margin-top:2px;white-space:pre-line;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
 .item .right{font-size:14px;color:var(--fg2);flex:none;max-width:40%;text-align:right}
 .item .badge{flex:none;font-size:12px;padding:2px 8px;border-radius:999px;background:var(--chip);color:var(--chip-fg)}
 .item .chev{color:var(--fg2);opacity:.55;font-size:22px;line-height:1;flex:none}
@@ -59,6 +59,10 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .hero-line{font-size:14px;color:var(--fg2)}
 .trailer{margin-top:8px;align-self:flex-start;padding:8px 14px;border-radius:999px;background:#ff0033;color:#fff;font-size:15px;font-weight:600}
 .trailer:active{opacity:.7}
+.item.long{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+.toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom) + 28px);transform:translateX(-50%);z-index:20;background:rgba(40,40,44,.92);color:#fff;
+ padding:10px 18px;border-radius:999px;font-size:15px;pointer-events:none;animation:toast 1.8s ease forwards}
+@keyframes toast{0%{opacity:0;transform:translate(-50%,8px)}12%,75%{opacity:1;transform:translate(-50%,0)}100%{opacity:0}}
 .loading,.empty{text-align:center;color:var(--fg2);padding:72px 20px;white-space:pre-line}
 .empty .big{font-size:44px;margin-bottom:8px}
 .spinner{width:28px;height:28px;margin:0 auto 14px;border:3px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:sp .8s linear infinite}
@@ -70,7 +74,20 @@ const SHELL = `<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8">
 <style>${CSS}</style></head><body><div id="root"></div>
 <script>
 window.__pending=null;
+function send(id){var vals={};
+  document.querySelectorAll('input[name],select[name]').forEach(function(i){vals[i.name]=i.value;});
+  if(window.__pending){var f=window.__pending;window.__pending=null;f(JSON.stringify({id:id,vals:vals,y:window.scrollY}));}}
+// 長按 0.5 秒：觸發 data-long，並取消接下來的點擊
+var lp=null,lpFired=false,lx=0,ly=0;
+document.addEventListener('touchstart',function(e){var el=e.target.closest('[data-long]');lpFired=false;if(!el)return;
+  var t=e.touches[0];lx=t.clientX;ly=t.clientY;
+  lp=setTimeout(function(){lp=null;lpFired=true;send(el.getAttribute('data-long'));},500);},{passive:true});
+document.addEventListener('touchmove',function(e){if(!lp)return;var t=e.touches[0];if(Math.abs(t.clientX-lx)>8||Math.abs(t.clientY-ly)>8){clearTimeout(lp);lp=null;}},{passive:true});
+document.addEventListener('touchend',function(){if(lp){clearTimeout(lp);lp=null;}});
+document.addEventListener('contextmenu',function(e){if(e.target.closest('[data-long]'))e.preventDefault();});
+window.__toast=function(t){var d=document.createElement('div');d.className='toast';d.textContent=t;document.body.appendChild(d);setTimeout(function(){d.remove()},1900);};
 document.addEventListener('click',function(e){
+  if(lpFired){lpFired=false;e.preventDefault();return;}
   var el=e.target.closest('[data-act]');if(!el)return;
   var id=el.getAttribute('data-act');var vals={};
   document.querySelectorAll('input[name],select[name]').forEach(function(i){vals[i.name]=i.value;});
@@ -112,6 +129,12 @@ export class UI {
     const { id, vals, y } = JSON.parse(String(result));
     const handler = getHandler(String(id));
     return handler ? { handler, vals: vals || {}, y: Number(y) || 0 } : null;
+  }
+
+  /** 畫面下方短暫顯示一行提示（例如「已複製地址」） */
+  async toast(text: string): Promise<void> {
+    await this.ready;
+    await this.wv.evaluateJavaScript(`window.__toast(${JSON.stringify(text)});true`, false);
   }
 
   /** 每次重繪前清掉舊的 handler。 */

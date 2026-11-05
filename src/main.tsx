@@ -11,7 +11,7 @@ import {
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
   loadSettings, saveSettings, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, TW,
   FORMATS, formatsOf, filterVersions, nearest, kmLabel, WINDOWS, findShowtimes, groupByMovie, shareText,
-  hallOf, tmdbTest, movieExtras,
+  hallOf, tmdbTest, movieExtras, mapsUrl, MAPS_LABEL,
 } from "./core";
 import type { MovieExtras } from "./core";
 import type { TwMovie, TwMovieCinema, Format, LatLng, Hit } from "./core";
@@ -155,6 +155,10 @@ class App {
         <Section title="設定">
           <Item icon="📅" title="寫入的行事曆" subtitle={this.calendarName} onTap={() => this.go(() => this.calendarView())} />
           <Item icon="📺" title="廣告預告" subtitle={`預計散場時間會加上 ${this.settings.ads} 分鐘`} right="點一下切換" chevron={false} onTap={() => this.cycleAds()} />
+          <Item icon="🗺" title="導航地圖" subtitle="點地址、分享、行程備註的導航連結" right={MAPS_LABEL[this.settings.maps || "apple"]} chevron={false} onTap={() => {
+            this.settings.maps = this.settings.maps === "google" ? "apple" : "google";
+            saveSettings(this.settings);
+          }} />
           <Item icon="⏱" title="補片長（TMDB）" subtitle={this.settings.tmdbToken ? "已設定：沒有片長的電影會自動補上" : "未設定"} onTap={() => this.go(() => this.tmdbView())} />
         </Section>
         <Note text="場次資料來自場次通 twshowtimes.com、開眼電影網，以及誠品、光點、樂聲官網，實際場次以影城公告為準。" />
@@ -282,7 +286,8 @@ class App {
     const { dates, address, notice, site } = await datesOf(c);
     const fav = this.settings.favorites.indexOf(c.id) >= 0;
     return (
-      <Page title={c.name} subtitle={address || `${c.city} ${c.district}`} onBack={() => this.back()}>
+      <Page title={c.name} subtitle={`${c.city} ${c.district}`} onBack={() => this.back()}>
+        {address ? <Section>{this.addressItem(c.name, address)}</Section> : null}
         <Section title="選擇日期">
           {dates.length ? null : <Empty icon="🗓" text="目前沒有公布的場次" />}
           {dates.map((d) => (
@@ -327,6 +332,23 @@ class App {
           })}
         </Section>
       </Page>
+    );
+  }
+
+  /** 地址列：點一下導航、長按複製 */
+  addressItem(name: string, address: string, title?: string): string {
+    return (
+      <Item
+        icon="📍"
+        title={title || address}
+        subtitle={title ? address + "\n點一下導航・長按複製地址" : "點一下導航・長按複製地址"}
+        chevron={false}
+        onTap={() => Safari.open(mapsUrl(name, address, this.settings.maps))}
+        onLongPress={async () => {
+          Pasteboard.copy(address);
+          await this.ui.toast("已複製地址");
+        }}
+      />
     );
   }
 
@@ -401,7 +423,7 @@ class App {
       <Page title="確認行程" subtitle="點選項目可以修改" onBack={() => this.back()}>
         <Section>
           <Item icon="🎬" title={p.movie.title} subtitle={p.version.label} />
-          <Item icon="📍" title={p.cinema.name} subtitle={p.address} />
+          {p.address ? this.addressItem(p.cinema.name, p.address, p.cinema.name) : <Item icon="📍" title={p.cinema.name} />}
           <Item icon="🕒" title={fmt(this.start(p))} subtitle={`預計 ${fmt(this.end(p)).slice(-5)} 散場`} />
         </Section>
         {isLate(p.time) ? <Note kind="warn" text="凌晨場：已自動算到隔天日期，請再核對電影票。" /> : null}
@@ -484,7 +506,7 @@ class App {
   }
 
   write(p: Pick, cal: Calendar, start: Date, end: Date) {
-    const maps = `https://maps.apple.com/?q=${encodeURIComponent(p.cinema.name)}${p.address ? "&address=" + encodeURIComponent(p.address) : ""}`;
+    const maps = mapsUrl(p.cinema.name, p.address, this.settings.maps);
     const ev = new CalendarEvent();
     ev.title = p.movie.title;
     ev.startDate = start;
@@ -619,7 +641,7 @@ class App {
 
   // ── 分享 ──
   async share(p: Pick) {
-    await ShareSheet.present([shareText({ ...p, address: p.address }, this.start(p), this.runtime ? this.end(p) : undefined, this.seat)]);
+    await ShareSheet.present([shareText({ ...p, address: p.address }, this.start(p), this.runtime ? this.end(p) : undefined, this.seat, this.settings.maps)]);
   }
 
   // ── 位置 ──

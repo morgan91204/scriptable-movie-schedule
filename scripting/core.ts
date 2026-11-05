@@ -38,6 +38,16 @@ export interface Settings {
   calendar?: string;
   ads: number;
   tmdbToken?: string; // TMDB API Read Access Token：有填才會幫沒有片長的電影補片長
+  maps?: MapsApp; // 導航用哪個地圖（預設 Apple 地圖）
+}
+
+export type MapsApp = "apple" | "google";
+export const MAPS_LABEL: Record<MapsApp, string> = { apple: "Apple 地圖", google: "Google 地圖" };
+/** 導航連結：Apple 地圖或 Google 地圖（分享、行程備註、點地址都用這個） */
+export function mapsUrl(name: string, address?: string, app: MapsApp = "apple"): string {
+  if (app === "google")
+    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([name, address].filter(Boolean).join(" "))}`;
+  return `https://maps.apple.com/?q=${encodeURIComponent(name)}${address ? "&address=" + encodeURIComponent(address) : ""}`;
 }
 
 export const TW = "https://twshowtimes.com";
@@ -693,8 +703,8 @@ export function groupByMovie(hits: Hit[]): { title: string; runtime: number; rat
 
 // ───────────────────────── 分享 ─────────────────────────
 
-export function shareText(p: { movie: { title: string }; version: { label: string }; cinema: Cinema; address?: string }, start: Date, end?: Date, seat?: string): string {
-  const maps = `https://maps.apple.com/?q=${encodeURIComponent(p.cinema.name)}${p.address ? "&address=" + encodeURIComponent(p.address) : ""}`;
+export function shareText(p: { movie: { title: string }; version: { label: string }; cinema: Cinema; address?: string }, start: Date, end?: Date, seat?: string, app: MapsApp = "apple"): string {
+  const maps = mapsUrl(p.cinema.name, p.address, app);
   return [
     `🎬 ${p.movie.title}`,
     `🕒 ${fmt(start)}${end ? ` – ${fmt(end).slice(-5)}` : ""}`,

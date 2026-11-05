@@ -61,6 +61,10 @@ export function h(type: string | ((props: any) => string), props: any, ...childr
       attrs += ` data-act="${register(v)}"`;
       continue;
     }
+    if (k === "onLongPress") {
+      attrs += ` data-long="${register(v)}"`;
+      continue;
+    }
     attrs += ` ${k === "className" ? "class" : k}="${esc(v === true ? "" : v)}"`;
   }
   if (VOID.test(type)) return `<${type}${attrs}>`;
@@ -118,13 +122,14 @@ export function Item(props: {
   right?: string;
   badge?: string;
   onTap?: Handler;
+  onLongPress?: Handler; // 長按（例如複製地址）
   muted?: boolean;
   accent?: boolean;
   chevron?: boolean;
 }): string {
-  const cls = ["item", props.onTap ? "tap" : "", props.muted ? "muted" : "", props.accent ? "accent" : ""].join(" ");
+  const cls = ["item", props.onTap ? "tap" : "", props.muted ? "muted" : "", props.accent ? "accent" : "", props.onLongPress ? "long" : ""].join(" ");
   return (
-    <div class={cls} onTap={props.onTap}>
+    <div class={cls} onTap={props.onTap} onLongPress={props.onLongPress}>
       {props.icon ? <span class="ico">{props.icon}</span> : null}
       <div class="body">
         <div class="title">{esc(props.title)}</div>

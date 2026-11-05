@@ -4,7 +4,7 @@
 // https://github.com/morgan91204/scriptable-movie-schedule
 
 import {
-  Button, ContentUnavailableView, Form, HStack, Image, Label, LabeledContent, List, Navigation, NavigationLink,
+  Button, ContentUnavailableView, Form, Group, HStack, Image, Label, LabeledContent, List, Navigation, NavigationLink,
   NavigationStack, Picker, ProgressView, Script, Section, Spacer, Text, TextField, Toggle, VStack,
   useEffect, useMemo, useState,
 } from "scripting"
@@ -14,7 +14,7 @@ import {
   Cinema, Movie, Settings, Version, TwMovie, TwMovieCinema, CITY_ORDER, TW,
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
   loadSettings, saveSettings, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, cinemaAddress,
-  FORMATS, formatsOf, filterVersions, nearest, kmLabel, WINDOWS, findShowtimes, groupByMovie, shareText, hallOf, tmdbTest, movieExtras,
+  FORMATS, formatsOf, filterVersions, nearest, kmLabel, WINDOWS, findShowtimes, groupByMovie, shareText, hallOf, tmdbTest, movieExtras, mapsUrl, MAPS_LABEL,
 } from "./core"
 import type { Format, LatLng, Hit } from "./core"
 
@@ -25,6 +25,8 @@ declare const CalendarEvent: any
 declare const EventAlarm: any
 declare const ShareSheet: any
 declare const Location: any
+declare const Pasteboard: any
+declare const HapticFeedback: any
 
 setPlatform(scriptingPlatform)
 
@@ -198,6 +200,9 @@ function Home() {
           <Picker title={"提醒"} value={settings.alarm ?? 30} onChanged={(v: number) => update({ alarm: v })}>
             {ALARMS.map((a) => <Text key={a.minutes} tag={a.minutes}>{a.label}</Text>)}
           </Picker>
+          <Picker title={"導航地圖"} value={settings.maps || "apple"} onChanged={(v: string) => update({ maps: v as any })}>
+            {(["apple", "google"] as const).map((k) => <Text key={k} tag={k}>{MAPS_LABEL[k]}</Text>)}
+          </Picker>
           <NavigationLink destination={<TmdbPage />}>
             <Row title={"補片長（TMDB）"} trailing={settings.tmdbToken ? "已設定" : "未設定"} />
           </NavigationLink>
@@ -205,6 +210,34 @@ function Home() {
       </>}
     </List>
   </NavigationStack>
+}
+
+/** 地址列：點一下用設定的地圖導航，長按跳出「複製地址」 */
+function AddressRow({ name, address, title }: { name: string; address: string; title?: string }) {
+  const [settings] = useSettings()
+  const copy = async () => {
+    await Pasteboard.setString(address)
+    try { HapticFeedback.notificationSuccess() } catch (_) {}
+  }
+  return <Button
+    action={() => Safari.openURL(mapsUrl(name, address, settings.maps))}
+    contextMenu={{
+      menuItems: <Group>
+        <Button title={"複製地址"} systemImage={"doc.on.doc"} action={copy} />
+        <Button title={`用${MAPS_LABEL[settings.maps || "apple"]}導航`} systemImage={"location.fill"} action={() => Safari.openURL(mapsUrl(name, address, settings.maps))} />
+      </Group>,
+    }}
+  >
+    <HStack>
+      <Image systemName={"mappin.and.ellipse"} foregroundStyle={"systemBlue"} />
+      <VStack alignment={"leading"} spacing={2}>
+        {title ? <Text foregroundStyle={"label"}>{title}</Text> : null}
+        <Text foregroundStyle={title ? "secondaryLabel" : "label"}>{address}</Text>
+      </VStack>
+      <Spacer />
+      <Image systemName={"arrow.triangle.turn.up.right.circle"} foregroundStyle={"systemBlue"} />
+    </HStack>
+  </Button>
 }
 
 /** 電影頁頂端：海報在左，資訊與紅色預告按鈕在右（跟 Scriptable 版一樣） */
@@ -290,7 +323,7 @@ function CinemaPage({ cinema }: { cinema: Cinema }) {
     refreshable={info.reload}
     toolbar={{ topBarTrailing: <Button title={fav ? "移出常去" : "加入常去"} systemImage={fav ? "star.fill" : "star"} action={toggleFav} /> }}
   >
-    {address ? <Section><Label title={address} systemImage={"mappin.and.ellipse"} /></Section> : null}
+    {address ? <Section footer={<Text>點一下導航，長按可複製地址</Text>}><AddressRow name={cinema.name} address={address} /></Section> : null}
     {info.error ? <ErrorRow error={info.error} retry={info.reload} /> : null}
     <Section header={<Text>選擇日期</Text>} footer={info.data?.notice ? <Text>{info.data.notice}</Text> : undefined}>
       {!info.data && !info.error ? <Loading text={`讀取 ${cinema.name} 的場次…`} /> : null}
@@ -403,7 +436,7 @@ function ConfirmPage({ pick }: { pick: Pick }) {
         .find((e: any) => e.title === pick.movie.title)
       if (dup && !(await Dialog.confirm({ title: "行事曆裡已經有這場", message: `${pick.movie.title}\n${fmt(start)}`, cancelLabel: "取消", confirmLabel: "還是加入" }))) return
 
-      const maps = `https://maps.apple.com/?q=${encodeURIComponent(pick.cinema.name)}${address ? "&address=" + encodeURIComponent(address) : ""}`
+      const maps = mapsUrl(pick.cinema.name, address, settings.maps)
       const ev = new CalendarEvent()
       ev.title = pick.movie.title
       ev.calendar = cal
@@ -437,8 +470,7 @@ function ConfirmPage({ pick }: { pick: Pick }) {
     <Section>
       <LabeledContent title={"電影"} value={pick.movie.title} />
       <LabeledContent title={"版本"} value={pick.version.label} />
-      <LabeledContent title={"影城"} value={pick.cinema.name} />
-      {address ? <LabeledContent title={"地址"} value={address} /> : null}
+      {address ? <AddressRow name={pick.cinema.name} address={address} title={pick.cinema.name} /> : <LabeledContent title={"影城"} value={pick.cinema.name} />}
       <LabeledContent title={"開演"} value={fmt(start)} />
       <LabeledContent title={"預計散場"} value={fmt(end).slice(-5)} />
     </Section>
@@ -472,7 +504,7 @@ function ConfirmPage({ pick }: { pick: Pick }) {
         </>
         : <Button title={busy ? "加入中…" : "加入行事曆"} systemImage={"calendar.badge.plus"} disabled={busy} action={save} />}
       <Button title={"分享這場給朋友"} systemImage={"square.and.arrow.up"}
-        action={() => ShareSheet.present([shareText({ ...pick, address }, start, runtime ? end : undefined, seat.trim())])} />
+        action={() => ShareSheet.present([shareText({ ...pick, address }, start, runtime ? end : undefined, seat.trim(), settings.maps)])} />
     </Section>
   </Form>
 }

@@ -17,6 +17,7 @@ globalThis.Timer = { schedule(ms, rep, cb) { return setTimeout(cb, ms); } };
 // 台北 101 附近
 globalThis.Location = { setAccuracyToHundredMeters() {}, async current() { return { latitude: 25.0339, longitude: 121.5645 }; } };
 globalThis.ShareSheet = { async present(items) { log.push("ShareSheet:\n" + items.join("\n")); return {}; } };
+globalThis.Pasteboard = { copy(t) { log.push("Pasteboard.copy " + t); } };
 globalThis.Safari = { open(u) { log.push("Safari.open " + u); } };
 globalThis.Color = class { constructor(hex) { this.hex = hex; } };
 globalThis.Font = { boldSystemFont: (n) => ({ bold: n }), systemFont: (n) => ({ size: n }) };
@@ -53,6 +54,7 @@ globalThis.WebView = class {
   async evaluateJavaScript(js, cb) {
     if (js.startsWith("window.__render(")) { const m = js.match(/^window\.__render\(([\s\S]*),(-?\d+)\);true$/); screenHtml = JSON.parse(m[1]); globalThis.__scrollTo = Number(m[2]); globalThis.__keep = m[2] === "-1"; return true; }
     if (js.startsWith("window.__pending=")) return new Promise((r) => (pendingResolve = r));
+    if (js.startsWith("window.__toast(")) { log.push("toast " + JSON.parse(js.slice(15, js.lastIndexOf(")")))); return true; }
     return new Function("DOMParser", "return " + js)(DOMParser);
   }
 };
@@ -98,7 +100,11 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 function screen() {
   const doc = new DOMParser().parseFromString("<html><body>" + screenHtml + "</body></html>", "text/html");
   const els = [...doc.querySelectorAll("*")].filter((e) => /^(DIV|BUTTON|H2|P|INPUT|SPAN)$/.test(e.tagName));
-  return { doc, acts: [...doc.querySelectorAll("[data-act]")].map((e) => ({ id: e.getAttribute("data-act"), text: e.textContent.replace(/\s+/g, " ").trim() })) };
+  return {
+    doc,
+    acts: [...doc.querySelectorAll("[data-act]")].map((e) => ({ id: e.getAttribute("data-act"), text: e.textContent.replace(/\s+/g, " ").trim() })),
+    longs: [...doc.querySelectorAll("[data-long]")].map((e) => ({ id: e.getAttribute("data-long"), text: e.textContent.replace(/\s+/g, " ").trim() })),
+  };
 }
 let shot = 0;
 export async function dump(label) {
@@ -129,6 +135,15 @@ export async function tap(re, vals = {}, y = 0) {
   console.log(`\n👉 點「${hit.text.slice(0, 60)}」${Object.keys(vals).length ? " 輸入 " + JSON.stringify(vals) : ""}`);
   const r = pendingResolve; pendingResolve = null;
   r(JSON.stringify({ id: hit.id, vals, y }));
+  await sleep(50);
+}
+export async function longPress(re) {
+  for (let i = 0; i < 600 && !(pendingResolve && screen().longs.some((a) => re.test(a.text))); i++) await sleep(100);
+  const hit = screen().longs.find((a) => re.test(a.text));
+  if (!hit) throw new Error("沒有可長按的：" + re);
+  console.log(`\n👆 長按「${hit.text.slice(0, 60)}」`);
+  const r = pendingResolve; pendingResolve = null;
+  r(JSON.stringify({ id: hit.id, vals: {}, y: 0 }));
   await sleep(50);
 }
 export function closeUI() { if (dismissUI) dismissUI(); }
