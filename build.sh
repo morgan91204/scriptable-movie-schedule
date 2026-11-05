@@ -20,7 +20,7 @@ cp dist/movie.js dist/app.mjs  # 測試用（test/*.mjs 會 import）
 echo "built v$VERSION"
 
 # ── Scripting 版：把共用資料層與 scripting-src/ 組成 scripting/（GitHub 匯入、自動更新用的腳本資料夾）
-SHARED="src/core.ts src/platform.ts src/parsers.ts src/parsers.gen.ts src/at-list.ts"
+SHARED="src/core.ts src/platform.ts src/parsers.ts src/parsers.gen.ts src/at-list.ts src/geo.ts"
 rm -rf build/scripting-check && mkdir -p build/scripting-check
 cp $SHARED scripting-src/index.tsx scripting-src/platform-scripting.ts scripting-src/scripting-shim.d.ts src/dom-shim.d.ts build/scripting-check/
 npx tsc -p tsconfig.scripting.json

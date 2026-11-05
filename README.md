@@ -13,7 +13,11 @@
 
 - **全台 105 間影城**：威秀、國賓、秀泰、美麗華、新光、喜樂時代、in89、誠品、光點華山、光點台北、樂聲、微風、哈拉、百老匯、王牌映画、威尼斯、新月……
 - **場次即時抓取**，不用手動維護；影城清單也會自動更新
+- **現在有什麼可以看**：選日期與時段（接下來 3 小時、晚上、深夜…），一次列出常去影城、附近 10 間或整個縣市的所有場次
 - **依電影找場次**：選一部片，看今天起 7 天哪些影城有放、各版本場次，可依縣市篩選
+- **特殊廳篩選**：IMAX、4DX、ScreenX、MX4D、杜比
+- **附近的影城**：依目前位置排序（直線距離）
+- **分享場次**：一鍵產生片名、時間、影城、導航連結，丟給朋友
 - 搜尋影城、自訂常去影城、深色模式
 - 不用登入、不用付費，只讀公開的時刻表網頁
 
@@ -49,6 +53,20 @@
 3. 展開動作：**Run In App** 開、**Show When Run** 開
 4. （選用）捷徑設定 → 在分享工作表中顯示，接收 URL／Safari 網頁；Run Inline Script 的 **Parameter** 接「捷徑輸入」。之後從 Safari 分享場次通、開眼、誠品、光點、樂聲的時刻表頁面，會直接跳到那間影城。
 
+## 兩個版本的功能對照
+
+| 功能 | Scripting | Scriptable |
+|---|---|---|
+| 影城 → 日期 → 電影 → 場次 | ✅ | ✅ |
+| 依電影找場次 | ✅ | ✅ |
+| 現在有什麼可以看 | ✅ | ✅ |
+| 特殊廳篩選 | ✅ | ✅ |
+| 附近的影城 | ✅ | ✅ |
+| 分享場次 | ✅ | ✅ |
+| 行程提醒 | ✅ | ❌ Scriptable 沒有提醒 API |
+| 只看常去影城（電影頁） | ✅ | ❌ |
+| 從 Safari 分享網頁直接跳到影城 | ❌ 尚未支援 | ✅ |
+
 ## 資料來源
 
 | 來源 | 涵蓋 | 備註 |
@@ -77,6 +95,8 @@ node test/at.mjs            # 開眼來源
 node test/loader.mjs online # 載入器：online / offline / 404
 node test/movie.mjs         # 依電影找場次（Scriptable 版）
 node test/scripting-core.mjs # 用 Scripting 平台實作跑共用資料層
+node test/features.mjs now | near | imax  # 時段搜尋、附近影城、特殊廳篩選
+node tools/geocode.mjs      # 新增影城後補座標
 ```
 
 | 檔案 | 內容 |
@@ -92,6 +112,7 @@ node test/scripting-core.mjs # 用 Scripting 平台實作跑共用資料層
 | `src/core.ts` | 資料層：設定檔、網路、各來源讀取與快取 |
 | `src/parsers.ts` | 各網站解析器；建置時編成 `src/parsers.gen.ts` 的 JS 字串，在兩個 App 的 WebView 裡用 DOMParser 執行 |
 | `src/at-list.ts` | 開眼內建戲院清單與去重代碼 |
+| `src/geo.ts` | 影城座標（`node tools/geocode.mjs` 產生，資料 © OpenStreetMap contributors） |
 | `loader/loader.js` | 捷徑用的自動更新載入器 |
 | `test/mock.mjs` | Node 版 Scriptable API 模擬 |
 

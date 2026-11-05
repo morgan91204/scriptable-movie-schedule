@@ -33,3 +33,8 @@ const ds = await m.datesOf(lux);
 console.log("開眼威秀尼斯日期", ds.dates, ds.site);
 m.saveSettings({ favorites: ["a"], ads: 15, calendar: "電影", alarm: 60 });
 console.log("設定", JSON.stringify(await m.loadSettings()));
+const near = m.nearest(cinemas, { lat: 25.0339, lng: 121.5645 }, 5);
+console.log("附近", near.map((x) => `${x.cinema.name} ${m.kmLabel(x.km)}`).join("、"));
+const r = await m.findShowtimes(near, m.todayTPE(), m.WINDOWS.find((w) => w.id === "night"), "");
+console.log("深夜場", r.hits.length, "場，", m.groupByMovie(r.hits).slice(0, 3).map((g) => `${g.title}(${g.hits.length})`).join("、"), "失敗", r.failed);
+console.log(m.shareText({ ...r.hits[0], address: r.hits[0].ctx.address }, new Date()));

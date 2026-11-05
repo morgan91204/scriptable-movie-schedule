@@ -10,8 +10,9 @@ import {
   Cinema, Settings, Movie, Version, EXTRA, CITY_ORDER, AD_STEPS,
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
   loadSettings, saveSettings, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, TW,
+  FORMATS, formatsOf, filterVersions, nearest, kmLabel, WINDOWS, findShowtimes, groupByMovie, shareText,
 } from "./core";
-import type { TwMovie, TwMovieCinema } from "./core";
+import type { TwMovie, TwMovieCinema, Format, LatLng, Hit } from "./core";
 
 interface Pick {
   cinema: Cinema;
@@ -124,7 +125,9 @@ class App {
     return (
       <Page title="🎬 電影行程" subtitle={`${this.cinemas.length} 間影城｜選影城 → 日期 → 電影 → 場次`}>
         <Section>
+          <Item icon="⏰" title="現在有什麼可以看" subtitle="選時段，一次列出常去、附近或某縣市的所有場次" onTap={() => this.go(() => this.nowView())} />
           <Item icon="🎬" title="依電影找場次" subtitle="先選電影，再看哪些影城有放映" onTap={() => this.go(() => this.movieListView(), "讀取電影清單…")} />
+          <Item icon="📍" title="附近的影城" subtitle="依目前位置排序" onTap={() => this.go(() => this.nearbyView(), "取得目前位置…")} />
           <Item icon="🔍" title="搜尋影城" subtitle="影城、分店、行政區或縣市" onTap={() => this.go(() => this.searchView())} />
         </Section>
         {favs.length ? (
@@ -348,6 +351,7 @@ class App {
           <Item icon="📅" title="行事曆" subtitle={this.calendarName} right="更換" onTap={() => this.go(() => this.calendarView())} />
         </Section>
         <Button label="✓ 加入行事曆" onTap={() => this.save(p)} />
+        <Button label="分享這場給朋友" kind="secondary" onTap={() => this.share(p)} />
       </Page>
     );
   }
@@ -439,6 +443,7 @@ class App {
         <Empty icon="✅" text={`${p.movie.title}\n${fmt(ev.startDate)} → ${fmt(ev.endDate).slice(-5)}\n${p.cinema.name}${this.seat ? "｜" + this.seat : ""}`} />
         <Section hint="Scriptable 無法直接設定提醒，打開行程後可在「提示」加上開演前 30 分鐘。">
           <Item icon="🔔" title="打開行程，加提醒" accent onTap={async () => { await ev.presentEdit(); }} />
+          <Item icon="📤" title="分享這場給朋友" accent onTap={() => this.share(p)} />
         </Section>
         <Button label="再新增一部" onTap={() => this.home()} />
       </Page>
@@ -473,6 +478,7 @@ class App {
   }
 
   movieCity = "全部";
+  movieFormat = "";
   async movieView(m: TwMovie, date: string): Promise<string> {
     const d = await movieDay(m.slug, date || undefined);
     const dates = d.dates.filter((x) => x >= todayTPE());
@@ -481,7 +487,11 @@ class App {
       (a, b) => (CITY_ORDER.indexOf(a) + 1 || 99) - (CITY_ORDER.indexOf(b) + 1 || 99)
     );
     const city = cities.indexOf(this.movieCity) >= 0 ? this.movieCity : "全部";
-    const shown = d.cinemas.filter((c) => city === "全部" || c.city === city);
+    const formats = FORMATS.filter((f) => d.cinemas.some((c) => c.versions.some((v) => formatsOf(v.label).indexOf(f) >= 0)));
+    const fmtSel: Format | "" = formats.indexOf(this.movieFormat as Format) >= 0 ? (this.movieFormat as Format) : "";
+    const shown = d.cinemas
+      .map((c) => ({ ...c, versions: filterVersions(c.versions, fmtSel) }))
+      .filter((c) => (city === "全部" || c.city === city) && c.versions.length);
     const toCinema = (c: TwMovieCinema): Cinema =>
       this.cinemas.find((x) => x.id === c.id) ||
       { id: c.id, name: c.name, city: c.city, district: c.district, source: "tw", url: `${TW}/cinemas/${c.id}/`, address: c.address };
@@ -504,7 +514,16 @@ class App {
             ))}
           </Chips>
         </Section>
-        {cities.filter((c) => city === "全部" || c === city).map((ct) => (
+        {formats.length ? (
+          <Section title="特殊廳">
+            <Chips>
+              {["", ...formats].map((f) => (
+                <Chip label={f || "全部"} muted={f !== fmtSel} onTap={() => { this.movieFormat = f; }} />
+              ))}
+            </Chips>
+          </Section>
+        ) : null}
+        {cities.filter((ct) => shown.some((c) => c.city === ct)).map((ct) => (
           <Section title={`${ct}（${shown.filter((c) => c.city === ct).length} 間）`}>
             {shown.filter((c) => c.city === ct).map((c) => {
               const movie: Movie = { title: d.title || m.title, runtime, rating: d.rating || m.rating, versions: c.versions };
@@ -521,6 +540,123 @@ class App {
           </Section>
         ))}
         {shown.length ? null : <Empty icon="🎞" text="這天沒有影城放映" />}
+      </Page>
+    );
+  }
+
+  // ── 分享 ──
+  async share(p: Pick) {
+    await ShareSheet.present([shareText({ ...p, address: p.address }, this.start(p), this.runtime ? this.end(p) : undefined, this.seat)]);
+  }
+
+  // ── 位置 ──
+  me: LatLng | null = null;
+  async locate(): Promise<LatLng> {
+    if (this.me) return this.me;
+    try {
+      Location.setAccuracyToHundredMeters();
+      const l = await Location.current();
+      this.me = { lat: l.latitude, lng: l.longitude };
+      return this.me;
+    } catch (_) {
+      throw new Error("拿不到目前位置。請到「設定 → 隱私權與安全性 → 定位服務 → Scriptable」允許使用位置。");
+    }
+  }
+
+  async nearbyView(): Promise<string> {
+    const me = await this.locate();
+    const list = nearest(this.cinemas, me, 25);
+    return (
+      <Page title="附近的影城" subtitle="直線距離" onBack={() => this.back()}>
+        <Section>
+          {list.map(({ cinema: c, km }) => (
+            <Item
+              icon={this.settings.favorites.indexOf(c.id) >= 0 ? "★" : undefined}
+              title={c.name}
+              subtitle={`${c.city} ${c.district}`}
+              right={kmLabel(km) || "距離未知"}
+              onTap={() => this.go(() => this.cinemaView(c), `讀取 ${c.name} 的場次…`)}
+            />
+          ))}
+        </Section>
+      </Page>
+    );
+  }
+
+  // ── 現在有什麼可以看 ──
+  nowDate = "";
+  nowWin = "soon";
+  nowScope = "fav"; // fav / near / 縣市名稱
+  nowFormat = "";
+  nowView(): string {
+    const today = todayTPE();
+    const dates = [0, 1, 2, 3, 4, 5, 6].map((i) => addDays(today, i));
+    const date = this.nowDate || today;
+    const wins = WINDOWS.filter((w) => !w.todayOnly || date === today);
+    const win = wins.find((w) => w.id === this.nowWin) || wins[0];
+    const cities = Array.from(new Set(this.cinemas.map((c) => c.city))).sort(
+      (a, b) => (CITY_ORDER.indexOf(a) + 1 || 99) - (CITY_ORDER.indexOf(b) + 1 || 99)
+    );
+    const scopes = [{ id: "fav", label: `常去影城（${this.settings.favorites.length}）` }, { id: "near", label: "附近 10 間" }, ...cities.map((c) => ({ id: c, label: c }))];
+    return (
+      <Page title="現在有什麼可以看" onBack={() => this.back()}>
+        <Section title="日期">
+          <Chips>
+            {dates.map((d) => (
+              <Chip label={dateLabel(d).replace(/（.）.*$/, "")} sub={d === today ? "今天" : d === addDays(today, 1) ? "明天" : dateLabel(d).match(/（(.)）/)?.[1] || ""} muted={d !== date} onTap={() => { this.nowDate = d; }} />
+            ))}
+          </Chips>
+        </Section>
+        <Section title="開演時段">
+          <Chips>
+            {wins.map((w) => <Chip label={w.label} muted={w.id !== win.id} onTap={() => { this.nowWin = w.id; }} />)}
+          </Chips>
+        </Section>
+        <Section title="找哪些影城" hint="縣市的影城較多，會花比較久時間。開眼來源的戲院通常只有今天的場次。">
+          <Chips>
+            {scopes.map((sc) => <Chip label={sc.label} muted={sc.id !== this.nowScope} onTap={() => { this.nowScope = sc.id; }} />)}
+          </Chips>
+        </Section>
+        <Section title="特殊廳">
+          <Chips>
+            {["", ...FORMATS].map((f) => <Chip label={f || "不限"} muted={f !== this.nowFormat} onTap={() => { this.nowFormat = f; }} />)}
+          </Chips>
+        </Section>
+        <Button label="🔍 找場次" onTap={() => this.go(() => this.nowResultsView(date, win.id), "正在查詢各影城的場次…")} />
+      </Page>
+    );
+  }
+
+  async nowResultsView(date: string, winId: string): Promise<string> {
+    const win = WINDOWS.find((w) => w.id === winId) || WINDOWS[0];
+    let scope: { cinema: Cinema; km: number | null }[];
+    if (this.nowScope === "near") scope = nearest(this.cinemas, await this.locate(), 10);
+    else if (this.nowScope === "fav") scope = this.settings.favorites.map((id) => this.cinemas.find((c) => c.id === id)).filter(Boolean).map((c) => ({ cinema: c as Cinema, km: null }));
+    else scope = this.cinemas.filter((c) => c.city === this.nowScope).map((c) => ({ cinema: c, km: null }));
+    if (!scope.length) throw new Error("沒有可以查的影城。先在影城頁加入常去影城，或改選附近／縣市。");
+    const { hits, failed } = await findShowtimes(scope, date, win, this.nowFormat as Format | "");
+    const groups = groupByMovie(hits);
+    const scopeLabel = this.nowScope === "fav" ? "常去影城" : this.nowScope === "near" ? "附近 10 間" : this.nowScope;
+    const open = (hit: Hit) => {
+      this.runtime = hit.movie.runtime;
+      this.seat = "";
+      this.go(() => this.confirmView({ cinema: hit.cinema, address: hit.ctx.address || hit.cinema.address || "", booking: hit.ctx.booking, sourceUrl: hit.ctx.sourceUrl, date: hit.date, movie: hit.movie, version: hit.version, time: hit.time }));
+    };
+    return (
+      <Page title={`${dateLabel(date).replace(/ .*$/, "")} ${win.label}`} subtitle={`${scopeLabel}｜${hits.length} 場、${groups.length} 部電影`} onBack={() => this.back()}>
+        {groups.length ? null : <Empty icon="🍿" text="這個時段沒有符合的場次，換個時段或範圍試試。" />}
+        {groups.map((g) => (
+          <Section title={`${g.title}（${g.hits.length} 場）`} hint={[g.runtime ? `${g.runtime} 分鐘` : "", g.rating].filter(Boolean).join("｜") || undefined}>
+            {g.hits.map((hit) => (
+              <Item
+                title={`${hit.time}${isLate(hit.time) ? "（凌晨）" : ""}　${hit.cinema.name}`}
+                subtitle={[hit.version.label, kmLabel(hit.km)].filter(Boolean).join("｜")}
+                onTap={() => open(hit)}
+              />
+            ))}
+          </Section>
+        ))}
+        {failed.length ? <Note kind="warn" text={`有 ${failed.length} 間讀取失敗：${failed.join("、")}`} /> : null}
       </Page>
     );
   }

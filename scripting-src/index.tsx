@@ -14,13 +14,17 @@ import {
   Cinema, Movie, Settings, Version, TwMovie, TwMovieCinema, CITY_ORDER, TW,
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
   loadSettings, saveSettings, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, cinemaAddress,
+  FORMATS, formatsOf, filterVersions, nearest, kmLabel, WINDOWS, findShowtimes, groupByMovie, shareText,
 } from "./core"
+import type { Format, LatLng, Hit } from "./core"
 
 declare const Safari: any
 declare const Dialog: any
 declare const Calendar: any
 declare const CalendarEvent: any
 declare const EventAlarm: any
+declare const ShareSheet: any
+declare const Location: any
 
 setPlatform(scriptingPlatform)
 
@@ -159,8 +163,14 @@ function Home() {
         {hits.map((c) => <CinemaLink key={c.id} cinema={c} />)}
       </Section> : <>
         <Section>
+          <NavigationLink destination={<NowPage />}>
+            <Label title={"現在有什麼可以看"} systemImage={"clock"} />
+          </NavigationLink>
           <NavigationLink destination={<MoviesPage />}>
             <Label title={"依電影找場次"} systemImage={"film"} />
+          </NavigationLink>
+          <NavigationLink destination={<NearbyPage />}>
+            <Label title={"附近的影城"} systemImage={"location"} />
           </NavigationLink>
         </Section>
 
@@ -399,6 +409,8 @@ function ConfirmPage({ pick }: { pick: Pick }) {
           <Button title={"在行事曆中查看／編輯"} systemImage={"calendar"} action={() => saved.presentEditView()} />
         </>
         : <Button title={busy ? "加入中…" : "加入行事曆"} systemImage={"calendar.badge.plus"} disabled={busy} action={save} />}
+      <Button title={"分享這場給朋友"} systemImage={"square.and.arrow.up"}
+        action={() => ShareSheet.present([shareText({ ...pick, address }, start, runtime ? end : undefined, seat.trim())])} />
     </Section>
   </Form>
 }
@@ -435,13 +447,17 @@ function MoviePage({ movie }: { movie: TwMovie }) {
   const [date, setDate] = useState("")
   const [city, setCity] = useState("全部")
   const [onlyFav, setOnlyFav] = useState(false)
+  const [format, setFormat] = useState<string>("")
   const day = useLoad(() => movieDay(movie.slug, date || undefined), [movie.slug, date])
 
   const data = day.data
   const dates = (data?.dates || []).filter((d) => d >= todayTPE())
   const cities = useMemo(() => sortCities(Array.from(new Set((data?.cinemas || []).map((c) => c.city)))), [data])
-  const shown = (data?.cinemas || []).filter((c) =>
-    (city === "全部" || c.city === city) && (!onlyFav || settings.favorites.indexOf(c.id) >= 0))
+  const formats = FORMATS.filter((f) => (data?.cinemas || []).some((c) => c.versions.some((v) => formatsOf(v.label).indexOf(f) >= 0)))
+  const fmtSel = (formats as string[]).indexOf(format) >= 0 ? (format as Format) : ""
+  const shown = (data?.cinemas || [])
+    .map((c) => ({ ...c, versions: filterVersions(c.versions, fmtSel) }))
+    .filter((c) => c.versions.length && (city === "全部" || c.city === city) && (!onlyFav || settings.favorites.indexOf(c.id) >= 0))
   const byCity = sortCities(Array.from(new Set(shown.map((c) => c.city))))
   const runtime = data?.runtime || movie.runtime
 
@@ -457,6 +473,9 @@ function MoviePage({ movie }: { movie: TwMovie }) {
       <Picker title={"縣市"} value={city} onChanged={setCity}>
         {["全部", ...cities].map((c) => <Text key={c} tag={c}>{c}</Text>)}
       </Picker>
+      {formats.length ? <Picker title={"特殊廳"} value={fmtSel} onChanged={setFormat}>
+        {["", ...formats].map((f) => <Text key={f || "all"} tag={f}>{f || "全部"}</Text>)}
+      </Picker> : null}
       <Toggle title={"只看常去影城"} value={onlyFav} onChanged={setOnlyFav} />
     </Section>
 
@@ -479,6 +498,112 @@ function MoviePage({ movie }: { movie: TwMovie }) {
         })}
       </Section>
     )}
+  </List>
+}
+
+// ───────────────────────── 附近的影城 ─────────────────────────
+
+let myLocation: LatLng | null = null
+async function locate(): Promise<LatLng> {
+  if (myLocation) return myLocation
+  try {
+    await Location.setAccuracy("hundredMeters")
+  } catch (_) {}
+  const l = await Location.requestCurrent()
+  if (!l) throw new Error("拿不到目前位置。請到「設定 → 隱私權與安全性 → 定位服務 → Scripting」允許使用位置。")
+  myLocation = { lat: l.latitude, lng: l.longitude }
+  return myLocation
+}
+
+function NearbyPage() {
+  useSettings()
+  const res = useLoad(async () => {
+    if (!store.cinemas.length) store.cinemas = await loadCinemas()
+    return nearest(store.cinemas, await locate(), 25)
+  }, [])
+  return <List navigationTitle={"附近的影城"} navigationBarTitleDisplayMode={"inline"} refreshable={async () => { myLocation = null; await res.reload() }}>
+    {res.error ? <ErrorRow error={res.error} retry={res.reload} /> : null}
+    {!res.data && !res.error ? <Section><Loading text={"取得目前位置…"} /></Section> : null}
+    {res.data ? <Section footer={<Text>直線距離。下拉可重新定位。</Text>}>
+      {res.data.map(({ cinema: c, km }) =>
+        <NavigationLink key={c.id} destination={<CinemaPage cinema={c} />}>
+          <Row title={(store.settings.favorites.indexOf(c.id) >= 0 ? "★ " : "") + c.name} subtitle={`${c.city} ${c.district}`} trailing={kmLabel(km) || "距離未知"} />
+        </NavigationLink>
+      )}
+    </Section> : null}
+  </List>
+}
+
+// ───────────────────────── 現在有什麼可以看 ─────────────────────────
+
+function NowPage() {
+  const [settings] = useSettings()
+  const today = todayTPE()
+  const [date, setDate] = useState(today)
+  const [winId, setWinId] = useState("soon")
+  const [scope, setScope] = useState("fav")
+  const [format, setFormat] = useState("")
+  const dates = [0, 1, 2, 3, 4, 5, 6].map((i) => addDays(today, i))
+  const wins = WINDOWS.filter((w) => !w.todayOnly || date === today)
+  const win = wins.find((w) => w.id === winId) || wins[0]
+  const cities = sortCities(Array.from(new Set(store.cinemas.map((c) => c.city))))
+  return <Form navigationTitle={"現在有什麼可以看"} navigationBarTitleDisplayMode={"inline"}>
+    <Section footer={<Text>縣市的影城較多，查詢會比較久。開眼來源的戲院通常只有今天的場次。</Text>}>
+      <Picker title={"日期"} value={date} onChanged={setDate}>
+        {dates.map((d) => <Text key={d} tag={d}>{dateLabel(d)}</Text>)}
+      </Picker>
+      <Picker title={"開演時段"} value={win.id} onChanged={setWinId}>
+        {wins.map((w) => <Text key={w.id} tag={w.id}>{w.label}</Text>)}
+      </Picker>
+      <Picker title={"找哪些影城"} value={scope} onChanged={setScope}>
+        <Text tag={"fav"}>{`常去影城（${settings.favorites.length}）`}</Text>
+        <Text tag={"near"}>附近 10 間</Text>
+        {cities.map((c) => <Text key={c} tag={c}>{c}</Text>)}
+      </Picker>
+      <Picker title={"特殊廳"} value={format} onChanged={setFormat}>
+        {["", ...FORMATS].map((f) => <Text key={f || "all"} tag={f}>{f || "不限"}</Text>)}
+      </Picker>
+    </Section>
+    <Section>
+      <NavigationLink destination={<NowResultsPage date={date} winId={win.id} scope={scope} format={format as Format | ""} />}>
+        <Label title={"找場次"} systemImage={"magnifyingglass"} />
+      </NavigationLink>
+    </Section>
+  </Form>
+}
+
+function NowResultsPage({ date, winId, scope, format }: { date: string; winId: string; scope: string; format: Format | "" }) {
+  const [progress, setProgress] = useState("")
+  const win = WINDOWS.find((w) => w.id === winId) || WINDOWS[0]
+  const res = useLoad(async () => {
+    if (!store.cinemas.length) store.cinemas = await loadCinemas()
+    let list: { cinema: Cinema; km: number | null }[]
+    if (scope === "near") list = nearest(store.cinemas, await locate(), 10)
+    else if (scope === "fav") list = store.settings.favorites.map((id) => store.cinemas.find((c) => c.id === id)).filter(Boolean).map((c) => ({ cinema: c as Cinema, km: null }))
+    else list = store.cinemas.filter((c) => c.city === scope).map((c) => ({ cinema: c, km: null }))
+    if (!list.length) throw new Error("沒有可以查的影城。先在影城頁加入常去影城，或改選附近／縣市。")
+    return await findShowtimes(list, date, win, format, (d, t) => setProgress(`已查 ${d} / ${t} 間`))
+  }, [date, winId, scope, format])
+  const groups = res.data ? groupByMovie(res.data.hits) : []
+  const scopeLabel = scope === "fav" ? "常去影城" : scope === "near" ? "附近 10 間" : scope
+  return <List navigationTitle={`${dateLabel(date).replace(/ .*$/, "")} ${win.label}`} navigationBarTitleDisplayMode={"inline"} refreshable={res.reload}>
+    {res.error ? <ErrorRow error={res.error} retry={res.reload} /> : null}
+    {!res.data && !res.error ? <Section><Loading text={`查詢${scopeLabel}的場次… ${progress}`} /></Section> : null}
+    {res.data && !groups.length ? <Section><Text foregroundStyle={"secondaryLabel"}>這個時段沒有符合的場次，換個時段或範圍試試。</Text></Section> : null}
+    {groups.map((g) =>
+      <Section key={g.title}
+        header={<Text>{`${g.title}（${g.hits.length} 場）`}</Text>}
+        footer={g.runtime || g.rating ? <Text>{[g.runtime ? `${g.runtime} 分鐘` : "", g.rating].filter(Boolean).join("｜")}</Text> : undefined}>
+        {g.hits.map((hit: Hit) =>
+          <NavigationLink key={`${hit.cinema.id}-${hit.version.label}-${hit.time}`} destination={
+            <ConfirmPage pick={{ cinema: hit.cinema, date: hit.date, movie: hit.movie, version: hit.version, time: hit.time, ...hit.ctx }} />
+          }>
+            <Row title={`${hit.time}${isLate(hit.time) ? "（凌晨）" : ""}　${hit.cinema.name}`} subtitle={[hit.version.label, kmLabel(hit.km)].filter(Boolean).join("｜")} />
+          </NavigationLink>
+        )}
+      </Section>
+    )}
+    {res.data?.failed.length ? <Section footer={<Text>{`讀取失敗：${res.data.failed.join("、")}`}</Text>}><Label title={`${res.data.failed.length} 間影城讀取失敗`} systemImage={"exclamationmark.triangle"} /></Section> : null}
   </List>
 }
 

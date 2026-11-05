@@ -1,6 +1,7 @@
 // 資料層：型別、設定檔、網路、四個來源的讀取。畫面在 main.tsx。
 import { PARSERS_JS } from "./parsers.gen";
 import { platform } from "./platform";
+import { GEO } from "./geo";
 import { AT_BUILTIN, AT_COVERED, AT_SKIP, AT_REGIONS } from "./at-list";
 import type { Movie, Version, TwCinema, TwDay, MultiDay, SpotMovie, LuxFilm, AtTheater, AtDay, TwMovie, TwMovieDay } from "./parsers";
 export type { TwMovie, TwMovieDay, TwMovieCinema } from "./parsers";
@@ -387,4 +388,163 @@ export async function cinemaAddress(c: Cinema): Promise<string> {
   } catch (_) {
     return "";
   }
+}
+
+// ───────────────────────── 特殊廳 ─────────────────────────
+
+export const FORMATS = ["IMAX", "4DX", "ScreenX", "MX4D", "杜比"] as const;
+export type Format = (typeof FORMATS)[number];
+const FORMAT_RE: Record<Format, RegExp> = {
+  IMAX: /IMAX/i,
+  "4DX": /4DX/i,
+  ScreenX: /SCREEN\s*X/i,
+  MX4D: /MX4D/i,
+  杜比: /DOLBY|杜比/i,
+};
+
+/** 版本標籤屬於哪些特殊廳，例如「IMAX 雷射 英語」→ ["IMAX"] */
+export function formatsOf(label: string): Format[] {
+  return FORMATS.filter((f) => FORMAT_RE[f].test(label));
+}
+
+/** 只留下符合特殊廳的版本；format 為空時原樣回傳 */
+export function filterVersions(versions: Version[], format: Format | "" | undefined): Version[] {
+  return format ? versions.filter((v) => formatsOf(v.label).indexOf(format) >= 0) : versions;
+}
+
+// ───────────────────────── 距離 ─────────────────────────
+
+export interface LatLng {
+  lat: number;
+  lng: number;
+}
+
+/** 兩點直線距離（公里） */
+export function distanceKm(a: LatLng, b: LatLng): number {
+  const R = 6371, rad = Math.PI / 180;
+  const dLat = (b.lat - a.lat) * rad, dLng = (b.lng - a.lng) * rad;
+  const s = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * rad) * Math.cos(b.lat * rad) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(s));
+}
+
+export function cinemaPos(c: Cinema): LatLng | null {
+  const g = GEO[c.id];
+  return g ? { lat: g[0], lng: g[1] } : null;
+}
+
+/** 依距離排序；沒有座標的影城排最後 */
+export function nearest(cinemas: Cinema[], me: LatLng, limit = 20): { cinema: Cinema; km: number | null }[] {
+  return cinemas
+    .map((c) => {
+      const p = cinemaPos(c);
+      return { cinema: c, km: p ? distanceKm(me, p) : null };
+    })
+    .sort((a, b) => (a.km ?? 1e9) - (b.km ?? 1e9))
+    .slice(0, limit);
+}
+
+export function kmLabel(km: number | null | undefined): string {
+  if (km === null || km === undefined) return "";
+  return km < 1 ? `${Math.round(km * 1000)} 公尺` : `${km < 10 ? km.toFixed(1) : Math.round(km)} 公里`;
+}
+
+// ───────────────────────── 現在有什麼可以看 ─────────────────────────
+
+export interface TimeWindow {
+  id: string;
+  label: string;
+  /** 分鐘，從 00:00 起算；凌晨場用 24:00 之後表示 */
+  from: number;
+  to: number;
+  todayOnly?: boolean;
+}
+
+export const WINDOWS: TimeWindow[] = [
+  { id: "soon", label: "接下來 3 小時", from: -1, to: -1, todayOnly: true },
+  { id: "morning", label: "中午前", from: 0, to: 12 * 60 },
+  { id: "afternoon", label: "下午 12–17 點", from: 12 * 60, to: 17 * 60 },
+  { id: "evening", label: "晚上 17–21 點", from: 17 * 60, to: 21 * 60 },
+  { id: "night", label: "深夜 21 點後", from: 21 * 60, to: 29 * 60 },
+  { id: "all", label: "整天", from: 0, to: 29 * 60 },
+];
+
+/** 場次在片單日的第幾分鐘；凌晨場（00:00–04:59）算到 24 點之後 */
+export function showMinute(t: string): number {
+  const [h, m] = t.split(":").map(Number);
+  return (isLate(t) ? h + 24 : h) * 60 + m;
+}
+
+export interface Hit {
+  cinema: Cinema;
+  movie: Movie;
+  version: Version;
+  time: string;
+  date: string;
+  km: number | null;
+  ctx: { booking: string; sourceUrl: string; address: string };
+}
+
+/** 在多間影城裡找出某天、某時段開演的所有場次 */
+export async function findShowtimes(
+  scope: { cinema: Cinema; km: number | null }[],
+  date: string,
+  win: TimeWindow,
+  format: Format | "" = "",
+  onProgress?: (done: number, total: number) => void
+): Promise<{ hits: Hit[]; failed: string[] }> {
+  let from = win.from, to = win.to;
+  if (win.id === "soon") {
+    const now = showMinute(nowHM());
+    from = now;
+    to = now + 180;
+  }
+  const hits: Hit[] = [];
+  const failed: string[] = [];
+  let done = 0;
+  const queue = scope.slice();
+  async function worker() {
+    for (let item = queue.shift(); item; item = queue.shift()) {
+      try {
+        const r = await moviesOf(item.cinema, date);
+        for (const m of r.movies)
+          for (const v of filterVersions(m.versions, format))
+            for (const t of v.times) {
+              const min = showMinute(t);
+              if (min >= from && min < to)
+                hits.push({ cinema: item.cinema, movie: m, version: v, time: t, date, km: item.km, ctx: { booking: r.booking, sourceUrl: r.sourceUrl, address: r.address } });
+            }
+      } catch (_) {
+        failed.push(item.cinema.name);
+      }
+      onProgress && onProgress(++done, scope.length);
+    }
+  }
+  await Promise.all([0, 1, 2, 3, 4, 5].map(worker)); // 同時最多 6 間，避免一次打太多網站
+  hits.sort((a, b) => showMinute(a.time) - showMinute(b.time) || (a.km ?? 1e9) - (b.km ?? 1e9));
+  return { hits, failed };
+}
+
+/** 把結果依電影分組，場次多的排前面 */
+export function groupByMovie(hits: Hit[]): { title: string; runtime: number; rating?: string; hits: Hit[] }[] {
+  const map: Record<string, { title: string; runtime: number; rating?: string; hits: Hit[] }> = {};
+  for (const h of hits) {
+    const g = map[h.movie.title] || (map[h.movie.title] = { title: h.movie.title, runtime: h.movie.runtime, rating: h.movie.rating, hits: [] });
+    if (!g.runtime && h.movie.runtime) g.runtime = h.movie.runtime;
+    g.hits.push(h);
+  }
+  return Object.values(map).sort((a, b) => b.hits.length - a.hits.length || showMinute(a.hits[0].time) - showMinute(b.hits[0].time));
+}
+
+// ───────────────────────── 分享 ─────────────────────────
+
+export function shareText(p: { movie: { title: string }; version: { label: string }; cinema: Cinema; address?: string }, start: Date, end?: Date, seat?: string): string {
+  const maps = `https://maps.apple.com/?q=${encodeURIComponent(p.cinema.name)}${p.address ? "&address=" + encodeURIComponent(p.address) : ""}`;
+  return [
+    `🎬 ${p.movie.title}`,
+    `🕒 ${fmt(start)}${end ? ` – ${fmt(end).slice(-5)}` : ""}`,
+    `📍 ${p.cinema.name}（${p.version.label}）`,
+    seat ? `💺 ${seat}` : "",
+    p.address ? `🏠 ${p.address}` : "",
+    `🗺 ${maps}`,
+  ].filter(Boolean).join("\n");
 }

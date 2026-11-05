@@ -4,5 +4,5 @@
     "types": ["scriptable-ios"], "strict": true, "noEmit": true, "skipLibCheck": true,
     "jsx": "react", "jsxFactory": "h", "jsxFragmentFactory": "Fragment"
   },
-  "files": ["src/main.tsx", "src/core.ts", "src/at-list.ts", "src/platform.ts", "src/platform-scriptable.ts", "src/parsers.gen.ts", "src/ui.ts", "src/jsx.tsx", "src/parsers.ts", "src/dom-shim.d.ts"]
+  "files": ["src/main.tsx", "src/core.ts", "src/at-list.ts", "src/geo.ts", "src/platform.ts", "src/platform-scriptable.ts", "src/parsers.gen.ts", "src/ui.ts", "src/jsx.tsx", "src/parsers.ts", "src/dom-shim.d.ts"]
 }
