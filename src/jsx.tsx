@@ -189,11 +189,13 @@ export function Badges(props: { items: RatingBadge[] }): string {
 }
 
 /** 電影頁頂端：海報在左（沒海報時是灰色預設圖，還在查時先留空的灰框），資訊、評分、預告按鈕在右 */
-export function Hero(props: { poster?: string; posterPending?: boolean; lines: string[]; trailerLabel?: string; onTrailer?: Handler; badges?: RatingBadge[] }): string {
+export function Hero(props: { poster?: string; posterUrl?: string; posterPending?: boolean; lines: string[]; trailerLabel?: string; onTrailer?: Handler; badges?: RatingBadge[] }): string {
+  // 海報：本機快取（file://）讀不到就改用網址，網址也讀不到才換成灰色預設圖
+  const fallback = "if(this.dataset.url&&this.src!==this.dataset.url){this.src=this.dataset.url}else{this.replaceWith(Object.assign(document.createElement('div'),{className:'poster none',textContent:'🎬'}))}";
   return (
     <div class="hero">
       {props.poster ? (
-        <img class="poster" src={props.poster} alt="" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'poster none',textContent:'🎬'}))" />
+        <img class="poster" src={props.poster} data-url={props.posterUrl && props.posterUrl !== props.poster ? props.posterUrl : undefined} alt="" onerror={fallback} />
       ) : (
         <div class={"poster none" + (props.posterPending ? " pending" : "")}>{props.posterPending ? "" : "🎬"}</div>
       )}

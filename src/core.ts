@@ -569,17 +569,80 @@ function atMovieIndex(): Promise<Record<string, string>> {
     return idx;
   })());
 }
+/** 開眼電影頁（預告、片長、海報都從這頁拿，同一次執行只抓一次） */
+const atPageMem: Record<string, Promise<string>> = {};
+const atPage = (id: string) => (atPageMem[id] ||= getText(`${AT}/movie/${id}/`));
+/** 開眼電影編號：先從場次通海報網址取（網址裡就有），沒有再從開眼清單對片名 */
+async function atMovieId(title: string, posterUrl: string): Promise<string> {
+  const fromPoster = (posterUrl.match(/\/photo\d*\/(f\w+)\//) || [])[1];
+  if (fromPoster) return fromPoster;
+  const idx = await atMovieIndex();
+  return idx[normTitle(title)] || idx[normTitle(baseTitle(title))] || "";
+}
 /** 開眼電影頁的海報（場次通沒有海報時的第二來源；重映、修復版常只有開眼有） */
 async function atPoster(title: string): Promise<string> {
-  const idx = await atMovieIndex();
-  const id = idx[normTitle(title)] || idx[normTitle(baseTitle(title))];
+  const id = await atMovieId(title, "");
   if (!id) return "";
-  const html = await getText(`${AT}/movie/${id}/`);
+  const html = await atPage(id);
   return (html.match(/property="og:image"\s+content="([^"]+)"/) || [])[1] || "";
 }
 
+/** 開眼電影頁上的上映年份（用來確認 IMDb／TMDB 對到的是同一部片；重映、修復版不適用，回傳 0）。最多等 3.5 秒 */
+async function atYearHint(title: string, slug?: string, en?: string): Promise<number> {
+  if (normTitle(baseTitle(title)) !== normTitle(title)) return 0; // 重映片：開眼頁的日期是重映日，不能拿來比
+  try {
+    const poster = await Promise.race([moviePoster(title, slug, en), delay(1500).then(() => "")]);
+    const id = await atMovieId(title, poster || "");
+    if (!id) return 0;
+    const html = await Promise.race([atPage(id), delay(3500).then(() => "")]);
+    const m = html.match(/上映日期[:：]?(?:\s|<[^>]*>|&nbsp;)*(\d{4})/); // 開眼頁是「上映日期：<a …>2026/11/06</a>」
+    return m ? Number(m[1]) : 0;
+  } catch (_) {
+    return 0;
+  }
+}
+
+/** 片長（分鐘）：來源沒給時，有金鑰先查 TMDB（中文、英文片名），再讀開眼電影頁的「片長：92分」。記在手機（找到 30 天、沒找到 1 天） */
+const runtimeMem: Record<string, Promise<{ runtime: number; from: string } | null>> = {};
+export function movieRuntime(title: string, slug?: string, en?: string): Promise<{ runtime: number; from: string } | null> {
+  const k = normTitle(title);
+  return (runtimeMem[k] ||= (async () => {
+    const read = (): Record<string, any> => {
+      try {
+        return JSON.parse(cacheGet("runtimes.json") || "{}") || {};
+      } catch (_) {
+        return {};
+      }
+    };
+    const hit = read()["at|" + k];
+    if (hit && Date.now() - hit.at < (hit.r ? 30 : 1) * 86400e3) return hit.r ? { runtime: hit.r, from: hit.from } : null;
+    let out: { runtime: number; from: string } | null = null;
+    const token = ((await loadSettings()).tmdbToken || "").trim();
+    if (token) {
+      for (const q of [title, en].filter(Boolean) as string[]) {
+        const r = await tmdbRuntime(q, token).catch(() => 0);
+        if (r) {
+          out = { runtime: r, from: "TMDB" };
+          break;
+        }
+      }
+    }
+    if (!out) {
+      try {
+        const id = await atMovieId(title, await moviePoster(title, slug, en).catch(() => ""));
+        const m = id ? (await atPage(id)).match(/片長[:：]\s*(\d{2,3})\s*分/) : null;
+        if (m) out = { runtime: Number(m[1]), from: "開眼電影網" };
+      } catch (_) {}
+    }
+    const all = read();
+    all["at|" + k] = { r: out?.runtime || 0, from: out?.from || "", at: Date.now() };
+    cacheSet("runtimes.json", JSON.stringify(all));
+    return out;
+  })());
+}
+
 /** 海報網址：場次通電影頁 → 同片名的其他場次通頁（重映、修復版）→ 開眼電影網 →（有填金鑰才）TMDB */
-async function findPoster(title: string, slug?: string): Promise<string> {
+async function findPoster(title: string, slug?: string, en?: string): Promise<string> {
   let p = await twPoster(slug || title).catch(() => ""); // 場次通的網址就是片名：先直接試，不用先下載整份電影清單
   if (p) return p;
   const list = await loadMovies();
@@ -593,13 +656,13 @@ async function findPoster(title: string, slug?: string): Promise<string> {
   if (p) return p;
   const token = ((await loadSettings()).tmdbToken || "").trim();
   if (!token) return "";
-  const hit = await tmdbFind(title, token).catch(() => null);
+  const hit = (await tmdbFind(title, token).catch(() => null)) || (en ? await tmdbFind(en, token).catch(() => null) : null);
   return hit?.p ? "https://image.tmdb.org/t/p/w500" + hit.p : "";
 }
 
 /** 只查海報網址（約 0.3 秒），不等預告：電影頁先把海報畫出來。手機上記過的直接用（找到的 7 天、沒找到的 1 天） */
 const posterOnly: Record<string, Promise<string>> = {};
-export function moviePoster(title: string, slug?: string): Promise<string> {
+export function moviePoster(title: string, slug?: string, en?: string): Promise<string> {
   const k = (slug || "") + "|" + title;
   return (posterOnly[k] ||= (async () => {
     const nk = normTitle(title);
@@ -608,7 +671,7 @@ export function moviePoster(title: string, slug?: string): Promise<string> {
     if (hit?.poster) return hit.poster;
     const own = all["p|" + nk]; // 只查過海報的紀錄
     if (own && Date.now() - own.at < (own.poster ? 7 : 1) * 86400e3) return own.poster;
-    const poster = normImageUrl(await findPoster(title, slug).catch(() => ""));
+    const poster = normImageUrl(await findPoster(title, slug, en).catch(() => ""));
     const latest = readExtras();
     latest["p|" + nk] = { poster, trailer: "", trailerName: "", at: Date.now() };
     cacheSet("extras.json", JSON.stringify(latest));
@@ -626,7 +689,7 @@ export function posterSrc(url: string): string {
   }
 }
 /** posterSrc 回傳的是本機來源（不是 http 網址） */
-export const isLocalSrc = (src: string) => /^(data:|\/)/.test(src);
+export const isLocalSrc = (src: string) => /^(data:|file:|\/)/.test(src);
 /** 背景把海報圖抓到手機快取（不等結果） */
 export function cachePoster(url: string): void {
   if (!url) return;
@@ -649,15 +712,15 @@ export function prefetchPosters(items: { title: string; slug?: string; en?: stri
     for (let m = queue.shift(); m; m = queue.shift()) {
       try {
         await waitIdle();
-        const u = await moviePoster(m.title, m.slug);
+        const u = await moviePoster(m.title, m.slug, m.en);
         if (u) await platform().cacheImage(u);
-        if (m.ratings) {
-          await waitIdle();
-          await movieRatings(m.title, m.en);
-        }
         if (m.trailer) {
           await waitIdle();
-          await movieExtras(m.title, m.slug);
+          await movieExtras(m.title, m.slug); // 會抓開眼電影頁，評分比對年份也用同一頁
+        }
+        if (m.ratings) {
+          await waitIdle();
+          await movieRatings(m.title, m.en, m.slug);
         }
       } catch (_) {}
     }
@@ -698,7 +761,7 @@ async function findExtras(title: string, slug?: string): Promise<MovieExtras> {
         atErr.push("開眼電影網沒有這部片的預告");
         return null;
       }
-      const html = await getText(`https://www.atmovies.com.tw/movie/${id}/`);
+      const html = await atPage(id);
       const key = (html.match(/youtube\.com\/embed\/([A-Za-z0-9_-]{11})/) || [])[1];
       if (!key) atErr.push("開眼電影網沒有這部片的預告");
       return key ? { key, name: "開眼電影網預告" } : null;
@@ -762,7 +825,7 @@ export async function fillRuntimes<T extends { title: string; runtime: number; r
     Array.from({ length: Math.min(4, queue.length) }, async () => {
       for (let m = queue.shift(); m; m = queue.shift()) {
         try {
-          const r = await tmdbRuntime(m.title, token);
+          const r = (await tmdbRuntime(m.title, token)) || ((m as any).en ? await tmdbRuntime(String((m as any).en), token) : 0);
           if (r) {
             m.runtime = r;
             m.runtimeFrom = "TMDB";
@@ -980,8 +1043,10 @@ const IMDB_GQL = "https://api.graphql.imdb.com/";
 interface Ident { id: string; name: string; year: number }
 
 /** 找 IMDb 編號（同時拿到英文片名與年份，給爛番茄用）：有金鑰走 TMDB，否則用 IMDb 搜尋建議 */
-async function identify(title: string, en: string | undefined, errs: string[]): Promise<Ident | null> {
+async function identify(title: string, en: string | undefined, errs: string[], yearHint = 0): Promise<Ident | null> {
   const token = ((await loadSettings()).tmdbToken || "").trim();
+  // 有開眼的上映年份時，只接受年份相差 1 年內的結果，避免同名的舊片、紀錄片被當成這部（對不到就顯示「-」）
+  const okYear = (y: number) => !yearHint || !y || Math.abs(y - yearHint) <= 1;
   // IMDb 搜尋建議：一次請求、很小，手機上最快
   const viaImdb = (async (): Promise<Ident | null> => {
     for (const q of [en, baseTitle(title)].filter(Boolean) as string[]) {
@@ -989,7 +1054,7 @@ async function identify(title: string, en: string | undefined, errs: string[]): 
       try {
         const r = await platform().fetchText(`https://v3.sg.media-imdb.com/suggestion/x/${encodeURIComponent(key)}.json`, { "User-Agent": UA });
         const d = (JSON.parse(r.body).d || []) as any[];
-        const hit = d.find((x) => /^tt/.test(x.id) && (x.qid === "movie" || x.qid === "tvMovie" || x.qid === "video"));
+        const hit = d.find((x) => /^tt/.test(x.id) && (x.qid === "movie" || x.qid === "tvMovie" || x.qid === "video") && okYear(Number(x.y) || 0));
         if (hit) return { id: hit.id, name: String(hit.l || en || ""), year: Number(hit.y) || 0 };
       } catch (e) {
         errs.push("IMDb 搜尋暫時讀不到");
@@ -1004,7 +1069,8 @@ async function identify(title: string, en: string | undefined, errs: string[]): 
       const hit = await tmdbFind(title, token);
       if (hit) {
         const [ids, d] = await Promise.all([tmdb(`/movie/${hit.id}/external_ids`, token), tmdb(`/movie/${hit.id}?language=en-US`, token)]);
-        if (ids?.imdb_id) return { id: String(ids.imdb_id), name: d?.title || d?.original_title || en || "", year: Number(String(d?.release_date || "").slice(0, 4)) || 0 };
+        const year = Number(String(d?.release_date || "").slice(0, 4)) || 0;
+        if (ids?.imdb_id && okYear(year)) return { id: String(ids.imdb_id), name: d?.title || d?.original_title || en || "", year };
       }
     } catch (e) {
       errs.push("TMDB 暫時讀不到");
@@ -1071,10 +1137,10 @@ async function rtFind(name: string, year: number): Promise<{ url: string; s: Non
   return s ? { url: pick.url, s } : null;
 }
 
-async function findRatings(title: string, en?: string): Promise<Ratings> {
+async function findRatings(title: string, en?: string, slug?: string): Promise<Ratings> {
   const out: Ratings = {};
   const errs: string[] = [];
-  const who = await identify(title, en, errs);
+  const who = await identify(title, en, errs, await atYearHint(title, slug, en));
   if (!who) {
     out.err = errs.join("；") || "IMDb 上找不到這部片";
     return out;
@@ -1123,7 +1189,7 @@ async function findRatings(title: string, en?: string): Promise<Ratings> {
 
 const ratingsMem: Record<string, Promise<Ratings>> = {};
 /** 評分（記在手機 3 天；查不到的下次打開再試） */
-export function movieRatings(title: string, en?: string): Promise<Ratings> {
+export function movieRatings(title: string, en?: string, slug?: string): Promise<Ratings> {
   const k = normTitle(title);
   return (ratingsMem[k] ||= (async () => {
     const read = (): Record<string, Ratings & { at: number }> => {
@@ -1137,7 +1203,7 @@ export function movieRatings(title: string, en?: string): Promise<Ratings> {
     const has = (x: Ratings) => !!(x.imdb || x.tomato || x.popcorn);
     // 有分數記 7 天；查過但沒有任何評分（新片、演唱會）記 1 天，不用每次進電影頁都重查
     if (hit && Date.now() - hit.at < (has(hit) ? 7 : 1) * 86400e3) return hit;
-    const r = await findRatings(title, en);
+    const r = await findRatings(title, en, slug);
     // 有錯（連線失敗）：不寫進手機快取（下次啟動再試），但這次執行內記住結果，重畫時不用再查
     if (!r.err || has(r)) {
       const all = read();

@@ -12,7 +12,7 @@ import {
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
   loadSettings, saveSettings, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, TW,
   FORMATS, formatsOf, filterVersions, nearest, kmLabel, WINDOWS, findShowtimes, groupByMovie, shareText,
-  hallOf, tmdbTest, movieExtras, moviePoster, posterSrc, cachePoster, prefetchPosters, foregroundTask, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, movieRatings, ratingTier,
+  hallOf, tmdbTest, movieExtras, moviePoster, movieRuntime, posterSrc, cachePoster, prefetchPosters, foregroundTask, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, movieRatings, ratingTier,
 } from "./core";
 import type { MovieExtras, Ratings } from "./core";
 import type { TwMovie, TwMovieCinema, Format, LatLng, Hit } from "./core";
@@ -118,7 +118,7 @@ class App {
           const again = await Promise.resolve(view()).catch(() => "");
           this.rerendering = false;
           this.late = [];
-          if (again && !clicked && this.stack[this.stack.length - 1] === view) await this.ui.render(again, -1);
+          if (again && !clicked && this.stack[this.stack.length - 1] === view) await this.ui.render(again, -1).catch(() => {});
         })();
         await painting;
         painting = null;
@@ -412,11 +412,29 @@ class App {
   /** 正在補畫：只用已經讀好的資料，不再等 */
   rerendering = false;
 
+  /** 來源沒給片長時，自動查 TMDB／開眼補上（最多等 wait 毫秒，沒好就之後補畫）；回傳查到的片長 */
+  async fillRuntime(m: { title: string; runtime: number; runtimeFrom?: string; slug?: string; en?: string }, wait = 2500): Promise<number> {
+    if (m.runtime) return m.runtime;
+    const job = foregroundTask(
+      movieRuntime(m.title, m.slug, m.en)
+        .then((r) => {
+          if (r && !m.runtime) {
+            m.runtime = r.runtime;
+            m.runtimeFrom = r.from;
+          }
+        })
+        .catch(() => {})
+    );
+    await Promise.race([job, sleep(this.rerendering ? 0 : wait)]);
+    if (!m.runtime) this.late.push(job);
+    return m.runtime;
+  }
+
   /** 海報、預告與評分：最多等 0.4 秒就先畫頁面（有快取的會直接出現），其餘讀好後各自補上。海報網址另外快查（不等預告） */
   async extras(title: string, slug?: string, en?: string): Promise<{ x: MovieExtras | null; r: Ratings | null; p: string; px: Promise<MovieExtras | null>; loading: boolean }> {
     const px = foregroundTask(movieExtras(title, slug).catch(() => null));
-    const pr = foregroundTask(movieRatings(title, en).catch(() => null));
-    const pp = foregroundTask(moviePoster(title, slug).catch(() => ""));
+    const pr = foregroundTask(movieRatings(title, en, slug).catch(() => null));
+    const pp = foregroundTask(moviePoster(title, slug, en).catch(() => ""));
     const wait = this.rerendering ? 0 : 400;
     const quick = <T,>(p: Promise<T>) => Promise.race([p, sleep(wait).then(() => undefined)]);
     const [x, r, p] = await Promise.all([quick(px), quick(pr), quick(pp)]);
@@ -445,6 +463,7 @@ class App {
     return (
       <Hero
         poster={poster}
+        posterUrl={posterUrl}
         posterPending={!poster && e.loading}
         lines={lines}
         badges={badges}
@@ -504,7 +523,13 @@ class App {
     return new Date(this.start(p).getTime() + ((this.runtime || 120) + this.settings.ads) * 6e4);
   }
 
-  confirmView(p: Pick): string {
+  async confirmView(p: Pick): Promise<string> {
+    // 來源沒給片長：先查 TMDB／開眼（最多等 2.5 秒），查到就直接帶入
+    if (!this.runtime && !p.movie.runtime) {
+      this.late = [];
+      await this.fillRuntime(p.movie as any);
+      if (p.movie.runtime) this.runtime = p.movie.runtime;
+    }
     return (
       <Page title="確認行程" subtitle="點選項目可以修改" onBack={() => this.back()}>
         <Section>
@@ -691,7 +716,7 @@ class App {
   async movieView(m: TwMovie, date: string): Promise<string> {
     const d = await movieDay(m.slug, date || undefined);
     const dates = d.dates.filter((x) => x >= todayTPE());
-    const runtime = d.runtime || m.runtime;
+    let runtime = d.runtime || m.runtime;
     const cities = Array.from(new Set(d.cinemas.map((c) => c.city))).sort(
       (a, b) => (CITY_ORDER.indexOf(a) + 1 || 99) - (CITY_ORDER.indexOf(b) + 1 || 99)
     );
@@ -708,6 +733,7 @@ class App {
       this.stack[this.stack.length - 1] = () => this.movieView(m, nd);
     };
     const x = await this.extras(m.title, m.slug, m.en);
+    if (!runtime) runtime = await this.fillRuntime(m, 1500); // 來源沒給片長：查 TMDB／開眼補上
     return (
       <Page title={m.title} subtitle={[m.rating || d.rating, runtime ? `${runtime} 分鐘` : "", `${d.cinemas.length} 間影城`].filter(Boolean).join("｜")} onBack={() => this.back()}>
         {this.hero(x, m.title, [m.en, [m.rating || d.rating, runtime ? `${runtime} 分鐘` : ""].filter(Boolean).join("｜"), `${d.cinemas.length} 間影城有放映`])}

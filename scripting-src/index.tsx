@@ -14,7 +14,7 @@ import {
   Cinema, Movie, Settings, Version, TwMovie, TwMovieCinema, CITY_ORDER, TW,
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
   loadSettings, saveSettings, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, cinemaAddress,
-  FORMATS, formatsOf, filterVersions, nearest, kmLabel, WINDOWS, findShowtimes, groupByMovie, shareText, hallOf, tmdbTest, movieExtras, moviePoster, posterSrc, isLocalSrc, cachePoster, prefetchPosters, foregroundTask, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, SCRIPTING_IMPORT_URL, movieRatings, ratingTier,
+  FORMATS, formatsOf, filterVersions, nearest, kmLabel, WINDOWS, findShowtimes, groupByMovie, shareText, hallOf, tmdbTest, movieExtras, moviePoster, movieRuntime, posterSrc, isLocalSrc, cachePoster, prefetchPosters, foregroundTask, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, SCRIPTING_IMPORT_URL, movieRatings, ratingTier,
 } from "./core"
 import type { Format, LatLng, Hit } from "./core"
 
@@ -280,8 +280,8 @@ function RatingBadge({ kind, value, tier, note, url }: { kind: "imdb" | "tomato"
 /** 電影頁頂端：海報在左，資訊、評分與紅色預告按鈕在右（跟 Scriptable 版一樣） */
 function MovieHero({ title, slug, lines, en }: { title: string; slug?: string; lines: string[]; en?: string }) {
   const x = useLoad(() => movieExtras(title, slug), [title, slug || ""])
-  const rt = useLoad(() => movieRatings(title, en), [title, en || ""])
-  const p = useLoad(() => moviePoster(title, slug), [title, slug || ""]) // 海報網址快查（不等預告）
+  const rt = useLoad(() => movieRatings(title, en, slug), [title, en || ""])
+  const p = useLoad(() => moviePoster(title, slug, en), [title, slug || ""]) // 海報網址快查（不等預告）
   const [opening, setOpening] = useState(false)
   const r = rt.data
   const posterUrl = x.data?.poster || p.data || ""
@@ -569,6 +569,18 @@ type Pick = { cinema: Cinema; date: string; movie: Movie; version: Version; time
 function ConfirmPage({ pick }: { pick: Pick }) {
   const [settings, update] = useSettings()
   const [runtimeText, setRuntimeText] = useState(pick.movie.runtime ? String(pick.movie.runtime) : "")
+  const [runtimeFrom, setRuntimeFrom] = useState(pick.movie.runtimeFrom || "")
+  useEffect(() => {
+    // 來源沒給片長：查 TMDB／開眼補上，查到就直接帶入（使用者已經自己輸入的話不覆蓋）
+    if (pick.movie.runtime) return
+    movieRuntime(pick.movie.title, (pick.movie as any).slug, (pick.movie as any).en).then((r) => {
+      if (!r) return
+      pick.movie.runtime = r.runtime
+      pick.movie.runtimeFrom = r.from
+      setRuntimeText((t) => t || String(r.runtime))
+      setRuntimeFrom(r.from)
+    }).catch(() => {})
+  }, [])
   const [seat, setSeat] = useState(hallOf(pick.version.label)) // 來源有標影廳就先帶入，可再修改
   const [address, setAddress] = useState(pick.address || pick.cinema.address || "")
   const [saved, setSaved] = useState<any>(null)
@@ -640,7 +652,7 @@ function ConfirmPage({ pick }: { pick: Pick }) {
     </Section>
     {isLate(pick.time) ? <Section footer={<Text>這是凌晨場：已自動算到隔天日期，請再核對電影票。</Text>}><Label title={"凌晨場"} systemImage={"moon.stars"} /></Section> : null}
 
-    <Section header={<Text>可調整</Text>} footer={!pick.movie.runtime ? <Text>資料來源沒有提供片長，請手動輸入。</Text> : pick.movie.runtimeFrom ? <Text>{`片長取自 ${pick.movie.runtimeFrom}（重映片為原版片長），請再核對。`}</Text> : undefined}>
+    <Section header={<Text>可調整</Text>} footer={!pick.movie.runtime ? <Text>資料來源沒有提供片長，正在查 TMDB／開眼電影網，查不到請手動輸入。</Text> : runtimeFrom || pick.movie.runtimeFrom ? <Text>{`片長取自 ${runtimeFrom || pick.movie.runtimeFrom}（重映片為原版片長），請再核對。`}</Text> : undefined}>
       <HStack>
         <Text>片長（分鐘）</Text>
         <TextField title={"片長（分鐘）"} value={runtimeText} onChanged={setRuntimeText} prompt={"例如 120"} keyboardType={"numberPad"} multilineTextAlignment={"trailing"} />
@@ -726,7 +738,9 @@ function MoviePage({ movie }: { movie: TwMovie }) {
     .map((c) => ({ ...c, versions: filterVersions(c.versions, fmtSel) }))
     .filter((c) => c.versions.length && (city === "全部" || c.city === city) && (!onlyFav || settings.favorites.indexOf(c.id) >= 0))
   const byCity = sortCities(Array.from(new Set(shown.map((c) => c.city))))
-  const runtime = data?.runtime || movie.runtime
+  const rt = useLoad(() => (data?.runtime || movie.runtime ? Promise.resolve(null) : movieRuntime(movie.title, movie.slug, movie.en)), [movie.slug, data ? 1 : 0]) // 來源沒給片長：查 TMDB／開眼補上
+  const runtime = data?.runtime || movie.runtime || rt.data?.runtime || 0
+  if (rt.data && !movie.runtime) { movie.runtime = rt.data.runtime; movie.runtimeFrom = rt.data.from }
 
   const toCinema = (c: TwMovieCinema): Cinema =>
     store.cinemas.find((x) => x.id === c.id) ||

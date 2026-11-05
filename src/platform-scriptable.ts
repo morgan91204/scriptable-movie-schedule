@@ -43,17 +43,18 @@ function pruneImages() {
     }
   } catch (_) {}
 }
+/** 快取圖的 file:// 網址：畫面的 WebView 以 cache 資料夾為 baseURL 載入，所以可以直接顯示本機檔 */
 function cachedImage(url: string): string | null {
   try {
-    const fm = FileManager.local();
     const p = imgPath(url);
-    if (!fm.fileExists(p)) return null;
-    const b64 = fm.read(p).toBase64String();
-    if (!b64) return null;
-    return (b64.startsWith("iVBOR") ? "data:image/png;base64," : "data:image/jpeg;base64,") + b64;
+    return FileManager.local().fileExists(p) ? "file://" + p : null;
   } catch (_) {
     return null;
   }
+}
+/** 圖片快取資料夾的 file:// 網址（給 WebView 當 baseURL） */
+export function imageCacheBaseUrl(): string {
+  return "file://" + FileManager.local().cacheDirectory() + "/";
 }
 
 export const scriptablePlatform: Platform = {
@@ -114,6 +115,7 @@ export const scriptablePlatform: Platform = {
       const d = await r.load();
       const status = (r.response && (r.response as any).statusCode) || 200;
       if (status !== 200 || !d) return null;
+      if (d.toBase64String().length < 100) return null; // 空檔不算
       FileManager.local().write(imgPath(url), d);
       return cachedImage(url);
     })().catch(() => null));

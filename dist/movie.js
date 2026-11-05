@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.06-0006
+// @movie-schedule-app 電影行程 v2026.11.06-0027
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/jsx.tsx
@@ -78,7 +78,8 @@ function Badges(props) {
   return /* @__PURE__ */ h("div", { class: "ratings" }, props.items.map((b) => /* @__PURE__ */ h("button", { class: "rate " + b.tier, onTap: b.tier === "none" ? void 0 : b.onTap, "aria-label": b.kind === "imdb" ? "IMDb" : b.kind === "tomato" ? "番茄指數" : "爆米花指數" }, b.kind === "imdb" ? /* @__PURE__ */ h("span", { class: "imdb" }, "IMDb") : /* @__PURE__ */ h("span", { class: "emo" }, b.kind === "tomato" ? b.tier === "bad" ? "🤢" : "🍅" : b.tier === "bad" ? "🫗" : "🍿"), /* @__PURE__ */ h("span", { class: "v" }, esc(b.value)), b.note ? /* @__PURE__ */ h("span", { class: "n" }, esc(b.note)) : null)));
 }
 function Hero(props) {
-  return /* @__PURE__ */ h("div", { class: "hero" }, props.poster ? /* @__PURE__ */ h("img", { class: "poster", src: props.poster, alt: "", onerror: "this.replaceWith(Object.assign(document.createElement('div'),{className:'poster none',textContent:'🎬'}))" }) : /* @__PURE__ */ h("div", { class: "poster none" + (props.posterPending ? " pending" : "") }, props.posterPending ? "" : "🎬"), /* @__PURE__ */ h("div", { class: "hero-info" }, props.lines.filter(Boolean).map((l) => /* @__PURE__ */ h("div", { class: "hero-line" }, esc(l))), props.badges ? /* @__PURE__ */ h(Badges, { items: props.badges }) : null, props.onTrailer ? /* @__PURE__ */ h("button", { class: "trailer", onTap: props.onTrailer }, "▶︎ ", esc(props.trailerLabel || "觀看預告")) : null));
+  const fallback = "if(this.dataset.url&&this.src!==this.dataset.url){this.src=this.dataset.url}else{this.replaceWith(Object.assign(document.createElement('div'),{className:'poster none',textContent:'🎬'}))}";
+  return /* @__PURE__ */ h("div", { class: "hero" }, props.poster ? /* @__PURE__ */ h("img", { class: "poster", src: props.poster, "data-url": props.posterUrl && props.posterUrl !== props.poster ? props.posterUrl : void 0, alt: "", onerror: fallback }) : /* @__PURE__ */ h("div", { class: "poster none" + (props.posterPending ? " pending" : "") }, props.posterPending ? "" : "🎬"), /* @__PURE__ */ h("div", { class: "hero-info" }, props.lines.filter(Boolean).map((l) => /* @__PURE__ */ h("div", { class: "hero-line" }, esc(l))), props.badges ? /* @__PURE__ */ h(Badges, { items: props.badges }) : null, props.onTrailer ? /* @__PURE__ */ h("button", { class: "trailer", onTap: props.onTrailer }, "▶︎ ", esc(props.trailerLabel || "觀看預告")) : null));
 }
 function Note(props) {
   return /* @__PURE__ */ h("p", { class: "note " + (props.kind || "info") }, esc(props.text));
@@ -89,6 +90,124 @@ function Loading(props) {
 function Empty(props) {
   return /* @__PURE__ */ h("div", { class: "empty" }, /* @__PURE__ */ h("div", { class: "big" }, props.icon || "🎬"), /* @__PURE__ */ h("div", null, esc(props.text)));
 }
+
+// src/platform-scriptable.ts
+function settingsFile() {
+  let fm;
+  try {
+    fm = FileManager.iCloud();
+    fm.documentsDirectory();
+  } catch (_) {
+    fm = FileManager.local();
+  }
+  const dir = fm.joinPath(fm.documentsDirectory(), "電影行程");
+  if (!fm.fileExists(dir)) fm.createDirectory(dir, true);
+  return { fm, path: fm.joinPath(dir, "設定.json") };
+}
+var web = null;
+var IMG_PREFIX = "movie-img-";
+var hash = (s) => {
+  let h2 = 5381;
+  for (let i = 0; i < s.length; i++) h2 = (h2 * 33 ^ s.charCodeAt(i)) >>> 0;
+  return h2.toString(16);
+};
+var imgPath = (url) => {
+  const fm = FileManager.local();
+  return fm.joinPath(fm.cacheDirectory(), IMG_PREFIX + hash(url) + ".jpg");
+};
+var imgJobs = {};
+var pruned = false;
+function pruneImages() {
+  if (pruned) return;
+  pruned = true;
+  try {
+    const fm = FileManager.local();
+    const dir = fm.cacheDirectory();
+    for (const n of fm.listContents(dir)) {
+      if (!n.startsWith(IMG_PREFIX)) continue;
+      const p = fm.joinPath(dir, n);
+      if (Date.now() - fm.modificationDate(p).getTime() > 14 * 864e5) fm.remove(p);
+    }
+  } catch (_) {
+  }
+}
+function cachedImage(url) {
+  try {
+    const p = imgPath(url);
+    return FileManager.local().fileExists(p) ? "file://" + p : null;
+  } catch (_) {
+    return null;
+  }
+}
+function imageCacheBaseUrl() {
+  return "file://" + FileManager.local().cacheDirectory() + "/";
+}
+var scriptablePlatform = {
+  async fetchText(url, headers) {
+    const r = new Request(url);
+    r.headers = headers;
+    r.timeoutInterval = 20;
+    const body = await r.loadString();
+    return { status: r.response && r.response.statusCode || 200, body };
+  },
+  async runInWebView(body) {
+    if (!web) {
+      web = new WebView();
+      await web.loadHTML("<html><body></body></html>", "https://twshowtimes.com/");
+    }
+    return await web.evaluateJavaScript(`(function(){${body}
+})()`, false);
+  },
+  async loadSettingsJSON() {
+    try {
+      const { fm, path } = settingsFile();
+      if (!fm.fileExists(path)) return null;
+      await fm.downloadFileFromiCloud(path);
+      return fm.readString(path);
+    } catch (_) {
+      return null;
+    }
+  },
+  saveSettingsJSON(json) {
+    try {
+      const { fm, path } = settingsFile();
+      fm.writeString(path, json);
+    } catch (_) {
+    }
+  },
+  cacheGet(name) {
+    try {
+      const fm = FileManager.local();
+      const p = fm.joinPath(fm.cacheDirectory(), "movie-" + name);
+      return fm.fileExists(p) ? fm.readString(p) : null;
+    } catch (_) {
+      return null;
+    }
+  },
+  cacheSet(name, value) {
+    try {
+      const fm = FileManager.local();
+      fm.writeString(fm.joinPath(fm.cacheDirectory(), "movie-" + name), value);
+    } catch (_) {
+    }
+  },
+  cachedImage,
+  cacheImage(url) {
+    return imgJobs[url] ||= (async () => {
+      pruneImages();
+      const hit = cachedImage(url);
+      if (hit) return hit;
+      const r = new Request(url);
+      r.timeoutInterval = 20;
+      const d = await r.load();
+      const status = r.response && r.response.statusCode || 200;
+      if (status !== 200 || !d) return null;
+      if (d.toBase64String().length < 100) return null;
+      FileManager.local().write(imgPath(url), d);
+      return cachedImage(url);
+    })().catch(() => null);
+  }
+};
 
 // src/ui.ts
 var CSS = `
@@ -206,7 +325,12 @@ var UI = class {
     this.wv = new WebView();
     this.presented = null;
     this.closed = false;
-    this.ready = this.wv.loadHTML(SHELL);
+    let base = "";
+    try {
+      base = imageCacheBaseUrl();
+    } catch (_) {
+    }
+    this.ready = (base ? this.wv.loadHTML(SHELL, base) : this.wv.loadHTML(SHELL)).catch(() => this.wv.loadHTML(SHELL));
   }
   /** 顯示畫面（不等待點擊），用於讀取中。 */
   /** scrollTo：畫完後捲到哪裡。-1 = 停在原位（同一頁重繪，例如切換廣告時間）；0 = 頂端；其他 = 返回時還原的位置 */
@@ -252,124 +376,6 @@ function platform() {
   if (!current) throw new Error("platform 尚未設定");
   return current;
 }
-
-// src/platform-scriptable.ts
-function settingsFile() {
-  let fm;
-  try {
-    fm = FileManager.iCloud();
-    fm.documentsDirectory();
-  } catch (_) {
-    fm = FileManager.local();
-  }
-  const dir = fm.joinPath(fm.documentsDirectory(), "電影行程");
-  if (!fm.fileExists(dir)) fm.createDirectory(dir, true);
-  return { fm, path: fm.joinPath(dir, "設定.json") };
-}
-var web = null;
-var IMG_PREFIX = "movie-img-";
-var hash = (s) => {
-  let h2 = 5381;
-  for (let i = 0; i < s.length; i++) h2 = (h2 * 33 ^ s.charCodeAt(i)) >>> 0;
-  return h2.toString(16);
-};
-var imgPath = (url) => {
-  const fm = FileManager.local();
-  return fm.joinPath(fm.cacheDirectory(), IMG_PREFIX + hash(url) + ".jpg");
-};
-var imgJobs = {};
-var pruned = false;
-function pruneImages() {
-  if (pruned) return;
-  pruned = true;
-  try {
-    const fm = FileManager.local();
-    const dir = fm.cacheDirectory();
-    for (const n of fm.listContents(dir)) {
-      if (!n.startsWith(IMG_PREFIX)) continue;
-      const p = fm.joinPath(dir, n);
-      if (Date.now() - fm.modificationDate(p).getTime() > 14 * 864e5) fm.remove(p);
-    }
-  } catch (_) {
-  }
-}
-function cachedImage(url) {
-  try {
-    const fm = FileManager.local();
-    const p = imgPath(url);
-    if (!fm.fileExists(p)) return null;
-    const b64 = fm.read(p).toBase64String();
-    if (!b64) return null;
-    return (b64.startsWith("iVBOR") ? "data:image/png;base64," : "data:image/jpeg;base64,") + b64;
-  } catch (_) {
-    return null;
-  }
-}
-var scriptablePlatform = {
-  async fetchText(url, headers) {
-    const r = new Request(url);
-    r.headers = headers;
-    r.timeoutInterval = 20;
-    const body = await r.loadString();
-    return { status: r.response && r.response.statusCode || 200, body };
-  },
-  async runInWebView(body) {
-    if (!web) {
-      web = new WebView();
-      await web.loadHTML("<html><body></body></html>", "https://twshowtimes.com/");
-    }
-    return await web.evaluateJavaScript(`(function(){${body}
-})()`, false);
-  },
-  async loadSettingsJSON() {
-    try {
-      const { fm, path } = settingsFile();
-      if (!fm.fileExists(path)) return null;
-      await fm.downloadFileFromiCloud(path);
-      return fm.readString(path);
-    } catch (_) {
-      return null;
-    }
-  },
-  saveSettingsJSON(json) {
-    try {
-      const { fm, path } = settingsFile();
-      fm.writeString(path, json);
-    } catch (_) {
-    }
-  },
-  cacheGet(name) {
-    try {
-      const fm = FileManager.local();
-      const p = fm.joinPath(fm.cacheDirectory(), "movie-" + name);
-      return fm.fileExists(p) ? fm.readString(p) : null;
-    } catch (_) {
-      return null;
-    }
-  },
-  cacheSet(name, value) {
-    try {
-      const fm = FileManager.local();
-      fm.writeString(fm.joinPath(fm.cacheDirectory(), "movie-" + name), value);
-    } catch (_) {
-    }
-  },
-  cachedImage,
-  cacheImage(url) {
-    return imgJobs[url] ||= (async () => {
-      pruneImages();
-      const hit = cachedImage(url);
-      if (hit) return hit;
-      const r = new Request(url);
-      r.timeoutInterval = 20;
-      const d = await r.load();
-      const status = r.response && r.response.statusCode || 200;
-      if (status !== 200 || !d) return null;
-      FileManager.local().write(imgPath(url), d);
-      return cachedImage(url);
-    })().catch(() => null);
-  }
-};
 
 // src/parsers.gen.ts
 var PARSERS_JS = `function parseTwIndex(doc) {
@@ -1345,14 +1351,72 @@ function atMovieIndex() {
     return idx;
   })();
 }
-async function atPoster(title) {
+var atPageMem = {};
+var atPage = (id) => atPageMem[id] ||= getText(`${AT}/movie/${id}/`);
+async function atMovieId(title, posterUrl) {
+  const fromPoster = (posterUrl.match(/\/photo\d*\/(f\w+)\//) || [])[1];
+  if (fromPoster) return fromPoster;
   const idx = await atMovieIndex();
-  const id = idx[normTitle(title)] || idx[normTitle(baseTitle(title))];
+  return idx[normTitle(title)] || idx[normTitle(baseTitle(title))] || "";
+}
+async function atPoster(title) {
+  const id = await atMovieId(title, "");
   if (!id) return "";
-  const html = await getText(`${AT}/movie/${id}/`);
+  const html = await atPage(id);
   return (html.match(/property="og:image"\s+content="([^"]+)"/) || [])[1] || "";
 }
-async function findPoster(title, slug) {
+async function atYearHint(title, slug, en) {
+  if (normTitle(baseTitle(title)) !== normTitle(title)) return 0;
+  try {
+    const poster = await Promise.race([moviePoster(title, slug, en), delay(1500).then(() => "")]);
+    const id = await atMovieId(title, poster || "");
+    if (!id) return 0;
+    const html = await Promise.race([atPage(id), delay(3500).then(() => "")]);
+    const m = html.match(/上映日期[:：]?(?:\s|<[^>]*>|&nbsp;)*(\d{4})/);
+    return m ? Number(m[1]) : 0;
+  } catch (_) {
+    return 0;
+  }
+}
+var runtimeMem = {};
+function movieRuntime(title, slug, en) {
+  const k = normTitle(title);
+  return runtimeMem[k] ||= (async () => {
+    const read = () => {
+      try {
+        return JSON.parse(cacheGet("runtimes.json") || "{}") || {};
+      } catch (_) {
+        return {};
+      }
+    };
+    const hit = read()["at|" + k];
+    if (hit && Date.now() - hit.at < (hit.r ? 30 : 1) * 864e5) return hit.r ? { runtime: hit.r, from: hit.from } : null;
+    let out = null;
+    const token = ((await loadSettings()).tmdbToken || "").trim();
+    if (token) {
+      for (const q of [title, en].filter(Boolean)) {
+        const r = await tmdbRuntime(q, token).catch(() => 0);
+        if (r) {
+          out = { runtime: r, from: "TMDB" };
+          break;
+        }
+      }
+    }
+    if (!out) {
+      try {
+        const id = await atMovieId(title, await moviePoster(title, slug, en).catch(() => ""));
+        const m = id ? (await atPage(id)).match(/片長[:：]\s*(\d{2,3})\s*分/) : null;
+        if (m) out = { runtime: Number(m[1]), from: "開眼電影網" };
+      } catch (_) {
+      }
+    }
+    const all = read();
+    all["at|" + k] = { r: out?.runtime || 0, from: out?.from || "", at: Date.now() };
+    cacheSet("runtimes.json", JSON.stringify(all));
+    return out;
+  })();
+}
+async function findPoster(title, slug, en) {
   let p = await twPoster(slug || title).catch(() => "");
   if (p) return p;
   const list = await loadMovies();
@@ -1366,11 +1430,11 @@ async function findPoster(title, slug) {
   if (p) return p;
   const token = ((await loadSettings()).tmdbToken || "").trim();
   if (!token) return "";
-  const hit = await tmdbFind(title, token).catch(() => null);
+  const hit = await tmdbFind(title, token).catch(() => null) || (en ? await tmdbFind(en, token).catch(() => null) : null);
   return hit?.p ? "https://image.tmdb.org/t/p/w500" + hit.p : "";
 }
 var posterOnly = {};
-function moviePoster(title, slug) {
+function moviePoster(title, slug, en) {
   const k = (slug || "") + "|" + title;
   return posterOnly[k] ||= (async () => {
     const nk = normTitle(title);
@@ -1379,7 +1443,7 @@ function moviePoster(title, slug) {
     if (hit?.poster) return hit.poster;
     const own = all["p|" + nk];
     if (own && Date.now() - own.at < (own.poster ? 7 : 1) * 864e5) return own.poster;
-    const poster = normImageUrl(await findPoster(title, slug).catch(() => ""));
+    const poster = normImageUrl(await findPoster(title, slug, en).catch(() => ""));
     const latest = readExtras();
     latest["p|" + nk] = { poster, trailer: "", trailerName: "", at: Date.now() };
     cacheSet("extras.json", JSON.stringify(latest));
@@ -1414,15 +1478,15 @@ function prefetchPosters(items, max = 200, trailers = 10, ratings = 12) {
     for (let m = queue.shift(); m; m = queue.shift()) {
       try {
         await waitIdle();
-        const u = await moviePoster(m.title, m.slug);
+        const u = await moviePoster(m.title, m.slug, m.en);
         if (u) await platform().cacheImage(u);
-        if (m.ratings) {
-          await waitIdle();
-          await movieRatings(m.title, m.en);
-        }
         if (m.trailer) {
           await waitIdle();
           await movieExtras(m.title, m.slug);
+        }
+        if (m.ratings) {
+          await waitIdle();
+          await movieRatings(m.title, m.en, m.slug);
         }
       } catch (_) {
       }
@@ -1460,7 +1524,7 @@ async function findExtras(title, slug) {
       atErr.push("開眼電影網沒有這部片的預告");
       return null;
     }
-    const html = await getText(`https://www.atmovies.com.tw/movie/${id}/`);
+    const html = await atPage(id);
     const key = (html.match(/youtube\.com\/embed\/([A-Za-z0-9_-]{11})/) || [])[1];
     if (!key) atErr.push("開眼電影網沒有這部片的預告");
     return key ? { key, name: "開眼電影網預告" } : null;
@@ -1518,7 +1582,7 @@ async function fillRuntimes(movies) {
     Array.from({ length: Math.min(4, queue.length) }, async () => {
       for (let m = queue.shift(); m; m = queue.shift()) {
         try {
-          const r = await tmdbRuntime(m.title, token);
+          const r = await tmdbRuntime(m.title, token) || (m.en ? await tmdbRuntime(String(m.en), token) : 0);
           if (r) {
             m.runtime = r;
             m.runtimeFrom = "TMDB";
@@ -1644,15 +1708,16 @@ var errText = (e) => {
   return m.replace(/[{}"\[\]]/g, "").trim().slice(0, 40) || "讀取失敗";
 };
 var IMDB_GQL = "https://api.graphql.imdb.com/";
-async function identify(title, en, errs) {
+async function identify(title, en, errs, yearHint = 0) {
   const token = ((await loadSettings()).tmdbToken || "").trim();
+  const okYear = (y) => !yearHint || !y || Math.abs(y - yearHint) <= 1;
   const viaImdb = (async () => {
     for (const q of [en, baseTitle(title)].filter(Boolean)) {
       const key = q.toLowerCase().replace(/[\\/?#%]/g, " ").trim();
       try {
         const r = await platform().fetchText(`https://v3.sg.media-imdb.com/suggestion/x/${encodeURIComponent(key)}.json`, { "User-Agent": UA });
         const d = JSON.parse(r.body).d || [];
-        const hit = d.find((x) => /^tt/.test(x.id) && (x.qid === "movie" || x.qid === "tvMovie" || x.qid === "video"));
+        const hit = d.find((x) => /^tt/.test(x.id) && (x.qid === "movie" || x.qid === "tvMovie" || x.qid === "video") && okYear(Number(x.y) || 0));
         if (hit) return { id: hit.id, name: String(hit.l || en || ""), year: Number(hit.y) || 0 };
       } catch (e) {
         errs.push("IMDb 搜尋暫時讀不到");
@@ -1666,7 +1731,8 @@ async function identify(title, en, errs) {
       const hit = await tmdbFind(title, token);
       if (hit) {
         const [ids, d] = await Promise.all([tmdb(`/movie/${hit.id}/external_ids`, token), tmdb(`/movie/${hit.id}?language=en-US`, token)]);
-        if (ids?.imdb_id) return { id: String(ids.imdb_id), name: d?.title || d?.original_title || en || "", year: Number(String(d?.release_date || "").slice(0, 4)) || 0 };
+        const year = Number(String(d?.release_date || "").slice(0, 4)) || 0;
+        if (ids?.imdb_id && okYear(year)) return { id: String(ids.imdb_id), name: d?.title || d?.original_title || en || "", year };
       }
     } catch (e) {
       errs.push("TMDB 暫時讀不到");
@@ -1724,10 +1790,10 @@ async function rtFind(name, year) {
   const s = await rtPage(pick.url);
   return s ? { url: pick.url, s } : null;
 }
-async function findRatings(title, en) {
+async function findRatings(title, en, slug) {
   const out = {};
   const errs = [];
-  const who = await identify(title, en, errs);
+  const who = await identify(title, en, errs, await atYearHint(title, slug, en));
   if (!who) {
     out.err = errs.join("；") || "IMDb 上找不到這部片";
     return out;
@@ -1768,7 +1834,7 @@ async function findRatings(title, en) {
   return out;
 }
 var ratingsMem = {};
-function movieRatings(title, en) {
+function movieRatings(title, en, slug) {
   const k = normTitle(title);
   return ratingsMem[k] ||= (async () => {
     const read = () => {
@@ -1781,7 +1847,7 @@ function movieRatings(title, en) {
     const hit = read()[k];
     const has = (x) => !!(x.imdb || x.tomato || x.popcorn);
     if (hit && Date.now() - hit.at < (has(hit) ? 7 : 1) * 864e5) return hit;
-    const r = await findRatings(title, en);
+    const r = await findRatings(title, en, slug);
     if (!r.err || has(r)) {
       const all = read();
       for (const [key, v] of Object.entries(all)) if (Date.now() - v.at > 7 * 864e5) delete all[key];
@@ -1868,7 +1934,7 @@ var App = class {
     this.loadingText = "讀取中…";
     // ── 事件迴圈 ──
     // 背景查 GitHub 上的最新版本（首頁顯示是否為最新版）
-    this.latest = checkLatest("2026.11.06-0006");
+    this.latest = checkLatest("2026.11.06-0027");
     // ── 搜尋 ──
     this.query = "";
     this.tmdbStatus = "";
@@ -1945,7 +2011,8 @@ var App = class {
           const again = await Promise.resolve(view()).catch(() => "");
           this.rerendering = false;
           this.late = [];
-          if (again && !clicked && this.stack[this.stack.length - 1] === view) await this.ui.render(again, -1);
+          if (again && !clicked && this.stack[this.stack.length - 1] === view) await this.ui.render(again, -1).catch(() => {
+          });
         })();
         await painting;
         painting = null;
@@ -1981,11 +2048,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.06-0006"}`);
+          Pasteboard.copy(`版本 ${"2026.11.06-0027"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.06-0006"}`,
+      `版本 ${"2026.11.06-0027"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -2120,11 +2187,27 @@ var App = class {
       }
     );
   }
+  /** 來源沒給片長時，自動查 TMDB／開眼補上（最多等 wait 毫秒，沒好就之後補畫）；回傳查到的片長 */
+  async fillRuntime(m, wait = 2500) {
+    if (m.runtime) return m.runtime;
+    const job = foregroundTask(
+      movieRuntime(m.title, m.slug, m.en).then((r) => {
+        if (r && !m.runtime) {
+          m.runtime = r.runtime;
+          m.runtimeFrom = r.from;
+        }
+      }).catch(() => {
+      })
+    );
+    await Promise.race([job, sleep(this.rerendering ? 0 : wait)]);
+    if (!m.runtime) this.late.push(job);
+    return m.runtime;
+  }
   /** 海報、預告與評分：最多等 0.4 秒就先畫頁面（有快取的會直接出現），其餘讀好後各自補上。海報網址另外快查（不等預告） */
   async extras(title, slug, en) {
     const px = foregroundTask(movieExtras(title, slug).catch(() => null));
-    const pr = foregroundTask(movieRatings(title, en).catch(() => null));
-    const pp = foregroundTask(moviePoster(title, slug).catch(() => ""));
+    const pr = foregroundTask(movieRatings(title, en, slug).catch(() => null));
+    const pp = foregroundTask(moviePoster(title, slug, en).catch(() => ""));
     const wait = this.rerendering ? 0 : 400;
     const quick = (p2) => Promise.race([p2, sleep(wait).then(() => void 0)]);
     const [x, r, p] = await Promise.all([quick(px), quick(pr), quick(pp)]);
@@ -2152,6 +2235,7 @@ var App = class {
       Hero,
       {
         poster,
+        posterUrl,
         posterPending: !poster && e.loading,
         lines,
         badges,
@@ -2196,7 +2280,12 @@ var App = class {
   end(p) {
     return new Date(this.start(p).getTime() + ((this.runtime || 120) + this.settings.ads) * 6e4);
   }
-  confirmView(p) {
+  async confirmView(p) {
+    if (!this.runtime && !p.movie.runtime) {
+      this.late = [];
+      await this.fillRuntime(p.movie);
+      if (p.movie.runtime) this.runtime = p.movie.runtime;
+    }
     return /* @__PURE__ */ h(Page, { title: "確認行程", subtitle: "點選項目可以修改", onBack: () => this.back() }, /* @__PURE__ */ h(Section, null, /* @__PURE__ */ h(Item, { icon: "🎬", title: p.movie.title, subtitle: p.version.label }), p.address ? this.addressItem(p.cinema.name, p.address, p.cinema.name) : /* @__PURE__ */ h(Item, { icon: "📍", title: p.cinema.name }), /* @__PURE__ */ h(Item, { icon: "🕒", title: fmt(this.start(p)), subtitle: `預計 ${fmt(this.end(p)).slice(-5)} 散場` })), isLate(p.time) ? /* @__PURE__ */ h(Note, { kind: "warn", text: "凌晨場：已自動算到隔天日期，請再核對電影票。" }) : null, /* @__PURE__ */ h(Section, { title: "可調整" }, /* @__PURE__ */ h(
       Item,
       {
@@ -2315,7 +2404,7 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
   async movieView(m, date) {
     const d = await movieDay(m.slug, date || void 0);
     const dates = d.dates.filter((x2) => x2 >= todayTPE());
-    const runtime = d.runtime || m.runtime;
+    let runtime = d.runtime || m.runtime;
     const cities = Array.from(new Set(d.cinemas.map((c) => c.city))).sort(
       (a, b) => (CITY_ORDER.indexOf(a) + 1 || 99) - (CITY_ORDER.indexOf(b) + 1 || 99)
     );
@@ -2328,6 +2417,7 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
       this.stack[this.stack.length - 1] = () => this.movieView(m, nd);
     };
     const x = await this.extras(m.title, m.slug, m.en);
+    if (!runtime) runtime = await this.fillRuntime(m, 1500);
     return /* @__PURE__ */ h(Page, { title: m.title, subtitle: [m.rating || d.rating, runtime ? `${runtime} 分鐘` : "", `${d.cinemas.length} 間影城`].filter(Boolean).join("｜"), onBack: () => this.back() }, this.hero(x, m.title, [m.en, [m.rating || d.rating, runtime ? `${runtime} 分鐘` : ""].filter(Boolean).join("｜"), `${d.cinemas.length} 間影城有放映`]), /* @__PURE__ */ h(Section, { title: "日期" }, /* @__PURE__ */ h(Chips, null, (dates.length ? dates : [d.date]).map((x2) => /* @__PURE__ */ h(Chip, { label: dateLabel(x2).replace(/（.）.*$/, ""), sub: x2 === d.date ? "目前" : dateLabel(x2).match(/（(.)）/)?.[1] || "", muted: x2 !== d.date, onTap: () => replace(x2) })))), /* @__PURE__ */ h(Section, { title: "縣市" }, /* @__PURE__ */ h(Chips, null, ["全部", ...cities].map((c) => /* @__PURE__ */ h(Chip, { label: c, muted: c !== city, onTap: () => {
       this.movieCity = c;
     } })))), formats.length ? /* @__PURE__ */ h(Section, { title: "特殊廳" }, /* @__PURE__ */ h(Chips, null, ["", ...formats].map((f) => /* @__PURE__ */ h(Chip, { label: f || "全部", muted: f !== fmtSel, onTap: () => {

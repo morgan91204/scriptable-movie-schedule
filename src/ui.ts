@@ -1,6 +1,7 @@
 // WebView 外殼：載入一次 HTML（含 CSS），之後每次只換 <body> 內容，
 // 並用 evaluateJavaScript(..., true) 等待使用者點擊，回傳被點的 data-act。
 import { getHandler, resetHandlers, Handler } from "./jsx";
+import { imageCacheBaseUrl } from "./platform-scriptable";
 
 export const CSS = `
 :root{color-scheme:light dark;
@@ -121,7 +122,12 @@ export class UI {
   closed = false;
 
   constructor() {
-    this.ready = this.wv.loadHTML(SHELL);
+    // baseURL 指到圖片快取資料夾：海報可以用 file:// 直接顯示；萬一不接受就照舊載入（海報改走網址）
+    let base = "";
+    try {
+      base = imageCacheBaseUrl();
+    } catch (_) {}
+    this.ready = (base ? this.wv.loadHTML(SHELL, base) : this.wv.loadHTML(SHELL)).catch(() => this.wv.loadHTML(SHELL));
   }
 
   /** 顯示畫面（不等待點擊），用於讀取中。 */
