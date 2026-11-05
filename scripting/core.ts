@@ -555,7 +555,7 @@ async function atPoster(title: string): Promise<string> {
   return (html.match(/property="og:image"\s+content="([^"]+)"/) || [])[1] || "";
 }
 
-/** 海報網址（不需金鑰）：場次通電影頁 → 同片名的其他場次通頁（重映、修復版）→ 開眼電影網 */
+/** 海報網址：場次通電影頁 → 同片名的其他場次通頁（重映、修復版）→ 開眼電影網 →（有填金鑰才）TMDB */
 async function findPoster(title: string, slug?: string): Promise<string> {
   let p = await twPoster(slug || title).catch(() => ""); // 場次通的網址就是片名：先直接試，不用先下載整份電影清單
   if (p) return p;
@@ -566,7 +566,12 @@ async function findPoster(title: string, slug?: string): Promise<string> {
     p = await twPoster(c.slug).catch(() => "");
     if (p) return p;
   }
-  return atPoster(title).catch(() => "");
+  p = await atPoster(title).catch(() => "");
+  if (p) return p;
+  const token = ((await loadSettings()).tmdbToken || "").trim();
+  if (!token) return "";
+  const hit = await tmdbFind(title, token).catch(() => null);
+  return hit?.p ? "https://image.tmdb.org/t/p/w500" + hit.p : "";
 }
 
 /** 只查海報網址（約 0.3 秒），不等預告：電影頁先把海報畫出來。手機上記過的直接用（找到的 7 天、沒找到的 1 天） */
