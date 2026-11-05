@@ -489,7 +489,8 @@ export async function movieExtras(title: string, slug?: string): Promise<MovieEx
     const ttl = hasToken && !hit?.trailerName ? 0 : hit?.poster ? 7 * 86400e3 : 86400e3;
     if (hit && Date.now() - hit.at < ttl) return { poster: hit.poster, trailer: hit.trailer, trailerName: hit.trailerName };
     const out = await findExtras(title, slug);
-    if (out.err) delete extrasCache[k]; // 出錯：下次打開再試
+    // 查不到預告也保留這次執行的結果（不寫進手機快取的 err 會讓下次啟動重查）；
+    // 不能刪掉 memo，否則 Scriptable 讀好後重畫會再查一次，畫面上的海報會先消失
     const all = read();
     for (const [key, v] of Object.entries(all)) if (Date.now() - v.at > 7 * 86400e3) delete all[key]; // 清掉過期的
     const { err: _e, ...keep } = out;
@@ -497,6 +498,13 @@ export async function movieExtras(title: string, slug?: string): Promise<MovieEx
     cacheSet("extras.json", JSON.stringify(all));
     return out;
   })());
+}
+
+/** 圖片網址正規化：解掉 HTML 跳脫、\\/、//host 與 http:// 都改成 https://（iOS 的 WebView／Image 不載入 http 圖片） */
+export function normImageUrl(u: string): string {
+  let s = String(u || "").trim().replace(/&amp;/g, "&").replace(/\\\//g, "/");
+  if (s.startsWith("//")) s = "https:" + s;
+  return s.replace(/^http:\/\//i, "https://");
 }
 
 /** 場次通電影頁的海報網址：有快取就直接用，沒有就只抓 og:image（不經過 WebView 解析，比較快） */
@@ -508,7 +516,7 @@ function twPoster(slug: string): Promise<string> {
     if (movieDayCache[url]?.image) return movieDayCache[url].image!;
     const r = await get(url);
     if (!r.ok) throw new Error("no page");
-    const img = (r.body.match(/property="og:image"\s+content="([^"]+)"/) || r.body.match(/"image":"([^"]+)"/) || [])[1] || "";
+    const img = normImageUrl((r.body.match(/property="og:image"\s+content="([^"]+)"/) || r.body.match(/"image":"([^"]+)"/) || [])[1] || "");
     return /og-default/.test(img) ? "" : img; // 場次通沒有海報時會放預設圖，不算
   })());
 }
@@ -566,7 +574,7 @@ async function findExtras(title: string, slug?: string): Promise<MovieExtras> {
       return null;
     });
   const [poster, t, at] = await Promise.all([posterJob, tmdbJob, atJob]);
-  out.poster = poster || (t && "poster" in t ? t.poster : "") || "";
+  out.poster = normImageUrl(poster || (t && "poster" in t ? t.poster : "") || "");
   // 預告來源順序：TMDB 中文預告 → 開眼 → TMDB 其他語言 → YouTube 搜尋
   const tv = t && "v" in t ? t.v : null;
   const pick = tv && tv.zh ? tv : at || tv;
@@ -949,7 +957,7 @@ export function movieRatings(title: string, en?: string): Promise<Ratings> {
     const hit = read()[k];
     if (hit && Date.now() - hit.at < 3 * 86400e3 && (hit.imdb || hit.tomato || hit.popcorn)) return hit;
     const r = await findRatings(title, en);
-    if (!(r.imdb || r.tomato || r.popcorn) || r.err) delete ratingsMem[k]; // 沒查到或有錯：下次打開再試，不記住
+    // 沒查到或有錯：不寫進手機快取（下次啟動再試），但這次執行內記住結果，重畫時不用再查
     if (r.imdb || r.tomato || r.popcorn) {
       const all = read();
       for (const [key, v] of Object.entries(all)) if (Date.now() - v.at > 3 * 86400e3) delete all[key];
@@ -991,17 +999,19 @@ export async function checkLatest(current: string): Promise<{ latest: string; is
 // ───────────────────────── 訂票 ─────────────────────────
 
 /** 各連鎖的官方 App（App Store 台灣區 ID）。順序有意義：美麗新要在美麗華前面 */
-// schemes：可能的 App 網址開頭（從 App 的 bundle id 推測，官方沒有公開）；Scripting 版會逐一試開，有裝就直接進 App
+// schemes：可能的 App 網址開頭（官方沒有公開；從 App Store 的 bundle id 推測，bundle id 本身也常被拿來當 scheme）；Scripting 版會逐一試開，有裝就直接進 App
+// bundle id（2026-11 由 itunes.apple.com/lookup 查得）：威秀 com.vieshow.vscinemas、秀泰 tw.com.maimai.showtimes、國賓 tw.com.langshin.AmbassadorLookMovie、
+// 新光 com.bonjays.skcinema.test、美麗新 tw.com.miramarcinemas.MiramarCinemasBookingOnline、美麗華 com.movie.Mirmar、喜樂時代 com.century-asia.app、樂聲 com.studiow.luxcinema、百老匯 com.broadwaycinemas.app
 export const CINEMA_APPS: { re: RegExp; name: string; id: string; schemes: string[] }[] = [
-  { re: /威秀|MUVIE|^vscinemas/i, name: "威秀影城", id: "6761522320", schemes: ["vscinemas", "vieshow", "vieshowcinemas"] },
-  { re: /秀泰|^showtimes/i, name: "秀泰影城", id: "1152850053", schemes: ["showtimes", "showtimescinema", "maimaishowtimes"] },
-  { re: /國賓|^ambassador/i, name: "國賓看電影", id: "435465064", schemes: ["ambassador", "ambassadorlookmovie", "ambassadortheatres"] },
-  { re: /新光影城|^skcinemas/i, name: "新光影城", id: "6747376383", schemes: ["skcinemas", "skcinema"] },
-  { re: /美麗新/, name: "美麗新影城", id: "581548701", schemes: ["miramarcinemas", "miramarcinemasbookingonline"] },
-  { re: /美麗華|^miramar/i, name: "美麗華影城", id: "1446574681", schemes: ["miramar", "mirmar", "miramarcinema"] },
-  { re: /喜樂時代|^centuryasia/i, name: "喜樂時代影城", id: "6751645458", schemes: ["centuryasia", "century-asia"] },
-  { re: /樂聲|^lux$/i, name: "樂聲影城", id: "833368283", schemes: ["luxcinema", "lux"] },
-  { re: /百老匯/, name: "龍祥百老匯影城", id: "6446755867", schemes: ["broadwaycinemas", "broadway"] },
+  { re: /威秀|MUVIE|^vscinemas/i, name: "威秀影城", id: "6761522320", schemes: ["vscinemas", "vieshow", "vieshowcinemas", "com.vieshow.vscinemas"] },
+  { re: /秀泰|^showtimes/i, name: "秀泰影城", id: "1152850053", schemes: ["showtimes", "showtimescinema", "maimaishowtimes", "tw.com.maimai.showtimes"] },
+  { re: /國賓|^ambassador/i, name: "國賓看電影", id: "435465064", schemes: ["ambassador", "ambassadorlookmovie", "ambassadortheatres", "tw.com.langshin.AmbassadorLookMovie"] },
+  { re: /新光影城|^skcinemas/i, name: "新光影城", id: "6747376383", schemes: ["skcinemas", "skcinema", "com.bonjays.skcinema.test", "com.bonjays.skcinema"] },
+  { re: /美麗新/, name: "美麗新影城", id: "581548701", schemes: ["miramarcinemas", "miramarcinemasbookingonline", "tw.com.miramarcinemas.MiramarCinemasBookingOnline"] },
+  { re: /美麗華|^miramar/i, name: "美麗華影城", id: "1446574681", schemes: ["miramar", "mirmar", "miramarcinema", "com.movie.Mirmar"] },
+  { re: /喜樂時代|^centuryasia/i, name: "喜樂時代影城", id: "6751645458", schemes: ["centuryasia", "century-asia", "com.century-asia.app"] },
+  { re: /樂聲|^lux$/i, name: "樂聲影城", id: "833368283", schemes: ["luxcinema", "lux", "com.studiow.luxcinema"] },
+  { re: /百老匯/, name: "龍祥百老匯影城", id: "6446755867", schemes: ["broadwaycinemas", "broadway", "com.broadwaycinemas.app"] },
 ];
 
 /** 這間影城的官方 App（沒有就回傳 null） */

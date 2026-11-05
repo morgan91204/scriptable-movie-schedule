@@ -253,50 +253,67 @@ function AddressRow({ name, address, title }: { name: string; address: string; t
   </Button>
 }
 
-/** 電影頁頂端：海報在左，資訊與紅色預告按鈕在右（跟 Scriptable 版一樣） */
-/** 評分徽章：IMDb／番茄指數／爆米花指數，顏色依分數（綠 ≥75、黃 60–74、紅 <60） */
+/** 評分徽章：IMDb／番茄指數／爆米花指數，顏色依分數（綠 ≥75、黃 60–74、紅 <60）；none = 沒有這項評分（顯示「-」、灰色、不可點） */
 // 注意：Scripting 的顏色只接受 #RRGGBB、#RGB、rgba() 與系統色名稱，8 碼 hex 會讓畫面出錯
 const TIER = {
   good: { fg: "systemGreen", bg: "rgba(48, 209, 88, 0.18)" },
   mid: { fg: "systemOrange", bg: "rgba(255, 159, 10, 0.2)" },
   bad: { fg: "systemRed", bg: "rgba(255, 69, 58, 0.18)" },
+  none: { fg: "secondaryLabel", bg: "rgba(120, 120, 128, 0.16)" },
 }
-function RatingBadge({ kind, value, tier, note, url }: { kind: "imdb" | "tomato" | "popcorn"; value: string; tier: "good" | "mid" | "bad"; note?: string; url: string }) {
+type Tier = keyof typeof TIER
+function RatingBadge({ kind, value, tier, note, url }: { kind: "imdb" | "tomato" | "popcorn"; value: string; tier: Tier; note?: string; url?: string }) {
   const c = TIER[tier]
   const icon = kind === "tomato" ? (tier === "bad" ? "🤢" : "🍅") : kind === "popcorn" ? (tier === "bad" ? "🫗" : "🍿") : ""
-  return <Button action={() => Safari.openURL(url)} buttonStyle={"plain"}>
-    <HStack spacing={2} padding={{ horizontal: 5, vertical: 2 }} background={c.bg} clipShape={{ type: "rect", cornerRadius: 6 }}>
+  // 字體用 caption2、留白縮到最小：三個徽章在 iPhone mini／SE 的寬度也放得下一排，不會被截斷
+  return <Button action={() => (url ? Safari.openURL(url) : undefined)} buttonStyle={"plain"} disabled={!url}>
+    <HStack spacing={2} padding={{ horizontal: 4, vertical: 2 }} background={c.bg} clipShape={{ type: "rect", cornerRadius: 6 }}>
       {kind === "imdb"
-        ? <Text font={"caption2"} fontWeight={"heavy"} foregroundStyle={"black"} padding={{ horizontal: 2, vertical: 0 }} background={"#F5C518"} clipShape={{ type: "rect", cornerRadius: 3 }}>IMDb</Text>
+        ? <Text font={"caption2"} fontWeight={"heavy"} foregroundStyle={"black"} padding={{ horizontal: 2, vertical: 0 }} background={tier === "none" ? "#C7C7CC" : "#F5C518"} clipShape={{ type: "rect", cornerRadius: 3 }}>IMDb</Text>
         : <Text font={"caption2"}>{icon}</Text>}
-      <Text font={"caption"} fontWeight={"bold"} foregroundStyle={c.fg} lineLimit={1}>{value + (note ? "✓" : "")}</Text>
+      <Text font={"caption2"} fontWeight={"bold"} foregroundStyle={c.fg} lineLimit={1}>{value + (note ? "✓" : "")}</Text>
     </HStack>
   </Button>
 }
 
+/** 電影頁頂端：海報在左，資訊、評分與紅色預告按鈕在右（跟 Scriptable 版一樣） */
 function MovieHero({ title, slug, lines, en }: { title: string; slug?: string; lines: string[]; en?: string }) {
   const x = useLoad(() => movieExtras(title, slug), [title, slug || ""])
   const rt = useLoad(() => movieRatings(title, en), [title, en || ""])
+  const [opening, setOpening] = useState(false)
   const r = rt.data
-  const url = x.data?.trailer || `https://www.youtube.com/results?search_query=${encodeURIComponent(title + " 預告")}`
+  const search = `https://www.youtube.com/results?search_query=${encodeURIComponent(title + " 預告")}`
+  // 點「觀看預告」：還在讀就等讀好再開（movieExtras 會回傳同一個進行中的查詢），不會先開成搜尋頁
+  const openTrailer = async () => {
+    let d = x.data
+    if (!d) {
+      setOpening(true)
+      d = await movieExtras(title, slug).catch(() => null)
+      setOpening(false)
+    }
+    await Safari.openURL(d?.trailer || search)
+  }
+  const trailerLabel = opening ? "預告讀取中…" : !x.data || x.data.trailerName ? "觀看預告" : "搜尋預告"
+  const loaded = !!(r && (r.imdb || r.tomato || r.popcorn))
   return <Section>
-    <HStack alignment={"bottom"} spacing={14} listRowBackground={"clear"}>
+    <HStack alignment={"bottom"} spacing={12} listRowBackground={"clear"}>
       {x.data?.poster
-        ? <Image imageUrl={x.data.poster} resizable scaleToFit frame={{ width: 112, height: 168 }}
+        ? <Image imageUrl={x.data.poster} resizable scaleToFit frame={{ width: 104, height: 156 }}
             clipShape={{ type: "rect", cornerRadius: 12 }} placeholder={<ProgressView progressViewStyle={"circular"} />} />
-        : x.data ? null : <ProgressView progressViewStyle={"circular"} frame={{ width: 112, height: 168 }} />}
+        : x.data ? null : <ProgressView progressViewStyle={"circular"} frame={{ width: 104, height: 156 }} />}
       <VStack alignment={"leading"} spacing={4}>
         {lines.filter(Boolean).map((l) => <Text key={l} font={"subheadline"} foregroundStyle={"secondaryLabel"}>{l}</Text>)}
-        {r && (r.imdb || r.tomato || r.popcorn) ? <HStack spacing={3}>
-          {r.imdb ? <RatingBadge kind={"imdb"} value={r.imdb.score.toFixed(1)} tier={ratingTier("imdb", r.imdb.score)} url={r.imdb.url} /> : null}
-          {r.tomato ? <RatingBadge kind={"tomato"} value={`${r.tomato.score}%`} tier={ratingTier("pct", r.tomato.score)} note={r.tomato.certified ? "認證" : undefined} url={r.tomato.url} /> : null}
-          {r.popcorn ? <RatingBadge kind={"popcorn"} value={`${r.popcorn.score}%`} tier={ratingTier("pct", r.popcorn.score)} url={r.popcorn.url} /> : null}
+        {/* 評分讀好後三個徽章都顯示：沒有那項評分就是「-」（跟「還沒抓到」分得開） */}
+        {r ? <HStack spacing={3}>
+          {r.imdb ? <RatingBadge kind={"imdb"} value={r.imdb.score.toFixed(1)} tier={ratingTier("imdb", r.imdb.score)} url={r.imdb.url} /> : <RatingBadge kind={"imdb"} value={"-"} tier={"none"} />}
+          {r.tomato ? <RatingBadge kind={"tomato"} value={`${r.tomato.score}%`} tier={ratingTier("pct", r.tomato.score)} note={r.tomato.certified ? "認證" : undefined} url={r.tomato.url} /> : <RatingBadge kind={"tomato"} value={"-"} tier={"none"} />}
+          {r.popcorn ? <RatingBadge kind={"popcorn"} value={`${r.popcorn.score}%`} tier={ratingTier("pct", r.popcorn.score)} url={r.popcorn.url} /> : <RatingBadge kind={"popcorn"} value={"-"} tier={"none"} />}
         </HStack> : null}
         {!r && !rt.error ? <Text font={"caption"} foregroundStyle={"tertiaryLabel"}>評分讀取中…</Text> : null}
-        {(r && !(r.imdb || r.tomato || r.popcorn)) || rt.error
-          ? <Text font={"caption2"} foregroundStyle={"tertiaryLabel"}>{`評分讀不到：${rt.error || r?.err || "查無資料"}`}</Text> : null}
-        <Button action={() => Safari.openURL(url)} buttonStyle={"borderedProminent"} buttonBorderShape={"capsule"} tint={"systemRed"} padding={{ top: 6 }}>
-          <Label title={!x.data || x.data.trailerName ? "觀看預告" : "搜尋預告"} systemImage={"play.fill"} font={"subheadline"} fontWeight={"semibold"} lineLimit={1} />
+        {(r && !loaded && r.err) || rt.error
+          ? <Text font={"caption2"} foregroundStyle={"tertiaryLabel"}>{`評分讀不到：${rt.error || r?.err}`}</Text> : null}
+        <Button action={openTrailer} buttonStyle={"borderedProminent"} buttonBorderShape={"capsule"} tint={"systemRed"} padding={{ top: 6 }} disabled={opening}>
+          <Label title={trailerLabel} systemImage={"play.fill"} font={"subheadline"} fontWeight={"semibold"} lineLimit={1} />
         </Button>
         {x.data?.err ? <Text font={"caption2"} foregroundStyle={"tertiaryLabel"}>{`預告：${x.data.err}`}</Text> : null}
         {x.error ? <Text font={"caption2"} foregroundStyle={"tertiaryLabel"}>{`預告讀不到：${x.error}`}</Text> : null}
@@ -639,7 +656,7 @@ function ConfirmPage({ pick }: { pick: Pick }) {
         : <Button title={busy ? "加入中…" : "加入行事曆"} systemImage={"calendar.badge.plus"} disabled={busy} action={save} />}
     </Section>
 
-    <Section footer={cinemaApp(pick.cinema) ? <Text>{`App 訂票會打開 App Store 的「${cinemaApp(pick.cinema)!.name}」頁面：已安裝點「打開」，沒安裝可以直接下載。`}</Text> : <Text>這間影城沒有官方 App，請用瀏覽器訂票。</Text>}>
+    <Section footer={cinemaApp(pick.cinema) ? <Text>{`已安裝「${cinemaApp(pick.cinema)!.name}」App 會直接開啟；開不了時會打開 App Store 頁面（已安裝點「打開」，沒安裝可以直接下載）。`}</Text> : <Text>這間影城沒有官方 App，請用瀏覽器訂票。</Text>}>
       <Button title={"以瀏覽器訂票"} systemImage={"globe"} action={async () => Safari.openURL(await bookingUrl(pick))} />
       {cinemaApp(pick.cinema) ? <Button title={`以 App 訂票（${cinemaApp(pick.cinema)!.name}）`} systemImage={"iphone"} action={() => openCinemaApp(pick.cinema)} /> : null}
     </Section>

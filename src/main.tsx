@@ -416,12 +416,16 @@ class App {
   hero(e: { x: MovieExtras | null; r: Ratings | null; px: Promise<MovieExtras | null>; loading: boolean }, title: string, lines: string[]): string {
     const { x, r } = e;
     const search = `https://www.youtube.com/results?search_query=${encodeURIComponent(title + " 預告")}`;
+    // 評分讀好後三個徽章都顯示：沒有那項評分就是「-」（跟「還沒抓到」分得開）
     const badges: RatingBadge[] = [];
-    if (r?.imdb) badges.push({ kind: "imdb", value: r.imdb.score.toFixed(1), tier: ratingTier("imdb", r.imdb.score), onTap: () => Safari.open(r.imdb!.url) });
-    if (r?.tomato) badges.push({ kind: "tomato", value: `${r.tomato.score}%`, tier: ratingTier("pct", r.tomato.score), note: r.tomato.certified ? "✓" : undefined, onTap: () => Safari.open(r.tomato!.url) });
-    if (r?.popcorn) badges.push({ kind: "popcorn", value: `${r.popcorn.score}%`, tier: ratingTier("pct", r.popcorn.score), onTap: () => Safari.open(r.popcorn!.url) });
-    if (!badges.length && e.loading) lines = [...lines, "評分讀取中…"];
-    else if (!badges.length && r?.err) lines = [...lines, `評分讀不到：${r.err}`];
+    if (r) {
+      badges.push(r.imdb ? { kind: "imdb", value: r.imdb.score.toFixed(1), tier: ratingTier("imdb", r.imdb.score), onTap: () => Safari.open(r.imdb!.url) } : { kind: "imdb", value: "-", tier: "none" });
+      badges.push(r.tomato ? { kind: "tomato", value: `${r.tomato.score}%`, tier: ratingTier("pct", r.tomato.score), note: r.tomato.certified ? "✓" : undefined, onTap: () => Safari.open(r.tomato!.url) } : { kind: "tomato", value: "-", tier: "none" });
+      badges.push(r.popcorn ? { kind: "popcorn", value: `${r.popcorn.score}%`, tier: ratingTier("pct", r.popcorn.score), onTap: () => Safari.open(r.popcorn!.url) } : { kind: "popcorn", value: "-", tier: "none" });
+    }
+    if (!r && e.loading) lines = [...lines, "評分讀取中…"];
+    else if (!r) lines = [...lines, "評分讀不到"];
+    if (r?.err && !(r.imdb || r.tomato || r.popcorn)) lines = [...lines, `評分讀不到：${r.err}`];
     if (x?.err) lines = [...lines, `預告：${x.err}`];
     return (
       <Hero
@@ -532,7 +536,10 @@ class App {
       <>
         <Button label="🌐 以瀏覽器訂票" kind="secondary" onTap={async () => Safari.open(await bookingUrl(p))} />
         {app ? (
-          <Button label={`📱 以 App 訂票（${app.name}）`} kind="secondary" onTap={() => Safari.open(app.url)} />
+          <>
+            <Button label={`📱 以 App 訂票（${app.name}）`} kind="secondary" onTap={() => Safari.open(app.url)} />
+            <Note text={`會打開 App Store 的「${app.name}」頁面：已安裝的話點「打開」就進 App，沒安裝可以直接下載。`} />
+          </>
         ) : (
           <Note text="這間影城沒有官方 App，請用瀏覽器訂票。" />
         )}

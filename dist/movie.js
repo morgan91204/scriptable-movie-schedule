@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.05-2241
+// @movie-schedule-app 電影行程 v2026.11.05-2306
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/jsx.tsx
@@ -75,7 +75,7 @@ function Button(props) {
 }
 function Badges(props) {
   if (!props.items.length) return "";
-  return /* @__PURE__ */ h("div", { class: "ratings" }, props.items.map((b) => /* @__PURE__ */ h("button", { class: "rate " + b.tier, onTap: b.onTap }, b.kind === "imdb" ? /* @__PURE__ */ h("span", { class: "imdb" }, "IMDb") : /* @__PURE__ */ h("span", { class: "emo" }, b.kind === "tomato" ? b.tier === "bad" ? "🤢" : "🍅" : b.tier === "bad" ? "🫗" : "🍿"), /* @__PURE__ */ h("span", { class: "v" }, esc(b.value)), b.note ? /* @__PURE__ */ h("span", { class: "n" }, esc(b.note)) : null)));
+  return /* @__PURE__ */ h("div", { class: "ratings" }, props.items.map((b) => /* @__PURE__ */ h("button", { class: "rate " + b.tier, onTap: b.tier === "none" ? void 0 : b.onTap, "aria-label": b.kind === "imdb" ? "IMDb" : b.kind === "tomato" ? "番茄指數" : "爆米花指數" }, b.kind === "imdb" ? /* @__PURE__ */ h("span", { class: "imdb" }, "IMDb") : /* @__PURE__ */ h("span", { class: "emo" }, b.kind === "tomato" ? b.tier === "bad" ? "🤢" : "🍅" : b.tier === "bad" ? "🫗" : "🍿"), /* @__PURE__ */ h("span", { class: "v" }, esc(b.value)), b.note ? /* @__PURE__ */ h("span", { class: "n" }, esc(b.note)) : null)));
 }
 function Hero(props) {
   return /* @__PURE__ */ h("div", { class: "hero" }, props.poster ? /* @__PURE__ */ h("img", { class: "poster", src: props.poster, alt: "", onerror: "this.style.display='none'" }) : null, /* @__PURE__ */ h("div", { class: "hero-info" }, props.lines.filter(Boolean).map((l) => /* @__PURE__ */ h("div", { class: "hero-line" }, esc(l))), props.badges ? /* @__PURE__ */ h(Badges, { items: props.badges }) : null, props.onTrailer ? /* @__PURE__ */ h("button", { class: "trailer", onTap: props.onTrailer }, "▶︎ ", esc(props.trailerLabel || "觀看預告")) : null));
@@ -148,11 +148,14 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .hero .poster{width:112px;aspect-ratio:2/3;object-fit:cover;border-radius:12px;background:var(--chip);box-shadow:0 4px 14px rgba(0,0,0,.25);flex:none}
 .hero-info{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
 .hero-line{font-size:14px;color:var(--fg2)}
-.ratings{display:flex;flex-wrap:nowrap;gap:4px;margin-top:6px;overflow:hidden}
-.rate{display:flex;align-items:center;gap:3px;padding:3px 6px;border-radius:7px;font-size:12px;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap;flex:none}
+.ratings{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px;overflow:visible}
+.rate{display:flex;align-items:center;gap:3px;padding:3px 5px;border-radius:7px;font-size:12px;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap;flex:none;line-height:1.2}
 .rate.good{background:rgba(48,209,88,.18);color:#1f9d45}
 .rate.mid{background:rgba(255,159,10,.2);color:#c77700}
 .rate.bad{background:rgba(255,69,58,.18);color:#d63a31}
+.rate.none{background:var(--chip);color:var(--fg2);opacity:.8}
+.rate.none .emo{filter:grayscale(1);opacity:.7}
+.rate.none .imdb{opacity:.55}
 @media(prefers-color-scheme:dark){.rate.good{color:#30d158}.rate.mid{color:#ffb340}.rate.bad{color:#ff6961}}
 .rate .imdb{background:#f5c518;color:#000;font-size:9px;font-weight:800;padding:1px 3px;border-radius:3px;letter-spacing:-.2px}
 .rate .emo{font-size:12px}
@@ -1220,7 +1223,6 @@ async function movieExtras(title, slug) {
     const ttl = hasToken && !hit?.trailerName ? 0 : hit?.poster ? 7 * 864e5 : 864e5;
     if (hit && Date.now() - hit.at < ttl) return { poster: hit.poster, trailer: hit.trailer, trailerName: hit.trailerName };
     const out = await findExtras(title, slug);
-    if (out.err) delete extrasCache[k];
     const all = read();
     for (const [key, v] of Object.entries(all)) if (Date.now() - v.at > 7 * 864e5) delete all[key];
     const { err: _e, ...keep } = out;
@@ -1228,6 +1230,11 @@ async function movieExtras(title, slug) {
     cacheSet("extras.json", JSON.stringify(all));
     return out;
   })();
+}
+function normImageUrl(u) {
+  let s = String(u || "").trim().replace(/&amp;/g, "&").replace(/\\\//g, "/");
+  if (s.startsWith("//")) s = "https:" + s;
+  return s.replace(/^http:\/\//i, "https://");
 }
 var posterMem = {};
 function twPoster(slug) {
@@ -1237,7 +1244,7 @@ function twPoster(slug) {
     if (movieDayCache[url]?.image) return movieDayCache[url].image;
     const r = await get(url);
     if (!r.ok) throw new Error("no page");
-    const img = (r.body.match(/property="og:image"\s+content="([^"]+)"/) || r.body.match(/"image":"([^"]+)"/) || [])[1] || "";
+    const img = normImageUrl((r.body.match(/property="og:image"\s+content="([^"]+)"/) || r.body.match(/"image":"([^"]+)"/) || [])[1] || "");
     return /og-default/.test(img) ? "" : img;
   })();
 }
@@ -1290,7 +1297,7 @@ async function findExtras(title, slug) {
     return null;
   });
   const [poster, t, at] = await Promise.all([posterJob, tmdbJob, atJob]);
-  out.poster = poster || (t && "poster" in t ? t.poster : "") || "";
+  out.poster = normImageUrl(poster || (t && "poster" in t ? t.poster : "") || "");
   const tv = t && "v" in t ? t.v : null;
   const pick = tv && tv.zh ? tv : at || tv;
   if (pick) {
@@ -1565,7 +1572,6 @@ function movieRatings(title, en) {
     const hit = read()[k];
     if (hit && Date.now() - hit.at < 3 * 864e5 && (hit.imdb || hit.tomato || hit.popcorn)) return hit;
     const r = await findRatings(title, en);
-    if (!(r.imdb || r.tomato || r.popcorn) || r.err) delete ratingsMem[k];
     if (r.imdb || r.tomato || r.popcorn) {
       const all = read();
       for (const [key, v] of Object.entries(all)) if (Date.now() - v.at > 3 * 864e5) delete all[key];
@@ -1594,15 +1600,15 @@ async function checkLatest(current2) {
   }
 }
 var CINEMA_APPS = [
-  { re: /威秀|MUVIE|^vscinemas/i, name: "威秀影城", id: "6761522320", schemes: ["vscinemas", "vieshow", "vieshowcinemas"] },
-  { re: /秀泰|^showtimes/i, name: "秀泰影城", id: "1152850053", schemes: ["showtimes", "showtimescinema", "maimaishowtimes"] },
-  { re: /國賓|^ambassador/i, name: "國賓看電影", id: "435465064", schemes: ["ambassador", "ambassadorlookmovie", "ambassadortheatres"] },
-  { re: /新光影城|^skcinemas/i, name: "新光影城", id: "6747376383", schemes: ["skcinemas", "skcinema"] },
-  { re: /美麗新/, name: "美麗新影城", id: "581548701", schemes: ["miramarcinemas", "miramarcinemasbookingonline"] },
-  { re: /美麗華|^miramar/i, name: "美麗華影城", id: "1446574681", schemes: ["miramar", "mirmar", "miramarcinema"] },
-  { re: /喜樂時代|^centuryasia/i, name: "喜樂時代影城", id: "6751645458", schemes: ["centuryasia", "century-asia"] },
-  { re: /樂聲|^lux$/i, name: "樂聲影城", id: "833368283", schemes: ["luxcinema", "lux"] },
-  { re: /百老匯/, name: "龍祥百老匯影城", id: "6446755867", schemes: ["broadwaycinemas", "broadway"] }
+  { re: /威秀|MUVIE|^vscinemas/i, name: "威秀影城", id: "6761522320", schemes: ["vscinemas", "vieshow", "vieshowcinemas", "com.vieshow.vscinemas"] },
+  { re: /秀泰|^showtimes/i, name: "秀泰影城", id: "1152850053", schemes: ["showtimes", "showtimescinema", "maimaishowtimes", "tw.com.maimai.showtimes"] },
+  { re: /國賓|^ambassador/i, name: "國賓看電影", id: "435465064", schemes: ["ambassador", "ambassadorlookmovie", "ambassadortheatres", "tw.com.langshin.AmbassadorLookMovie"] },
+  { re: /新光影城|^skcinemas/i, name: "新光影城", id: "6747376383", schemes: ["skcinemas", "skcinema", "com.bonjays.skcinema.test", "com.bonjays.skcinema"] },
+  { re: /美麗新/, name: "美麗新影城", id: "581548701", schemes: ["miramarcinemas", "miramarcinemasbookingonline", "tw.com.miramarcinemas.MiramarCinemasBookingOnline"] },
+  { re: /美麗華|^miramar/i, name: "美麗華影城", id: "1446574681", schemes: ["miramar", "mirmar", "miramarcinema", "com.movie.Mirmar"] },
+  { re: /喜樂時代|^centuryasia/i, name: "喜樂時代影城", id: "6751645458", schemes: ["centuryasia", "century-asia", "com.century-asia.app"] },
+  { re: /樂聲|^lux$/i, name: "樂聲影城", id: "833368283", schemes: ["luxcinema", "lux", "com.studiow.luxcinema"] },
+  { re: /百老匯/, name: "龍祥百老匯影城", id: "6446755867", schemes: ["broadwaycinemas", "broadway", "com.broadwaycinemas.app"] }
 ];
 function cinemaApp(c) {
   const a = CINEMA_APPS.find((x) => x.re.test(c.name) || x.re.test(c.id));
@@ -1652,7 +1658,7 @@ var App = class {
     this.loadingText = "讀取中…";
     // ── 事件迴圈 ──
     // 背景查 GitHub 上的最新版本（首頁顯示是否為最新版）
-    this.latest = checkLatest("2026.11.05-2241");
+    this.latest = checkLatest("2026.11.05-2306");
     // ── 搜尋 ──
     this.query = "";
     this.tmdbStatus = "";
@@ -1756,11 +1762,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.05-2241"}`);
+          Pasteboard.copy(`版本 ${"2026.11.05-2306"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.05-2241"}`,
+      `版本 ${"2026.11.05-2306"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -1908,11 +1914,14 @@ var App = class {
     const { x, r } = e;
     const search = `https://www.youtube.com/results?search_query=${encodeURIComponent(title + " 預告")}`;
     const badges = [];
-    if (r?.imdb) badges.push({ kind: "imdb", value: r.imdb.score.toFixed(1), tier: ratingTier("imdb", r.imdb.score), onTap: () => Safari.open(r.imdb.url) });
-    if (r?.tomato) badges.push({ kind: "tomato", value: `${r.tomato.score}%`, tier: ratingTier("pct", r.tomato.score), note: r.tomato.certified ? "✓" : void 0, onTap: () => Safari.open(r.tomato.url) });
-    if (r?.popcorn) badges.push({ kind: "popcorn", value: `${r.popcorn.score}%`, tier: ratingTier("pct", r.popcorn.score), onTap: () => Safari.open(r.popcorn.url) });
-    if (!badges.length && e.loading) lines = [...lines, "評分讀取中…"];
-    else if (!badges.length && r?.err) lines = [...lines, `評分讀不到：${r.err}`];
+    if (r) {
+      badges.push(r.imdb ? { kind: "imdb", value: r.imdb.score.toFixed(1), tier: ratingTier("imdb", r.imdb.score), onTap: () => Safari.open(r.imdb.url) } : { kind: "imdb", value: "-", tier: "none" });
+      badges.push(r.tomato ? { kind: "tomato", value: `${r.tomato.score}%`, tier: ratingTier("pct", r.tomato.score), note: r.tomato.certified ? "✓" : void 0, onTap: () => Safari.open(r.tomato.url) } : { kind: "tomato", value: "-", tier: "none" });
+      badges.push(r.popcorn ? { kind: "popcorn", value: `${r.popcorn.score}%`, tier: ratingTier("pct", r.popcorn.score), onTap: () => Safari.open(r.popcorn.url) } : { kind: "popcorn", value: "-", tier: "none" });
+    }
+    if (!r && e.loading) lines = [...lines, "評分讀取中…"];
+    else if (!r) lines = [...lines, "評分讀不到"];
+    if (r?.err && !(r.imdb || r.tomato || r.popcorn)) lines = [...lines, `評分讀不到：${r.err}`];
     if (x?.err) lines = [...lines, `預告：${x.err}`];
     return /* @__PURE__ */ h(
       Hero,
@@ -1984,7 +1993,7 @@ var App = class {
   /** 以瀏覽器訂票／以 App 訂票 */
   bookingButtons(p) {
     const app = cinemaApp(p.cinema);
-    return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Button, { label: "🌐 以瀏覽器訂票", kind: "secondary", onTap: async () => Safari.open(await bookingUrl(p)) }), app ? /* @__PURE__ */ h(Button, { label: `📱 以 App 訂票（${app.name}）`, kind: "secondary", onTap: () => Safari.open(app.url) }) : /* @__PURE__ */ h(Note, { text: "這間影城沒有官方 App，請用瀏覽器訂票。" }));
+    return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Button, { label: "🌐 以瀏覽器訂票", kind: "secondary", onTap: async () => Safari.open(await bookingUrl(p)) }), app ? /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Button, { label: `📱 以 App 訂票（${app.name}）`, kind: "secondary", onTap: () => Safari.open(app.url) }), /* @__PURE__ */ h(Note, { text: `會打開 App Store 的「${app.name}」頁面：已安裝的話點「打開」就進 App，沒安裝可以直接下載。` })) : /* @__PURE__ */ h(Note, { text: "這間影城沒有官方 App，請用瀏覽器訂票。" }));
   }
   runtimeView() {
     return /* @__PURE__ */ h(Page, { title: "片長", onBack: () => this.back() }, /* @__PURE__ */ h(Note, { text: "請依官網或電影票輸入正片分鐘數。" }), /* @__PURE__ */ h("input", { class: "field", name: "v", type: "number", inputmode: "numeric", value: this.runtime || "", placeholder: "例如 120", autofocus: true }), /* @__PURE__ */ h(

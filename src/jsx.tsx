@@ -168,16 +168,17 @@ export function Button(props: { label: string; onTap?: Handler; kind?: "primary"
 export interface RatingBadge {
   kind: "imdb" | "tomato" | "popcorn";
   value: string; // 顯示的分數，例如 8.5、94%
-  tier: "good" | "mid" | "bad";
+  tier: "good" | "mid" | "bad" | "none"; // none = 沒有這項評分
   note?: string; // 例如「新鮮認證」
   onTap?: Handler;
 }
+/** 評分徽章列：tier 為 none 表示沒有這項評分（顯示「-」，灰色、不可點） */
 export function Badges(props: { items: RatingBadge[] }): string {
   if (!props.items.length) return "";
   return (
     <div class="ratings">
       {props.items.map((b) => (
-        <button class={"rate " + b.tier} onTap={b.onTap}>
+        <button class={"rate " + b.tier} onTap={b.tier === "none" ? undefined : b.onTap} aria-label={b.kind === "imdb" ? "IMDb" : b.kind === "tomato" ? "番茄指數" : "爆米花指數"}>
           {b.kind === "imdb" ? <span class="imdb">IMDb</span> : <span class="emo">{b.kind === "tomato" ? (b.tier === "bad" ? "🤢" : "🍅") : b.tier === "bad" ? "🫗" : "🍿"}</span>}
           <span class="v">{esc(b.value)}</span>
           {b.note ? <span class="n">{esc(b.note)}</span> : null}
