@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.05-2322
+// @movie-schedule-app 電影行程 v2026.11.05-2332
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/jsx.tsx
@@ -1303,24 +1303,32 @@ function twPoster(slug) {
   })();
 }
 async function findPoster(title, slug) {
-  if (slug) return twPoster(slug);
-  try {
-    return await twPoster(title);
-  } catch (_) {
-  }
+  let p = await twPoster(slug || title).catch(() => "");
+  if (p) return p;
   const list = await loadMovies();
   const key = normTitle(title), bkey = normTitle(baseTitle(title));
-  const s = (list.find((m) => normTitle(m.title) === key) || list.find((m) => normTitle(baseTitle(m.title)) === bkey))?.slug;
-  return s ? twPoster(s) : "";
+  const cands = list.filter((m) => m.slug !== (slug || title) && (normTitle(m.title) === key || normTitle(baseTitle(m.title)) === bkey));
+  for (const c of cands) {
+    p = await twPoster(c.slug).catch(() => "");
+    if (p) return p;
+  }
+  return "";
 }
 var posterOnly = {};
 function moviePoster(title, slug) {
   const k = (slug || "") + "|" + title;
   return posterOnly[k] ||= (async () => {
+    const nk = normTitle(title);
     const all = readExtras();
-    const hit = all["t|" + normTitle(title)] || all["n|" + normTitle(title)];
+    const hit = all["t|" + nk] || all["n|" + nk];
     if (hit?.poster) return hit.poster;
-    return normImageUrl(await findPoster(title, slug).catch(() => ""));
+    const own = all["p|" + nk];
+    if (own && Date.now() - own.at < (own.poster ? 7 : 1) * 864e5) return own.poster;
+    const poster = normImageUrl(await findPoster(title, slug).catch(() => ""));
+    const latest = readExtras();
+    latest["p|" + nk] = { poster, trailer: "", trailerName: "", at: Date.now() };
+    cacheSet("extras.json", JSON.stringify(latest));
+    return poster;
   })();
 }
 function posterSrc(url) {
@@ -1339,7 +1347,7 @@ function cachePoster(url) {
   }
 }
 var prefetched = /* @__PURE__ */ new Set();
-function prefetchPosters(items, max = 30, trailers = 10) {
+function prefetchPosters(items, max = 200, trailers = 30) {
   const queue = [];
   items.slice(0, max).forEach((m, i) => {
     const k = (m.slug || "") + "|" + m.title;
@@ -1357,7 +1365,7 @@ function prefetchPosters(items, max = 30, trailers = 10) {
       }
     }
   };
-  for (let i = 0; i < 2; i++) run();
+  for (let i = 0; i < 3; i++) run();
 }
 async function findExtras(title, slug) {
   const base = baseTitle(title);
@@ -1760,7 +1768,7 @@ var App = class {
     this.loadingText = "讀取中…";
     // ── 事件迴圈 ──
     // 背景查 GitHub 上的最新版本（首頁顯示是否為最新版）
-    this.latest = checkLatest("2026.11.05-2322");
+    this.latest = checkLatest("2026.11.05-2332");
     // ── 搜尋 ──
     this.query = "";
     this.tmdbStatus = "";
@@ -1864,11 +1872,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.05-2322"}`);
+          Pasteboard.copy(`版本 ${"2026.11.05-2332"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.05-2322"}`,
+      `版本 ${"2026.11.05-2332"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }

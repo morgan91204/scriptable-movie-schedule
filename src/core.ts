@@ -523,28 +523,36 @@ function twPoster(slug: string): Promise<string> {
   })());
 }
 
-/** 場次通的海報網址（不需金鑰）：有 slug 直接查，否則用片名試，再不行從電影清單對片名 */
+/** 場次通的海報網址（不需金鑰）：有 slug 直接查，否則用片名試；沒有海報（重映、修復版常見）再從電影清單找同片名的其他場次通頁 */
 async function findPoster(title: string, slug?: string): Promise<string> {
-  if (slug) return twPoster(slug);
-  // 場次通的網址就是片名：先直接試，不用先下載整份電影清單
-  try {
-    return await twPoster(title);
-  } catch (_) {}
+  let p = await twPoster(slug || title).catch(() => ""); // 場次通的網址就是片名：先直接試，不用先下載整份電影清單
+  if (p) return p;
   const list = await loadMovies();
   const key = normTitle(title), bkey = normTitle(baseTitle(title));
-  const s = (list.find((m) => normTitle(m.title) === key) || list.find((m) => normTitle(baseTitle(m.title)) === bkey))?.slug;
-  return s ? twPoster(s) : "";
+  const cands = list.filter((m) => m.slug !== (slug || title) && (normTitle(m.title) === key || normTitle(baseTitle(m.title)) === bkey));
+  for (const c of cands) {
+    p = await twPoster(c.slug).catch(() => "");
+    if (p) return p;
+  }
+  return "";
 }
 
-/** 只查海報網址（約 0.3 秒），不等預告：電影頁先把海報畫出來。手機上記過的直接用 */
+/** 只查海報網址（約 0.3 秒），不等預告：電影頁先把海報畫出來。手機上記過的直接用（找到的 7 天、沒找到的 1 天） */
 const posterOnly: Record<string, Promise<string>> = {};
 export function moviePoster(title: string, slug?: string): Promise<string> {
   const k = (slug || "") + "|" + title;
   return (posterOnly[k] ||= (async () => {
+    const nk = normTitle(title);
     const all = readExtras();
-    const hit = all["t|" + normTitle(title)] || all["n|" + normTitle(title)];
+    const hit = all["t|" + nk] || all["n|" + nk];
     if (hit?.poster) return hit.poster;
-    return normImageUrl(await findPoster(title, slug).catch(() => ""));
+    const own = all["p|" + nk]; // 只查過海報的紀錄
+    if (own && Date.now() - own.at < (own.poster ? 7 : 1) * 86400e3) return own.poster;
+    const poster = normImageUrl(await findPoster(title, slug).catch(() => ""));
+    const latest = readExtras();
+    latest["p|" + nk] = { poster, trailer: "", trailerName: "", at: Date.now() };
+    cacheSet("extras.json", JSON.stringify(latest));
+    return poster;
   })());
 }
 
@@ -567,8 +575,8 @@ export function cachePoster(url: string): void {
   } catch (_) {}
 }
 const prefetched = new Set<string>();
-/** 列表出現時在背景預抓：前 max 部的海報網址與海報圖（一次 2 個），前 trailers 部連預告也先查，之後進電影頁就不用等 */
-export function prefetchPosters(items: { title: string; slug?: string }[], max = 30, trailers = 10): void {
+/** 列表出現時在背景預抓：整份清單（最多 max 部）的海報網址與海報圖，一次 3 個；前 trailers 部連預告也先查，之後進電影頁就不用等 */
+export function prefetchPosters(items: { title: string; slug?: string }[], max = 200, trailers = 30): void {
   const queue: { title: string; slug?: string; trailer: boolean }[] = [];
   items.slice(0, max).forEach((m, i) => {
     const k = (m.slug || "") + "|" + m.title;
@@ -585,7 +593,7 @@ export function prefetchPosters(items: { title: string; slug?: string }[], max =
       } catch (_) {}
     }
   };
-  for (let i = 0; i < 2; i++) run();
+  for (let i = 0; i < 3; i++) run();
 }
 
 async function findExtras(title: string, slug?: string): Promise<MovieExtras> {
