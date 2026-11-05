@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.05-2345
+// @movie-schedule-app 電影行程 v2026.11.05-2354
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/jsx.tsx
@@ -1276,17 +1276,18 @@ async function movieExtras(title, slug) {
     const ck = (hasToken ? "t|" : "n|") + normTitle(title);
     const read = readExtras;
     const hit = read()[ck];
-    const ttl = hasToken && !hit?.trailerName ? 0 : hit?.poster ? 7 * 864e5 : 864e5;
+    const ttl = !hit?.trailerName ? hit?.v === EXTRAS_V ? 36e5 : 0 : hit?.poster ? 7 * 864e5 : 864e5;
     if (hit && Date.now() - hit.at < ttl) return { poster: hit.poster, trailer: hit.trailer, trailerName: hit.trailerName };
     const out = await findExtras(title, slug);
     const all = read();
     for (const [key, v] of Object.entries(all)) if (Date.now() - v.at > 7 * 864e5) delete all[key];
     const { err: _e, ...keep } = out;
-    all[ck] = { ...keep, at: Date.now() };
+    all[ck] = { ...keep, at: Date.now(), v: EXTRAS_V };
     cacheSet("extras.json", JSON.stringify(all));
     return out;
   })();
 }
+var EXTRAS_V = 2;
 function normImageUrl(u) {
   let s = String(u || "").trim().replace(/&amp;/g, "&").replace(/\\\//g, "/");
   if (s.startsWith("//")) s = "https:" + s;
@@ -1445,7 +1446,12 @@ async function findExtras(title, slug) {
   const [poster, t, at] = await Promise.all([posterJob, tmdbJob, atJob]);
   out.poster = normImageUrl(poster || (t && "poster" in t ? t.poster : "") || "");
   const tv = t && "v" in t ? t.v : null;
-  const pick = (tv && tv.zh ? tv : at || tv) || await ytFirst(base + " 預告").catch(() => null);
+  let pick = tv && tv.zh ? tv : at || tv;
+  if (!pick) {
+    const yt = await ytFirst(base + " 預告");
+    if ("key" in yt) pick = yt;
+    else atErr.push("YouTube " + yt.err);
+  }
   if (pick) {
     out.trailer = `https://www.youtube.com/watch?v=${pick.key}`;
     out.trailerName = String(pick.name || "預告片");
@@ -1454,11 +1460,16 @@ async function findExtras(title, slug) {
   return out;
 }
 async function ytFirst(query) {
-  const r = await platform().fetchText(`https://www.youtube.com/results?search_query=${encodeURIComponent(query)}&hl=zh-TW&gl=TW`, {
-    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15",
-    "Accept-Language": "zh-TW,zh;q=0.9"
-  });
-  if (r.status < 200 || r.status >= 300) return null;
+  let r;
+  try {
+    r = await platform().fetchText(`https://www.youtube.com/results?search_query=${encodeURIComponent(query)}&hl=zh-TW&gl=TW`, {
+      "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15",
+      "Accept-Language": "zh-TW,zh;q=0.9"
+    });
+  } catch (e) {
+    return { err: "搜尋頁讀不到（" + errText(e) + "）" };
+  }
+  if (r.status < 200 || r.status >= 300) return { err: "搜尋頁回應 " + r.status };
   const list = [];
   for (const m of r.body.matchAll(/"videoRenderer":\{"videoId":"([A-Za-z0-9_-]{11})"([\s\S]{0,4000}?)"title":\{"runs":\[\{"text":"((?:[^"\\]|\\.)*)"/g)) {
     let name = m[3];
@@ -1469,7 +1480,7 @@ async function ytFirst(query) {
     list.push({ key: m[1], name });
     if (list.length >= 5) break;
   }
-  if (!list.length) return null;
+  if (!list.length) return { err: /consent\.youtube|consent\.google/.test(r.body) ? "搜尋頁要求同意 Cookie" : "搜尋頁裡找不到影片（" + Math.round(r.body.length / 1024) + "KB）" };
   return list.find((v) => /預告|trailer|teaser/i.test(v.name)) || list[0];
 }
 async function fillRuntimes(movies) {
@@ -1824,7 +1835,7 @@ var App = class {
     this.loadingText = "讀取中…";
     // ── 事件迴圈 ──
     // 背景查 GitHub 上的最新版本（首頁顯示是否為最新版）
-    this.latest = checkLatest("2026.11.05-2345");
+    this.latest = checkLatest("2026.11.05-2354");
     // ── 搜尋 ──
     this.query = "";
     this.tmdbStatus = "";
@@ -1928,11 +1939,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.05-2345"}`);
+          Pasteboard.copy(`版本 ${"2026.11.05-2354"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.05-2345"}`,
+      `版本 ${"2026.11.05-2354"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }

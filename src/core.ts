@@ -485,10 +485,10 @@ export async function movieExtras(title: string, slug?: string): Promise<MovieEx
   return (extrasCache[k] ||= (async () => {
     const ck = (hasToken ? "t|" : "n|") + normTitle(title);
     const read = readExtras;
-    const hit = read()[ck];
-    // 有金鑰卻沒找到預告（可能是當時連線失敗）只記 1 小時；沒海報記 1 天；其他 7 天
-    // 有金鑰卻沒有預告：不採用舊紀錄，重新查；沒海報記 1 天；其他 7 天
-    const ttl = hasToken && !hit?.trailerName ? 0 : hit?.poster ? 7 * 86400e3 : 86400e3;
+    const hit = read()[ck] as (MovieExtras & { at: number; v?: number }) | undefined;
+    // 有找到預告：記 7 天（沒海報 1 天）。沒找到預告：只記 1 小時就重查（可能只是當時連線失敗）；
+    // 舊版（v 不是 2）記下的「沒預告」一律重查，因為舊版還不會取 YouTube 搜尋的第一支影片
+    const ttl = !hit?.trailerName ? (hit?.v === EXTRAS_V ? 3600e3 : 0) : hit?.poster ? 7 * 86400e3 : 86400e3;
     if (hit && Date.now() - hit.at < ttl) return { poster: hit.poster, trailer: hit.trailer, trailerName: hit.trailerName };
     const out = await findExtras(title, slug);
     // 查不到預告也保留這次執行的結果（不寫進手機快取的 err 會讓下次啟動重查）；
@@ -496,11 +496,13 @@ export async function movieExtras(title: string, slug?: string): Promise<MovieEx
     const all = read();
     for (const [key, v] of Object.entries(all)) if (Date.now() - v.at > 7 * 86400e3) delete all[key]; // 清掉過期的
     const { err: _e, ...keep } = out;
-    all[ck] = { ...keep, at: Date.now() };
+    all[ck] = { ...keep, at: Date.now(), v: EXTRAS_V } as MovieExtras & { at: number };
     cacheSet("extras.json", JSON.stringify(all));
     return out;
   })());
 }
+/** extras.json 紀錄的版本：預告查法改了就加 1，讓舊的「沒預告」紀錄重查 */
+const EXTRAS_V = 2;
 
 /** 圖片網址正規化：解掉 HTML 跳脫、\\/、//host 與 http:// 都改成 https://（iOS 的 WebView／Image 不載入 http 圖片） */
 export function normImageUrl(u: string): string {
@@ -679,7 +681,12 @@ async function findExtras(title: string, slug?: string): Promise<MovieExtras> {
   out.poster = normImageUrl(poster || (t && "poster" in t ? t.poster : "") || "");
   // 預告來源順序：TMDB 中文預告 → 開眼 → TMDB 其他語言 → YouTube 搜尋的第一個結果 → YouTube 搜尋頁
   const tv = t && "v" in t ? t.v : null;
-  const pick = (tv && tv.zh ? tv : at || tv) || (await ytFirst(base + " 預告").catch(() => null));
+  let pick = tv && tv.zh ? tv : at || tv;
+  if (!pick) {
+    const yt = await ytFirst(base + " 預告");
+    if ("key" in yt) pick = yt;
+    else atErr.push("YouTube " + yt.err);
+  }
   if (pick) {
     out.trailer = `https://www.youtube.com/watch?v=${pick.key}`;
     out.trailerName = String(pick.name || "預告片");
@@ -690,12 +697,17 @@ async function findExtras(title: string, slug?: string): Promise<MovieExtras> {
 
 /** YouTube 搜尋結果裡的第一支影片（優先挑標題有「預告」或 trailer 的），點了直接看、不用再從搜尋頁挑。
  *  用桌面版 UA，手機版 UA 會被轉到 m.youtube.com；結果頁約 1MB，所以只在開眼／TMDB 都沒有預告時才查 */
-async function ytFirst(query: string): Promise<{ key: string; name: string } | null> {
-  const r = await platform().fetchText(`https://www.youtube.com/results?search_query=${encodeURIComponent(query)}&hl=zh-TW&gl=TW`, {
-    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15",
-    "Accept-Language": "zh-TW,zh;q=0.9",
-  });
-  if (r.status < 200 || r.status >= 300) return null;
+async function ytFirst(query: string): Promise<{ key: string; name: string } | { err: string }> {
+  let r: { status: number; body: string };
+  try {
+    r = await platform().fetchText(`https://www.youtube.com/results?search_query=${encodeURIComponent(query)}&hl=zh-TW&gl=TW`, {
+      "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15",
+      "Accept-Language": "zh-TW,zh;q=0.9",
+    });
+  } catch (e) {
+    return { err: "搜尋頁讀不到（" + errText(e) + "）" };
+  }
+  if (r.status < 200 || r.status >= 300) return { err: "搜尋頁回應 " + r.status };
   const list: { key: string; name: string }[] = [];
   for (const m of r.body.matchAll(/"videoRenderer":\{"videoId":"([A-Za-z0-9_-]{11})"([\s\S]{0,4000}?)"title":\{"runs":\[\{"text":"((?:[^"\\]|\\.)*)"/g)) {
     let name = m[3];
@@ -705,7 +717,7 @@ async function ytFirst(query: string): Promise<{ key: string; name: string } | n
     list.push({ key: m[1], name });
     if (list.length >= 5) break;
   }
-  if (!list.length) return null;
+  if (!list.length) return { err: /consent\.youtube|consent\.google/.test(r.body) ? "搜尋頁要求同意 Cookie" : "搜尋頁裡找不到影片（" + Math.round(r.body.length / 1024) + "KB）" };
   return list.find((v) => /預告|trailer|teaser/i.test(v.name)) || list[0];
 }
 
