@@ -188,10 +188,15 @@ export function Badges(props: { items: RatingBadge[] }): string {
   );
 }
 
-export function Hero(props: { poster?: string; lines: string[]; trailerLabel?: string; onTrailer?: Handler; badges?: RatingBadge[] }): string {
+/** 電影頁頂端：海報在左（沒海報時是灰色預設圖，還在查時先留空的灰框），資訊、評分、預告按鈕在右 */
+export function Hero(props: { poster?: string; posterPending?: boolean; lines: string[]; trailerLabel?: string; onTrailer?: Handler; badges?: RatingBadge[] }): string {
   return (
     <div class="hero">
-      {props.poster ? <img class="poster" src={props.poster} alt="" onerror="this.style.display='none'" /> : null}
+      {props.poster ? (
+        <img class="poster" src={props.poster} alt="" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'poster none',textContent:'🎬'}))" />
+      ) : (
+        <div class={"poster none" + (props.posterPending ? " pending" : "")}>{props.posterPending ? "" : "🎬"}</div>
+      )}
       <div class="hero-info">
         {props.lines.filter(Boolean).map((l) => <div class="hero-line">{esc(l)}</div>)}
         {props.badges ? <Badges items={props.badges} /> : null}

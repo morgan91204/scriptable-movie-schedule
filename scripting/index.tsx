@@ -310,7 +310,9 @@ function MovieHero({ title, slug, lines, en }: { title: string; slug?: string; l
           ? <Image filePath={poster} resizable scaleToFit frame={{ width: 104, height: 156 }} clipShape={{ type: "rect", cornerRadius: 12 }} />
           : <Image imageUrl={poster} resizable scaleToFit frame={{ width: 104, height: 156 }}
               clipShape={{ type: "rect", cornerRadius: 12 }} placeholder={<ProgressView progressViewStyle={"circular"} />} />
-        : posterPending ? <ProgressView progressViewStyle={"circular"} frame={{ width: 104, height: 156 }} /> : null}
+        : <VStack frame={{ width: 104, height: 156 }} background={"rgba(120, 120, 128, 0.22)"} clipShape={{ type: "rect", cornerRadius: 12 }}>
+            {posterPending ? <ProgressView progressViewStyle={"circular"} /> : <Image systemName={"film"} font={"largeTitle"} foregroundStyle={"tertiaryLabel"} />}
+          </VStack>}
       <VStack alignment={"leading"} spacing={4}>
         {lines.filter(Boolean).map((l) => <Text key={l} font={"subheadline"} foregroundStyle={"secondaryLabel"}>{l}</Text>)}
         {/* 評分讀好後三個徽章都顯示：沒有那項評分就是「-」（跟「還沒抓到」分得開） */}

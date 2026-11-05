@@ -435,6 +435,7 @@ class App {
     return (
       <Hero
         poster={poster}
+        posterPending={!poster && e.loading}
         lines={lines}
         badges={badges}
         // 還在讀的時候先顯示「觀看預告」，點下去會等讀好再開，不會誤開成搜尋頁

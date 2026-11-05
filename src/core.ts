@@ -663,12 +663,12 @@ async function findExtras(title: string, slug?: string): Promise<MovieExtras> {
     .then(async (poster) => {
       const id = (poster.match(/\/photo\d*\/(f\w+)\//) || [])[1];
       if (!id) {
-        atErr.push(poster ? "海報不是開眼的，對不到開眼電影頁" : "場次通沒有這部片的海報");
+        atErr.push("開眼電影網沒有這部片的預告");
         return null;
       }
       const html = await getText(`https://www.atmovies.com.tw/movie/${id}/`);
       const key = (html.match(/youtube\.com\/embed\/([A-Za-z0-9_-]{11})/) || [])[1];
-      if (!key) atErr.push("開眼電影頁沒有預告");
+      if (!key) atErr.push("開眼電影網沒有這部片的預告");
       return key ? { key, name: "開眼電影網預告" } : null;
     })
     .catch((e) => {

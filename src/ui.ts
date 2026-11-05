@@ -57,6 +57,8 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .field:focus{box-shadow:0 0 0 2px var(--accent)}
 .hero{display:flex;gap:14px;align-items:flex-end;margin:12px 4px 4px}
 .hero .poster{width:112px;aspect-ratio:2/3;object-fit:cover;border-radius:12px;background:var(--chip);box-shadow:0 4px 14px rgba(0,0,0,.25);flex:none}
+.hero .poster.none{display:flex;align-items:center;justify-content:center;font-size:40px;box-shadow:none;opacity:.9;filter:grayscale(1);color:var(--fg2)}
+.hero .poster.pending{opacity:.5}
 .hero-info{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
 .hero-line{font-size:14px;color:var(--fg2)}
 .ratings{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px;overflow:visible}

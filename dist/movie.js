@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.05-2338
+// @movie-schedule-app 電影行程 v2026.11.05-2339
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/jsx.tsx
@@ -78,7 +78,7 @@ function Badges(props) {
   return /* @__PURE__ */ h("div", { class: "ratings" }, props.items.map((b) => /* @__PURE__ */ h("button", { class: "rate " + b.tier, onTap: b.tier === "none" ? void 0 : b.onTap, "aria-label": b.kind === "imdb" ? "IMDb" : b.kind === "tomato" ? "番茄指數" : "爆米花指數" }, b.kind === "imdb" ? /* @__PURE__ */ h("span", { class: "imdb" }, "IMDb") : /* @__PURE__ */ h("span", { class: "emo" }, b.kind === "tomato" ? b.tier === "bad" ? "🤢" : "🍅" : b.tier === "bad" ? "🫗" : "🍿"), /* @__PURE__ */ h("span", { class: "v" }, esc(b.value)), b.note ? /* @__PURE__ */ h("span", { class: "n" }, esc(b.note)) : null)));
 }
 function Hero(props) {
-  return /* @__PURE__ */ h("div", { class: "hero" }, props.poster ? /* @__PURE__ */ h("img", { class: "poster", src: props.poster, alt: "", onerror: "this.style.display='none'" }) : null, /* @__PURE__ */ h("div", { class: "hero-info" }, props.lines.filter(Boolean).map((l) => /* @__PURE__ */ h("div", { class: "hero-line" }, esc(l))), props.badges ? /* @__PURE__ */ h(Badges, { items: props.badges }) : null, props.onTrailer ? /* @__PURE__ */ h("button", { class: "trailer", onTap: props.onTrailer }, "▶︎ ", esc(props.trailerLabel || "觀看預告")) : null));
+  return /* @__PURE__ */ h("div", { class: "hero" }, props.poster ? /* @__PURE__ */ h("img", { class: "poster", src: props.poster, alt: "", onerror: "this.replaceWith(Object.assign(document.createElement('div'),{className:'poster none',textContent:'🎬'}))" }) : /* @__PURE__ */ h("div", { class: "poster none" + (props.posterPending ? " pending" : "") }, props.posterPending ? "" : "🎬"), /* @__PURE__ */ h("div", { class: "hero-info" }, props.lines.filter(Boolean).map((l) => /* @__PURE__ */ h("div", { class: "hero-line" }, esc(l))), props.badges ? /* @__PURE__ */ h(Badges, { items: props.badges }) : null, props.onTrailer ? /* @__PURE__ */ h("button", { class: "trailer", onTap: props.onTrailer }, "▶︎ ", esc(props.trailerLabel || "觀看預告")) : null));
 }
 function Note(props) {
   return /* @__PURE__ */ h("p", { class: "note " + (props.kind || "info") }, esc(props.text));
@@ -146,6 +146,8 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .field:focus{box-shadow:0 0 0 2px var(--accent)}
 .hero{display:flex;gap:14px;align-items:flex-end;margin:12px 4px 4px}
 .hero .poster{width:112px;aspect-ratio:2/3;object-fit:cover;border-radius:12px;background:var(--chip);box-shadow:0 4px 14px rgba(0,0,0,.25);flex:none}
+.hero .poster.none{display:flex;align-items:center;justify-content:center;font-size:40px;box-shadow:none;opacity:.9;filter:grayscale(1);color:var(--fg2)}
+.hero .poster.pending{opacity:.5}
 .hero-info{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
 .hero-line{font-size:14px;color:var(--fg2)}
 .ratings{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px;overflow:visible}
@@ -1429,12 +1431,12 @@ async function findExtras(title, slug) {
   const atJob = posterJob.then(async (poster2) => {
     const id = (poster2.match(/\/photo\d*\/(f\w+)\//) || [])[1];
     if (!id) {
-      atErr.push(poster2 ? "海報不是開眼的，對不到開眼電影頁" : "場次通沒有這部片的海報");
+      atErr.push("開眼電影網沒有這部片的預告");
       return null;
     }
     const html = await getText(`https://www.atmovies.com.tw/movie/${id}/`);
     const key = (html.match(/youtube\.com\/embed\/([A-Za-z0-9_-]{11})/) || [])[1];
-    if (!key) atErr.push("開眼電影頁沒有預告");
+    if (!key) atErr.push("開眼電影網沒有這部片的預告");
     return key ? { key, name: "開眼電影網預告" } : null;
   }).catch((e) => {
     atErr.push("開眼 " + errText(e));
@@ -1803,7 +1805,7 @@ var App = class {
     this.loadingText = "讀取中…";
     // ── 事件迴圈 ──
     // 背景查 GitHub 上的最新版本（首頁顯示是否為最新版）
-    this.latest = checkLatest("2026.11.05-2338");
+    this.latest = checkLatest("2026.11.05-2339");
     // ── 搜尋 ──
     this.query = "";
     this.tmdbStatus = "";
@@ -1907,11 +1909,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.05-2338"}`);
+          Pasteboard.copy(`版本 ${"2026.11.05-2339"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.05-2338"}`,
+      `版本 ${"2026.11.05-2339"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -2077,6 +2079,7 @@ var App = class {
       Hero,
       {
         poster,
+        posterPending: !poster && e.loading,
         lines,
         badges,
         trailerLabel: !x || x.trailerName ? "觀看預告" : "搜尋預告",
