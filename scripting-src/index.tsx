@@ -14,7 +14,7 @@ import {
   Cinema, Movie, Settings, Version, TwMovie, TwMovieCinema, CITY_ORDER, TW,
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
   loadSettings, saveSettings, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, cinemaAddress,
-  FORMATS, formatsOf, filterVersions, nearest, kmLabel, WINDOWS, findShowtimes, groupByMovie, shareText, hallOf, tmdbTest, movieExtras, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey,
+  FORMATS, formatsOf, filterVersions, nearest, kmLabel, WINDOWS, findShowtimes, groupByMovie, shareText, hallOf, tmdbTest, movieExtras, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, SCRIPTING_IMPORT_URL,
 } from "./core"
 import type { Format, LatLng, Hit } from "./core"
 
@@ -28,6 +28,7 @@ declare const Location: any
 declare const Pasteboard: any
 declare const HapticFeedback: any
 declare function setTimeout(fn: () => void, ms: number): any
+declare const Storage: any
 
 setPlatform(scriptingPlatform)
 
@@ -129,6 +130,7 @@ function sortCities(cities: string[]): string[] {
 
 function Home() {
   const dismiss = Navigation.useDismiss()
+  useUpdatePrompt()
   const [settings, update] = useSettings()
   const [query, setQuery] = useState("")
   const [calendars, setCalendars] = useState<string[]>([])
@@ -317,9 +319,10 @@ function TmdbPage() {
   </Form>
 }
 
-/** 版本號：點一下複製「版本 …」 */
+/** 版本號：點一下複製「版本 …」，並顯示是否為最新版、可一鍵更新 */
 function VersionRow() {
   const [copied, setCopied] = useState(false)
+  const latest = useLoad(async () => (await checkLatest(appVersion())) || { latest: "", isLatest: false, failed: true }, [])
   const text = `版本 ${appVersion()}`
   const copy = async () => {
     await Pasteboard.setString(text)
@@ -327,13 +330,41 @@ function VersionRow() {
     setCopied(true)
     setTimeout(() => setCopied(false), 1500)
   }
-  return <Button action={copy}>
-    <HStack>
-      <Text foregroundStyle={"secondaryLabel"}>{text}</Text>
-      <Spacer />
-      <Text foregroundStyle={copied ? "systemGreen" : "tertiaryLabel"} font={"footnote"}>{copied ? "已複製 ✓" : "點一下複製"}</Text>
-    </HStack>
-  </Button>
+  const r = latest.data
+  return <>
+    <Button action={copy}>
+      <HStack>
+        <Text foregroundStyle={"secondaryLabel"}>{text}</Text>
+        <Spacer />
+        <Text foregroundStyle={copied ? "systemGreen" : "tertiaryLabel"} font={"footnote"}>{copied ? "已複製 ✓" : "點一下複製"}</Text>
+      </HStack>
+    </Button>
+    {!r ? <Text foregroundStyle={"secondaryLabel"} font={"footnote"}>檢查是否為最新版…</Text> : null}
+    {r && "failed" in r ? <Text foregroundStyle={"secondaryLabel"} font={"footnote"}>無法確認是否為最新版（讀不到 GitHub）</Text> : null}
+    {r && !("failed" in r) && r.isLatest ? <Label title={"已是最新版"} systemImage={"checkmark.seal.fill"} foregroundStyle={"systemGreen"} /> : null}
+    {r && !("failed" in r) && !r.isLatest ? <Button title={`有新版 ${r.latest}，點此更新`} systemImage={"arrow.down.circle.fill"} action={() => Safari.openURL(SCRIPTING_IMPORT_URL)} /> : null}
+  </>
+}
+
+/** 開啟時檢查新版：有新版就問要不要更新（同一個新版只問一次） */
+function useUpdatePrompt() {
+  useEffect(() => {
+    ;(async () => {
+      const r = await checkLatest(appVersion())
+      if (!r || r.isLatest) return
+      let asked = ""
+      try { asked = Storage.get("asked-update") || "" } catch (_) {}
+      if (asked === r.latest) return
+      try { Storage.set("asked-update", r.latest) } catch (_) {}
+      const ok = await Dialog.confirm({
+        title: "電影行程有新版本",
+        message: `目前 ${appVersion()}\n最新 ${r.latest}\n\n要現在更新嗎？會打開 Scripting 的匯入畫面，選「取代／更新」即可，設定不會消失。`,
+        cancelLabel: "之後再說",
+        confirmLabel: "更新",
+      })
+      if (ok) Safari.openURL(SCRIPTING_IMPORT_URL)
+    })()
+  }, [])
 }
 
 function CitiesPage() {
@@ -562,6 +593,14 @@ function ConfirmPage({ pick }: { pick: Pick }) {
           <Button title={"在行事曆中查看／編輯"} systemImage={"calendar"} action={() => saved.presentEditView()} />
         </>
         : <Button title={busy ? "加入中…" : "加入行事曆"} systemImage={"calendar.badge.plus"} disabled={busy} action={save} />}
+    </Section>
+
+    <Section footer={cinemaApp(pick.cinema) ? <Text>{`App 訂票會打開 App Store 的「${cinemaApp(pick.cinema)!.name}」頁面：已安裝點「打開」，沒安裝可以直接下載。`}</Text> : <Text>這間影城沒有官方 App，請用瀏覽器訂票。</Text>}>
+      <Button title={"以瀏覽器訂票"} systemImage={"globe"} action={async () => Safari.openURL(await bookingUrl(pick))} />
+      {cinemaApp(pick.cinema) ? <Button title={`以 App 訂票（${cinemaApp(pick.cinema)!.name}）`} systemImage={"iphone"} action={() => Safari.openURL(cinemaApp(pick.cinema)!.url)} /> : null}
+    </Section>
+
+    <Section>
       <Button title={"分享這場給朋友"} systemImage={"square.and.arrow.up"}
         action={() => ShareSheet.present([shareText({ ...pick, address }, start, runtime ? end : undefined, seat.trim(), settings.maps)])} />
     </Section>

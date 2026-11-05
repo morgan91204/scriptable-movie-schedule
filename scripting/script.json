@@ -2,7 +2,7 @@
   "name": "電影行程",
   "icon": "film.stack",
   "color": "#7B61FF",
-  "version": "2026.11.05.2131",
+  "version": "2026.11.05.2142",
   "description": "Pick a cinema or a movie, choose a showtime, and add it to iOS Calendar with an alert.",
   "localizedNames": {
     "zh": "電影行程",
@@ -23,6 +23,6 @@
   "intentInputTypes": [],
   "remoteResource": {
     "url": "https://github.com/morgan91204/scriptable-movie-schedule/tree/main/scripting",
-    "autoUpdateInterval": 21600
+    "autoUpdateInterval": 3600
   }
 }

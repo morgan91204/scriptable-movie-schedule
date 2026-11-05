@@ -741,6 +741,59 @@ export function groupByMovie(hits: Hit[]): { title: string; runtime: number; rat
   return Object.values(map).sort((a, b) => b.hits.length - a.hits.length || showMinute(a.hits[0].time) - showMinute(b.hits[0].time));
 }
 
+// ───────────────────────── 版本檢查 ─────────────────────────
+
+const VERSION_URL = "https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/main/dist/version.json";
+/** Scripting 一鍵重新匯入（會覆蓋成 GitHub 上的最新版，設定不受影響） */
+export const SCRIPTING_IMPORT_URL =
+  "https://www.scripting.fun/import_scripts?urls=%5B%22https%3A%2F%2Fgithub.com%2Fmorgan91204%2Fscriptable-movie-schedule%2Ftree%2Fmain%2Fscripting%22%5D";
+const verNum = (v: string) => Number(String(v || "").replace(/\D/g, "")) || 0; // 2026.11.05-2139 與 2026.11.05.2139 都變成 202611052139
+
+/** 查 GitHub 上的最新版本；查不到回傳 null */
+export async function checkLatest(current: string): Promise<{ latest: string; isLatest: boolean } | null> {
+  try {
+    const r = await platform().fetchText(VERSION_URL + "?t=" + Date.now(), { accept: "application/json" });
+    if (r.status < 200 || r.status >= 300) return null;
+    const latest = String(JSON.parse(r.body).version || "");
+    if (!latest) return null;
+    return { latest, isLatest: verNum(current) >= verNum(latest) };
+  } catch (_) {
+    return null;
+  }
+}
+
+// ───────────────────────── 訂票 ─────────────────────────
+
+/** 各連鎖的官方 App（App Store 台灣區 ID）。順序有意義：美麗新要在美麗華前面 */
+export const CINEMA_APPS: { re: RegExp; name: string; id: string }[] = [
+  { re: /威秀|MUVIE|^vscinemas/i, name: "威秀影城", id: "6761522320" },
+  { re: /秀泰|^showtimes/i, name: "秀泰影城", id: "1152850053" },
+  { re: /國賓|^ambassador/i, name: "國賓看電影", id: "435465064" },
+  { re: /新光影城|^skcinemas/i, name: "新光影城", id: "6747376383" },
+  { re: /美麗新/, name: "美麗新影城", id: "581548701" },
+  { re: /美麗華|^miramar/i, name: "美麗華影城", id: "1446574681" },
+  { re: /喜樂時代|^centuryasia/i, name: "喜樂時代影城", id: "6751645458" },
+  { re: /樂聲|^lux$/i, name: "樂聲影城", id: "833368283" },
+  { re: /百老匯/, name: "龍祥百老匯影城", id: "6446755867" },
+];
+
+/** 這間影城的官方 App（沒有就回傳 null） */
+export function cinemaApp(c: Cinema): { name: string; id: string; url: string } | null {
+  const a = CINEMA_APPS.find((x) => x.re.test(c.name) || x.re.test(c.id));
+  // itms-apps:// 直接打開 App Store 的 App 頁：已安裝會顯示「打開」，沒安裝可以直接下載
+  return a ? { name: a.name, id: a.id, url: `itms-apps://apps.apple.com/tw/app/id${a.id}` } : null;
+}
+
+/** 訂票網頁：場次頁給的官方訂票連結 → 影城官網 → 時刻表 */
+export async function bookingUrl(p: { cinema: Cinema; booking?: string }): Promise<string> {
+  if (p.booking) return p.booking;
+  try {
+    return (await datesOf(p.cinema)).site || p.cinema.url;
+  } catch (_) {
+    return p.cinema.url;
+  }
+}
+
 // ───────────────────────── 分享 ─────────────────────────
 
 export function shareText(p: { movie: { title: string }; version: { label: string }; cinema: Cinema; address?: string }, start: Date, end?: Date, seat?: string, app: MapsApp = "apple"): string {

@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.05-2131
+// @movie-schedule-app 電影行程 v2026.11.05-2142
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/jsx.tsx
@@ -50,6 +50,9 @@ function h(type, props, ...children) {
   }
   if (VOID.test(type)) return `<${type}${attrs}>`;
   return `<${type}${attrs}>${flat(children)}</${type}>`;
+}
+function Fragment(props) {
+  return flat(props.children || []);
 }
 function Page(props) {
   return /* @__PURE__ */ h("div", { class: "page" }, /* @__PURE__ */ h("header", { class: "bar" }, props.onBack ? /* @__PURE__ */ h("button", { class: "back", onTap: props.onBack }, "‹ 返回") : /* @__PURE__ */ h("span", { class: "back-spacer" }), /* @__PURE__ */ h("div", { class: "bar-title" }, /* @__PURE__ */ h("div", { class: "t" }, esc(props.title)), props.subtitle ? /* @__PURE__ */ h("div", { class: "s" }, esc(props.subtitle)) : null), props.right ? /* @__PURE__ */ h("span", { class: "bar-right" }, props.right) : /* @__PURE__ */ h("span", { class: "back-spacer" })), /* @__PURE__ */ h("main", { class: "content" }, props.children));
@@ -1377,6 +1380,42 @@ function groupByMovie(hits) {
   }
   return Object.values(map).sort((a, b) => b.hits.length - a.hits.length || showMinute(a.hits[0].time) - showMinute(b.hits[0].time));
 }
+var VERSION_URL = "https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/main/dist/version.json";
+var verNum = (v) => Number(String(v || "").replace(/\D/g, "")) || 0;
+async function checkLatest(current2) {
+  try {
+    const r = await platform().fetchText(VERSION_URL + "?t=" + Date.now(), { accept: "application/json" });
+    if (r.status < 200 || r.status >= 300) return null;
+    const latest = String(JSON.parse(r.body).version || "");
+    if (!latest) return null;
+    return { latest, isLatest: verNum(current2) >= verNum(latest) };
+  } catch (_) {
+    return null;
+  }
+}
+var CINEMA_APPS = [
+  { re: /威秀|MUVIE|^vscinemas/i, name: "威秀影城", id: "6761522320" },
+  { re: /秀泰|^showtimes/i, name: "秀泰影城", id: "1152850053" },
+  { re: /國賓|^ambassador/i, name: "國賓看電影", id: "435465064" },
+  { re: /新光影城|^skcinemas/i, name: "新光影城", id: "6747376383" },
+  { re: /美麗新/, name: "美麗新影城", id: "581548701" },
+  { re: /美麗華|^miramar/i, name: "美麗華影城", id: "1446574681" },
+  { re: /喜樂時代|^centuryasia/i, name: "喜樂時代影城", id: "6751645458" },
+  { re: /樂聲|^lux$/i, name: "樂聲影城", id: "833368283" },
+  { re: /百老匯/, name: "龍祥百老匯影城", id: "6446755867" }
+];
+function cinemaApp(c) {
+  const a = CINEMA_APPS.find((x) => x.re.test(c.name) || x.re.test(c.id));
+  return a ? { name: a.name, id: a.id, url: `itms-apps://apps.apple.com/tw/app/id${a.id}` } : null;
+}
+async function bookingUrl(p) {
+  if (p.booking) return p.booking;
+  try {
+    return (await datesOf(p.cinema)).site || p.cinema.url;
+  } catch (_) {
+    return p.cinema.url;
+  }
+}
 function shareText(p, start, end, seat, app = "apple") {
   const maps = mapsUrl(p.cinema.name, p.address, app);
   return [
@@ -1411,6 +1450,9 @@ var App = class {
     this.runtime = 0;
     this.seat = "";
     this.loadingText = "讀取中…";
+    // ── 事件迴圈 ──
+    // 背景查 GitHub 上的最新版本（首頁顯示是否為最新版）
+    this.latest = checkLatest("2026.11.05-2142");
     // ── 搜尋 ──
     this.query = "";
     this.tmdbStatus = "";
@@ -1437,7 +1479,6 @@ var App = class {
   home() {
     this.stack = [this.stack[0]];
   }
-  // ── 事件迴圈 ──
   async run() {
     this.settings = await loadSettings();
     this.go(() => this.homeView(), "讀取影城清單…");
@@ -1501,13 +1542,13 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.05-2131"}`);
+          Pasteboard.copy(`版本 ${"2026.11.05-2142"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.05-2131"}`,
+      `版本 ${"2026.11.05-2142"}`,
       "（點一下複製）"
-    ));
+    ), await this.versionNote());
   }
   // ── 依縣市找影院 ──
   citiesView() {
@@ -1701,7 +1742,20 @@ var App = class {
         right: "修改",
         onTap: () => this.go(() => this.runtimeView())
       }
-    ), /* @__PURE__ */ h(Item, { icon: "📺", title: "廣告預告", subtitle: `${this.settings.ads} 分鐘`, right: "點一下切換", chevron: false, onTap: () => this.cycleAds() }), /* @__PURE__ */ h(Item, { icon: "💺", title: "影廳／座位", subtitle: this.seat || "未填（選填）", right: "修改", onTap: () => this.go(() => this.seatView()) }), /* @__PURE__ */ h(Item, { icon: "📅", title: "行事曆", subtitle: this.calendarName, right: "更換", onTap: () => this.go(() => this.calendarView()) })), /* @__PURE__ */ h(Button, { label: "✓ 加入行事曆", onTap: () => this.save(p) }), /* @__PURE__ */ h(Button, { label: "分享這場給朋友", kind: "secondary", onTap: () => this.share(p) }));
+    ), /* @__PURE__ */ h(Item, { icon: "📺", title: "廣告預告", subtitle: `${this.settings.ads} 分鐘`, right: "點一下切換", chevron: false, onTap: () => this.cycleAds() }), /* @__PURE__ */ h(Item, { icon: "💺", title: "影廳／座位", subtitle: this.seat || "未填（選填）", right: "修改", onTap: () => this.go(() => this.seatView()) }), /* @__PURE__ */ h(Item, { icon: "📅", title: "行事曆", subtitle: this.calendarName, right: "更換", onTap: () => this.go(() => this.calendarView()) })), /* @__PURE__ */ h(Button, { label: "✓ 加入行事曆", onTap: () => this.save(p) }), this.bookingButtons(p), /* @__PURE__ */ h(Button, { label: "分享這場給朋友", kind: "secondary", onTap: () => this.share(p) }));
+  }
+  /** 版本狀態：已是最新版／有新版（捷徑每次執行都會下載最新版，重新執行就會更新） */
+  async versionNote() {
+    const r = await Promise.race([this.latest, sleep(1500).then(() => void 0)]);
+    if (r === void 0) return "";
+    if (!r) return /* @__PURE__ */ h(Note, { text: "（無法確認是否為最新版：讀不到 GitHub）" });
+    if (r.isLatest) return /* @__PURE__ */ h(Note, { text: "✅ 已是最新版" });
+    return /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}：關閉後重新執行捷徑就會更新（GitHub 約有 5 分鐘延遲）。如果是匯入 .scriptable 檔安裝的，請改用捷徑才會自動更新。` });
+  }
+  /** 以瀏覽器訂票／以 App 訂票 */
+  bookingButtons(p) {
+    const app = cinemaApp(p.cinema);
+    return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Button, { label: "🌐 以瀏覽器訂票", kind: "secondary", onTap: async () => Safari.open(await bookingUrl(p)) }), app ? /* @__PURE__ */ h(Button, { label: `📱 以 App 訂票（${app.name}）`, kind: "secondary", onTap: () => Safari.open(app.url) }) : /* @__PURE__ */ h(Note, { text: "這間影城沒有官方 App，請用瀏覽器訂票。" }));
   }
   runtimeView() {
     return /* @__PURE__ */ h(Page, { title: "片長", onBack: () => this.back() }, /* @__PURE__ */ h(Note, { text: "請依官網或電影票輸入正片分鐘數。" }), /* @__PURE__ */ h("input", { class: "field", name: "v", type: "number", inputmode: "numeric", value: this.runtime || "", placeholder: "例如 120", autofocus: true }), /* @__PURE__ */ h(
@@ -1772,7 +1826,7 @@ ${fmt(this.start(p))}
 ${fmt(ev.startDate)} → ${fmt(ev.endDate).slice(-5)}
 ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Section, { hint: "Scriptable 無法直接設定提醒，打開行程後可在「提示」加上開演前 30 分鐘。" }, /* @__PURE__ */ h(Item, { icon: "🔔", title: "打開行程，加提醒", accent: true, onTap: async () => {
       await ev.presentEdit();
-    } }), /* @__PURE__ */ h(Item, { icon: "📤", title: "分享這場給朋友", accent: true, onTap: () => this.share(p) })), /* @__PURE__ */ h(Button, { label: "再新增一部", onTap: () => this.home() }));
+    } }), /* @__PURE__ */ h(Item, { icon: "📤", title: "分享這場給朋友", accent: true, onTap: () => this.share(p) })), this.bookingButtons(p), /* @__PURE__ */ h(Button, { label: "再新增一部", onTap: () => this.home() }));
   }
   async movieListView() {
     const all = await loadMovies();

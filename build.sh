@@ -17,6 +17,7 @@ node -e '
 const fs=require("fs");const js=fs.readFileSync("dist/movie.js","utf8");
 fs.writeFileSync("dist/電影行程.scriptable",JSON.stringify({always_run_in_app:false,icon:{color:"deep-purple",glyph:"film"},name:"電影行程",script:js,share_sheet_inputs:["url","plain-text"]},null,1));'
 cp dist/movie.js dist/app.mjs  # 測試用（test/*.mjs 會 import）
+printf '{"version":"%s"}\n' "$VERSION" > dist/version.json  # 兩版 App 用來判斷是否為最新版
 echo "built v$VERSION"
 
 # ── Scripting 版：把共用資料層與 scripting-src/ 組成 scripting/（GitHub 匯入、自動更新用的腳本資料夾）

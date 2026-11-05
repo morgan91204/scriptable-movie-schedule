@@ -11,7 +11,7 @@ import {
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
   loadSettings, saveSettings, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, TW,
   FORMATS, formatsOf, filterVersions, nearest, kmLabel, WINDOWS, findShowtimes, groupByMovie, shareText,
-  hallOf, tmdbTest, movieExtras, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey,
+  hallOf, tmdbTest, movieExtras, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest,
 } from "./core";
 import type { MovieExtras } from "./core";
 import type { TwMovie, TwMovieCinema, Format, LatLng, Hit } from "./core";
@@ -65,6 +65,9 @@ class App {
   }
 
   // ── 事件迴圈 ──
+  // 背景查 GitHub 上的最新版本（首頁顯示是否為最新版）
+  latest: Promise<{ latest: string; isLatest: boolean } | null> = checkLatest(APP_VERSION);
+
   async run() {
     this.settings = await loadSettings();
     this.go(() => this.homeView(), "讀取影城清單…");
@@ -163,6 +166,7 @@ class App {
         >
           {`版本 ${APP_VERSION}`}（點一下複製）
         </p>
+        {await this.versionNote()}
       </Page>
     );
   }
@@ -473,8 +477,33 @@ class App {
           <Item icon="📅" title="行事曆" subtitle={this.calendarName} right="更換" onTap={() => this.go(() => this.calendarView())} />
         </Section>
         <Button label="✓ 加入行事曆" onTap={() => this.save(p)} />
+        {this.bookingButtons(p)}
         <Button label="分享這場給朋友" kind="secondary" onTap={() => this.share(p)} />
       </Page>
+    );
+  }
+
+  /** 版本狀態：已是最新版／有新版（捷徑每次執行都會下載最新版，重新執行就會更新） */
+  async versionNote(): Promise<string> {
+    const r = await Promise.race([this.latest, sleep(1500).then(() => undefined)]);
+    if (r === undefined) return "";
+    if (!r) return <Note text="（無法確認是否為最新版：讀不到 GitHub）" />;
+    if (r.isLatest) return <Note text="✅ 已是最新版" />;
+    return <Note kind="warn" text={`🆕 有新版 ${r.latest}：關閉後重新執行捷徑就會更新（GitHub 約有 5 分鐘延遲）。如果是匯入 .scriptable 檔安裝的，請改用捷徑才會自動更新。`} />;
+  }
+
+  /** 以瀏覽器訂票／以 App 訂票 */
+  bookingButtons(p: Pick): string {
+    const app = cinemaApp(p.cinema);
+    return (
+      <>
+        <Button label="🌐 以瀏覽器訂票" kind="secondary" onTap={async () => Safari.open(await bookingUrl(p))} />
+        {app ? (
+          <Button label={`📱 以 App 訂票（${app.name}）`} kind="secondary" onTap={() => Safari.open(app.url)} />
+        ) : (
+          <Note text="這間影城沒有官方 App，請用瀏覽器訂票。" />
+        )}
+      </>
     );
   }
 
@@ -567,6 +596,7 @@ class App {
           <Item icon="🔔" title="打開行程，加提醒" accent onTap={async () => { await ev.presentEdit(); }} />
           <Item icon="📤" title="分享這場給朋友" accent onTap={() => this.share(p)} />
         </Section>
+        {this.bookingButtons(p)}
         <Button label="再新增一部" onTap={() => this.home()} />
       </Page>
     );
