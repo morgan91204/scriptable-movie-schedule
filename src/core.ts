@@ -472,6 +472,29 @@ const extrasCache: Record<string, Promise<MovieExtras>> = {};
 export function movieExtras(title: string, slug?: string): Promise<MovieExtras> {
   const k = (slug || "") + "|" + title;
   return (extrasCache[k] ||= (async () => {
+    // 找過的海報／預告網址記在手機上（找到的 7 天、沒找到的 1 天），之後不用再查
+    const hasToken = !!((await loadSettings()).tmdbToken || "").trim();
+    const ck = (hasToken ? "t|" : "n|") + normTitle(title);
+    const read = (): Record<string, MovieExtras & { at: number }> => {
+      try {
+        return JSON.parse(cacheGet("extras.json") || "{}") || {};
+      } catch (_) {
+        return {};
+      }
+    };
+    const hit = read()[ck];
+    if (hit && Date.now() - hit.at < (hit.poster ? 7 : 1) * 86400e3) return { poster: hit.poster, trailer: hit.trailer, trailerName: hit.trailerName };
+    const out = await findExtras(title, slug);
+    const all = read();
+    for (const [key, v] of Object.entries(all)) if (Date.now() - v.at > 7 * 86400e3) delete all[key]; // 清掉過期的
+    all[ck] = { ...out, at: Date.now() };
+    cacheSet("extras.json", JSON.stringify(all));
+    return out;
+  })());
+}
+
+async function findExtras(title: string, slug?: string): Promise<MovieExtras> {
+  {
     const base = baseTitle(title);
     const out: MovieExtras = {
       poster: "",
@@ -507,7 +530,7 @@ export function movieExtras(title: string, slug?: string): Promise<MovieExtras> 
       } catch (_) {}
     }
     return out;
-  })());
+  }
 }
 
 /** 沒有片長的電影，從 TMDB 補上（會標記 runtimeFrom）；沒設定 Token 或查詢失敗就原樣回傳 */

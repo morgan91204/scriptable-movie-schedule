@@ -27,6 +27,7 @@ declare const ShareSheet: any
 declare const Location: any
 declare const Pasteboard: any
 declare const HapticFeedback: any
+declare function setTimeout(fn: () => void, ms: number): any
 
 setPlatform(scriptingPlatform)
 
@@ -184,7 +185,7 @@ function Home() {
           {favs.map((c) => <CinemaLink key={c.id} cinema={c} showCity />)}
         </Section> : null}
 
-        <Section header={<Text>加入行事曆時</Text>} footer={<Text>{`場次資料來自場次通、開眼電影網，以及誠品、光點、樂聲官網，實際場次以影城公告為準。\n\n版本 ${appVersion()}`}</Text>}>
+        <Section header={<Text>加入行事曆時</Text>}>
           <Picker title={"寫入的行事曆"} value={settings.calendar || ""} onChanged={(v: string) => update({ calendar: v })}>
             {calendars.map((t) => <Text key={t} tag={t}>{t}</Text>)}
           </Picker>
@@ -200,6 +201,10 @@ function Home() {
           <NavigationLink destination={<TmdbPage />}>
             <Row title={"補片長（TMDB）"} trailing={settings.tmdbToken ? "已設定" : "未設定"} />
           </NavigationLink>
+        </Section>
+
+        <Section footer={<Text>場次資料來自場次通、開眼電影網，以及誠品、光點、樂聲官網，實際場次以影城公告為準。</Text>}>
+          <VersionRow />
         </Section>
       </>}
     </List>
@@ -312,6 +317,25 @@ function TmdbPage() {
   </Form>
 }
 
+/** 版本號：點一下複製「版本 …」 */
+function VersionRow() {
+  const [copied, setCopied] = useState(false)
+  const text = `版本 ${appVersion()}`
+  const copy = async () => {
+    await Pasteboard.setString(text)
+    try { HapticFeedback.notificationSuccess() } catch (_) {}
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1500)
+  }
+  return <Button action={copy}>
+    <HStack>
+      <Text foregroundStyle={"secondaryLabel"}>{text}</Text>
+      <Spacer />
+      <Text foregroundStyle={copied ? "systemGreen" : "tertiaryLabel"} font={"footnote"}>{copied ? "已複製 ✓" : "點一下複製"}</Text>
+    </HStack>
+  </Button>
+}
+
 function CitiesPage() {
   const list = store.cinemas
   const cities = sortCities(Array.from(new Set(list.map((c) => c.city))))
@@ -371,7 +395,7 @@ function CinemaPage({ cinema }: { cinema: Cinema }) {
     </Section>
     <Section>
       {info.data?.site ? <Button title={"影城官網（訂票）"} systemImage={"house"} action={() => Safari.openURL(info.data!.site!)} /> : null}
-      {info.data?.site !== cinema.url ? <Button title={cinema.source === "at" ? "在 Safari 開啟開眼時刻表" : "在 Safari 開啟場次通時刻表"} systemImage={"safari"} action={() => Safari.openURL(cinema.url)} /> : null}
+      {info.data?.site !== cinema.url ? <Button title={cinema.source === "at" ? "以瀏覽器開啟開眼時刻表" : "以瀏覽器開啟場次通時刻表"} systemImage={"globe"} action={() => Safari.openURL(cinema.url)} /> : null}
     </Section>
   </List>
 }

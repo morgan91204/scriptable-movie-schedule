@@ -154,7 +154,15 @@ class App {
           <Item icon="⏱" title="補片長（TMDB）" subtitle={this.settings.tmdbToken ? "已設定：沒有片長的電影會自動補上" : "未設定"} onTap={() => this.go(() => this.tmdbView())} />
         </Section>
         <Note text="場次資料來自場次通 twshowtimes.com、開眼電影網，以及誠品、光點、樂聲官網，實際場次以影城公告為準。" />
-        <Note text={`版本 ${APP_VERSION}`} />
+        <p
+          class="note version"
+          onTap={async () => {
+            Pasteboard.copy(`版本 ${APP_VERSION}`);
+            await this.ui.toast("已複製版本號");
+          }}
+        >
+          {`版本 ${APP_VERSION}`}（點一下複製）
+        </p>
       </Page>
     );
   }
@@ -319,7 +327,7 @@ class App {
         <Section>
           <Item icon={fav ? "★" : "☆"} title={fav ? "移出常去影城" : "加入常去影城"} chevron={false} onTap={() => this.toggleFav(c)} />
           {site ? <Item icon="🏠" title="影城官網（訂票）" subtitle={site.replace(/^https?:\/\//, "").replace(/\/.*$/, "")} chevron={false} accent onTap={() => Safari.open(site)} /> : null}
-          {site !== c.url ? <Item icon="🌐" title={c.source === "at" ? "在 Safari 開啟開眼時刻表" : "在 Safari 開啟場次通時刻表"} chevron={false} accent onTap={() => Safari.open(c.url)} /> : null}
+          {site !== c.url ? <Item icon="🌐" title={c.source === "at" ? "以瀏覽器開啟開眼時刻表" : "以瀏覽器開啟場次通時刻表"} chevron={false} accent onTap={() => Safari.open(c.url)} /> : null}
         </Section>
       </Page>
     );
