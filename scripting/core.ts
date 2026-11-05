@@ -354,16 +354,70 @@ export async function moviesOf(c: Cinema, date: string): Promise<{ movies: Movie
   if (c.source === "at") {
     let d = await atDay(c);
     if (d.date !== date) d = await atDay(c, date);
-    return { movies: d.movies, booking: d.site, sourceUrl: `${c.url}${date.replace(/-/g, "")}/`, address: d.address || c.address || "" };
+    return { movies: await fillRuntimes(d.movies), booking: d.site, sourceUrl: `${c.url}${date.replace(/-/g, "")}/`, address: d.address || c.address || "" };
   }
   if (c.source === "tw") {
     let d = await twDay(c);
     if (d.date !== date) d = await twDay(c, date);
     if (d.date && d.date !== date) throw new Error("網站回傳的日期和選擇的不同，請稍後再試");
-    return { movies: d.movies, booking: d.booking, sourceUrl: `${TW}/cinemas/${c.id}/${date}/`, address: d.address };
+    return { movies: await fillRuntimes(d.movies), booking: d.booking, sourceUrl: `${TW}/cinemas/${c.id}/${date}/`, address: d.address };
   }
   const m = await multiDay(c);
-  return { movies: m.schedules[date] || [], booking: c.url, sourceUrl: c.url, address: c.address || "" };
+  return { movies: await fillRuntimes(m.schedules[date] || []), booking: c.url, sourceUrl: c.url, address: c.address || "" };
+}
+
+// ───────────────────────── 補片長（開眼電影網） ─────────────────────────
+// 場次通的重映、修復版、演唱會等有時沒有片長：用開眼的片單比對片名補上。
+
+const normTitle = (t: string) =>
+  String(t || "").toLowerCase().replace(/[\s:：·・\-–—!！?？,，.。'"’「」『』《》()（）\[\]【】]/g, "");
+// 片名多出這些字仍視為同一部（重映、修復版）；「導演剪輯版」等片長會變的不算
+const REISSUE_RE = /^(?:加碼|數位|[248]k|修復|重映|重製|再映|經典|紀念|\d*週年|版)+$/i;
+
+let runtimeIndex: Promise<Record<string, number>> | null = null;
+function loadRuntimeIndex(): Promise<Record<string, number>> {
+  if (runtimeIndex) return runtimeIndex;
+  runtimeIndex = (async () => {
+    try {
+      const c = JSON.parse(cacheGet("runtimes.json") || "null");
+      if (c && Date.now() - c.at < 12 * 3600e3 && c.index) return c.index as Record<string, number>;
+    } catch (_) {}
+    const pages = await Promise.all(
+      ["now", "now2", "next"].map((p) => getText(`https://www.atmovies.com.tw/movie/${p}/`).catch(() => ""))
+    );
+    const lists = await parseMany<{ title: string; runtime: number }[]>("parseAtRuntimes", pages.filter(Boolean));
+    const index: Record<string, number> = {};
+    for (const list of lists) for (const x of list) index[normTitle(x.title)] ||= x.runtime;
+    if (Object.keys(index).length) cacheSet("runtimes.json", JSON.stringify({ at: Date.now(), index }));
+    return index;
+  })().catch(() => ({}));
+  return runtimeIndex;
+}
+
+/** 依片名找片長：先找完全相同，再找「原片名＋重映／修復版」 */
+export function matchRuntime(index: Record<string, number>, title: string): number {
+  const t = normTitle(title);
+  if (!t) return 0;
+  if (index[t]) return index[t];
+  let best = "";
+  for (const k of Object.keys(index))
+    if (k.length >= 2 && k.length > best.length && t.startsWith(k) && REISSUE_RE.test(t.slice(k.length))) best = k;
+  return best ? index[best] : 0;
+}
+
+/** 沒有片長的電影，從開眼補上（會標記 runtimeFrom） */
+export async function fillRuntimes<T extends { title: string; runtime: number; runtimeFrom?: string }>(movies: T[]): Promise<T[]> {
+  if (!movies.some((m) => !m.runtime)) return movies;
+  const index = await loadRuntimeIndex();
+  for (const m of movies)
+    if (!m.runtime) {
+      const r = matchRuntime(index, m.title);
+      if (r) {
+        m.runtime = r;
+        m.runtimeFrom = "開眼電影網";
+      }
+    }
+  return movies;
 }
 
 // ───────────────────────── 互動元件 ─────────────────────────
@@ -373,7 +427,7 @@ export async function moviesOf(c: Cinema, date: string): Promise<{ movies: Movie
 let moviesCache: TwMovie[] | null = null;
 /** 場次通的電影清單（上映中＋即將上映） */
 export async function loadMovies(): Promise<TwMovie[]> {
-  if (!moviesCache) moviesCache = await parse<TwMovie[]>("parseTwMovies", await getText(TW + "/movies/"));
+  if (!moviesCache) moviesCache = await fillRuntimes(await parse<TwMovie[]>("parseTwMovies", await getText(TW + "/movies/")));
   return moviesCache;
 }
 
@@ -382,7 +436,11 @@ const movieDayCache: Record<string, TwMovieDay> = {};
 export async function movieDay(slug: string, date?: string): Promise<TwMovieDay> {
   const path = encodeURIComponent(slug).replace(/%3A/gi, ":");
   const url = `${TW}/movies/${path}/${date ? date + "/" : ""}`;
-  if (!movieDayCache[url]) movieDayCache[url] = await parse<TwMovieDay>("parseTwMovieDay", await getText(url));
+  if (!movieDayCache[url]) {
+    const d = await parse<TwMovieDay>("parseTwMovieDay", await getText(url));
+    await fillRuntimes([d]);
+    movieDayCache[url] = d;
+  }
   return movieDayCache[url];
 }
 

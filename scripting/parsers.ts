@@ -10,6 +10,7 @@ export interface Movie {
   runtime: number; // 0 = 來源沒提供
   rating?: string;
   versions: Version[];
+  runtimeFrom?: string; // 片長不是場次來源給的時，註明從哪裡補來
 }
 export interface TwCinema {
   id: string;
@@ -333,6 +334,7 @@ export interface TwMovie {
   en: string;
   rating: string;
   runtime: number;
+  runtimeFrom?: string;
   cinemaCount: number;
   comingSoon: boolean;
 }
@@ -349,6 +351,7 @@ export interface TwMovieDay {
   en: string;
   rating: string;
   runtime: number;
+  runtimeFrom?: string;
   date: string;
   dates: string[];
   cinemas: TwMovieCinema[];
@@ -442,4 +445,17 @@ export function parseTwMovieDay(doc: Document): TwMovieDay {
     }
   }
   return { title, en, rating, runtime, date, dates, cinemas };
+}
+
+/** 開眼「本期首輪／二輪／近期上映」清單：片名與片長（給沒有片長的場次補資料用） */
+export function parseAtRuntimes(doc: Document): { title: string; runtime: number }[] {
+  const clean = (s: unknown) => String(s || "").replace(/\s+/g, " ").trim();
+  const out: { title: string; runtime: number }[] = [];
+  for (const li of Array.from(doc.querySelectorAll("li"))) {
+    const a = li.querySelector('a[href^="/movie/f"]');
+    const rt = clean(li.querySelector(".runtime")?.textContent).match(/\((\d+)\s*分\)/);
+    const title = clean(a?.textContent);
+    if (title && rt && Number(rt[1]) > 0) out.push({ title, runtime: Number(rt[1]) });
+  }
+  return out;
 }

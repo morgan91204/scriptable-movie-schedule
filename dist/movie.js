@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.05-1950
+// @movie-schedule-app 電影行程 v2026.11.05-1959
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/jsx.tsx
@@ -594,9 +594,21 @@ function parseTwMovieDay(doc) {
   }
   return { title, en, rating, runtime, date, dates, cinemas };
 }
+function parseAtRuntimes(doc) {
+  const clean = (s) => String(s || "").replace(/\\s+/g, " ").trim();
+  const out = [];
+  for (const li of Array.from(doc.querySelectorAll("li"))) {
+    const a = li.querySelector('a[href^="/movie/f"]');
+    const rt = clean(li.querySelector(".runtime")?.textContent).match(/\\((\\d+)\\s*分\\)/);
+    const title = clean(a?.textContent);
+    if (title && rt && Number(rt[1]) > 0) out.push({ title, runtime: Number(rt[1]) });
+  }
+  return out;
+}
 {
   parseAtDay,
   parseAtRegion,
+  parseAtRuntimes,
   parseEslite,
   parseLux,
   parseLuxFilm,
@@ -1066,27 +1078,75 @@ async function moviesOf(c, date) {
   if (c.source === "at") {
     let d = await atDay(c);
     if (d.date !== date) d = await atDay(c, date);
-    return { movies: d.movies, booking: d.site, sourceUrl: `${c.url}${date.replace(/-/g, "")}/`, address: d.address || c.address || "" };
+    return { movies: await fillRuntimes(d.movies), booking: d.site, sourceUrl: `${c.url}${date.replace(/-/g, "")}/`, address: d.address || c.address || "" };
   }
   if (c.source === "tw") {
     let d = await twDay(c);
     if (d.date !== date) d = await twDay(c, date);
     if (d.date && d.date !== date) throw new Error("網站回傳的日期和選擇的不同，請稍後再試");
-    return { movies: d.movies, booking: d.booking, sourceUrl: `${TW}/cinemas/${c.id}/${date}/`, address: d.address };
+    return { movies: await fillRuntimes(d.movies), booking: d.booking, sourceUrl: `${TW}/cinemas/${c.id}/${date}/`, address: d.address };
   }
   const m = await multiDay(c);
-  return { movies: m.schedules[date] || [], booking: c.url, sourceUrl: c.url, address: c.address || "" };
+  return { movies: await fillRuntimes(m.schedules[date] || []), booking: c.url, sourceUrl: c.url, address: c.address || "" };
+}
+var normTitle = (t) => String(t || "").toLowerCase().replace(/[\s:：·・\-–—!！?？,，.。'"’「」『』《》()（）\[\]【】]/g, "");
+var REISSUE_RE = /^(?:加碼|數位|[248]k|修復|重映|重製|再映|經典|紀念|\d*週年|版)+$/i;
+var runtimeIndex = null;
+function loadRuntimeIndex() {
+  if (runtimeIndex) return runtimeIndex;
+  runtimeIndex = (async () => {
+    try {
+      const c = JSON.parse(cacheGet("runtimes.json") || "null");
+      if (c && Date.now() - c.at < 12 * 36e5 && c.index) return c.index;
+    } catch (_) {
+    }
+    const pages = await Promise.all(
+      ["now", "now2", "next"].map((p) => getText(`https://www.atmovies.com.tw/movie/${p}/`).catch(() => ""))
+    );
+    const lists = await parseMany("parseAtRuntimes", pages.filter(Boolean));
+    const index = {};
+    for (const list of lists) for (const x of list) index[normTitle(x.title)] ||= x.runtime;
+    if (Object.keys(index).length) cacheSet("runtimes.json", JSON.stringify({ at: Date.now(), index }));
+    return index;
+  })().catch(() => ({}));
+  return runtimeIndex;
+}
+function matchRuntime(index, title) {
+  const t = normTitle(title);
+  if (!t) return 0;
+  if (index[t]) return index[t];
+  let best = "";
+  for (const k of Object.keys(index))
+    if (k.length >= 2 && k.length > best.length && t.startsWith(k) && REISSUE_RE.test(t.slice(k.length))) best = k;
+  return best ? index[best] : 0;
+}
+async function fillRuntimes(movies) {
+  if (!movies.some((m) => !m.runtime)) return movies;
+  const index = await loadRuntimeIndex();
+  for (const m of movies)
+    if (!m.runtime) {
+      const r = matchRuntime(index, m.title);
+      if (r) {
+        m.runtime = r;
+        m.runtimeFrom = "開眼電影網";
+      }
+    }
+  return movies;
 }
 var moviesCache = null;
 async function loadMovies() {
-  if (!moviesCache) moviesCache = await parse("parseTwMovies", await getText(TW + "/movies/"));
+  if (!moviesCache) moviesCache = await fillRuntimes(await parse("parseTwMovies", await getText(TW + "/movies/")));
   return moviesCache;
 }
 var movieDayCache = {};
 async function movieDay(slug, date) {
   const path = encodeURIComponent(slug).replace(/%3A/gi, ":");
   const url = `${TW}/movies/${path}/${date ? date + "/" : ""}`;
-  if (!movieDayCache[url]) movieDayCache[url] = await parse("parseTwMovieDay", await getText(url));
+  if (!movieDayCache[url]) {
+    const d = await parse("parseTwMovieDay", await getText(url));
+    await fillRuntimes([d]);
+    movieDayCache[url] = d;
+  }
   return movieDayCache[url];
 }
 var FORMATS = ["IMAX", "4DX", "ScreenX", "MX4D", "杜比"];
@@ -1294,7 +1354,7 @@ var App = class {
     const cities = Array.from(new Set(this.cinemas.map((c) => c.city))).sort(
       (a, b) => (CITY_ORDER.indexOf(a) + 1 || 99) - (CITY_ORDER.indexOf(b) + 1 || 99)
     );
-    return /* @__PURE__ */ h(Page, { title: "🎬 電影行程", subtitle: `${this.cinemas.length} 間影城｜選影城 → 日期 → 電影 → 場次` }, /* @__PURE__ */ h(Section, null, /* @__PURE__ */ h(Item, { icon: "⏰", title: "現在有什麼可以看", subtitle: "選時段，一次列出常去、附近或某縣市的所有場次", onTap: () => this.go(() => this.nowView()) }), /* @__PURE__ */ h(Item, { icon: "🎬", title: "依電影找場次", subtitle: "先選電影，再看哪些影城有放映", onTap: () => this.go(() => this.movieListView(), "讀取電影清單…") }), /* @__PURE__ */ h(Item, { icon: "📍", title: "附近的影城", subtitle: "依目前位置排序", onTap: () => this.go(() => this.nearbyView(), "取得目前位置…") }), /* @__PURE__ */ h(Item, { icon: "🔍", title: "搜尋影城", subtitle: "影城、分店、行政區或縣市", onTap: () => this.go(() => this.searchView()) })), favs.length ? /* @__PURE__ */ h(Section, { title: "常去影城" }, favs.map((c) => /* @__PURE__ */ h(Item, { icon: "★", title: c.name, subtitle: `${c.city} ${c.district}`, onTap: () => this.go(() => this.cinemaView(c), `讀取 ${c.name} 的場次…`) }))) : null, /* @__PURE__ */ h(Section, { title: "全台影城", hint: "影城清單來自場次通與開眼電影網，會自動更新。" }, cities.map((city) => /* @__PURE__ */ h(Item, { title: city, badge: `${this.cinemas.filter((c) => c.city === city).length} 間`, onTap: () => this.go(() => this.cityView(city)) }))), /* @__PURE__ */ h(Section, { title: "設定" }, /* @__PURE__ */ h(Item, { icon: "📅", title: "寫入的行事曆", subtitle: this.calendarName, onTap: () => this.go(() => this.calendarView()) }), /* @__PURE__ */ h(Item, { icon: "📺", title: "廣告預告", subtitle: `預計散場時間會加上 ${this.settings.ads} 分鐘`, right: "點一下切換", chevron: false, onTap: () => this.cycleAds() })), /* @__PURE__ */ h(Note, { text: "場次資料來自場次通 twshowtimes.com、開眼電影網，以及誠品、光點、樂聲官網，實際場次以影城公告為準。" }), /* @__PURE__ */ h(Note, { text: `版本 ${"2026.11.05-1950"}` }));
+    return /* @__PURE__ */ h(Page, { title: "🎬 電影行程", subtitle: `${this.cinemas.length} 間影城｜選影城 → 日期 → 電影 → 場次` }, /* @__PURE__ */ h(Section, null, /* @__PURE__ */ h(Item, { icon: "⏰", title: "現在有什麼可以看", subtitle: "選時段，一次列出常去、附近或某縣市的所有場次", onTap: () => this.go(() => this.nowView()) }), /* @__PURE__ */ h(Item, { icon: "🎬", title: "依電影找場次", subtitle: "先選電影，再看哪些影城有放映", onTap: () => this.go(() => this.movieListView(), "讀取電影清單…") }), /* @__PURE__ */ h(Item, { icon: "📍", title: "附近的影城", subtitle: "依目前位置排序", onTap: () => this.go(() => this.nearbyView(), "取得目前位置…") }), /* @__PURE__ */ h(Item, { icon: "🔍", title: "搜尋影城", subtitle: "影城、分店、行政區或縣市", onTap: () => this.go(() => this.searchView()) })), favs.length ? /* @__PURE__ */ h(Section, { title: "常去影城" }, favs.map((c) => /* @__PURE__ */ h(Item, { icon: "★", title: c.name, subtitle: `${c.city} ${c.district}`, onTap: () => this.go(() => this.cinemaView(c), `讀取 ${c.name} 的場次…`) }))) : null, /* @__PURE__ */ h(Section, { title: "全台影城", hint: "影城清單來自場次通與開眼電影網，會自動更新。" }, cities.map((city) => /* @__PURE__ */ h(Item, { title: city, badge: `${this.cinemas.filter((c) => c.city === city).length} 間`, onTap: () => this.go(() => this.cityView(city)) }))), /* @__PURE__ */ h(Section, { title: "設定" }, /* @__PURE__ */ h(Item, { icon: "📅", title: "寫入的行事曆", subtitle: this.calendarName, onTap: () => this.go(() => this.calendarView()) }), /* @__PURE__ */ h(Item, { icon: "📺", title: "廣告預告", subtitle: `預計散場時間會加上 ${this.settings.ads} 分鐘`, right: "點一下切換", chevron: false, onTap: () => this.cycleAds() })), /* @__PURE__ */ h(Note, { text: "場次資料來自場次通 twshowtimes.com、開眼電影網，以及誠品、光點、樂聲官網，實際場次以影城公告為準。" }), /* @__PURE__ */ h(Note, { text: `版本 ${"2026.11.05-1959"}` }));
   }
   searchView() {
     const k = this.query.trim().toLowerCase().replace(/臺/g, "台");
@@ -1414,7 +1474,7 @@ var App = class {
       {
         icon: "⏱",
         title: "片長",
-        subtitle: this.runtime ? `${this.runtime} 分鐘` : "來源沒有提供，請輸入（未填以 120 分鐘計）",
+        subtitle: this.runtime ? `${this.runtime} 分鐘` + (p.movie.runtimeFrom && this.runtime === p.movie.runtime ? `（取自${p.movie.runtimeFrom}，請核對）` : "") : "來源沒有提供，請輸入（未填以 120 分鐘計）",
         right: "修改",
         onTap: () => this.go(() => this.runtimeView())
       }
@@ -1530,7 +1590,7 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
     } })))), formats.length ? /* @__PURE__ */ h(Section, { title: "特殊廳" }, /* @__PURE__ */ h(Chips, null, ["", ...formats].map((f) => /* @__PURE__ */ h(Chip, { label: f || "全部", muted: f !== fmtSel, onTap: () => {
       this.movieFormat = f;
     } })))) : null, cities.filter((ct) => shown.some((c) => c.city === ct)).map((ct) => /* @__PURE__ */ h(Section, { title: `${ct}（${shown.filter((c) => c.city === ct).length} 間）` }, shown.filter((c) => c.city === ct).map((c) => {
-      const movie = { title: d.title || m.title, runtime, rating: d.rating || m.rating, versions: c.versions };
+      const movie = { title: d.title || m.title, runtime, rating: d.rating || m.rating, versions: c.versions, runtimeFrom: d.runtime ? d.runtimeFrom : m.runtimeFrom };
       const summary = c.versions.map((v) => `${v.label} ${[...v.times].sort(byShowtime).join(" ")}`).join("／");
       return /* @__PURE__ */ h(
         Item,

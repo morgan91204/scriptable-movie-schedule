@@ -89,7 +89,7 @@
 npm install
 ./build.sh                  # 型別檢查 → 編譯 dist/movie.js 與 dist/電影行程.scriptable
 node test/run.mjs vs        # 在 Node 模擬 Scriptable，用真實網路資料跑完整流程
-node test/run.mjs eslite | spoths | spot | search | noruntime
+node test/run.mjs eslite | spoths | spot | search | filled | noruntime
 node test/lux.mjs           # 樂聲（限台灣 IP，測試改讀 test/fixtures/）
 node test/at.mjs            # 開眼來源
 node test/loader.mjs online # 載入器：online / offline / 404

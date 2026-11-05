@@ -2,7 +2,7 @@
   "name": "電影行程",
   "icon": "film.stack",
   "color": "#7B61FF",
-  "version": "2026.11.05.1950",
+  "version": "2026.11.05.1959",
   "description": "Pick a cinema or a movie, choose a showtime, and add it to iOS Calendar with an alert.",
   "localizedNames": {
     "zh": "電影行程",

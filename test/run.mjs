@@ -56,6 +56,14 @@ const driver = (async () => {
     await tap(/^確定$/, { v: "130" });
     await tap(/加入行事曆/);
     await dump("完成頁");
+  } else if (scenario === "filled") {
+    // 場次通沒給片長的重映片：應從開眼補上並註明來源
+    await tap(/^台北市/);
+    await tap(/台北信義威秀影城/);
+    await tap(/（.）/);
+    await tap(/(修復版|重映).*開眼|(修復版|重映)/);
+    await tap(/^\d\d:\d\d/);
+    await dump("確認頁（片長取自開眼）");
   } else if (scenario === "error") {
     await tap(/搜尋影城/);
     await tap(/^搜尋$/, { q: "zzzz" });

@@ -388,7 +388,7 @@ function ConfirmPage({ pick }: { pick: Pick }) {
     </Section>
     {isLate(pick.time) ? <Section footer={<Text>這是凌晨場：已自動算到隔天日期，請再核對電影票。</Text>}><Label title={"凌晨場"} systemImage={"moon.stars"} /></Section> : null}
 
-    <Section header={<Text>可調整</Text>} footer={pick.movie.runtime ? undefined : <Text>資料來源沒有提供片長，請手動輸入。</Text>}>
+    <Section header={<Text>可調整</Text>} footer={!pick.movie.runtime ? <Text>資料來源沒有提供片長，請手動輸入。</Text> : pick.movie.runtimeFrom ? <Text>{`片長取自${pick.movie.runtimeFrom}（原版片長），請再核對。`}</Text> : undefined}>
       <HStack>
         <Text>片長（分鐘）</Text>
         <TextField title={"片長（分鐘）"} value={runtimeText} onChanged={setRuntimeText} prompt={"例如 120"} keyboardType={"numberPad"} multilineTextAlignment={"trailing"} />
@@ -492,7 +492,7 @@ function MoviePage({ movie }: { movie: TwMovie }) {
     {byCity.map((ct) =>
       <Section key={ct} header={<Text>{`${ct}（${shown.filter((c) => c.city === ct).length} 間）`}</Text>}>
         {shown.filter((c) => c.city === ct).map((c) => {
-          const m: Movie = { title: data!.title || movie.title, runtime, rating: data!.rating || movie.rating, versions: c.versions }
+          const m: Movie = { title: data!.title || movie.title, runtime, rating: data!.rating || movie.rating, versions: c.versions, runtimeFrom: data?.runtime ? data.runtimeFrom : movie.runtimeFrom }
           const d = data!.date
           const summary = c.versions.map((v) => `${v.label} ${[...v.times].sort(byShowtime).join(" ")}`).join("／")
           return <NavigationLink key={c.id} destination={

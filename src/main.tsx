@@ -351,7 +351,11 @@ class App {
           <Item
             icon="⏱"
             title="片長"
-            subtitle={this.runtime ? `${this.runtime} 分鐘` : "來源沒有提供，請輸入（未填以 120 分鐘計）"}
+            subtitle={
+              this.runtime
+                ? `${this.runtime} 分鐘` + (p.movie.runtimeFrom && this.runtime === p.movie.runtime ? `（取自${p.movie.runtimeFrom}，請核對）` : "")
+                : "來源沒有提供，請輸入（未填以 120 分鐘計）"
+            }
             right="修改"
             onTap={() => this.go(() => this.runtimeView())}
           />
@@ -535,7 +539,7 @@ class App {
         {cities.filter((ct) => shown.some((c) => c.city === ct)).map((ct) => (
           <Section title={`${ct}（${shown.filter((c) => c.city === ct).length} 間）`}>
             {shown.filter((c) => c.city === ct).map((c) => {
-              const movie: Movie = { title: d.title || m.title, runtime, rating: d.rating || m.rating, versions: c.versions };
+              const movie: Movie = { title: d.title || m.title, runtime, rating: d.rating || m.rating, versions: c.versions, runtimeFrom: d.runtime ? d.runtimeFrom : m.runtimeFrom };
               const summary = c.versions.map((v) => `${v.label} ${[...v.times].sort(byShowtime).join(" ")}`).join("／");
               return (
                 <Item
