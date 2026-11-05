@@ -373,12 +373,19 @@ export async function moviesOf(c: Cinema, date: string): Promise<{ movies: Movie
 
 const normTitle = (t: string) =>
   String(t || "").toLowerCase().replace(/[\s:：·・\-–—!！?？,，.。'"’「」『』《》()（）\[\]【】]/g, "");
-/** 去掉「4K重映」「數位修復版」「加碼重映」等字，查原片 */
+/** 去掉「4K重映」「全新4K修復版」「(4K修復)」「加碼重映」等字，查原片 */
+const REISSUE_WORDS = "全新|加碼|數位|[248]K|修復|重映|重製|再映|經典|紀念|\\d*週年";
 export function baseTitle(t: string): string {
-  return String(t || "")
-    .replace(/[《》]/g, "")
-    .replace(/[\s:：\-–—]*(?:加碼|數位|[248]K|修復|重映|重製|再映|經典|紀念|\d*週年)+版?\s*$/i, "")
-    .trim();
+  let s = String(t || "").replace(/[《》]/g, "").trim();
+  for (let i = 0; i < 3; i++) {
+    const before = s;
+    // 結尾括號裡是重映字樣：讓子彈飛(4K修復)、XXX【數位修復版】
+    s = s.replace(new RegExp(`\\s*[（(\\[【][^）)\\]】]*(?:${REISSUE_WORDS})[^）)\\]】]*[）)\\]】]\\s*$`, "i"), "");
+    // 結尾直接接重映字樣：讓子彈飛 全新4K修復版、進擊的鼓手 4K重映
+    s = s.replace(new RegExp(`[\\s:：\\-–—]*(?:${REISSUE_WORDS})+(?:版本?)?\\s*$`, "i"), "");
+    if (s === before) break;
+  }
+  return s.trim() || String(t || "").trim();
 }
 
 const TMDB = "https://api.themoviedb.org/3";
