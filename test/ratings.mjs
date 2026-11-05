@@ -22,3 +22,8 @@ for (const [t, en] of [["進擊的鼓手 4K重映", ""], ["讓子彈飛(4K修復
   const r = await m.movieRatings(t, en);
   console.log(`${t}（${Date.now() - t0}ms）`, r.imdb ? `IMDb ${r.imdb.score}（${r.imdb.votes}）` : "IMDb —", r.tomato ? `🍅 ${r.tomato.score}%${r.tomato.certified ? " 新鮮認證" : ""}` : "🍅 —", r.popcorn ? `🍿 ${r.popcorn.score}%` : "🍿 —", r.tomato?.url || "");
 }
+console.log("— 海報／預告 —");
+for (const [t, slug] of [["泥面人", "泥面人"], ["野獸之心", ""], ["快打旋風", "快打旋風"]]) {
+  const t0 = Date.now(); const x = await m.movieExtras(t, slug || undefined);
+  console.log(`${t}（${Date.now() - t0}ms）`, x.poster ? "海報 ✓" : "海報 —", x.trailerName || "搜尋預告");
+}

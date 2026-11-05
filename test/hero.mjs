@@ -12,7 +12,7 @@ const driver = (async () => {
   await dump("剛打開");
   await new Promise((r) => setTimeout(r, 9000));
   await dump("9 秒後（應自動補上）");
-  await tap(/觀看預告|搜尋 YouTube 預告/);
+  await tap(/觀看預告|搜尋預告/);
   closeUI();
 })().catch((e) => { console.error("❌", e.message); process.exit(1); });
 await import("../dist/app.mjs"); await driver;

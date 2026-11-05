@@ -253,11 +253,11 @@ function RatingBadge({ kind, value, tier, note, url }: { kind: "imdb" | "tomato"
   const c = TIER[tier]
   const icon = kind === "tomato" ? (tier === "bad" ? "🤢" : "🍅") : kind === "popcorn" ? (tier === "bad" ? "🫗" : "🍿") : ""
   return <Button action={() => Safari.openURL(url)} buttonStyle={"plain"}>
-    <HStack spacing={3} padding={{ horizontal: 6, vertical: 3 }} background={c.bg} clipShape={{ type: "rect", cornerRadius: 7 }}>
+    <HStack spacing={2} padding={{ horizontal: 5, vertical: 2 }} background={c.bg} clipShape={{ type: "rect", cornerRadius: 6 }}>
       {kind === "imdb"
-        ? <Text font={"caption2"} fontWeight={"heavy"} foregroundStyle={"black"} padding={{ horizontal: 3, vertical: 1 }} background={"#F5C518"} clipShape={{ type: "rect", cornerRadius: 3 }}>IMDb</Text>
-        : <Text font={"footnote"}>{icon}</Text>}
-      <Text font={"footnote"} fontWeight={"bold"} foregroundStyle={c.fg}>{value + (note ? "✓" : "")}</Text>
+        ? <Text font={"caption2"} fontWeight={"heavy"} foregroundStyle={"black"} padding={{ horizontal: 2, vertical: 0 }} background={"#F5C518"} clipShape={{ type: "rect", cornerRadius: 3 }}>IMDb</Text>
+        : <Text font={"caption2"}>{icon}</Text>}
+      <Text font={"caption"} fontWeight={"bold"} foregroundStyle={c.fg} lineLimit={1}>{value + (note ? "✓" : "")}</Text>
     </HStack>
   </Button>
 }
@@ -275,7 +275,7 @@ function MovieHero({ title, slug, lines, en }: { title: string; slug?: string; l
         : x.data ? null : <ProgressView progressViewStyle={"circular"} frame={{ width: 112, height: 168 }} />}
       <VStack alignment={"leading"} spacing={4}>
         {lines.filter(Boolean).map((l) => <Text key={l} font={"subheadline"} foregroundStyle={"secondaryLabel"}>{l}</Text>)}
-        {r && (r.imdb || r.tomato || r.popcorn) ? <HStack spacing={4}>
+        {r && (r.imdb || r.tomato || r.popcorn) ? <HStack spacing={3}>
           {r.imdb ? <RatingBadge kind={"imdb"} value={r.imdb.score.toFixed(1)} tier={ratingTier("imdb", r.imdb.score)} url={r.imdb.url} /> : null}
           {r.tomato ? <RatingBadge kind={"tomato"} value={`${r.tomato.score}%`} tier={ratingTier("pct", r.tomato.score)} note={r.tomato.certified ? "認證" : undefined} url={r.tomato.url} /> : null}
           {r.popcorn ? <RatingBadge kind={"popcorn"} value={`${r.popcorn.score}%`} tier={ratingTier("pct", r.popcorn.score)} url={r.popcorn.url} /> : null}

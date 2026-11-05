@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.05-2217
+// @movie-schedule-app 電影行程 v2026.11.05-2223
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/jsx.tsx
@@ -148,17 +148,17 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .hero .poster{width:112px;aspect-ratio:2/3;object-fit:cover;border-radius:12px;background:var(--chip);box-shadow:0 4px 14px rgba(0,0,0,.25);flex:none}
 .hero-info{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
 .hero-line{font-size:14px;color:var(--fg2)}
-.ratings{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
-.rate{display:flex;align-items:center;gap:5px;padding:4px 9px;border-radius:9px;font-size:14px;font-weight:700;font-variant-numeric:tabular-nums}
+.ratings{display:flex;flex-wrap:nowrap;gap:4px;margin-top:6px;overflow:hidden}
+.rate{display:flex;align-items:center;gap:3px;padding:3px 6px;border-radius:7px;font-size:12px;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap;flex:none}
 .rate.good{background:rgba(48,209,88,.18);color:#1f9d45}
 .rate.mid{background:rgba(255,159,10,.2);color:#c77700}
 .rate.bad{background:rgba(255,69,58,.18);color:#d63a31}
 @media(prefers-color-scheme:dark){.rate.good{color:#30d158}.rate.mid{color:#ffb340}.rate.bad{color:#ff6961}}
-.rate .imdb{background:#f5c518;color:#000;font-size:11px;font-weight:800;padding:1px 4px;border-radius:4px}
-.rate .emo{font-size:14px}
-.rate .n{font-size:11px;font-weight:600;opacity:.85}
+.rate .imdb{background:#f5c518;color:#000;font-size:9px;font-weight:800;padding:1px 3px;border-radius:3px;letter-spacing:-.2px}
+.rate .emo{font-size:12px}
+.rate .n{font-size:10px;font-weight:600;opacity:.85}
 .rate:active{opacity:.6}
-.trailer{margin-top:8px;align-self:flex-start;padding:8px 14px;border-radius:999px;background:#ff0033;color:#fff;font-size:15px;font-weight:600}
+.trailer{margin-top:8px;align-self:flex-start;padding:7px 13px;border-radius:999px;background:#ff0033;color:#fff;font-size:14px;font-weight:600;white-space:nowrap}
 .trailer:active{opacity:.7}
 .item.long{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
 .toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom) + 28px);transform:translateX(-50%);z-index:20;background:rgba(40,40,44,.92);color:#fff;
@@ -1229,45 +1229,56 @@ async function movieExtras(title, slug) {
     return out;
   })();
 }
+var posterMem = {};
+function twPoster(slug) {
+  return posterMem[slug] ||= (async () => {
+    const path = encodeURIComponent(slug).replace(/%3A/gi, ":");
+    const url = `${TW}/movies/${path}/`;
+    if (movieDayCache[url]?.image) return movieDayCache[url].image;
+    const html = await getText(url);
+    return (html.match(/property="og:image"\s+content="([^"]+)"/) || html.match(/"image":"([^"]+)"/) || [])[1] || "";
+  })();
+}
 async function findExtras(title, slug) {
-  {
-    const base = baseTitle(title);
-    const out = {
-      poster: "",
-      trailer: `https://www.youtube.com/results?search_query=${encodeURIComponent(base + " 預告")}`,
-      trailerName: ""
-    };
-    try {
-      let s = slug;
-      if (!s) {
-        const list = await loadMovies();
-        const key = normTitle(title), bkey = normTitle(base);
-        s = (list.find((m) => normTitle(m.title) === key) || list.find((m) => normTitle(baseTitle(m.title)) === bkey))?.slug;
-      }
-      if (s) out.poster = (await movieDay(s)).image || "";
-    } catch (_) {
+  const base = baseTitle(title);
+  const out = {
+    poster: "",
+    trailer: `https://www.youtube.com/results?search_query=${encodeURIComponent(base + " 預告")}`,
+    trailerName: ""
+  };
+  const posterJob = (async () => {
+    let s = slug;
+    if (!s) {
+      const list = await loadMovies();
+      const key = normTitle(title), bkey = normTitle(base);
+      s = (list.find((m) => normTitle(m.title) === key) || list.find((m) => normTitle(baseTitle(m.title)) === bkey))?.slug;
     }
-    const token = ((await loadSettings()).tmdbToken || "").trim();
-    if (token) {
-      try {
-        const hit = await tmdbFind(title, token);
-        if (hit) {
-          if (!out.poster && hit.p) out.poster = "https://image.tmdb.org/t/p/w500" + hit.p;
-          const pickVideo = (list) => list.filter((v2) => v2.site === "YouTube" && v2.key).sort((a, b) => rankVideo(a) - rankVideo(b))[0];
-          const rankVideo = (v2) => (v2.type === "Trailer" ? 0 : v2.type === "Teaser" ? 1 : 2) + (v2.official ? 0 : 0.5);
-          let v = pickVideo((await tmdb(`/movie/${hit.id}/videos?language=zh-TW`, token))?.results || []);
-          if (!v) v = pickVideo((await tmdb(`/movie/${hit.id}/videos`, token))?.results || []);
-          if (v) {
-            out.trailer = `https://www.youtube.com/watch?v=${v.key}`;
-            out.trailerName = String(v.name || "預告片");
-          } else out.err = "TMDB 沒有這部片的預告";
-        } else out.err = "TMDB 找不到這部片";
-      } catch (e) {
-        out.err = "TMDB " + errText(e);
-      }
+    return s ? twPoster(s) : "";
+  })().catch(() => "");
+  const token = ((await loadSettings()).tmdbToken || "").trim();
+  const tmdbJob = (async () => {
+    if (!token) return null;
+    const hit = await tmdbFind(title, token);
+    if (!hit) return { err: "TMDB 找不到這部片" };
+    const pickVideo = (list) => list.filter((v2) => v2.site === "YouTube" && v2.key).sort((a, b) => rankVideo(a) - rankVideo(b))[0];
+    const rankVideo = (v2) => (v2.type === "Trailer" ? 0 : v2.type === "Teaser" ? 1 : 2) + (v2.official ? 0 : 0.5);
+    const [zh, all] = await Promise.all([
+      tmdb(`/movie/${hit.id}/videos?language=zh-TW`, token).catch(() => null),
+      tmdb(`/movie/${hit.id}/videos`, token).catch(() => null)
+    ]);
+    const v = pickVideo(zh?.results || []) || pickVideo(all?.results || []);
+    return { poster: hit.p ? "https://image.tmdb.org/t/p/w500" + hit.p : "", v, err: v ? "" : "TMDB 沒有這部片的預告" };
+  })().catch((e) => ({ err: "TMDB " + errText(e) }));
+  const [poster, t] = await Promise.all([posterJob, tmdbJob]);
+  out.poster = poster || (t && "poster" in t ? t.poster : "") || "";
+  if (t) {
+    if ("v" in t && t.v) {
+      out.trailer = `https://www.youtube.com/watch?v=${t.v.key}`;
+      out.trailerName = String(t.v.name || "預告片");
     }
-    return out;
+    if (t.err) out.err = t.err;
   }
+  return out;
 }
 async function fillRuntimes(movies) {
   const todo = movies.filter((m) => !m.runtime);
@@ -1400,14 +1411,14 @@ function groupByMovie(hits) {
 }
 var errText = (e) => String(e?.message || e).slice(0, 80);
 var IMDB_GQL = "https://api.graphql.imdb.com/";
-async function imdbId(title, en, errs = []) {
+async function identify(title, en, errs) {
   const token = ((await loadSettings()).tmdbToken || "").trim();
   if (token) {
     try {
       const hit = await tmdbFind(title, token);
       if (hit) {
-        const ids = await tmdb(`/movie/${hit.id}/external_ids`, token);
-        if (ids?.imdb_id) return String(ids.imdb_id);
+        const [ids, d] = await Promise.all([tmdb(`/movie/${hit.id}/external_ids`, token), tmdb(`/movie/${hit.id}?language=en-US`, token)]);
+        if (ids?.imdb_id) return { id: String(ids.imdb_id), name: d?.title || d?.original_title || en || "", year: Number(String(d?.release_date || "").slice(0, 4)) || 0 };
       }
     } catch (e) {
       errs.push("TMDB " + errText(e));
@@ -1419,63 +1430,84 @@ async function imdbId(title, en, errs = []) {
       const r = await platform().fetchText(`https://v3.sg.media-imdb.com/suggestion/x/${encodeURIComponent(key)}.json`, { "User-Agent": UA });
       const d = JSON.parse(r.body).d || [];
       const hit = d.find((x) => /^tt/.test(x.id) && (x.qid === "movie" || x.qid === "tvMovie" || x.qid === "video"));
-      if (hit) return hit.id;
+      if (hit) return { id: hit.id, name: String(hit.l || en || ""), year: Number(hit.y) || 0 };
     } catch (e) {
       errs.push("IMDb 搜尋 " + errText(e));
     }
   }
-  return "";
+  return null;
+}
+var rtSlug = (name) => name.toLowerCase().replace(/&/g, " and ").replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+async function rtPage(url) {
+  const r = await get(url);
+  if (!r.ok) return null;
+  const page = r.body;
+  const j = (page.match(/<script[^>]*id="media-scorecard-json"[^>]*>([\s\S]*?)<\/script>/) || [])[1];
+  if (!j) return null;
+  const d = JSON.parse(j);
+  const pct = (x) => x && /\d/.test(String(x.scorePercent || "")) ? Number(String(x.scorePercent).replace(/\D/g, "")) : -1;
+  const ld = (page.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/) || [])[1];
+  let name = "", year = 0;
+  try {
+    const o = ld ? JSON.parse(ld) : {};
+    const m = String(o.name || "").match(/^(.*?)\s*\((\d{4})\)\s*$/);
+    name = m ? m[1] : String(o.name || "");
+    year = m ? Number(m[2]) : Number(String(o.dateCreated || "").slice(0, 4)) || 0;
+  } catch (_) {
+  }
+  return { critics: pct(d.criticsScore), certified: !!d.criticsScore?.certified, audience: pct(d.audienceScore), name, year };
+}
+var normEn = (s) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+async function rtFind(name, year) {
+  const okYear = (y) => !year || !y || Math.abs(y - year) <= 1;
+  const okName = (n) => !n || normEn(n) === normEn(name) || normEn(n).startsWith(normEn(name));
+  const slug = rtSlug(name);
+  if (slug) {
+    const urls = [`https://www.rottentomatoes.com/m/${slug}`, ...year ? [`https://www.rottentomatoes.com/m/${slug}_${year}`] : []];
+    const pages = await Promise.all(urls.map((u) => rtPage(u).catch(() => null)));
+    for (const i of pages.length > 1 ? [1, 0] : [0]) {
+      const s2 = pages[i];
+      if (s2 && okYear(s2.year) && okName(s2.name)) return { url: urls[i], s: s2 };
+    }
+  }
+  const html = await getText(`https://www.rottentomatoes.com/search?search=${encodeURIComponent(name)}`);
+  const list = [];
+  for (const m of html.matchAll(/<search-page-media-row([\s\S]*?)<\/search-page-media-row>/g)) {
+    const b = m[1];
+    const url = (b.match(/href="(https:\/\/www\.rottentomatoes\.com\/m\/[^"]+)"[^>]*slot="title"/) || b.match(/href="(https:\/\/www\.rottentomatoes\.com\/m\/[^"]+)"/) || [])[1];
+    if (!url) continue;
+    const t = (b.match(/slot="title"[^>]*>\s*([^<]+?)\s*</) || [])[1] || "";
+    list.push({ year: Number((b.match(/release-year="(\d*)"/) || [])[1] || 0), url, title: t.replace(/&amp;/g, "&").replace(/&#39;/g, "'") });
+  }
+  const pick = list.find((x) => normEn(x.title) === normEn(name) && okYear(x.year)) || list.find((x) => year && Math.abs(x.year - year) <= 1 && normEn(x.title).includes(normEn(name)));
+  if (!pick) return null;
+  const s = await rtPage(pick.url);
+  return s ? { url: pick.url, s } : null;
 }
 async function findRatings(title, en) {
   const out = {};
   const errs = [];
-  const id = await imdbId(title, en, errs);
-  if (!id) {
+  const who = await identify(title, en, errs);
+  if (!who) {
     out.err = errs.join("；") || "IMDb 找不到這部片";
     return out;
   }
-  let name = "", year = 0;
-  try {
-    const q = `{ title(id:"${id}"){ titleText{text} originalTitleText{text} releaseYear{year} ratingsSummary{aggregateRating voteCount} } }`;
-    const r = await platform().fetchText(`${IMDB_GQL}?query=${encodeURIComponent(q)}`, {
-      "content-type": "application/json",
-      "x-imdb-client-name": "imdb-web-next-localized"
-    });
+  const imdbJob = (async () => {
+    const q = `{ title(id:"${who.id}"){ ratingsSummary{aggregateRating voteCount} } }`;
+    const r = await platform().fetchText(`${IMDB_GQL}?query=${encodeURIComponent(q)}`, { "content-type": "application/json", "x-imdb-client-name": "imdb-web-next-localized" });
     const t = JSON.parse(r.body)?.data?.title;
-    name = t?.titleText?.text || t?.originalTitleText?.text || "";
-    year = Number(t?.releaseYear?.year) || 0;
     const score = Number(t?.ratingsSummary?.aggregateRating) || 0;
-    if (score) out.imdb = { score, votes: Number(t.ratingsSummary.voteCount) || 0, url: `https://www.imdb.com/title/${id}/` };
+    if (score) out.imdb = { score, votes: Number(t.ratingsSummary.voteCount) || 0, url: `https://www.imdb.com/title/${who.id}/` };
     else if (!t) errs.push("IMDb 評分 " + r.status + " " + r.body.slice(0, 60));
-  } catch (e) {
-    errs.push("IMDb 評分 " + errText(e));
-  }
-  if (name) {
-    try {
-      const html = await getText(`https://www.rottentomatoes.com/search?search=${encodeURIComponent(name)}`);
-      const list = [];
-      for (const m of html.matchAll(/<search-page-media-row([\s\S]*?)<\/search-page-media-row>/g)) {
-        const b = m[1];
-        const url = (b.match(/href="(https:\/\/www\.rottentomatoes\.com\/m\/[^"]+)"[^>]*slot="title"/) || b.match(/href="(https:\/\/www\.rottentomatoes\.com\/m\/[^"]+)"/) || [])[1];
-        if (!url) continue;
-        const t = (b.match(/slot="title"[^>]*>\s*([^<]+?)\s*</) || [])[1] || "";
-        list.push({ year: Number((b.match(/release-year="(\d*)"/) || [])[1] || 0), url, title: t.replace(/&amp;/g, "&").replace(/&#39;/g, "'") });
-      }
-      const norm = (s) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
-      const pick = list.find((x) => norm(x.title) === norm(name) && (!year || Math.abs(x.year - year) <= 1)) || list.find((x) => year && Math.abs(x.year - year) <= 1 && norm(x.title).includes(norm(name)));
-      if (pick) {
-        const page = await getText(pick.url);
-        const j = (page.match(/<script[^>]*id="media-scorecard-json"[^>]*>([\s\S]*?)<\/script>/) || [])[1];
-        const d = j ? JSON.parse(j) : {};
-        const pct = (x) => x && /\d/.test(String(x.scorePercent || "")) ? Number(String(x.scorePercent).replace(/\D/g, "")) : -1;
-        const s = { critics: pct(d.criticsScore), certified: !!d.criticsScore?.certified, audience: pct(d.audienceScore) };
-        if (s.critics >= 0) out.tomato = { score: s.critics, certified: s.certified, url: pick.url };
-        if (s.audience >= 0) out.popcorn = { score: s.audience, url: pick.url };
-      }
-    } catch (e) {
-      errs.push("爛番茄 " + errText(e));
-    }
-  }
+  })().catch((e) => errs.push("IMDb 評分 " + errText(e)));
+  const rtJob = (async () => {
+    if (!who.name) return;
+    const f = await rtFind(who.name, who.year);
+    if (!f) return;
+    if (f.s.critics >= 0) out.tomato = { score: f.s.critics, certified: f.s.certified, url: f.url };
+    if (f.s.audience >= 0) out.popcorn = { score: f.s.audience, url: f.url };
+  })().catch((e) => errs.push("爛番茄 " + errText(e)));
+  await Promise.all([imdbJob, rtJob]);
   if (errs.length) out.err = errs.join("；");
   return out;
 }
@@ -1491,12 +1523,12 @@ function movieRatings(title, en) {
       }
     };
     const hit = read()[k];
-    if (hit && Date.now() - hit.at < 864e5 && (hit.imdb || hit.tomato || hit.popcorn)) return hit;
+    if (hit && Date.now() - hit.at < 3 * 864e5 && (hit.imdb || hit.tomato || hit.popcorn)) return hit;
     const r = await findRatings(title, en);
     if (!(r.imdb || r.tomato || r.popcorn) || r.err) delete ratingsMem[k];
     if (r.imdb || r.tomato || r.popcorn) {
       const all = read();
-      for (const [key, v] of Object.entries(all)) if (Date.now() - v.at > 864e5) delete all[key];
+      for (const [key, v] of Object.entries(all)) if (Date.now() - v.at > 3 * 864e5) delete all[key];
       const { err: _e, ...keep } = r;
       all[k] = { ...keep, at: Date.now() };
       cacheSet("ratings.json", JSON.stringify(all));
@@ -1580,7 +1612,7 @@ var App = class {
     this.loadingText = "讀取中…";
     // ── 事件迴圈 ──
     // 背景查 GitHub 上的最新版本（首頁顯示是否為最新版）
-    this.latest = checkLatest("2026.11.05-2217");
+    this.latest = checkLatest("2026.11.05-2223");
     // ── 搜尋 ──
     this.query = "";
     this.tmdbStatus = "";
@@ -1684,11 +1716,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.05-2217"}`);
+          Pasteboard.copy(`版本 ${"2026.11.05-2223"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.05-2217"}`,
+      `版本 ${"2026.11.05-2223"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -1837,7 +1869,7 @@ var App = class {
     const search = `https://www.youtube.com/results?search_query=${encodeURIComponent(title + " 預告")}`;
     const badges = [];
     if (r?.imdb) badges.push({ kind: "imdb", value: r.imdb.score.toFixed(1), tier: ratingTier("imdb", r.imdb.score), onTap: () => Safari.open(r.imdb.url) });
-    if (r?.tomato) badges.push({ kind: "tomato", value: `${r.tomato.score}%`, tier: ratingTier("pct", r.tomato.score), note: r.tomato.certified ? "認證" : void 0, onTap: () => Safari.open(r.tomato.url) });
+    if (r?.tomato) badges.push({ kind: "tomato", value: `${r.tomato.score}%`, tier: ratingTier("pct", r.tomato.score), note: r.tomato.certified ? "✓" : void 0, onTap: () => Safari.open(r.tomato.url) });
     if (r?.popcorn) badges.push({ kind: "popcorn", value: `${r.popcorn.score}%`, tier: ratingTier("pct", r.popcorn.score), onTap: () => Safari.open(r.popcorn.url) });
     if (!badges.length && e.loading) lines = [...lines, "評分讀取中…"];
     else if (!badges.length && r?.err) lines = [...lines, `評分讀不到：${r.err}`];
