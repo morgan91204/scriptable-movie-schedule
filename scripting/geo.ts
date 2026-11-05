@@ -98,7 +98,7 @@ export const GEO: Record<string, [number, number]> = {
   "vscinemas-taichung-ifg":[24.13837, 120.68985],
   "vscinemas-tainan":[22.99498, 120.20561],
   "vscinemas-tainan-focus":[22.99577, 120.21016],
-  "vscinemas-tainan-nanfang":[24.80208, 120.9651],
+  "vscinemas-tainan-nanfang":[22.99111, 120.23304], // 南紡購物中心（自動查詢誤抓到新竹，手動修正）
   "vscinemas-taoyuan":[25.02592, 121.29401],
   "vscinemas-taoyuan-tg":[25.02051, 121.30432],
   "vscinemas-toufen":[24.68901, 120.90402],
