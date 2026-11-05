@@ -24,6 +24,15 @@ declare const EventAlarm: any
 
 setPlatform(scriptingPlatform)
 
+/** 版本號來自 script.json（建置時寫入），Scripting 自動更新後會跟著變 */
+function appVersion(): string {
+  try {
+    return (Script as any).metadata?.version || "未知"
+  } catch (_) {
+    return "未知"
+  }
+}
+
 // ───────────────────────── 共用狀態 ─────────────────────────
 
 const ADS = [0, 10, 15, 20]
@@ -169,7 +178,7 @@ function Home() {
           )}
         </Section> : null}
 
-        <Section header={<Text>加入行事曆時</Text>} footer={<Text>場次資料來自場次通、開眼電影網，以及誠品、光點、樂聲官網，實際場次以影城公告為準。</Text>}>
+        <Section header={<Text>加入行事曆時</Text>} footer={<Text>{`場次資料來自場次通、開眼電影網，以及誠品、光點、樂聲官網，實際場次以影城公告為準。\n\n版本 ${appVersion()}`}</Text>}>
           <Picker title={"寫入的行事曆"} value={settings.calendar || ""} onChanged={(v: string) => update({ calendar: v })}>
             {calendars.map((t) => <Text key={t} tag={t}>{t}</Text>)}
           </Picker>
