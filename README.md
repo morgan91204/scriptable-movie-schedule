@@ -26,9 +26,8 @@
 ### Scripting 版（原生介面，推薦）
 
 1. App Store 安裝 **[Scripting](https://apps.apple.com/app/id6479691128)**。
-2. 在 Scripting 匯入這個 GitHub 資料夾：
-   `https://github.com/morgan91204/scriptable-movie-schedule/tree/main/scripting`
-3. 在腳本設定裡開啟**自動更新**，之後的新版會自動套用。
+2. 在 iPhone 上點 **[一鍵匯入](https://www.scripting.fun/import_scripts?urls=%5B%22https%3A%2F%2Fgithub.com%2Fmorgan91204%2Fscriptable-movie-schedule%2Ftree%2Fmain%2Fscripting%22%5D)**，網頁會自動打開 Scripting 並詢問是否匯入（沒跳轉就按頁面上的 Try Again）。
+3. 腳本已預設每 6 小時檢查更新；請確認 Scripting 設定裡的全域「自動更新」有開，新版才會自動套用。
 4. 執行「電影行程」，第一次會詢問行事曆與網路權限，都選允許。
 
 ### Scriptable 版：捷徑（會自動更新）

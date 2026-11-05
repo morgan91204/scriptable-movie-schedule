@@ -20,5 +20,9 @@
   },
   "contributors": [],
   "runInApp": false,
-  "intentInputTypes": []
+  "intentInputTypes": [],
+  "remoteResource": {
+    "url": "https://github.com/morgan91204/scriptable-movie-schedule/tree/main/scripting",
+    "autoUpdateInterval": 21600
+  }
 }
