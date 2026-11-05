@@ -11,6 +11,7 @@ import {
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
   loadSettings, saveSettings, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, TW,
   FORMATS, formatsOf, filterVersions, nearest, kmLabel, WINDOWS, findShowtimes, groupByMovie, shareText,
+  hallOf,
 } from "./core";
 import type { TwMovie, TwMovieCinema, Format, LatLng, Hit } from "./core";
 
@@ -313,7 +314,7 @@ class App {
                     warn={isLate(t)}
                     onTap={() => {
                       this.runtime = m.runtime;
-                      this.seat = "";
+                      this.seat = hallOf(v.label); // 來源有標影廳就先帶入，可再修改
                       this.go(() =>
                         this.confirmView({ cinema: c, address: r.address || c.address || "", booking: r.booking, sourceUrl: r.sourceUrl, date, movie: m, version: v, time: t })
                       );
@@ -647,7 +648,7 @@ class App {
     const scopeLabel = this.nowScope === "fav" ? "常去影城" : this.nowScope === "near" ? "附近 10 間" : this.nowScope;
     const open = (hit: Hit) => {
       this.runtime = hit.movie.runtime;
-      this.seat = "";
+      this.seat = hallOf(hit.version.label);
       this.go(() => this.confirmView({ cinema: hit.cinema, address: hit.ctx.address || hit.cinema.address || "", booking: hit.ctx.booking, sourceUrl: hit.ctx.sourceUrl, date: hit.date, movie: hit.movie, version: hit.version, time: hit.time }));
     };
     return (

@@ -14,7 +14,7 @@ import {
   Cinema, Movie, Settings, Version, TwMovie, TwMovieCinema, CITY_ORDER, TW,
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
   loadSettings, saveSettings, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, cinemaAddress,
-  FORMATS, formatsOf, filterVersions, nearest, kmLabel, WINDOWS, findShowtimes, groupByMovie, shareText,
+  FORMATS, formatsOf, filterVersions, nearest, kmLabel, WINDOWS, findShowtimes, groupByMovie, shareText, hallOf,
 } from "./core"
 import type { Format, LatLng, Hit } from "./core"
 
@@ -316,7 +316,7 @@ type Pick = { cinema: Cinema; date: string; movie: Movie; version: Version; time
 function ConfirmPage({ pick }: { pick: Pick }) {
   const [settings, update] = useSettings()
   const [runtimeText, setRuntimeText] = useState(pick.movie.runtime ? String(pick.movie.runtime) : "")
-  const [seat, setSeat] = useState("")
+  const [seat, setSeat] = useState(hallOf(pick.version.label)) // 來源有標影廳就先帶入，可再修改
   const [address, setAddress] = useState(pick.address || pick.cinema.address || "")
   const [saved, setSaved] = useState<any>(null)
   const [busy, setBusy] = useState(false)

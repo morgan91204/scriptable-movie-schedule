@@ -287,6 +287,12 @@ async function luxCinema(): Promise<MultiDay> {
   return { schedules, notice: "樂聲官網沒有標影廳的場次會列在「其他影廳」。" };
 }
 
+/** 從版本名稱取出影廳（光點華山「第 2 廳｜字幕…」、樂聲「XL 巨幕廳（800 席）」），沒有就回傳空字串 */
+export function hallOf(label: string): string {
+  const m = String(label || "").match(/^(第 ?\d+ ?廳|[A-Za-z0-9]+ ?(?:巨幕廳|大廳|廳))/);
+  return m ? m[1] : "";
+}
+
 /** 場次排序：凌晨場（00:00–04:59）排在當天最後 */
 export const byShowtime = (a: string, b: string) => ((isLate(a) ? "2" : "1") + a).localeCompare((isLate(b) ? "2" : "1") + b);
 
