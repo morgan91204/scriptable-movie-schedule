@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.05-2015
+// @movie-schedule-app 電影行程 v2026.11.05-2022
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/jsx.tsx
@@ -66,6 +66,9 @@ function Chip(props) {
 function Button(props) {
   return /* @__PURE__ */ h("button", { class: "btn " + (props.kind || "primary"), onTap: props.onTap, "data-enter": props.enter ? "" : void 0 }, esc(props.label));
 }
+function Hero(props) {
+  return /* @__PURE__ */ h("div", { class: "hero" }, props.poster ? /* @__PURE__ */ h("img", { class: "poster", src: props.poster, alt: "", onerror: "this.style.display='none'" }) : null, /* @__PURE__ */ h("div", { class: "hero-info" }, props.lines.filter(Boolean).map((l) => /* @__PURE__ */ h("div", { class: "hero-line" }, esc(l))), props.onTrailer ? /* @__PURE__ */ h("button", { class: "trailer", onTap: props.onTrailer }, "▶︎ ", esc(props.trailerLabel || "觀看預告")) : null));
+}
 function Note(props) {
   return /* @__PURE__ */ h("p", { class: "note " + (props.kind || "info") }, esc(props.text));
 }
@@ -128,6 +131,12 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .note.error{color:var(--red)}
 .field{display:block;width:100%;padding:12px 14px;border:0;border-radius:12px;background:var(--card);color:var(--fg);font-size:17px;margin-top:8px;outline:none}
 .field:focus{box-shadow:0 0 0 2px var(--accent)}
+.hero{display:flex;gap:14px;align-items:flex-end;margin:12px 4px 4px}
+.hero .poster{width:112px;aspect-ratio:2/3;object-fit:cover;border-radius:12px;background:var(--chip);box-shadow:0 4px 14px rgba(0,0,0,.25);flex:none}
+.hero-info{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
+.hero-line{font-size:14px;color:var(--fg2)}
+.trailer{margin-top:8px;align-self:flex-start;padding:8px 14px;border-radius:999px;background:#ff0033;color:#fff;font-size:15px;font-weight:600}
+.trailer:active{opacity:.7}
 .loading,.empty{text-align:center;color:var(--fg2);padding:72px 20px;white-space:pre-line}
 .empty .big{font-size:44px;margin-bottom:8px}
 .spinner{width:28px;height:28px;margin:0 auto 14px;border:3px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:sp .8s linear infinite}
@@ -533,7 +542,7 @@ function parseTwMovies(doc) {
 }
 function parseTwMovieDay(doc) {
   const clean = (s) => String(s || "").replace(/\\s+/g, " ").trim();
-  let title = "", en = "", rating = "", runtime = 0;
+  let title = "", en = "", rating = "", runtime = 0, image = "";
   const address = {};
   for (const el of Array.from(doc.querySelectorAll('script[type="application/ld+json"]'))) {
     try {
@@ -543,6 +552,7 @@ function parseTwMovieDay(doc) {
       en = clean(o.alternateName);
       rating = clean(o.contentRating);
       runtime = Number((String(o.duration || "").match(/(\\d+)M/) || [])[1] || 0);
+      image = clean(typeof o.image === "string" ? o.image : o.image && (o.image.url || o.image[0]));
       for (const ev of o.subjectOf || []) {
         const loc = ev && ev.location;
         if (loc && loc.name && loc.address && loc.address.streetAddress) address[clean(loc.name)] = clean(loc.address.streetAddress);
@@ -592,7 +602,7 @@ function parseTwMovieDay(doc) {
       });
     }
   }
-  return { title, en, rating, runtime, date, dates, cinemas };
+  return { title, en, rating, runtime, image, date, dates, cinemas };
 }
 {
   parseAtDay,
@@ -1096,29 +1106,77 @@ async function tmdb(path, token) {
   if (r.status < 200 || r.status >= 300) throw new Error("TMDB 暫時讀不到");
   return JSON.parse(r.body);
 }
-async function tmdbRuntime(title, token) {
+async function tmdbFind(title, token) {
   const q = baseTitle(title);
   const key = normTitle(q);
-  if (!key || !token) return 0;
-  let cache = {};
-  try {
-    cache = JSON.parse(cacheGet("runtimes.json") || "{}") || {};
-  } catch (_) {
-  }
-  const hit = cache[key];
-  if (hit && Date.now() - hit.at < (hit.r ? 30 : 1) * 864e5) return hit.r;
+  if (!key || !token) return null;
+  const read = () => {
+    try {
+      return JSON.parse(cacheGet("runtimes.json") || "{}") || {};
+    } catch (_) {
+      return {};
+    }
+  };
+  const hit = read()[key];
+  if (hit && "id" in hit && Date.now() - hit.at < (hit.id ? 30 : 1) * 864e5) return hit.id ? hit : null;
   const found = await tmdb(`/search/movie?language=zh-TW&query=${encodeURIComponent(q)}`, token);
   const results = found?.results || [];
   const pick = results.find((x) => normTitle(x.title) === key || normTitle(x.original_title) === key) || results[0];
-  let r = 0;
-  if (pick?.id) r = Number((await tmdb(`/movie/${pick.id}?language=zh-TW`, token))?.runtime) || 0;
-  try {
-    cache = JSON.parse(cacheGet("runtimes.json") || "{}") || {};
-  } catch (_) {
+  const v = { id: 0, r: 0, p: "", at: Date.now() };
+  if (pick?.id) {
+    const d = await tmdb(`/movie/${pick.id}?language=zh-TW`, token);
+    v.id = pick.id;
+    v.r = Number(d?.runtime) || 0;
+    v.p = d?.poster_path || pick.poster_path || "";
   }
-  cache[key] = { r, at: Date.now() };
+  const cache = read();
+  cache[key] = v;
   cacheSet("runtimes.json", JSON.stringify(cache));
-  return r;
+  return v.id ? v : null;
+}
+async function tmdbRuntime(title, token) {
+  return (await tmdbFind(title, token))?.r || 0;
+}
+var extrasCache = {};
+function movieExtras(title, slug) {
+  const k = (slug || "") + "|" + title;
+  return extrasCache[k] ||= (async () => {
+    const base = baseTitle(title);
+    const out = {
+      poster: "",
+      trailer: `https://www.youtube.com/results?search_query=${encodeURIComponent(base + " 預告")}`,
+      trailerName: ""
+    };
+    try {
+      let s = slug;
+      if (!s) {
+        const list = await loadMovies();
+        const key = normTitle(title), bkey = normTitle(base);
+        s = (list.find((m) => normTitle(m.title) === key) || list.find((m) => normTitle(baseTitle(m.title)) === bkey))?.slug;
+      }
+      if (s) out.poster = (await movieDay(s)).image || "";
+    } catch (_) {
+    }
+    const token = ((await loadSettings()).tmdbToken || "").trim();
+    if (token) {
+      try {
+        const hit = await tmdbFind(title, token);
+        if (hit) {
+          if (!out.poster && hit.p) out.poster = "https://image.tmdb.org/t/p/w500" + hit.p;
+          const pickVideo = (list) => list.filter((v2) => v2.site === "YouTube" && v2.key).sort((a, b) => rankVideo(a) - rankVideo(b))[0];
+          const rankVideo = (v2) => (v2.type === "Trailer" ? 0 : v2.type === "Teaser" ? 1 : 2) + (v2.official ? 0 : 0.5);
+          let v = pickVideo((await tmdb(`/movie/${hit.id}/videos?language=zh-TW`, token))?.results || []);
+          if (!v) v = pickVideo((await tmdb(`/movie/${hit.id}/videos`, token))?.results || []);
+          if (v) {
+            out.trailer = `https://www.youtube.com/watch?v=${v.key}`;
+            out.trailerName = String(v.name || "預告片");
+          }
+        }
+      } catch (_) {
+      }
+    }
+    return out;
+  })();
 }
 async function fillRuntimes(movies) {
   const todo = movies.filter((m) => !m.runtime);
@@ -1368,7 +1426,7 @@ var App = class {
     const cities = Array.from(new Set(this.cinemas.map((c) => c.city))).sort(
       (a, b) => (CITY_ORDER.indexOf(a) + 1 || 99) - (CITY_ORDER.indexOf(b) + 1 || 99)
     );
-    return /* @__PURE__ */ h(Page, { title: "🎬 電影行程", subtitle: `${this.cinemas.length} 間影城｜選影城 → 日期 → 電影 → 場次` }, /* @__PURE__ */ h(Section, null, /* @__PURE__ */ h(Item, { icon: "⏰", title: "現在有什麼可以看", subtitle: "選時段，一次列出常去、附近或某縣市的所有場次", onTap: () => this.go(() => this.nowView()) }), /* @__PURE__ */ h(Item, { icon: "🎬", title: "依電影找場次", subtitle: "先選電影，再看哪些影城有放映", onTap: () => this.go(() => this.movieListView(), "讀取電影清單…") }), /* @__PURE__ */ h(Item, { icon: "📍", title: "附近的影城", subtitle: "依目前位置排序", onTap: () => this.go(() => this.nearbyView(), "取得目前位置…") }), /* @__PURE__ */ h(Item, { icon: "🔍", title: "搜尋影城", subtitle: "影城、分店、行政區或縣市", onTap: () => this.go(() => this.searchView()) })), favs.length ? /* @__PURE__ */ h(Section, { title: "常去影城" }, favs.map((c) => /* @__PURE__ */ h(Item, { icon: "★", title: c.name, subtitle: `${c.city} ${c.district}`, onTap: () => this.go(() => this.cinemaView(c), `讀取 ${c.name} 的場次…`) }))) : null, /* @__PURE__ */ h(Section, { title: "全台影城", hint: "影城清單來自場次通與開眼電影網，會自動更新。" }, cities.map((city) => /* @__PURE__ */ h(Item, { title: city, badge: `${this.cinemas.filter((c) => c.city === city).length} 間`, onTap: () => this.go(() => this.cityView(city)) }))), /* @__PURE__ */ h(Section, { title: "設定" }, /* @__PURE__ */ h(Item, { icon: "📅", title: "寫入的行事曆", subtitle: this.calendarName, onTap: () => this.go(() => this.calendarView()) }), /* @__PURE__ */ h(Item, { icon: "📺", title: "廣告預告", subtitle: `預計散場時間會加上 ${this.settings.ads} 分鐘`, right: "點一下切換", chevron: false, onTap: () => this.cycleAds() }), /* @__PURE__ */ h(Item, { icon: "⏱", title: "補片長（TMDB）", subtitle: this.settings.tmdbToken ? "已設定：沒有片長的電影會自動補上" : "未設定", onTap: () => this.go(() => this.tmdbView()) })), /* @__PURE__ */ h(Note, { text: "場次資料來自場次通 twshowtimes.com、開眼電影網，以及誠品、光點、樂聲官網，實際場次以影城公告為準。" }), /* @__PURE__ */ h(Note, { text: `版本 ${"2026.11.05-2015"}` }));
+    return /* @__PURE__ */ h(Page, { title: "🎬 電影行程", subtitle: `${this.cinemas.length} 間影城｜選影城 → 日期 → 電影 → 場次` }, /* @__PURE__ */ h(Section, null, /* @__PURE__ */ h(Item, { icon: "⏰", title: "現在有什麼可以看", subtitle: "選時段，一次列出常去、附近或某縣市的所有場次", onTap: () => this.go(() => this.nowView()) }), /* @__PURE__ */ h(Item, { icon: "🎬", title: "依電影找場次", subtitle: "先選電影，再看哪些影城有放映", onTap: () => this.go(() => this.movieListView(), "讀取電影清單…") }), /* @__PURE__ */ h(Item, { icon: "📍", title: "附近的影城", subtitle: "依目前位置排序", onTap: () => this.go(() => this.nearbyView(), "取得目前位置…") }), /* @__PURE__ */ h(Item, { icon: "🔍", title: "搜尋影城", subtitle: "影城、分店、行政區或縣市", onTap: () => this.go(() => this.searchView()) })), favs.length ? /* @__PURE__ */ h(Section, { title: "常去影城" }, favs.map((c) => /* @__PURE__ */ h(Item, { icon: "★", title: c.name, subtitle: `${c.city} ${c.district}`, onTap: () => this.go(() => this.cinemaView(c), `讀取 ${c.name} 的場次…`) }))) : null, /* @__PURE__ */ h(Section, { title: "全台影城", hint: "影城清單來自場次通與開眼電影網，會自動更新。" }, cities.map((city) => /* @__PURE__ */ h(Item, { title: city, badge: `${this.cinemas.filter((c) => c.city === city).length} 間`, onTap: () => this.go(() => this.cityView(city)) }))), /* @__PURE__ */ h(Section, { title: "設定" }, /* @__PURE__ */ h(Item, { icon: "📅", title: "寫入的行事曆", subtitle: this.calendarName, onTap: () => this.go(() => this.calendarView()) }), /* @__PURE__ */ h(Item, { icon: "📺", title: "廣告預告", subtitle: `預計散場時間會加上 ${this.settings.ads} 分鐘`, right: "點一下切換", chevron: false, onTap: () => this.cycleAds() }), /* @__PURE__ */ h(Item, { icon: "⏱", title: "補片長（TMDB）", subtitle: this.settings.tmdbToken ? "已設定：沒有片長的電影會自動補上" : "未設定", onTap: () => this.go(() => this.tmdbView()) })), /* @__PURE__ */ h(Note, { text: "場次資料來自場次通 twshowtimes.com、開眼電影網，以及誠品、光點、樂聲官網，實際場次以影城公告為準。" }), /* @__PURE__ */ h(Note, { text: `版本 ${"2026.11.05-2022"}` }));
   }
   searchView() {
     const k = this.query.trim().toLowerCase().replace(/臺/g, "台");
@@ -1480,11 +1538,31 @@ var App = class {
       );
     })));
   }
+  /** 海報與預告（最多等 3 秒，等不到就先不顯示海報） */
+  async extras(title, slug) {
+    return Promise.race([movieExtras(title, slug).catch(() => null), sleep(3e3).then(() => null)]);
+  }
+  hero(x, title, lines) {
+    const url = x?.trailer || `https://www.youtube.com/results?search_query=${encodeURIComponent(title + " 預告")}`;
+    return /* @__PURE__ */ h(
+      Hero,
+      {
+        poster: x?.poster,
+        lines,
+        trailerLabel: x?.trailerName ? "觀看預告" : "搜尋 YouTube 預告",
+        onTrailer: () => Safari.open(url)
+      }
+    );
+  }
   // ── 場次 ──
-  timesView(c, date, m, r) {
+  async timesView(c, date, m, r) {
     const isToday = date === todayTPE();
     const now = nowHM();
-    return /* @__PURE__ */ h(Page, { title: m.title, subtitle: `${c.name}｜${dateLabel(date)}`, onBack: () => this.back() }, /* @__PURE__ */ h(Note, { text: [m.runtime ? `片長 ${m.runtime} 分鐘` : "片長未提供，下一步可手動輸入", m.rating].filter(Boolean).join("｜") }), m.versions.map((v) => /* @__PURE__ */ h(Section, { title: v.label }, /* @__PURE__ */ h(Chips, null, [...v.times].sort(byShowtime).map((t) => {
+    const x = await this.extras(m.title);
+    return /* @__PURE__ */ h(Page, { title: m.title, subtitle: `${c.name}｜${dateLabel(date)}`, onBack: () => this.back() }, this.hero(x, m.title, [
+      m.runtime ? `片長 ${m.runtime} 分鐘` + (m.runtimeFrom ? `（${m.runtimeFrom}）` : "") : "片長未提供，下一步可手動輸入",
+      m.rating || ""
+    ]), m.versions.map((v) => /* @__PURE__ */ h(Section, { title: v.label }, /* @__PURE__ */ h(Chips, null, [...v.times].sort(byShowtime).map((t) => {
       const past = isToday && t <= now && !isLate(t);
       const end = m.runtime ? fmt(new Date(tpeDate(date, t).getTime() + (m.runtime + this.settings.ads) * 6e4)).slice(-5) : "";
       return /* @__PURE__ */ h(
@@ -1616,7 +1694,7 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
   }
   async movieView(m, date) {
     const d = await movieDay(m.slug, date || void 0);
-    const dates = d.dates.filter((x) => x >= todayTPE());
+    const dates = d.dates.filter((x2) => x2 >= todayTPE());
     const runtime = d.runtime || m.runtime;
     const cities = Array.from(new Set(d.cinemas.map((c) => c.city))).sort(
       (a, b) => (CITY_ORDER.indexOf(a) + 1 || 99) - (CITY_ORDER.indexOf(b) + 1 || 99)
@@ -1625,11 +1703,12 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
     const formats = FORMATS.filter((f) => d.cinemas.some((c) => c.versions.some((v) => formatsOf(v.label).indexOf(f) >= 0)));
     const fmtSel = formats.indexOf(this.movieFormat) >= 0 ? this.movieFormat : "";
     const shown = d.cinemas.map((c) => ({ ...c, versions: filterVersions(c.versions, fmtSel) })).filter((c) => (city === "全部" || c.city === city) && c.versions.length);
-    const toCinema = (c) => this.cinemas.find((x) => x.id === c.id) || { id: c.id, name: c.name, city: c.city, district: c.district, source: "tw", url: `${TW}/cinemas/${c.id}/`, address: c.address };
+    const toCinema = (c) => this.cinemas.find((x2) => x2.id === c.id) || { id: c.id, name: c.name, city: c.city, district: c.district, source: "tw", url: `${TW}/cinemas/${c.id}/`, address: c.address };
     const replace = (nd) => {
       this.stack[this.stack.length - 1] = () => this.movieView(m, nd);
     };
-    return /* @__PURE__ */ h(Page, { title: m.title, subtitle: [m.rating || d.rating, runtime ? `${runtime} 分鐘` : "", `${d.cinemas.length} 間影城`].filter(Boolean).join("｜"), onBack: () => this.back() }, /* @__PURE__ */ h(Section, { title: "日期" }, /* @__PURE__ */ h(Chips, null, (dates.length ? dates : [d.date]).map((x) => /* @__PURE__ */ h(Chip, { label: dateLabel(x).replace(/（.）.*$/, ""), sub: x === d.date ? "目前" : dateLabel(x).match(/（(.)）/)?.[1] || "", muted: x !== d.date, onTap: () => replace(x) })))), /* @__PURE__ */ h(Section, { title: "縣市" }, /* @__PURE__ */ h(Chips, null, ["全部", ...cities].map((c) => /* @__PURE__ */ h(Chip, { label: c, muted: c !== city, onTap: () => {
+    const x = await this.extras(m.title, m.slug);
+    return /* @__PURE__ */ h(Page, { title: m.title, subtitle: [m.rating || d.rating, runtime ? `${runtime} 分鐘` : "", `${d.cinemas.length} 間影城`].filter(Boolean).join("｜"), onBack: () => this.back() }, this.hero(x, m.title, [m.en, [m.rating || d.rating, runtime ? `${runtime} 分鐘` : ""].filter(Boolean).join("｜"), `${d.cinemas.length} 間影城有放映`]), /* @__PURE__ */ h(Section, { title: "日期" }, /* @__PURE__ */ h(Chips, null, (dates.length ? dates : [d.date]).map((x2) => /* @__PURE__ */ h(Chip, { label: dateLabel(x2).replace(/（.）.*$/, ""), sub: x2 === d.date ? "目前" : dateLabel(x2).match(/（(.)）/)?.[1] || "", muted: x2 !== d.date, onTap: () => replace(x2) })))), /* @__PURE__ */ h(Section, { title: "縣市" }, /* @__PURE__ */ h(Chips, null, ["全部", ...cities].map((c) => /* @__PURE__ */ h(Chip, { label: c, muted: c !== city, onTap: () => {
       this.movieCity = c;
     } })))), formats.length ? /* @__PURE__ */ h(Section, { title: "特殊廳" }, /* @__PURE__ */ h(Chips, null, ["", ...formats].map((f) => /* @__PURE__ */ h(Chip, { label: f || "全部", muted: f !== fmtSel, onTap: () => {
       this.movieFormat = f;

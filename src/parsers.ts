@@ -352,6 +352,7 @@ export interface TwMovieDay {
   rating: string;
   runtime: number;
   runtimeFrom?: string;
+  image?: string; // 海報網址
   date: string;
   dates: string[];
   cinemas: TwMovieCinema[];
@@ -386,7 +387,7 @@ export function parseTwMovies(doc: Document): TwMovie[] {
 /** 場次通單一電影某天的頁面：哪些影城有放、各版本場次 */
 export function parseTwMovieDay(doc: Document): TwMovieDay {
   const clean = (s: unknown) => String(s || "").replace(/\s+/g, " ").trim();
-  let title = "", en = "", rating = "", runtime = 0;
+  let title = "", en = "", rating = "", runtime = 0, image = "";
   const address: Record<string, string> = {};
   for (const el of Array.from(doc.querySelectorAll('script[type="application/ld+json"]'))) {
     try {
@@ -396,6 +397,7 @@ export function parseTwMovieDay(doc: Document): TwMovieDay {
       en = clean(o.alternateName);
       rating = clean(o.contentRating);
       runtime = Number((String(o.duration || "").match(/(\d+)M/) || [])[1] || 0);
+      image = clean(typeof o.image === "string" ? o.image : o.image && (o.image.url || o.image[0]));
       for (const ev of o.subjectOf || []) {
         const loc = ev && ev.location;
         if (loc && loc.name && loc.address && loc.address.streetAddress) address[clean(loc.name)] = clean(loc.address.streetAddress);
@@ -444,6 +446,6 @@ export function parseTwMovieDay(doc: Document): TwMovieDay {
       });
     }
   }
-  return { title, en, rating, runtime, date, dates, cinemas };
+  return { title, en, rating, runtime, image, date, dates, cinemas };
 }
 

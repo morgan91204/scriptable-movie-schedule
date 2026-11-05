@@ -53,6 +53,12 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .note.error{color:var(--red)}
 .field{display:block;width:100%;padding:12px 14px;border:0;border-radius:12px;background:var(--card);color:var(--fg);font-size:17px;margin-top:8px;outline:none}
 .field:focus{box-shadow:0 0 0 2px var(--accent)}
+.hero{display:flex;gap:14px;align-items:flex-end;margin:12px 4px 4px}
+.hero .poster{width:112px;aspect-ratio:2/3;object-fit:cover;border-radius:12px;background:var(--chip);box-shadow:0 4px 14px rgba(0,0,0,.25);flex:none}
+.hero-info{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
+.hero-line{font-size:14px;color:var(--fg2)}
+.trailer{margin-top:8px;align-self:flex-start;padding:8px 14px;border-radius:999px;background:#ff0033;color:#fff;font-size:15px;font-weight:600}
+.trailer:active{opacity:.7}
 .loading,.empty{text-align:center;color:var(--fg2);padding:72px 20px;white-space:pre-line}
 .empty .big{font-size:44px;margin-bottom:8px}
 .spinner{width:28px;height:28px;margin:0 auto 14px;border:3px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:sp .8s linear infinite}

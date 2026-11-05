@@ -158,6 +158,23 @@ export function Button(props: { label: string; onTap?: Handler; kind?: "primary"
   );
 }
 
+/** 電影頁頂端：海報＋資訊＋預告按鈕 */
+export function Hero(props: { poster?: string; lines: string[]; trailerLabel?: string; onTrailer?: Handler }): string {
+  return (
+    <div class="hero">
+      {props.poster ? <img class="poster" src={props.poster} alt="" onerror="this.style.display='none'" /> : null}
+      <div class="hero-info">
+        {props.lines.filter(Boolean).map((l) => <div class="hero-line">{esc(l)}</div>)}
+        {props.onTrailer ? (
+          <button class="trailer" onTap={props.onTrailer}>
+            ▶︎ {esc(props.trailerLabel || "觀看預告")}
+          </button>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 export function Note(props: { text: string; kind?: "info" | "warn" | "error" }): string {
   return <p class={"note " + (props.kind || "info")}>{esc(props.text)}</p>;
 }

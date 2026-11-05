@@ -108,7 +108,8 @@ export async function dump(label) {
   console.log(`\n── ${label} ──`);
   const title = doc.querySelector(".bar-title");
   if (title) console.log("  ［" + title.textContent.replace(/\s+/g, " ").trim() + "］");
-  for (const e of doc.querySelectorAll(".item, .chip, .btn, .note, .empty, .sec-title, input"))
+  for (const e of doc.querySelectorAll(".poster")) console.log("    [海報] " + e.getAttribute("src"));
+  for (const e of doc.querySelectorAll(".item, .chip, .btn, .note, .empty, .sec-title, input, .hero-line, .trailer"))
     console.log((e.hasAttribute("data-act") ? "  • " : "    ") + (e.tagName === "INPUT" ? `[輸入框 ${e.getAttribute("name")}=${e.getAttribute("value") || ""}]` : e.textContent.replace(/\s+/g, " ").trim()).slice(0, 110));
 }
 export async function waitFor(re, ms = 60000) {

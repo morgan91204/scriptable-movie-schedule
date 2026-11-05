@@ -2,7 +2,7 @@
 // 執行環境：Scriptable（iOS）。原始碼用 TSX 撰寫，編譯後的 .js 放進 Scriptable 執行。
 // 畫面：WebView（HTML/CSS），事件迴圈在 run()。資料層在 core.ts，網頁解析在 parsers.ts。
 
-import { h, Fragment, Page, Section, Item, Chips, Chip, Button, Note, Loading, Empty } from "./jsx";
+import { h, Fragment, Page, Section, Item, Chips, Chip, Button, Note, Loading, Empty, Hero } from "./jsx";
 import { UI } from "./ui";
 import { setPlatform } from "./platform";
 import { scriptablePlatform } from "./platform-scriptable";
@@ -11,8 +11,9 @@ import {
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
   loadSettings, saveSettings, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, TW,
   FORMATS, formatsOf, filterVersions, nearest, kmLabel, WINDOWS, findShowtimes, groupByMovie, shareText,
-  hallOf, tmdbTest,
+  hallOf, tmdbTest, movieExtras,
 } from "./core";
+import type { MovieExtras } from "./core";
 import type { TwMovie, TwMovieCinema, Format, LatLng, Hit } from "./core";
 
 interface Pick {
@@ -329,13 +330,34 @@ class App {
     );
   }
 
+  /** 海報與預告（最多等 3 秒，等不到就先不顯示海報） */
+  async extras(title: string, slug?: string): Promise<MovieExtras | null> {
+    return Promise.race([movieExtras(title, slug).catch(() => null), sleep(3000).then(() => null)]);
+  }
+
+  hero(x: MovieExtras | null, title: string, lines: string[]): string {
+    const url = x?.trailer || `https://www.youtube.com/results?search_query=${encodeURIComponent(title + " 預告")}`;
+    return (
+      <Hero
+        poster={x?.poster}
+        lines={lines}
+        trailerLabel={x?.trailerName ? "觀看預告" : "搜尋 YouTube 預告"}
+        onTrailer={() => Safari.open(url)}
+      />
+    );
+  }
+
   // ── 場次 ──
-  timesView(c: Cinema, date: string, m: Movie, r: { booking: string; sourceUrl: string; address: string }): string {
+  async timesView(c: Cinema, date: string, m: Movie, r: { booking: string; sourceUrl: string; address: string }): Promise<string> {
     const isToday = date === todayTPE();
     const now = nowHM();
+    const x = await this.extras(m.title);
     return (
       <Page title={m.title} subtitle={`${c.name}｜${dateLabel(date)}`} onBack={() => this.back()}>
-        <Note text={[m.runtime ? `片長 ${m.runtime} 分鐘` : "片長未提供，下一步可手動輸入", m.rating].filter(Boolean).join("｜")} />
+        {this.hero(x, m.title, [
+          m.runtime ? `片長 ${m.runtime} 分鐘` + (m.runtimeFrom ? `（${m.runtimeFrom}）` : "") : "片長未提供，下一步可手動輸入",
+          m.rating || "",
+        ])}
         {m.versions.map((v) => (
           <Section title={v.label}>
             <Chips>
@@ -547,8 +569,10 @@ class App {
     const replace = (nd: string) => {
       this.stack[this.stack.length - 1] = () => this.movieView(m, nd);
     };
+    const x = await this.extras(m.title, m.slug);
     return (
       <Page title={m.title} subtitle={[m.rating || d.rating, runtime ? `${runtime} 分鐘` : "", `${d.cinemas.length} 間影城`].filter(Boolean).join("｜")} onBack={() => this.back()}>
+        {this.hero(x, m.title, [m.en, [m.rating || d.rating, runtime ? `${runtime} 分鐘` : ""].filter(Boolean).join("｜"), `${d.cinemas.length} 間影城有放映`])}
         <Section title="日期">
           <Chips>
             {(dates.length ? dates : [d.date]).map((x) => (

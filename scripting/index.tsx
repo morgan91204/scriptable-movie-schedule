@@ -4,7 +4,7 @@
 // https://github.com/morgan91204/scriptable-movie-schedule
 
 import {
-  Button, ContentUnavailableView, Form, HStack, Label, LabeledContent, List, Navigation, NavigationLink,
+  Button, ContentUnavailableView, Form, HStack, Image, Label, LabeledContent, List, Navigation, NavigationLink,
   NavigationStack, Picker, ProgressView, Script, Section, Spacer, Text, TextField, Toggle, VStack,
   useEffect, useMemo, useState,
 } from "scripting"
@@ -14,7 +14,7 @@ import {
   Cinema, Movie, Settings, Version, TwMovie, TwMovieCinema, CITY_ORDER, TW,
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
   loadSettings, saveSettings, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, cinemaAddress,
-  FORMATS, formatsOf, filterVersions, nearest, kmLabel, WINDOWS, findShowtimes, groupByMovie, shareText, hallOf, tmdbTest,
+  FORMATS, formatsOf, filterVersions, nearest, kmLabel, WINDOWS, findShowtimes, groupByMovie, shareText, hallOf, tmdbTest, movieExtras,
 } from "./core"
 import type { Format, LatLng, Hit } from "./core"
 
@@ -207,6 +207,20 @@ function Home() {
   </NavigationStack>
 }
 
+/** 電影海報＋YouTube 預告按鈕 */
+function MovieHero({ title, slug }: { title: string; slug?: string }) {
+  const x = useLoad(() => movieExtras(title, slug), [title, slug || ""])
+  const url = x.data?.trailer || `https://www.youtube.com/results?search_query=${encodeURIComponent(title + " 預告")}`
+  return <Section>
+    {x.data?.poster ? <HStack>
+      <Spacer />
+      <Image imageUrl={x.data.poster} resizable scaleToFit frame={{ width: 160, height: 240 }} placeholder={<ProgressView progressViewStyle={"circular"} />} />
+      <Spacer />
+    </HStack> : null}
+    <Button title={x.data?.trailerName ? "觀看預告" : "搜尋 YouTube 預告"} systemImage={"play.rectangle.fill"} action={() => Safari.openURL(url)} />
+  </Section>
+}
+
 function TmdbPage() {
   const [settings, update] = useSettings()
   const [token, setToken] = useState(settings.tmdbToken || "")
@@ -321,10 +335,11 @@ function ShowtimesPage({ cinema, date, movie, ctx }: { cinema: Cinema; date: str
   const isToday = date === todayTPE()
   const now = nowHM()
   return <List navigationTitle={movie.title} navigationBarTitleDisplayMode={"inline"}>
+    <MovieHero title={movie.title} />
     <Section>
       <LabeledContent title={"影城"} value={cinema.name} />
       <LabeledContent title={"日期"} value={dateLabel(date)} />
-      <LabeledContent title={"片長"} value={movie.runtime ? `${movie.runtime} 分鐘` : "未提供"} />
+      <LabeledContent title={"片長"} value={movie.runtime ? `${movie.runtime} 分鐘` + (movie.runtimeFrom ? `（${movie.runtimeFrom}）` : "") : "未提供"} />
       {movie.rating ? <LabeledContent title={"分級"} value={movie.rating} /> : null}
     </Section>
     {movie.versions.map((v) =>
@@ -505,6 +520,7 @@ function MoviePage({ movie }: { movie: TwMovie }) {
     { id: c.id, name: c.name, city: c.city, district: c.district, source: "tw", url: `${TW}/cinemas/${c.id}/`, address: c.address }
 
   return <List navigationTitle={movie.title} navigationBarTitleDisplayMode={"inline"} refreshable={day.reload}>
+    <MovieHero title={movie.title} slug={movie.slug} />
     <Section footer={<Text>{[movie.en, movie.rating || data?.rating, runtime ? `${runtime} 分鐘` : ""].filter(Boolean).join("｜")}</Text>}>
       <Picker title={"日期"} value={date || data?.date || ""} onChanged={setDate}>
         {(dates.length ? dates : [data?.date || todayTPE()]).map((d) => <Text key={d} tag={d}>{dateLabel(d)}</Text>)}

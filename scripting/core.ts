@@ -396,28 +396,91 @@ async function tmdb(path: string, token: string): Promise<any> {
   return JSON.parse(r.body);
 }
 
-/** 用 TMDB 查片長（0 = 查不到）。結果記在快取：找到的 30 天、找不到的 1 天 */
-export async function tmdbRuntime(title: string, token: string): Promise<number> {
+interface TmdbHit { id: number; r: number; p: string; at: number }
+/** 用 TMDB 依片名找電影（id、片長、海報）。結果記在快取：找到的 30 天、找不到的 1 天 */
+async function tmdbFind(title: string, token: string): Promise<TmdbHit | null> {
   const q = baseTitle(title);
   const key = normTitle(q);
-  if (!key || !token) return 0;
-  let cache: Record<string, { r: number; at: number }> = {};
-  try {
-    cache = JSON.parse(cacheGet("runtimes.json") || "{}") || {};
-  } catch (_) {}
-  const hit = cache[key];
-  if (hit && Date.now() - hit.at < (hit.r ? 30 : 1) * 86400e3) return hit.r;
+  if (!key || !token) return null;
+  const read = (): Record<string, TmdbHit> => {
+    try {
+      return JSON.parse(cacheGet("runtimes.json") || "{}") || {};
+    } catch (_) {
+      return {};
+    }
+  };
+  const hit = read()[key];
+  if (hit && "id" in hit && Date.now() - hit.at < (hit.id ? 30 : 1) * 86400e3) return hit.id ? hit : null;
   const found = await tmdb(`/search/movie?language=zh-TW&query=${encodeURIComponent(q)}`, token);
   const results: any[] = found?.results || [];
   const pick = results.find((x) => normTitle(x.title) === key || normTitle(x.original_title) === key) || results[0];
-  let r = 0;
-  if (pick?.id) r = Number((await tmdb(`/movie/${pick.id}?language=zh-TW`, token))?.runtime) || 0;
-  try {
-    cache = JSON.parse(cacheGet("runtimes.json") || "{}") || {};
-  } catch (_) {}
-  cache[key] = { r, at: Date.now() };
+  const v: TmdbHit = { id: 0, r: 0, p: "", at: Date.now() };
+  if (pick?.id) {
+    const d = await tmdb(`/movie/${pick.id}?language=zh-TW`, token);
+    v.id = pick.id;
+    v.r = Number(d?.runtime) || 0;
+    v.p = d?.poster_path || pick.poster_path || "";
+  }
+  const cache = read();
+  cache[key] = v;
   cacheSet("runtimes.json", JSON.stringify(cache));
-  return r;
+  return v.id ? v : null;
+}
+
+/** 用 TMDB 查片長（0 = 查不到） */
+export async function tmdbRuntime(title: string, token: string): Promise<number> {
+  return (await tmdbFind(title, token))?.r || 0;
+}
+
+// ───────────────────────── 海報、預告片 ─────────────────────────
+
+export interface MovieExtras {
+  poster: string; // 海報網址（可能是空字串）
+  trailer: string; // YouTube 預告網址；找不到時是 YouTube 搜尋頁
+  trailerName: string; // 找到的影片標題；空字串 = 只是搜尋
+}
+const extrasCache: Record<string, Promise<MovieExtras>> = {};
+
+/** 海報：場次通電影頁（不需 Token）→ TMDB；預告：TMDB 的 YouTube 影片 → YouTube 搜尋 */
+export function movieExtras(title: string, slug?: string): Promise<MovieExtras> {
+  const k = (slug || "") + "|" + title;
+  return (extrasCache[k] ||= (async () => {
+    const base = baseTitle(title);
+    const out: MovieExtras = {
+      poster: "",
+      trailer: `https://www.youtube.com/results?search_query=${encodeURIComponent(base + " 預告")}`,
+      trailerName: "",
+    };
+    // 場次通的海報：有 slug 直接讀；沒有就從電影清單比對片名
+    try {
+      let s = slug;
+      if (!s) {
+        const list = await loadMovies();
+        const key = normTitle(title), bkey = normTitle(base);
+        s = (list.find((m) => normTitle(m.title) === key) || list.find((m) => normTitle(baseTitle(m.title)) === bkey))?.slug;
+      }
+      if (s) out.poster = (await movieDay(s)).image || "";
+    } catch (_) {}
+    const token = ((await loadSettings()).tmdbToken || "").trim();
+    if (token) {
+      try {
+        const hit = await tmdbFind(title, token);
+        if (hit) {
+          if (!out.poster && hit.p) out.poster = "https://image.tmdb.org/t/p/w500" + hit.p;
+          const pickVideo = (list: any[]) =>
+            list.filter((v) => v.site === "YouTube" && v.key).sort((a, b) => rankVideo(a) - rankVideo(b))[0];
+          const rankVideo = (v: any) => (v.type === "Trailer" ? 0 : v.type === "Teaser" ? 1 : 2) + (v.official ? 0 : 0.5);
+          let v = pickVideo((await tmdb(`/movie/${hit.id}/videos?language=zh-TW`, token))?.results || []);
+          if (!v) v = pickVideo((await tmdb(`/movie/${hit.id}/videos`, token))?.results || []);
+          if (v) {
+            out.trailer = `https://www.youtube.com/watch?v=${v.key}`;
+            out.trailerName = String(v.name || "預告片");
+          }
+        }
+      } catch (_) {}
+    }
+    return out;
+  })());
 }
 
 /** 沒有片長的電影，從 TMDB 補上（會標記 runtimeFrom）；沒設定 Token 或查詢失敗就原樣回傳 */
