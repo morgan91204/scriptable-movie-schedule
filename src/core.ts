@@ -506,8 +506,10 @@ function twPoster(slug: string): Promise<string> {
     const path = encodeURIComponent(slug).replace(/%3A/gi, ":");
     const url = `${TW}/movies/${path}/`;
     if (movieDayCache[url]?.image) return movieDayCache[url].image!;
-    const html = await getText(url);
-    return (html.match(/property="og:image"\s+content="([^"]+)"/) || html.match(/"image":"([^"]+)"/) || [])[1] || "";
+    const r = await get(url);
+    if (!r.ok) throw new Error("no page");
+    const img = (r.body.match(/property="og:image"\s+content="([^"]+)"/) || r.body.match(/"image":"([^"]+)"/) || [])[1] || "";
+    return /og-default/.test(img) ? "" : img; // 場次通沒有海報時會放預設圖，不算
   })());
 }
 
@@ -520,12 +522,14 @@ async function findExtras(title: string, slug?: string): Promise<MovieExtras> {
   };
   // 海報（場次通）與預告（TMDB）同時查
   const posterJob = (async () => {
-    let s = slug;
-    if (!s) {
-      const list = await loadMovies();
-      const key = normTitle(title), bkey = normTitle(base);
-      s = (list.find((m) => normTitle(m.title) === key) || list.find((m) => normTitle(baseTitle(m.title)) === bkey))?.slug;
-    }
+    if (slug) return twPoster(slug);
+    // 場次通的網址就是片名：先直接試，不用先下載整份電影清單
+    try {
+      return await twPoster(title);
+    } catch (_) {}
+    const list = await loadMovies();
+    const key = normTitle(title), bkey = normTitle(base);
+    const s = (list.find((m) => normTitle(m.title) === key) || list.find((m) => normTitle(baseTitle(m.title)) === bkey))?.slug;
     return s ? twPoster(s) : "";
   })().catch(() => "");
   const token = ((await loadSettings()).tmdbToken || "").trim();
@@ -539,18 +543,30 @@ async function findExtras(title: string, slug?: string): Promise<MovieExtras> {
       tmdb(`/movie/${hit.id}/videos?language=zh-TW`, token).catch(() => null),
       tmdb(`/movie/${hit.id}/videos`, token).catch(() => null),
     ]);
-    const v = pickVideo(zh?.results || []) || pickVideo(all?.results || []);
+    const vz = pickVideo(zh?.results || []);
+    const v = vz ? { ...vz, zh: true } : pickVideo(all?.results || []);
     return { poster: hit.p ? "https://image.tmdb.org/t/p/w500" + hit.p : "", v, err: v ? "" : "TMDB 沒有這部片的預告" };
   })().catch((e) => ({ err: "TMDB " + errText(e) }));
-  const [poster, t] = await Promise.all([posterJob, tmdbJob]);
+  // 開眼電影網的電影頁有 YouTube 預告（不需要金鑰）：海報網址裡就有開眼的電影編號
+  const atJob = posterJob
+    .then(async (poster) => {
+      const id = (poster.match(/\/photo\d*\/(f\w+)\//) || [])[1];
+      if (!id) return null;
+      const html = await getText(`https://www.atmovies.com.tw/movie/${id}/`);
+      const key = (html.match(/youtube\.com\/embed\/([A-Za-z0-9_-]{11})/) || [])[1];
+      return key ? { key, name: "開眼電影網預告" } : null;
+    })
+    .catch(() => null);
+  const [poster, t, at] = await Promise.all([posterJob, tmdbJob, atJob]);
   out.poster = poster || (t && "poster" in t ? t.poster : "") || "";
-  if (t) {
-    if ("v" in t && t.v) {
-      out.trailer = `https://www.youtube.com/watch?v=${t.v.key}`;
-      out.trailerName = String(t.v.name || "預告片");
-    }
-    if (t.err) out.err = t.err;
+  // 預告來源順序：TMDB 中文預告 → 開眼 → TMDB 其他語言 → YouTube 搜尋
+  const tv = t && "v" in t ? t.v : null;
+  const pick = tv && tv.zh ? tv : at || tv;
+  if (pick) {
+    out.trailer = `https://www.youtube.com/watch?v=${pick.key}`;
+    out.trailerName = String(pick.name || "預告片");
   }
+  if (t?.err && !pick) out.err = t.err;
   return out;
 }
 

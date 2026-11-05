@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.05-2223
+// @movie-schedule-app 電影行程 v2026.11.05-2227
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/jsx.tsx
@@ -1235,8 +1235,10 @@ function twPoster(slug) {
     const path = encodeURIComponent(slug).replace(/%3A/gi, ":");
     const url = `${TW}/movies/${path}/`;
     if (movieDayCache[url]?.image) return movieDayCache[url].image;
-    const html = await getText(url);
-    return (html.match(/property="og:image"\s+content="([^"]+)"/) || html.match(/"image":"([^"]+)"/) || [])[1] || "";
+    const r = await get(url);
+    if (!r.ok) throw new Error("no page");
+    const img = (r.body.match(/property="og:image"\s+content="([^"]+)"/) || r.body.match(/"image":"([^"]+)"/) || [])[1] || "";
+    return /og-default/.test(img) ? "" : img;
   })();
 }
 async function findExtras(title, slug) {
@@ -1247,12 +1249,14 @@ async function findExtras(title, slug) {
     trailerName: ""
   };
   const posterJob = (async () => {
-    let s = slug;
-    if (!s) {
-      const list = await loadMovies();
-      const key = normTitle(title), bkey = normTitle(base);
-      s = (list.find((m) => normTitle(m.title) === key) || list.find((m) => normTitle(baseTitle(m.title)) === bkey))?.slug;
+    if (slug) return twPoster(slug);
+    try {
+      return await twPoster(title);
+    } catch (_) {
     }
+    const list = await loadMovies();
+    const key = normTitle(title), bkey = normTitle(base);
+    const s = (list.find((m) => normTitle(m.title) === key) || list.find((m) => normTitle(baseTitle(m.title)) === bkey))?.slug;
     return s ? twPoster(s) : "";
   })().catch(() => "");
   const token = ((await loadSettings()).tmdbToken || "").trim();
@@ -1266,18 +1270,26 @@ async function findExtras(title, slug) {
       tmdb(`/movie/${hit.id}/videos?language=zh-TW`, token).catch(() => null),
       tmdb(`/movie/${hit.id}/videos`, token).catch(() => null)
     ]);
-    const v = pickVideo(zh?.results || []) || pickVideo(all?.results || []);
+    const vz = pickVideo(zh?.results || []);
+    const v = vz ? { ...vz, zh: true } : pickVideo(all?.results || []);
     return { poster: hit.p ? "https://image.tmdb.org/t/p/w500" + hit.p : "", v, err: v ? "" : "TMDB 沒有這部片的預告" };
   })().catch((e) => ({ err: "TMDB " + errText(e) }));
-  const [poster, t] = await Promise.all([posterJob, tmdbJob]);
+  const atJob = posterJob.then(async (poster2) => {
+    const id = (poster2.match(/\/photo\d*\/(f\w+)\//) || [])[1];
+    if (!id) return null;
+    const html = await getText(`https://www.atmovies.com.tw/movie/${id}/`);
+    const key = (html.match(/youtube\.com\/embed\/([A-Za-z0-9_-]{11})/) || [])[1];
+    return key ? { key, name: "開眼電影網預告" } : null;
+  }).catch(() => null);
+  const [poster, t, at] = await Promise.all([posterJob, tmdbJob, atJob]);
   out.poster = poster || (t && "poster" in t ? t.poster : "") || "";
-  if (t) {
-    if ("v" in t && t.v) {
-      out.trailer = `https://www.youtube.com/watch?v=${t.v.key}`;
-      out.trailerName = String(t.v.name || "預告片");
-    }
-    if (t.err) out.err = t.err;
+  const tv = t && "v" in t ? t.v : null;
+  const pick = tv && tv.zh ? tv : at || tv;
+  if (pick) {
+    out.trailer = `https://www.youtube.com/watch?v=${pick.key}`;
+    out.trailerName = String(pick.name || "預告片");
   }
+  if (t?.err && !pick) out.err = t.err;
   return out;
 }
 async function fillRuntimes(movies) {
@@ -1612,7 +1624,7 @@ var App = class {
     this.loadingText = "讀取中…";
     // ── 事件迴圈 ──
     // 背景查 GitHub 上的最新版本（首頁顯示是否為最新版）
-    this.latest = checkLatest("2026.11.05-2223");
+    this.latest = checkLatest("2026.11.05-2227");
     // ── 搜尋 ──
     this.query = "";
     this.tmdbStatus = "";
@@ -1716,11 +1728,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.05-2223"}`);
+          Pasteboard.copy(`版本 ${"2026.11.05-2227"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.05-2223"}`,
+      `版本 ${"2026.11.05-2227"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
