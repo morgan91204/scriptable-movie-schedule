@@ -1,0 +1,23 @@
+import { tap, dump, saved, closeUI } from "./mock.mjs";
+const driver = (async () => {
+  await tap(/依電影找場次/);
+  await dump("電影清單");
+  await tap(/^搜尋$/, { q: "惡靈" });
+  await dump("搜尋惡靈");
+  await tap(/^惡靈古堡/);
+  await dump("放映影城（今天）");
+  await tap(/^台北市$/);
+  await dump("只看台北");
+  await tap(/^11\/6/);
+  await dump("明天");
+  await tap(/台北信義威秀影城|台北京站威秀影城|MUVIE/);
+  await dump("場次");
+  await tap(/^\d\d:\d\d→/);
+  await dump("確認");
+  await tap(/加入行事曆/);
+  closeUI();
+})().catch((e) => { console.error("❌", e.message); process.exit(1); });
+await import("../dist/app.mjs");
+await driver;
+for (const e of saved) console.log("\n寫入：", e.title, e.startDate.toISOString(), "|", e.location, "\n" + e.notes);
+process.exit(0);

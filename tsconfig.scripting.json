@@ -1,0 +1,7 @@
+{
+  "compilerOptions": {
+    "target": "ES2020", "module": "ESNext", "moduleResolution": "Bundler", "lib": ["ES2022"], "types": [],
+    "strict": true, "noEmit": true, "skipLibCheck": true, "jsx": "preserve"
+  },
+  "files": ["build/scripting-check/index.tsx", "build/scripting-check/scripting-shim.d.ts", "build/scripting-check/dom-shim.d.ts"]
+}

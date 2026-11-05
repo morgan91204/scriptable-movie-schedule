@@ -326,3 +326,120 @@ export function parseAtDay(doc: Document): AtDay {
   }
   return { name: clean(doc.querySelector("#section_nav")?.textContent).split("﹥").pop() || "", address, site, date, movies };
 }
+
+export interface TwMovie {
+  slug: string; // 場次通電影頁路徑名稱（中文片名，可能含特殊字元）
+  title: string;
+  en: string;
+  rating: string;
+  runtime: number;
+  cinemaCount: number;
+  comingSoon: boolean;
+}
+export interface TwMovieCinema {
+  id: string; // 場次通影城代碼
+  name: string;
+  city: string;
+  district: string;
+  address: string;
+  versions: Version[];
+}
+export interface TwMovieDay {
+  title: string;
+  en: string;
+  rating: string;
+  runtime: number;
+  date: string;
+  dates: string[];
+  cinemas: TwMovieCinema[];
+}
+
+/** 場次通「全部電影」頁：上映中＋即將上映 */
+export function parseTwMovies(doc: Document): TwMovie[] {
+  const clean = (s: unknown) => String(s || "").replace(/\s+/g, " ").trim();
+  const out: TwMovie[] = [];
+  for (const sec of Array.from(doc.querySelectorAll("section"))) {
+    const h2 = clean(sec.querySelector("h2")?.textContent);
+    if (!/上映中|即將上映/.test(h2)) continue;
+    for (const a of Array.from(sec.querySelectorAll('a[href^="/movies/"]'))) {
+      const m = (a.getAttribute("href") || "").match(/^\/movies\/([^/]+)\/$/);
+      const title = clean(a.querySelector(".card-title, h3")?.textContent);
+      if (!m || !title || out.some((x) => x.slug === m[1])) continue;
+      const badges = Array.from(a.querySelectorAll(".badge")).map((e) => clean(e.textContent));
+      out.push({
+        slug: decodeURIComponent(m[1]),
+        title,
+        en: clean(a.querySelector("p")?.textContent),
+        rating: badges.find((b) => /級$/.test(b)) || "",
+        runtime: Number((badges.find((b) => /分鐘$/.test(b)) || "").replace(/\D/g, "") || 0),
+        cinemaCount: Number((badges.find((b) => /間影城$/.test(b)) || "").replace(/\D/g, "") || 0),
+        comingSoon: /即將上映/.test(h2),
+      });
+    }
+  }
+  return out;
+}
+
+/** 場次通單一電影某天的頁面：哪些影城有放、各版本場次 */
+export function parseTwMovieDay(doc: Document): TwMovieDay {
+  const clean = (s: unknown) => String(s || "").replace(/\s+/g, " ").trim();
+  let title = "", en = "", rating = "", runtime = 0;
+  const address: Record<string, string> = {};
+  for (const el of Array.from(doc.querySelectorAll('script[type="application/ld+json"]'))) {
+    try {
+      const o = JSON.parse(el.textContent || "");
+      if (o["@type"] !== "Movie") continue;
+      title = clean(o.name);
+      en = clean(o.alternateName);
+      rating = clean(o.contentRating);
+      runtime = Number((String(o.duration || "").match(/(\d+)M/) || [])[1] || 0);
+      for (const ev of o.subjectOf || []) {
+        const loc = ev && ev.location;
+        if (loc && loc.name && loc.address && loc.address.streetAddress) address[clean(loc.name)] = clean(loc.address.streetAddress);
+      }
+    } catch (_) {}
+  }
+  if (!title) title = clean(doc.querySelector("h1")?.textContent);
+  const heading = Array.from(doc.querySelectorAll("h2")).map((e) => clean(e.textContent)).find((s) => /\d{4}-\d{2}-\d{2}\s*場次/.test(s)) || "";
+  const date = (heading.match(/\d{4}-\d{2}-\d{2}/) || [""])[0];
+  const dates: string[] = date ? [date] : [];
+  for (const a of Array.from(doc.querySelectorAll('a[href^="/movies/"]'))) {
+    const m = (a.getAttribute("href") || "").match(/\/(\d{4}-\d{2}-\d{2})\/$/);
+    if (m && dates.indexOf(m[1]) < 0) dates.push(m[1]);
+  }
+  dates.sort();
+  const cinemas: TwMovieCinema[] = [];
+  for (const sec of Array.from(doc.querySelectorAll("section[data-region]"))) {
+    const city = clean(sec.querySelector("h3 a")?.textContent);
+    for (const a of Array.from(sec.querySelectorAll('a[href^="/cinemas/"]'))) {
+      const id = ((a.getAttribute("href") || "").match(/^\/cinemas\/([^/]+)\/(?:\d{4}-\d{2}-\d{2}\/)?$/) || [])[1];
+      const name = clean(a.querySelector(".card-title")?.textContent);
+      if (!id || !name) continue;
+      const place = clean(a.querySelector(".card-title + span, .text-sm")?.textContent);
+      const versions: Version[] = [];
+      let cur: Version | null = null;
+      for (const sp of Array.from(a.querySelectorAll(".badge"))) {
+        const txt = clean(sp.textContent);
+        if (sp.classList.contains("font-mono")) {
+          if (!/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(txt)) continue;
+          if (!cur) versions.push((cur = { label: "一般場", times: [] }));
+          if (cur.times.indexOf(txt) < 0) cur.times.push(txt);
+        } else if (sp.classList.contains("badge-secondary")) {
+          const label = txt || "一般場";
+          cur = versions.find((v) => v.label === label) || null;
+          if (!cur) versions.push((cur = { label, times: [] }));
+        }
+      }
+      if (!versions.some((v) => v.times.length)) continue;
+      cinemas.push({
+        id,
+        name,
+        city: city || place.split(" ")[0] || "",
+        district: place.split(" ")[1] || "",
+        address: address[name] || "",
+        versions: versions.filter((v) => v.times.length),
+      });
+    }
+  }
+  return { title, en, rating, runtime, date, dates, cinemas };
+}

@@ -4,11 +4,14 @@
 
 import { h, Fragment, Page, Section, Item, Chips, Chip, Button, Note, Loading, Empty } from "./jsx";
 import { UI } from "./ui";
+import { setPlatform } from "./platform";
+import { scriptablePlatform } from "./platform-scriptable";
 import {
   Cinema, Settings, Movie, Version, EXTRA, CITY_ORDER, AD_STEPS,
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
-  loadSettings, saveSettings, loadCinemas, datesOf, moviesOf,
+  loadSettings, saveSettings, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, TW,
 } from "./core";
+import type { TwMovie, TwMovieCinema } from "./core";
 
 interface Pick {
   cinema: Cinema;
@@ -121,6 +124,7 @@ class App {
     return (
       <Page title="🎬 電影行程" subtitle={`${this.cinemas.length} 間影城｜選影城 → 日期 → 電影 → 場次`}>
         <Section>
+          <Item icon="🎬" title="依電影找場次" subtitle="先選電影，再看哪些影城有放映" onTap={() => this.go(() => this.movieListView(), "讀取電影清單…")} />
           <Item icon="🔍" title="搜尋影城" subtitle="影城、分店、行政區或縣市" onTap={() => this.go(() => this.searchView())} />
         </Section>
         {favs.length ? (
@@ -441,6 +445,86 @@ class App {
     );
   }
 
+  // ── 依電影找 ──
+  movieQuery = "";
+  async movieListView(): Promise<string> {
+    const all = await loadMovies();
+    const k = this.movieQuery.trim().toLowerCase();
+    const list = all.filter((m) => !k || `${m.title} ${m.en}`.toLowerCase().includes(k));
+    const item = (m: TwMovie) => (
+      <Item
+        title={m.title}
+        subtitle={[m.rating, m.runtime ? `${m.runtime} 分` : "", m.en].filter(Boolean).join("｜")}
+        badge={m.cinemaCount ? `${m.cinemaCount} 間` : undefined}
+        onTap={() => this.go(() => this.movieView(m, ""), `讀取《${m.title}》的放映影城…`)}
+      />
+    );
+    const now = list.filter((m) => !m.comingSoon);
+    const soon = list.filter((m) => m.comingSoon);
+    return (
+      <Page title="依電影找場次" subtitle={`${all.length} 部電影`} onBack={() => this.back()}>
+        <input class="field" name="q" value={this.movieQuery} placeholder="搜尋片名" />
+        <Button label="搜尋" kind="secondary" enter onTap={(v) => { this.movieQuery = v.q || ""; }} />
+        {now.length ? <Section title={`上映中（${now.length}）`} hint="依今天放映的影城數排序，資料來自場次通。">{now.map(item)}</Section> : null}
+        {soon.length ? <Section title={`即將上映（${soon.length}）`}>{soon.map(item)}</Section> : null}
+        {list.length ? null : <Empty icon="🎞" text="找不到相符的電影" />}
+      </Page>
+    );
+  }
+
+  movieCity = "全部";
+  async movieView(m: TwMovie, date: string): Promise<string> {
+    const d = await movieDay(m.slug, date || undefined);
+    const dates = d.dates.filter((x) => x >= todayTPE());
+    const runtime = d.runtime || m.runtime;
+    const cities = Array.from(new Set(d.cinemas.map((c) => c.city))).sort(
+      (a, b) => (CITY_ORDER.indexOf(a) + 1 || 99) - (CITY_ORDER.indexOf(b) + 1 || 99)
+    );
+    const city = cities.indexOf(this.movieCity) >= 0 ? this.movieCity : "全部";
+    const shown = d.cinemas.filter((c) => city === "全部" || c.city === city);
+    const toCinema = (c: TwMovieCinema): Cinema =>
+      this.cinemas.find((x) => x.id === c.id) ||
+      { id: c.id, name: c.name, city: c.city, district: c.district, source: "tw", url: `${TW}/cinemas/${c.id}/`, address: c.address };
+    const replace = (nd: string) => {
+      this.stack[this.stack.length - 1] = () => this.movieView(m, nd);
+    };
+    return (
+      <Page title={m.title} subtitle={[m.rating || d.rating, runtime ? `${runtime} 分鐘` : "", `${d.cinemas.length} 間影城`].filter(Boolean).join("｜")} onBack={() => this.back()}>
+        <Section title="日期">
+          <Chips>
+            {(dates.length ? dates : [d.date]).map((x) => (
+              <Chip label={dateLabel(x).replace(/（.）.*$/, "")} sub={x === d.date ? "目前" : dateLabel(x).match(/（(.)）/)?.[1] || ""} muted={x !== d.date} onTap={() => replace(x)} />
+            ))}
+          </Chips>
+        </Section>
+        <Section title="縣市">
+          <Chips>
+            {["全部", ...cities].map((c) => (
+              <Chip label={c} muted={c !== city} onTap={() => { this.movieCity = c; }} />
+            ))}
+          </Chips>
+        </Section>
+        {cities.filter((c) => city === "全部" || c === city).map((ct) => (
+          <Section title={`${ct}（${shown.filter((c) => c.city === ct).length} 間）`}>
+            {shown.filter((c) => c.city === ct).map((c) => {
+              const movie: Movie = { title: d.title || m.title, runtime, rating: d.rating || m.rating, versions: c.versions };
+              const summary = c.versions.map((v) => `${v.label} ${[...v.times].sort(byShowtime).join(" ")}`).join("／");
+              return (
+                <Item
+                  icon={this.settings.favorites.indexOf(c.id) >= 0 ? "★" : undefined}
+                  title={c.name}
+                  subtitle={summary}
+                  onTap={() => this.go(() => this.timesView(toCinema(c), d.date, movie, { booking: "", sourceUrl: `${TW}/cinemas/${c.id}/${d.date}/`, address: c.address }))}
+                />
+              );
+            })}
+          </Section>
+        ))}
+        {shown.length ? null : <Empty icon="🎞" text="這天沒有影城放映" />}
+      </Page>
+    );
+  }
+
   // 從捷徑或 Safari 分享場次通／誠品／光點網址時，直接跳到那間影城
   startFrom(url: string): boolean {
     const m = url.match(/twshowtimes\.com\/cinemas\/([^/]+)\/(?:(\d{4}-\d{2}-\d{2})\/)?/);
@@ -462,5 +546,6 @@ class App {
   }
 }
 
+setPlatform(scriptablePlatform);
 await new App().run();
 Script.complete();

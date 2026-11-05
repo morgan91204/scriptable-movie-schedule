@@ -1,0 +1,10 @@
+const {DOMParser}=require('linkedom');const fs=require('fs');
+const js=fs.readFileSync('src/parsers.gen.ts','utf8').match(/PARSERS_JS: string = (".*");/s)[1];
+const code=JSON.parse(js);
+const run=(name,file)=>new Function('DOMParser','html',code+'\nreturn '+name+'(new DOMParser().parseFromString(html,"text/html"))')(DOMParser,fs.readFileSync(file,'utf8'));
+const T='/tmp/claude-0/-home-claude/5947329c-f87c-5e44-984a-1cc58fbaa31a/scratchpad/tw/';
+const ms=run('parseTwMovies',T+'movies.html');console.log('movies',ms.length,'now',ms.filter(m=>!m.comingSoon).length,'soon',ms.filter(m=>m.comingSoon).length,JSON.stringify(ms.slice(0,2)));
+const d=run('parseTwMovieDay',T+(process.argv[2]||'movie1.html'));console.log(d.title,d.en,d.rating,d.runtime,d.date,d.dates.join(' '),'cinemas',d.cinemas.length);
+console.log(JSON.stringify(d.cinemas.slice(0,3),null,0));
+console.log('no address:',d.cinemas.filter(c=>!c.address).map(c=>c.name));
+console.log('multi-version:',JSON.stringify(d.cinemas.find(c=>c.versions.length>1)));

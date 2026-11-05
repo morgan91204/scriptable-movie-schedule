@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.05-1321
+// @movie-schedule-app 電影行程 v2026.11.05-1739
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/jsx.tsx
@@ -184,18 +184,93 @@ var UI = class {
   }
 };
 
-// src/parsers.ts
-function parseTwIndex(doc) {
-  const clean = (s) => String(s || "").replace(/\s+/g, " ").trim();
+// src/platform.ts
+var current = null;
+function setPlatform(p) {
+  current = p;
+}
+function platform() {
+  if (!current) throw new Error("platform 尚未設定");
+  return current;
+}
+
+// src/platform-scriptable.ts
+function settingsFile() {
+  let fm;
+  try {
+    fm = FileManager.iCloud();
+    fm.documentsDirectory();
+  } catch (_) {
+    fm = FileManager.local();
+  }
+  const dir = fm.joinPath(fm.documentsDirectory(), "電影行程");
+  if (!fm.fileExists(dir)) fm.createDirectory(dir, true);
+  return { fm, path: fm.joinPath(dir, "設定.json") };
+}
+var web = null;
+var scriptablePlatform = {
+  async fetchText(url, headers) {
+    const r = new Request(url);
+    r.headers = headers;
+    r.timeoutInterval = 20;
+    const body = await r.loadString();
+    return { status: r.response && r.response.statusCode || 200, body };
+  },
+  async runInWebView(body) {
+    if (!web) {
+      web = new WebView();
+      await web.loadHTML("<html><body></body></html>", "https://twshowtimes.com/");
+    }
+    return await web.evaluateJavaScript(`(function(){${body}
+})()`, false);
+  },
+  async loadSettingsJSON() {
+    try {
+      const { fm, path } = settingsFile();
+      if (!fm.fileExists(path)) return null;
+      await fm.downloadFileFromiCloud(path);
+      return fm.readString(path);
+    } catch (_) {
+      return null;
+    }
+  },
+  saveSettingsJSON(json) {
+    try {
+      const { fm, path } = settingsFile();
+      fm.writeString(path, json);
+    } catch (_) {
+    }
+  },
+  cacheGet(name) {
+    try {
+      const fm = FileManager.local();
+      const p = fm.joinPath(fm.cacheDirectory(), "movie-" + name);
+      return fm.fileExists(p) ? fm.readString(p) : null;
+    } catch (_) {
+      return null;
+    }
+  },
+  cacheSet(name, value) {
+    try {
+      const fm = FileManager.local();
+      fm.writeString(fm.joinPath(fm.cacheDirectory(), "movie-" + name), value);
+    } catch (_) {
+    }
+  }
+};
+
+// src/parsers.gen.ts
+var PARSERS_JS = `function parseTwIndex(doc) {
+  const clean = (s) => String(s || "").replace(/\\s+/g, " ").trim();
   const out = [];
   const seen = {};
   let city = "";
   for (const el of Array.from(doc.querySelectorAll('h2, a[href^="/cinemas/"]'))) {
     if (el.tagName === "H2") {
-      city = clean(el.querySelector("a")?.textContent || el.textContent).replace(/\(.*$/, "").trim();
+      city = clean(el.querySelector("a")?.textContent || el.textContent).replace(/\\(.*$/, "").trim();
       continue;
     }
-    const m = (el.getAttribute("href") || "").match(/^\/cinemas\/([^/]+)\/$/);
+    const m = (el.getAttribute("href") || "").match(/^\\/cinemas\\/([^/]+)\\/$/);
     if (!m || seen[m[1]]) continue;
     const name = clean(el.querySelector("h3")?.textContent);
     if (!name) continue;
@@ -205,13 +280,13 @@ function parseTwIndex(doc) {
   return out;
 }
 function parseTwDay(doc) {
-  const clean = (s) => String(s || "").replace(/\s+/g, " ").trim();
-  const timeRe = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
-  const heading = Array.from(doc.querySelectorAll("h2")).map((e) => clean(e.textContent)).find((s) => /\d{4}-\d{2}-\d{2}\s*片單/.test(s));
-  const date = heading ? heading.match(/\d{4}-\d{2}-\d{2}/)[0] : "";
+  const clean = (s) => String(s || "").replace(/\\s+/g, " ").trim();
+  const timeRe = /^(?:[01]\\d|2[0-3]):[0-5]\\d$/;
+  const heading = Array.from(doc.querySelectorAll("h2")).map((e) => clean(e.textContent)).find((s) => /\\d{4}-\\d{2}-\\d{2}\\s*片單/.test(s));
+  const date = heading ? heading.match(/\\d{4}-\\d{2}-\\d{2}/)[0] : "";
   const dates = [];
   for (const a of Array.from(doc.querySelectorAll('a[href^="/cinemas/"]'))) {
-    const m = (a.getAttribute("href") || "").match(/^\/cinemas\/[^/]+\/(\d{4}-\d{2}-\d{2})\/$/);
+    const m = (a.getAttribute("href") || "").match(/^\\/cinemas\\/[^/]+\\/(\\d{4}-\\d{2}-\\d{2})\\/$/);
     if (m && dates.indexOf(m[1]) < 0) dates.push(m[1]);
   }
   if (date && dates.indexOf(date) < 0) dates.unshift(date);
@@ -225,7 +300,7 @@ function parseTwDay(doc) {
     }
   }
   const bookingEl = Array.from(doc.querySelectorAll("a[href]")).find(
-    (a) => /前往訂票/.test(a.textContent || "") && /^https:\/\//.test(a.getAttribute("href") || "")
+    (a) => /前往訂票/.test(a.textContent || "") && /^https:\\/\\//.test(a.getAttribute("href") || "")
   );
   const movies = [];
   for (const card of Array.from(doc.querySelectorAll(".card"))) {
@@ -233,7 +308,7 @@ function parseTwDay(doc) {
     if (!titleEl) continue;
     const title = clean(titleEl.textContent);
     const badges = Array.from(card.querySelectorAll(".badge-sm")).map((e) => clean(e.textContent));
-    const rt = badges.find((s) => /^\d+\s*分$/.test(s));
+    const rt = badges.find((s) => /^\\d+\\s*分$/.test(s));
     const rating = badges.find((s) => /級$/.test(s)) || "";
     const versions = [];
     for (const row of Array.from(card.querySelectorAll(".flex.flex-wrap.items-center.gap-2"))) {
@@ -247,7 +322,7 @@ function parseTwDay(doc) {
       else versions.push({ label, times: uniq });
     }
     if (title && versions.length)
-      movies.push({ title, runtime: rt ? Number(rt.match(/\d+/)[0]) : 0, rating, versions });
+      movies.push({ title, runtime: rt ? Number(rt.match(/\\d+/)[0]) : 0, rating, versions });
   }
   return {
     cinema: clean(doc.querySelector("h1")?.textContent),
@@ -259,10 +334,10 @@ function parseTwDay(doc) {
   };
 }
 function parseEslite(doc) {
-  const clean = (s) => String(s || "").replace(/\s+/g, " ").trim();
+  const clean = (s) => String(s || "").replace(/\\s+/g, " ").trim();
   const schedules = {};
   const add = (day, title, runtime, label, time) => {
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || !title || !/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(time)) return;
+    if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(day) || !title || !/^(?:[01]\\d|2[0-3]):[0-5]\\d$/.test(time)) return;
     const list = schedules[day] || (schedules[day] = []);
     let m = list.find((x) => x.title === title && x.runtime === runtime);
     if (!m) list.push(m = { title, runtime, versions: [] });
@@ -270,36 +345,36 @@ function parseEslite(doc) {
     if (!v) m.versions.push(v = { label, times: [] });
     if (v.times.indexOf(time) < 0) v.times.push(time);
   };
-  const updated = (doc.body.textContent || "").match(/最後更新時間[：:]\s*(\d{4})-(\d{2})-(\d{2})/);
+  const updated = (doc.body.textContent || "").match(/最後更新時間[：:]\\s*(\\d{4})-(\\d{2})-(\\d{2})/);
   if (!updated) throw new Error("讀不到誠品官網的更新日期，無法判斷場次年份");
-  const anchor = Date.parse(`${updated[1]}-${updated[2]}-${updated[3]}T12:00:00+08:00`);
+  const anchor = Date.parse(\`\${updated[1]}-\${updated[2]}-\${updated[3]}T12:00:00+08:00\`);
   for (const box of Array.from(doc.querySelectorAll(".box"))) {
     const title = clean(box.querySelector(".intro .left p")?.textContent);
     if (!title) continue;
     const info = clean(box.querySelector(".intro .right")?.textContent);
-    const runtime = Number((info.match(/片長[：:]\s*(\d+)\s*分鐘/) || [])[1] || 0);
-    const subtitle = (info.match(/字幕[：:]\s*([^\s]+)/) || [])[1] || "";
+    const runtime = Number((info.match(/片長[：:]\\s*(\\d+)\\s*分鐘/) || [])[1] || 0);
+    const subtitle = (info.match(/字幕[：:]\\s*([^\\s]+)/) || [])[1] || "";
     for (const slide of Array.from(box.querySelectorAll(".time-swiper .swiper-slide"))) {
-      const md = clean(slide.querySelector("p")?.textContent).match(/^(\d{1,2})\/(\d{1,2})/);
+      const md = clean(slide.querySelector("p")?.textContent).match(/^(\\d{1,2})\\/(\\d{1,2})/);
       if (!md) continue;
       const mm = md[1].padStart(2, "0"), dd = md[2].padStart(2, "0");
       const y = Number(updated[1]);
-      const cands = [y - 1, y, y + 1].map((yy) => `${yy}-${mm}-${dd}`);
+      const cands = [y - 1, y, y + 1].map((yy) => \`\${yy}-\${mm}-\${dd}\`);
       cands.sort(
         (a, b) => Math.abs(Date.parse(a + "T12:00:00+08:00") - anchor) - Math.abs(Date.parse(b + "T12:00:00+08:00") - anchor)
       );
       for (const li of Array.from(slide.querySelectorAll("li")))
-        add(cands[0], title, runtime, subtitle ? `字幕 ${subtitle}` : "一般場", clean(li.textContent));
+        add(cands[0], title, runtime, subtitle ? \`字幕 \${subtitle}\` : "一般場", clean(li.textContent));
     }
   }
   return { schedules, notice: "" };
 }
 function parseSpotHs(doc) {
-  const clean = (s) => String(s || "").replace(/\s+/g, " ").trim();
+  const clean = (s) => String(s || "").replace(/\\s+/g, " ").trim();
   const schedules = {};
   let notice = "";
   const add = (day, title, runtime, label, time) => {
-    if (!title || !/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(time)) return;
+    if (!title || !/^(?:[01]\\d|2[0-3]):[0-5]\\d$/.test(time)) return;
     const list = schedules[day] || (schedules[day] = []);
     let m = list.find((x) => x.title === title && x.runtime === runtime);
     if (!m) list.push(m = { title, runtime, versions: [] });
@@ -307,15 +382,15 @@ function parseSpotHs(doc) {
     if (!v) m.versions.push(v = { label, times: [] });
     if (v.times.indexOf(time) < 0) v.times.push(time);
   };
-  const tables = Array.from(doc.querySelectorAll("table[id]")).filter((t) => /^\d{8}$/.test(t.id));
+  const tables = Array.from(doc.querySelectorAll("table[id]")).filter((t) => /^\\d{8}$/.test(t.id));
   const halls = [];
   for (const t of tables) if (t.parentElement && halls.indexOf(t.parentElement) < 0) halls.push(t.parentElement);
   for (const table of tables) {
-    const day = table.id.replace(/^(\d{4})(\d{2})(\d{2})$/, "$1-$2-$3");
-    const hall = `第 ${halls.indexOf(table.parentElement) + 1} 廳`;
+    const day = table.id.replace(/^(\\d{4})(\\d{2})(\\d{2})$/, "$1-$2-$3");
+    const hall = \`第 \${halls.indexOf(table.parentElement) + 1} 廳\`;
     for (const row of Array.from(table.querySelectorAll("tr"))) {
       const cells = Array.from(row.children).filter((el) => /^(TD|TH)$/.test(el.tagName));
-      const ti = cells.findIndex((el) => /^\d{2}:\d{2}$/.test(clean(el.textContent)));
+      const ti = cells.findIndex((el) => /^\\d{2}:\\d{2}$/.test(clean(el.textContent)));
       if (ti < 0) {
         if (/影展|包場/.test(row.textContent || ""))
           notice = "部分日期有影展／包場，官網沒列出的個別場次不會出現，請另查官方活動頁。";
@@ -324,39 +399,39 @@ function parseSpotHs(doc) {
       const titleCell = cells[ti + 1];
       if (!titleCell) continue;
       const holder = titleCell.cloneNode(true);
-      for (const br of Array.from(holder.querySelectorAll("br"))) br.replaceWith("\n");
-      const title = (holder.textContent || "").split("\n").map(clean).find(Boolean) || "";
+      for (const br of Array.from(holder.querySelectorAll("br"))) br.replaceWith("\\n");
+      const title = (holder.textContent || "").split("\\n").map(clean).find(Boolean) || "";
       const rtText = clean(cells[ti + 2]?.textContent);
       const subtitle = clean(cells[ti + 3]?.textContent);
-      add(day, title, /^\d+$/.test(rtText) ? Number(rtText) : 0, hall + (subtitle ? `｜字幕 ${subtitle}` : ""), clean(cells[ti].textContent));
+      add(day, title, /^\\d+$/.test(rtText) ? Number(rtText) : 0, hall + (subtitle ? \`｜字幕 \${subtitle}\` : ""), clean(cells[ti].textContent));
     }
   }
   return { schedules, notice };
 }
 function parseSpotMovie(doc) {
-  const clean = (s) => String(s || "").replace(/\s+/g, " ").trim();
-  const title = clean(doc.querySelector(".movie_title")?.textContent).replace(/([：:])\s+/g, "$1");
+  const clean = (s) => String(s || "").replace(/\\s+/g, " ").trim();
+  const title = clean(doc.querySelector(".movie_title")?.textContent).replace(/([：:])\\s+/g, "$1");
   if (!title) return null;
   const body = doc.body.textContent || "";
-  const runtime = Number((body.match(/(\d+)\s*min/i) || [])[1] || 0);
+  const runtime = Number((body.match(/(\\d+)\\s*min/i) || [])[1] || 0);
   const k = body.indexOf("放映時刻");
   const entries = [];
   if (k >= 0) {
-    const seg = body.slice(k).split(/Add\s/)[0];
-    const marks = Array.from(seg.matchAll(/(\d{1,2})\/(\d{1,2})\s*\([一二三四五六日]\)/g));
+    const seg = body.slice(k).split(/Add\\s/)[0];
+    const marks = Array.from(seg.matchAll(/(\\d{1,2})\\/(\\d{1,2})\\s*\\([一二三四五六日]\\)/g));
     marks.forEach((mk, i) => {
       const part = seg.slice((mk.index || 0) + mk[0].length, i + 1 < marks.length ? marks[i + 1].index : void 0);
-      const times = Array.from(part.matchAll(/(\d{1,2}):(\d{2})/g)).map((t) => t[1].padStart(2, "0") + ":" + t[2]).filter((t) => /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(t));
+      const times = Array.from(part.matchAll(/(\\d{1,2}):(\\d{2})/g)).map((t) => t[1].padStart(2, "0") + ":" + t[2]).filter((t) => /^(?:[01]\\d|2[0-3]):[0-5]\\d$/.test(t));
       if (times.length) entries.push({ month: Number(mk[1]), day: Number(mk[2]), times });
     });
   }
   return { title, runtime, entries };
 }
 function parseLux(doc) {
-  const clean = (s) => String(s || "").replace(/\s+/g, " ").trim();
+  const clean = (s) => String(s || "").replace(/\\s+/g, " ").trim();
   const out = [];
   for (const a of Array.from(doc.querySelectorAll('.movie_all_list a[href*="movie_item.php"]'))) {
-    const id = ((a.getAttribute("href") || "").match(/film_id=(\d+)/) || [])[1];
+    const id = ((a.getAttribute("href") || "").match(/film_id=(\\d+)/) || [])[1];
     const h1 = a.querySelector("h1");
     if (!id || !h1) continue;
     const holder = h1.cloneNode(true);
@@ -367,11 +442,11 @@ function parseLux(doc) {
     for (const el of Array.from(a.querySelectorAll("h3, li"))) {
       const txt = clean(el.textContent);
       if (el.tagName === "H3") {
-        const md = txt.match(/(\d{1,2})\/(\d{1,2})/);
+        const md = txt.match(/(\\d{1,2})\\/(\\d{1,2})/);
         cur = md ? { month: Number(md[1]), day: Number(md[2]), times: [] } : null;
         if (cur) entries.push(cur);
       } else if (cur) {
-        const m = txt.match(/^(\d{1,2}):(\d{2})\s*(?:\|\s*(\S+))?/);
+        const m = txt.match(/^(\\d{1,2}):(\\d{2})\\s*(?:\\|\\s*(\\S+))?/);
         if (m) cur.times.push({ t: m[1].padStart(2, "0") + ":" + m[2], hall: m[3] || "" });
       }
     }
@@ -383,44 +458,44 @@ function parseLux(doc) {
   return out;
 }
 function parseLuxFilm(doc) {
-  const text = String(doc.body.textContent || "").replace(/\s+/g, " ");
+  const text = String(doc.body.textContent || "").replace(/\\s+/g, " ");
   return {
-    runtime: Number((text.match(/長度\s*\|\s*(\d+)\s*min/i) || [])[1] || 0),
-    rating: (text.match(/級別\s*\|\s*(\S+?級)/) || [])[1] || ""
+    runtime: Number((text.match(/長度\\s*\\|\\s*(\\d+)\\s*min/i) || [])[1] || 0),
+    rating: (text.match(/級別\\s*\\|\\s*(\\S+?級)/) || [])[1] || ""
   };
 }
 function parseAtRegion(doc) {
   const out = [];
-  const region = ((doc.querySelector('link[rel="canonical"]')?.getAttribute("href") || "").match(/\/(a\d\d)\//) || [])[1] || "";
+  const region = ((doc.querySelector('link[rel="canonical"]')?.getAttribute("href") || "").match(/\\/(a\\d\\d)\\//) || [])[1] || "";
   for (const a of Array.from(doc.querySelectorAll('a[href^="/showtime/t"]'))) {
-    const m = (a.getAttribute("href") || "").match(/^\/showtime\/(t\w+)\/(a\d\d)\/$/);
-    const name = String(a.textContent || "").replace(/\s+/g, " ").trim();
+    const m = (a.getAttribute("href") || "").match(/^\\/showtime\\/(t\\w+)\\/(a\\d\\d)\\/$/);
+    const name = String(a.textContent || "").replace(/\\s+/g, " ").trim();
     if (!m || !name || region && m[2] !== region || out.some((x) => x.id === m[1])) continue;
     out.push({ id: m[1], region: m[2], name });
   }
   return out;
 }
 function parseAtDay(doc) {
-  const clean = (s) => String(s || "").replace(/\s+/g, " ").trim();
+  const clean = (s) => String(s || "").replace(/\\s+/g, " ").trim();
   const RATING = { G: "普遍級", P: "保護級", F2: "輔12級", F5: "輔15級", R: "限制級" };
   const info = Array.from(doc.querySelectorAll("li")).map((li) => clean(li.textContent));
-  const address = (info.find((s) => /^地址[:：]/.test(s)) || "").replace(/^地址[:：]\s*/, "").replace(/\s*\(地圖\)\s*$/, "");
+  const address = (info.find((s) => /^地址[:：]/.test(s)) || "").replace(/^地址[:：]\\s*/, "").replace(/\\s*\\(地圖\\)\\s*$/, "");
   const siteEl = Array.from(doc.querySelectorAll("li")).find((li) => /^網站[:：]/.test(clean(li.textContent)));
   const site = siteEl?.querySelector("a")?.getAttribute("href") || "";
-  const h3 = Array.from(doc.querySelectorAll("h3")).map((e) => clean(e.textContent)).find((s) => /\d{4}\/\d{2}\/\d{2}/.test(s)) || "";
-  const date = (h3.match(/\d{4}\/\d{2}\/\d{2}/) || [""])[0].replace(/\//g, "-");
+  const h3 = Array.from(doc.querySelectorAll("h3")).map((e) => clean(e.textContent)).find((s) => /\\d{4}\\/\\d{2}\\/\\d{2}/.test(s)) || "";
+  const date = (h3.match(/\\d{4}\\/\\d{2}\\/\\d{2}/) || [""])[0].replace(/\\//g, "-");
   const movies = [];
   for (const table of Array.from(doc.querySelectorAll("#theaterShowtimeTable, ul[id='theaterShowtimeTable']"))) {
     const title = clean(table.querySelector(".filmTitle a")?.textContent);
     if (!title) continue;
     const text = clean(table.textContent);
-    const runtime = Number((text.match(/片長[:：]\s*(\d+)\s*分/) || [])[1] || 0);
-    const cer = ((table.querySelector('img[src*="cer_"]')?.getAttribute("src") || "").match(/cer_(\w+)\./) || [])[1] || "";
+    const runtime = Number((text.match(/片長[:：]\\s*(\\d+)\\s*分/) || [])[1] || 0);
+    const cer = ((table.querySelector('img[src*="cer_"]')?.getAttribute("src") || "").match(/cer_(\\w+)\\./) || [])[1] || "";
     let label = "一般場";
     const times = [];
     for (const li of Array.from(table.querySelectorAll("li"))) {
       if (li.classList.contains("filmVersion")) label = clean(li.textContent) || label;
-      const m = clean(li.textContent).match(/^(\d{1,2})[:：](\d{2})$/);
+      const m = clean(li.textContent).match(/^(\\d{1,2})[:：](\\d{2})$/);
       if (m) times.push(m[1].padStart(2, "0") + ":" + m[2]);
     }
     if (!times.length) continue;
@@ -432,6 +507,107 @@ function parseAtDay(doc) {
   }
   return { name: clean(doc.querySelector("#section_nav")?.textContent).split("﹥").pop() || "", address, site, date, movies };
 }
+function parseTwMovies(doc) {
+  const clean = (s) => String(s || "").replace(/\\s+/g, " ").trim();
+  const out = [];
+  for (const sec of Array.from(doc.querySelectorAll("section"))) {
+    const h2 = clean(sec.querySelector("h2")?.textContent);
+    if (!/上映中|即將上映/.test(h2)) continue;
+    for (const a of Array.from(sec.querySelectorAll('a[href^="/movies/"]'))) {
+      const m = (a.getAttribute("href") || "").match(/^\\/movies\\/([^/]+)\\/$/);
+      const title = clean(a.querySelector(".card-title, h3")?.textContent);
+      if (!m || !title || out.some((x) => x.slug === m[1])) continue;
+      const badges = Array.from(a.querySelectorAll(".badge")).map((e) => clean(e.textContent));
+      out.push({
+        slug: decodeURIComponent(m[1]),
+        title,
+        en: clean(a.querySelector("p")?.textContent),
+        rating: badges.find((b) => /級$/.test(b)) || "",
+        runtime: Number((badges.find((b) => /分鐘$/.test(b)) || "").replace(/\\D/g, "") || 0),
+        cinemaCount: Number((badges.find((b) => /間影城$/.test(b)) || "").replace(/\\D/g, "") || 0),
+        comingSoon: /即將上映/.test(h2)
+      });
+    }
+  }
+  return out;
+}
+function parseTwMovieDay(doc) {
+  const clean = (s) => String(s || "").replace(/\\s+/g, " ").trim();
+  let title = "", en = "", rating = "", runtime = 0;
+  const address = {};
+  for (const el of Array.from(doc.querySelectorAll('script[type="application/ld+json"]'))) {
+    try {
+      const o = JSON.parse(el.textContent || "");
+      if (o["@type"] !== "Movie") continue;
+      title = clean(o.name);
+      en = clean(o.alternateName);
+      rating = clean(o.contentRating);
+      runtime = Number((String(o.duration || "").match(/(\\d+)M/) || [])[1] || 0);
+      for (const ev of o.subjectOf || []) {
+        const loc = ev && ev.location;
+        if (loc && loc.name && loc.address && loc.address.streetAddress) address[clean(loc.name)] = clean(loc.address.streetAddress);
+      }
+    } catch (_) {
+    }
+  }
+  if (!title) title = clean(doc.querySelector("h1")?.textContent);
+  const heading = Array.from(doc.querySelectorAll("h2")).map((e) => clean(e.textContent)).find((s) => /\\d{4}-\\d{2}-\\d{2}\\s*場次/.test(s)) || "";
+  const date = (heading.match(/\\d{4}-\\d{2}-\\d{2}/) || [""])[0];
+  const dates = date ? [date] : [];
+  for (const a of Array.from(doc.querySelectorAll('a[href^="/movies/"]'))) {
+    const m = (a.getAttribute("href") || "").match(/\\/(\\d{4}-\\d{2}-\\d{2})\\/$/);
+    if (m && dates.indexOf(m[1]) < 0) dates.push(m[1]);
+  }
+  dates.sort();
+  const cinemas = [];
+  for (const sec of Array.from(doc.querySelectorAll("section[data-region]"))) {
+    const city = clean(sec.querySelector("h3 a")?.textContent);
+    for (const a of Array.from(sec.querySelectorAll('a[href^="/cinemas/"]'))) {
+      const id = ((a.getAttribute("href") || "").match(/^\\/cinemas\\/([^/]+)\\/(?:\\d{4}-\\d{2}-\\d{2}\\/)?$/) || [])[1];
+      const name = clean(a.querySelector(".card-title")?.textContent);
+      if (!id || !name) continue;
+      const place = clean(a.querySelector(".card-title + span, .text-sm")?.textContent);
+      const versions = [];
+      let cur = null;
+      for (const sp of Array.from(a.querySelectorAll(".badge"))) {
+        const txt = clean(sp.textContent);
+        if (sp.classList.contains("font-mono")) {
+          if (!/^(?:[01]\\d|2[0-3]):[0-5]\\d$/.test(txt)) continue;
+          if (!cur) versions.push(cur = { label: "一般場", times: [] });
+          if (cur.times.indexOf(txt) < 0) cur.times.push(txt);
+        } else if (sp.classList.contains("badge-secondary")) {
+          const label = txt || "一般場";
+          cur = versions.find((v) => v.label === label) || null;
+          if (!cur) versions.push(cur = { label, times: [] });
+        }
+      }
+      if (!versions.some((v) => v.times.length)) continue;
+      cinemas.push({
+        id,
+        name,
+        city: city || place.split(" ")[0] || "",
+        district: place.split(" ")[1] || "",
+        address: address[name] || "",
+        versions: versions.filter((v) => v.times.length)
+      });
+    }
+  }
+  return { title, en, rating, runtime, date, dates, cinemas };
+}
+{
+  parseAtDay,
+  parseAtRegion,
+  parseEslite,
+  parseLux,
+  parseLuxFilm,
+  parseSpotHs,
+  parseSpotMovie,
+  parseTwDay,
+  parseTwIndex,
+  parseTwMovieDay,
+  parseTwMovies
+};
+`;
 
 // src/at-list.ts
 var AT_BUILTIN = [
@@ -586,82 +762,41 @@ function fmt(dt) {
   const d = s.slice(0, 10);
   return `${d.replace(/-/g, "/")}（${weekday(d)}）${s.slice(11, 16)}`;
 }
-function storage() {
-  let fm;
-  try {
-    fm = FileManager.iCloud();
-    fm.documentsDirectory();
-  } catch (_) {
-    fm = FileManager.local();
-  }
-  const dir = fm.joinPath(fm.documentsDirectory(), "電影行程");
-  if (!fm.fileExists(dir)) fm.createDirectory(dir, true);
-  return { fm, dir };
-}
 async function loadSettings() {
   const def = { favorites: ["vscinemas-xinyi", "eslite", "spot-hs", "spot-taipei"], ads: 10 };
   try {
-    const { fm, dir } = storage();
-    const p = fm.joinPath(dir, "設定.json");
-    if (!fm.fileExists(p)) return def;
-    await fm.downloadFileFromiCloud(p);
-    return { ...def, ...JSON.parse(fm.readString(p)) };
+    const json = await platform().loadSettingsJSON();
+    return json ? { ...def, ...JSON.parse(json) } : def;
   } catch (_) {
     return def;
   }
 }
 function saveSettings(s) {
-  try {
-    const { fm, dir } = storage();
-    fm.writeString(fm.joinPath(dir, "設定.json"), JSON.stringify(s, null, 1));
-  } catch (_) {
-  }
+  platform().saveSettingsJSON(JSON.stringify(s, null, 1));
 }
-function cacheGet(name) {
-  try {
-    const fm = FileManager.local();
-    const p = fm.joinPath(fm.cacheDirectory(), "movie-" + name);
-    return fm.fileExists(p) ? fm.readString(p) : null;
-  } catch (_) {
-    return null;
-  }
-}
-function cacheSet(name, v) {
-  try {
-    const fm = FileManager.local();
-    fm.writeString(fm.joinPath(fm.cacheDirectory(), "movie-" + name), v);
-  } catch (_) {
-  }
-}
+var cacheGet = (name) => platform().cacheGet(name);
+var cacheSet = (name, v) => platform().cacheSet(name, v);
 async function get(url) {
-  const r = new Request(url);
-  r.headers = { "User-Agent": UA, "Accept-Language": "zh-TW,zh;q=0.9" };
-  r.timeoutInterval = 20;
-  const body = await r.loadString();
-  const code = r.response && r.response.statusCode || 200;
-  return { ok: code >= 200 && code < 300, body };
+  const r = await platform().fetchText(url, { "User-Agent": UA, "Accept-Language": "zh-TW,zh;q=0.9" });
+  return { ok: r.status >= 200 && r.status < 300, body: r.body };
 }
 async function getText(url) {
   const r = await get(url);
   if (!r.ok) throw new Error("網站暫時讀不到：" + url);
   return r.body;
 }
-var web = null;
-async function parseMany(fn, htmls) {
-  if (!web) {
-    web = new WebView();
-    await web.loadHTML("<html><body></body></html>", TW + "/");
-  }
-  const js = `(function(){var f=(${fn.toString()});var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(function(x){return f(new DOMParser().parseFromString(x,'text/html'));})});}catch(e){return JSON.stringify({ok:false,e:String(e&&e.message||e)});}})()`;
-  const r = JSON.parse(await web.evaluateJavaScript(js, false));
+async function parseMany(name, htmls) {
+  const body = `${PARSERS_JS}
+var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(function(x){return ${name}(new DOMParser().parseFromString(x,'text/html'));})});}catch(e){return JSON.stringify({ok:false,e:String(e&&e.message||e)});}`;
+  const r = JSON.parse(await platform().runInWebView(body));
   if (!r.ok) throw new Error(r.e);
   return r.v;
 }
-var parse = async (fn, html) => (await parseMany(fn, [html]))[0];
+var parse = async (name, html) => (await parseMany(name, [html]))[0];
 async function loadCinemas() {
   let list = [];
   try {
-    list = await parse(parseTwIndex, await getText(TW + "/cinemas/"));
+    list = await parse("parseTwIndex", await getText(TW + "/cinemas/"));
     if (list.length) cacheSet("cinemas.json", JSON.stringify(list));
   } catch (e) {
     const c = cacheGet("cinemas.json");
@@ -693,7 +828,7 @@ async function loadAtTheaters() {
     try {
       const regions = Object.keys(AT_REGIONS);
       const pages = await Promise.all(regions.map((r) => getText(`${AT}/showtime/${r}/`).catch(() => "<html><body></body></html>")));
-      const lists = await parseMany(parseAtRegion, pages);
+      const lists = await parseMany("parseAtRegion", pages);
       found = [].concat(...lists.map((l, i) => l.filter((t) => t.region === regions[i])));
       if (found.length) cacheSet("at-theaters.json", JSON.stringify({ at: Date.now(), list: found }));
     } catch (_) {
@@ -706,7 +841,7 @@ async function loadAtTheaters() {
 var atDayCache = {};
 async function atDay(c, date) {
   const url = date ? `${c.url}${date.replace(/-/g, "")}/` : c.url;
-  if (!atDayCache[url]) atDayCache[url] = await parse(parseAtDay, await getText(url));
+  if (!atDayCache[url]) atDayCache[url] = await parse("parseAtDay", await getText(url));
   return atDayCache[url];
 }
 var twDayCache = {};
@@ -714,7 +849,7 @@ async function twDay(c, date) {
   const key = c.id + "|" + (date || "");
   if (!twDayCache[key]) {
     const url = date ? `${TW}/cinemas/${c.id}/${date}/` : c.url;
-    twDayCache[key] = await parse(parseTwDay, await getText(url));
+    twDayCache[key] = await parse("parseTwDay", await getText(url));
   }
   return twDayCache[key];
 }
@@ -722,8 +857,8 @@ var multiCache = {};
 async function multiDay(c) {
   if (multiCache[c.id]) return multiCache[c.id];
   let r;
-  if (c.source === "eslite") r = await parse(parseEslite, await getText(c.url));
-  else if (c.source === "spot-hs") r = await parse(parseSpotHs, await getText(c.url));
+  if (c.source === "eslite") r = await parse("parseEslite", await getText(c.url));
+  else if (c.source === "spot-hs") r = await parse("parseSpotHs", await getText(c.url));
   else if (c.source === "lux") r = await luxCinema();
   else r = await spotTaipei();
   multiCache[c.id] = r;
@@ -734,9 +869,9 @@ async function luxCinema() {
   const base = "https://www.luxcinema.com.tw/web/";
   const page = await getText(base + "2020.php?type=ShowTimes");
   if (/僅限台灣地區/.test(page)) throw new Error("樂聲官網只接受台灣的連線，請關閉 VPN 後再試");
-  const films = await parse(parseLux, page);
+  const films = await parse("parseLux", page);
   const details = await parseMany(
-    parseLuxFilm,
+    "parseLuxFilm",
     await Promise.all(films.map((f) => getText(`${base}2020-movie_item.php?film_id=${f.id}`).catch(() => "<html><body></body></html>")))
   );
   const today = todayTPE();
@@ -776,7 +911,7 @@ async function spotTaipei() {
   }
   const pages = await Promise.all(urls.map((u) => get(u).catch(() => ({ ok: false, body: "" }))));
   const htmls = pages.filter((p) => p.ok && /movie_title/.test(p.body)).map((p) => p.body);
-  const films = (await parseMany(parseSpotMovie, htmls)).filter(Boolean);
+  const films = (await parseMany("parseSpotMovie", htmls)).filter(Boolean);
   const schedules = {};
   const y0 = Number(today.slice(0, 4));
   for (const f of films) {
@@ -829,6 +964,18 @@ async function moviesOf(c, date) {
   const m = await multiDay(c);
   return { movies: m.schedules[date] || [], booking: c.url, sourceUrl: c.url, address: c.address || "" };
 }
+var moviesCache = null;
+async function loadMovies() {
+  if (!moviesCache) moviesCache = await parse("parseTwMovies", await getText(TW + "/movies/"));
+  return moviesCache;
+}
+var movieDayCache = {};
+async function movieDay(slug, date) {
+  const path = encodeURIComponent(slug).replace(/%3A/gi, ":");
+  const url = `${TW}/movies/${path}/${date ? date + "/" : ""}`;
+  if (!movieDayCache[url]) movieDayCache[url] = await parse("parseTwMovieDay", await getText(url));
+  return movieDayCache[url];
+}
 
 // src/main.tsx
 var sleep = (ms) => new Promise((r) => Timer.schedule(ms, false, () => r()));
@@ -854,6 +1001,9 @@ var App = class {
     this.loadingText = "讀取中…";
     // ── 搜尋 ──
     this.query = "";
+    // ── 依電影找 ──
+    this.movieQuery = "";
+    this.movieCity = "全部";
   }
   go(view, loading = "讀取中…") {
     this.loadingText = loading;
@@ -917,7 +1067,7 @@ var App = class {
     const cities = Array.from(new Set(this.cinemas.map((c) => c.city))).sort(
       (a, b) => (CITY_ORDER.indexOf(a) + 1 || 99) - (CITY_ORDER.indexOf(b) + 1 || 99)
     );
-    return /* @__PURE__ */ h(Page, { title: "🎬 電影行程", subtitle: `${this.cinemas.length} 間影城｜選影城 → 日期 → 電影 → 場次` }, /* @__PURE__ */ h(Section, null, /* @__PURE__ */ h(Item, { icon: "🔍", title: "搜尋影城", subtitle: "影城、分店、行政區或縣市", onTap: () => this.go(() => this.searchView()) })), favs.length ? /* @__PURE__ */ h(Section, { title: "常去影城" }, favs.map((c) => /* @__PURE__ */ h(Item, { icon: "★", title: c.name, subtitle: `${c.city} ${c.district}`, onTap: () => this.go(() => this.cinemaView(c), `讀取 ${c.name} 的場次…`) }))) : null, /* @__PURE__ */ h(Section, { title: "全台影城", hint: "影城清單來自場次通與開眼電影網，會自動更新。" }, cities.map((city) => /* @__PURE__ */ h(Item, { title: city, badge: `${this.cinemas.filter((c) => c.city === city).length} 間`, onTap: () => this.go(() => this.cityView(city)) }))), /* @__PURE__ */ h(Section, { title: "設定" }, /* @__PURE__ */ h(Item, { icon: "📅", title: "寫入的行事曆", subtitle: this.calendarName, onTap: () => this.go(() => this.calendarView()) }), /* @__PURE__ */ h(Item, { icon: "📺", title: "廣告預告", subtitle: `預計散場時間會加上 ${this.settings.ads} 分鐘`, right: "點一下切換", chevron: false, onTap: () => this.cycleAds() })), /* @__PURE__ */ h(Note, { text: "場次資料來自場次通 twshowtimes.com、開眼電影網，以及誠品、光點、樂聲官網，實際場次以影城公告為準。" }), /* @__PURE__ */ h(Note, { text: `版本 ${"2026.11.05-1321"}` }));
+    return /* @__PURE__ */ h(Page, { title: "🎬 電影行程", subtitle: `${this.cinemas.length} 間影城｜選影城 → 日期 → 電影 → 場次` }, /* @__PURE__ */ h(Section, null, /* @__PURE__ */ h(Item, { icon: "🎬", title: "依電影找場次", subtitle: "先選電影，再看哪些影城有放映", onTap: () => this.go(() => this.movieListView(), "讀取電影清單…") }), /* @__PURE__ */ h(Item, { icon: "🔍", title: "搜尋影城", subtitle: "影城、分店、行政區或縣市", onTap: () => this.go(() => this.searchView()) })), favs.length ? /* @__PURE__ */ h(Section, { title: "常去影城" }, favs.map((c) => /* @__PURE__ */ h(Item, { icon: "★", title: c.name, subtitle: `${c.city} ${c.district}`, onTap: () => this.go(() => this.cinemaView(c), `讀取 ${c.name} 的場次…`) }))) : null, /* @__PURE__ */ h(Section, { title: "全台影城", hint: "影城清單來自場次通與開眼電影網，會自動更新。" }, cities.map((city) => /* @__PURE__ */ h(Item, { title: city, badge: `${this.cinemas.filter((c) => c.city === city).length} 間`, onTap: () => this.go(() => this.cityView(city)) }))), /* @__PURE__ */ h(Section, { title: "設定" }, /* @__PURE__ */ h(Item, { icon: "📅", title: "寫入的行事曆", subtitle: this.calendarName, onTap: () => this.go(() => this.calendarView()) }), /* @__PURE__ */ h(Item, { icon: "📺", title: "廣告預告", subtitle: `預計散場時間會加上 ${this.settings.ads} 分鐘`, right: "點一下切換", chevron: false, onTap: () => this.cycleAds() })), /* @__PURE__ */ h(Note, { text: "場次資料來自場次通 twshowtimes.com、開眼電影網，以及誠品、光點、樂聲官網，實際場次以影城公告為準。" }), /* @__PURE__ */ h(Note, { text: `版本 ${"2026.11.05-1739"}` }));
   }
   searchView() {
     const k = this.query.trim().toLowerCase().replace(/臺/g, "台");
@@ -1114,6 +1264,54 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
       await ev.presentEdit();
     } })), /* @__PURE__ */ h(Button, { label: "再新增一部", onTap: () => this.home() }));
   }
+  async movieListView() {
+    const all = await loadMovies();
+    const k = this.movieQuery.trim().toLowerCase();
+    const list = all.filter((m) => !k || `${m.title} ${m.en}`.toLowerCase().includes(k));
+    const item = (m) => /* @__PURE__ */ h(
+      Item,
+      {
+        title: m.title,
+        subtitle: [m.rating, m.runtime ? `${m.runtime} 分` : "", m.en].filter(Boolean).join("｜"),
+        badge: m.cinemaCount ? `${m.cinemaCount} 間` : void 0,
+        onTap: () => this.go(() => this.movieView(m, ""), `讀取《${m.title}》的放映影城…`)
+      }
+    );
+    const now = list.filter((m) => !m.comingSoon);
+    const soon = list.filter((m) => m.comingSoon);
+    return /* @__PURE__ */ h(Page, { title: "依電影找場次", subtitle: `${all.length} 部電影`, onBack: () => this.back() }, /* @__PURE__ */ h("input", { class: "field", name: "q", value: this.movieQuery, placeholder: "搜尋片名" }), /* @__PURE__ */ h(Button, { label: "搜尋", kind: "secondary", enter: true, onTap: (v) => {
+      this.movieQuery = v.q || "";
+    } }), now.length ? /* @__PURE__ */ h(Section, { title: `上映中（${now.length}）`, hint: "依今天放映的影城數排序，資料來自場次通。" }, now.map(item)) : null, soon.length ? /* @__PURE__ */ h(Section, { title: `即將上映（${soon.length}）` }, soon.map(item)) : null, list.length ? null : /* @__PURE__ */ h(Empty, { icon: "🎞", text: "找不到相符的電影" }));
+  }
+  async movieView(m, date) {
+    const d = await movieDay(m.slug, date || void 0);
+    const dates = d.dates.filter((x) => x >= todayTPE());
+    const runtime = d.runtime || m.runtime;
+    const cities = Array.from(new Set(d.cinemas.map((c) => c.city))).sort(
+      (a, b) => (CITY_ORDER.indexOf(a) + 1 || 99) - (CITY_ORDER.indexOf(b) + 1 || 99)
+    );
+    const city = cities.indexOf(this.movieCity) >= 0 ? this.movieCity : "全部";
+    const shown = d.cinemas.filter((c) => city === "全部" || c.city === city);
+    const toCinema = (c) => this.cinemas.find((x) => x.id === c.id) || { id: c.id, name: c.name, city: c.city, district: c.district, source: "tw", url: `${TW}/cinemas/${c.id}/`, address: c.address };
+    const replace = (nd) => {
+      this.stack[this.stack.length - 1] = () => this.movieView(m, nd);
+    };
+    return /* @__PURE__ */ h(Page, { title: m.title, subtitle: [m.rating || d.rating, runtime ? `${runtime} 分鐘` : "", `${d.cinemas.length} 間影城`].filter(Boolean).join("｜"), onBack: () => this.back() }, /* @__PURE__ */ h(Section, { title: "日期" }, /* @__PURE__ */ h(Chips, null, (dates.length ? dates : [d.date]).map((x) => /* @__PURE__ */ h(Chip, { label: dateLabel(x).replace(/（.）.*$/, ""), sub: x === d.date ? "目前" : dateLabel(x).match(/（(.)）/)?.[1] || "", muted: x !== d.date, onTap: () => replace(x) })))), /* @__PURE__ */ h(Section, { title: "縣市" }, /* @__PURE__ */ h(Chips, null, ["全部", ...cities].map((c) => /* @__PURE__ */ h(Chip, { label: c, muted: c !== city, onTap: () => {
+      this.movieCity = c;
+    } })))), cities.filter((c) => city === "全部" || c === city).map((ct) => /* @__PURE__ */ h(Section, { title: `${ct}（${shown.filter((c) => c.city === ct).length} 間）` }, shown.filter((c) => c.city === ct).map((c) => {
+      const movie = { title: d.title || m.title, runtime, rating: d.rating || m.rating, versions: c.versions };
+      const summary = c.versions.map((v) => `${v.label} ${[...v.times].sort(byShowtime).join(" ")}`).join("／");
+      return /* @__PURE__ */ h(
+        Item,
+        {
+          icon: this.settings.favorites.indexOf(c.id) >= 0 ? "★" : void 0,
+          title: c.name,
+          subtitle: summary,
+          onTap: () => this.go(() => this.timesView(toCinema(c), d.date, movie, { booking: "", sourceUrl: `${TW}/cinemas/${c.id}/${d.date}/`, address: c.address }))
+        }
+      );
+    }))), shown.length ? null : /* @__PURE__ */ h(Empty, { icon: "🎞", text: "這天沒有影城放映" }));
+  }
   // 從捷徑或 Safari 分享場次通／誠品／光點網址時，直接跳到那間影城
   startFrom(url) {
     const m = url.match(/twshowtimes\.com\/cinemas\/([^/]+)\/(?:(\d{4}-\d{2}-\d{2})\/)?/);
@@ -1134,5 +1332,6 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
     return true;
   }
 };
+setPlatform(scriptablePlatform);
 await new App().run();
 Script.complete();

@@ -1,7 +1,9 @@
 // 資料層：型別、設定檔、網路、四個來源的讀取。畫面在 main.tsx。
-import { parseTwIndex, parseTwDay, parseEslite, parseSpotHs, parseSpotMovie, parseLux, parseLuxFilm, parseAtRegion, parseAtDay } from "./parsers";
+import { PARSERS_JS } from "./parsers.gen";
+import { platform } from "./platform";
 import { AT_BUILTIN, AT_COVERED, AT_SKIP, AT_REGIONS } from "./at-list";
-import type { Movie, Version, TwCinema, TwDay, MultiDay, SpotMovie, LuxFilm, AtTheater, AtDay } from "./parsers";
+import type { Movie, Version, TwCinema, TwDay, MultiDay, SpotMovie, LuxFilm, AtTheater, AtDay, TwMovie, TwMovieDay } from "./parsers";
+export type { TwMovie, TwMovieDay, TwMovieCinema } from "./parsers";
 export type { Movie, Version } from "./parsers";
 
 // ───────────────────────── 資料模型 ─────────────────────────
@@ -114,66 +116,30 @@ export function fmt(dt: Date): string {
   return `${d.replace(/-/g, "/")}（${weekday(d)}）${s.slice(11, 16)}`;
 }
 
-// ───────────────────────── 設定（iCloud） ─────────────────────────
-
-function storage(): { fm: FileManager; dir: string } {
-  let fm: FileManager;
-  try {
-    fm = FileManager.iCloud();
-    fm.documentsDirectory();
-  } catch (_) {
-    fm = FileManager.local();
-  }
-  const dir = fm.joinPath(fm.documentsDirectory(), "電影行程");
-  if (!fm.fileExists(dir)) fm.createDirectory(dir, true);
-  return { fm, dir };
-}
+// ───────────────────────── 設定 ─────────────────────────
 
 export async function loadSettings(): Promise<Settings> {
   const def: Settings = { favorites: ["vscinemas-xinyi", "eslite", "spot-hs", "spot-taipei"], ads: 10 };
   try {
-    const { fm, dir } = storage();
-    const p = fm.joinPath(dir, "設定.json");
-    if (!fm.fileExists(p)) return def;
-    await fm.downloadFileFromiCloud(p);
-    return { ...def, ...JSON.parse(fm.readString(p)) };
+    const json = await platform().loadSettingsJSON();
+    return json ? { ...def, ...JSON.parse(json) } : def;
   } catch (_) {
     return def;
   }
 }
 
 export function saveSettings(s: Settings): void {
-  try {
-    const { fm, dir } = storage();
-    fm.writeString(fm.joinPath(dir, "設定.json"), JSON.stringify(s, null, 1));
-  } catch (_) {}
+  platform().saveSettingsJSON(JSON.stringify(s, null, 1));
 }
 
-function cacheGet(name: string): string | null {
-  try {
-    const fm = FileManager.local();
-    const p = fm.joinPath(fm.cacheDirectory(), "movie-" + name);
-    return fm.fileExists(p) ? fm.readString(p) : null;
-  } catch (_) {
-    return null;
-  }
-}
-function cacheSet(name: string, v: string): void {
-  try {
-    const fm = FileManager.local();
-    fm.writeString(fm.joinPath(fm.cacheDirectory(), "movie-" + name), v);
-  } catch (_) {}
-}
+const cacheGet = (name: string) => platform().cacheGet(name);
+const cacheSet = (name: string, v: string) => platform().cacheSet(name, v);
 
 // ───────────────────────── 網路與解析 ─────────────────────────
 
 async function get(url: string): Promise<{ ok: boolean; body: string }> {
-  const r = new Request(url);
-  r.headers = { "User-Agent": UA, "Accept-Language": "zh-TW,zh;q=0.9" };
-  r.timeoutInterval = 20;
-  const body = await r.loadString();
-  const code = (r.response && (r.response as any).statusCode) || 200;
-  return { ok: code >= 200 && code < 300, body };
+  const r = await platform().fetchText(url, { "User-Agent": UA, "Accept-Language": "zh-TW,zh;q=0.9" });
+  return { ok: r.status >= 200 && r.status < 300, body: r.body };
 }
 
 async function getText(url: string): Promise<string> {
@@ -183,28 +149,25 @@ async function getText(url: string): Promise<string> {
 }
 
 // 解析器在隱藏的 WebView 裡用瀏覽器原生 DOMParser 跑，比正規表達式穩定。
-let web: WebView | null = null;
-async function parseMany<T>(fn: Function, htmls: string[]): Promise<T[]> {
-  if (!web) {
-    web = new WebView();
-    await web.loadHTML("<html><body></body></html>", TW + "/");
-  }
-  const js =
-    `(function(){var f=(${fn.toString()});var hs=${JSON.stringify(htmls)};` +
-    `try{return JSON.stringify({ok:true,v:hs.map(function(x){return f(new DOMParser().parseFromString(x,'text/html'));})});}` +
-    `catch(e){return JSON.stringify({ok:false,e:String(e&&e.message||e)});}})()`;
-  const r = JSON.parse(await web.evaluateJavaScript(js, false));
+// 解析器原始碼（parsers.ts）在建置時編成 JS 字串 PARSERS_JS，兩個 App 共用。
+type ParserName = keyof typeof import("./parsers");
+async function parseMany<T>(name: ParserName, htmls: string[]): Promise<T[]> {
+  const body =
+    `${PARSERS_JS}\nvar hs=${JSON.stringify(htmls)};` +
+    `try{return JSON.stringify({ok:true,v:hs.map(function(x){return ${name}(new DOMParser().parseFromString(x,'text/html'));})});}` +
+    `catch(e){return JSON.stringify({ok:false,e:String(e&&e.message||e)});}`;
+  const r = JSON.parse(await platform().runInWebView(body));
   if (!r.ok) throw new Error(r.e);
   return r.v as T[];
 }
-const parse = async <T,>(fn: Function, html: string) => (await parseMany<T>(fn, [html]))[0];
+const parse = async <T,>(name: ParserName, html: string) => (await parseMany<T>(name, [html]))[0];
 
 // ───────────────────────── 資料來源 ─────────────────────────
 
 export async function loadCinemas(): Promise<Cinema[]> {
   let list: TwCinema[] = [];
   try {
-    list = await parse<TwCinema[]>(parseTwIndex, await getText(TW + "/cinemas/"));
+    list = await parse<TwCinema[]>("parseTwIndex", await getText(TW + "/cinemas/"));
     if (list.length) cacheSet("cinemas.json", JSON.stringify(list));
   } catch (e) {
     const c = cacheGet("cinemas.json");
@@ -242,7 +205,7 @@ async function loadAtTheaters(): Promise<Cinema[]> {
     try {
       const regions = Object.keys(AT_REGIONS);
       const pages = await Promise.all(regions.map((r) => getText(`${AT}/showtime/${r}/`).catch(() => "<html><body></body></html>")));
-      const lists = await parseMany<AtTheater[]>(parseAtRegion, pages);
+      const lists = await parseMany<AtTheater[]>("parseAtRegion", pages);
       found = ([] as AtTheater[]).concat(...lists.map((l, i) => l.filter((t) => t.region === regions[i])));
       if (found.length) cacheSet("at-theaters.json", JSON.stringify({ at: Date.now(), list: found }));
     } catch (_) {
@@ -256,7 +219,7 @@ async function loadAtTheaters(): Promise<Cinema[]> {
 const atDayCache: Record<string, AtDay> = {};
 async function atDay(c: Cinema, date?: string): Promise<AtDay> {
   const url = date ? `${c.url}${date.replace(/-/g, "")}/` : c.url;
-  if (!atDayCache[url]) atDayCache[url] = await parse<AtDay>(parseAtDay, await getText(url));
+  if (!atDayCache[url]) atDayCache[url] = await parse<AtDay>("parseAtDay", await getText(url));
   return atDayCache[url];
 }
 
@@ -265,7 +228,7 @@ async function twDay(c: Cinema, date?: string): Promise<TwDay> {
   const key = c.id + "|" + (date || "");
   if (!twDayCache[key]) {
     const url = date ? `${TW}/cinemas/${c.id}/${date}/` : c.url;
-    twDayCache[key] = await parse<TwDay>(parseTwDay, await getText(url));
+    twDayCache[key] = await parse<TwDay>("parseTwDay", await getText(url));
   }
   return twDayCache[key];
 }
@@ -274,8 +237,8 @@ const multiCache: Record<string, MultiDay> = {};
 async function multiDay(c: Cinema): Promise<MultiDay> {
   if (multiCache[c.id]) return multiCache[c.id];
   let r: MultiDay;
-  if (c.source === "eslite") r = await parse<MultiDay>(parseEslite, await getText(c.url));
-  else if (c.source === "spot-hs") r = await parse<MultiDay>(parseSpotHs, await getText(c.url));
+  if (c.source === "eslite") r = await parse<MultiDay>("parseEslite", await getText(c.url));
+  else if (c.source === "spot-hs") r = await parse<MultiDay>("parseSpotHs", await getText(c.url));
   else if (c.source === "lux") r = await luxCinema();
   else r = await spotTaipei();
   multiCache[c.id] = r;
@@ -290,9 +253,8 @@ async function luxCinema(): Promise<MultiDay> {
   const base = "https://www.luxcinema.com.tw/web/";
   const page = await getText(base + "2020.php?type=ShowTimes");
   if (/僅限台灣地區/.test(page)) throw new Error("樂聲官網只接受台灣的連線，請關閉 VPN 後再試");
-  const films = await parse<LuxFilm[]>(parseLux, page);
-  const details = await parseMany<{ runtime: number; rating: string }>(
-    parseLuxFilm,
+  const films = await parse<LuxFilm[]>("parseLux", page);
+  const details = await parseMany<{ runtime: number; rating: string }>("parseLuxFilm",
     await Promise.all(films.map((f) => getText(`${base}2020-movie_item.php?film_id=${f.id}`).catch(() => "<html><body></body></html>")))
   );
   const today = todayTPE();
@@ -337,7 +299,7 @@ async function spotTaipei(): Promise<MultiDay> {
   }
   const pages = await Promise.all(urls.map((u) => get(u).catch(() => ({ ok: false, body: "" }))));
   const htmls = pages.filter((p) => p.ok && /movie_title/.test(p.body)).map((p) => p.body);
-  const films = (await parseMany<SpotMovie | null>(parseSpotMovie, htmls)).filter(Boolean) as SpotMovie[];
+  const films = (await parseMany<SpotMovie | null>("parseSpotMovie", htmls)).filter(Boolean) as SpotMovie[];
   const schedules: Record<string, Movie[]> = {};
   const y0 = Number(today.slice(0, 4));
   for (const f of films) {
@@ -398,3 +360,31 @@ export async function moviesOf(c: Cinema, date: string): Promise<{ movies: Movie
 }
 
 // ───────────────────────── 互動元件 ─────────────────────────
+
+// ───────────────────────── 依電影找影城（場次通） ─────────────────────────
+
+let moviesCache: TwMovie[] | null = null;
+/** 場次通的電影清單（上映中＋即將上映） */
+export async function loadMovies(): Promise<TwMovie[]> {
+  if (!moviesCache) moviesCache = await parse<TwMovie[]>("parseTwMovies", await getText(TW + "/movies/"));
+  return moviesCache;
+}
+
+const movieDayCache: Record<string, TwMovieDay> = {};
+/** 某部電影某天在哪些影城放映（不給日期 = 今天） */
+export async function movieDay(slug: string, date?: string): Promise<TwMovieDay> {
+  const path = encodeURIComponent(slug).replace(/%3A/gi, ":");
+  const url = `${TW}/movies/${path}/${date ? date + "/" : ""}`;
+  if (!movieDayCache[url]) movieDayCache[url] = await parse<TwMovieDay>("parseTwMovieDay", await getText(url));
+  return movieDayCache[url];
+}
+
+/** 影城地址：清單或電影頁沒有時，讀一次影城頁補上 */
+export async function cinemaAddress(c: Cinema): Promise<string> {
+  if (c.address) return c.address;
+  try {
+    return (await datesOf(c)).address || "";
+  } catch (_) {
+    return "";
+  }
+}
