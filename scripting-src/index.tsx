@@ -243,21 +243,21 @@ function AddressRow({ name, address, title }: { name: string; address: string; t
 
 /** 電影頁頂端：海報在左，資訊與紅色預告按鈕在右（跟 Scriptable 版一樣） */
 /** 評分徽章：IMDb／番茄指數／爆米花指數，顏色依分數（綠 ≥75、黃 60–74、紅 <60） */
+// 注意：Scripting 的顏色只接受 #RRGGBB、#RGB、rgba() 與系統色名稱，8 碼 hex 會讓畫面出錯
 const TIER = {
-  good: { fg: "#1FA34A", bg: "#30D1582E" },
-  mid: { fg: "#D98200", bg: "#FF9F0A33" },
-  bad: { fg: "#E0443A", bg: "#FF453A2E" },
+  good: { fg: "systemGreen", bg: "rgba(48, 209, 88, 0.18)" },
+  mid: { fg: "systemOrange", bg: "rgba(255, 159, 10, 0.2)" },
+  bad: { fg: "systemRed", bg: "rgba(255, 69, 58, 0.18)" },
 }
 function RatingBadge({ kind, value, tier, note, url }: { kind: "imdb" | "tomato" | "popcorn"; value: string; tier: "good" | "mid" | "bad"; note?: string; url: string }) {
   const c = TIER[tier]
   const icon = kind === "tomato" ? (tier === "bad" ? "🤢" : "🍅") : kind === "popcorn" ? (tier === "bad" ? "🫗" : "🍿") : ""
   return <Button action={() => Safari.openURL(url)} buttonStyle={"plain"}>
-    <HStack spacing={4} padding={{ horizontal: 8, vertical: 4 }} background={c.bg} clipShape={{ type: "rect", cornerRadius: 8 }}>
+    <HStack spacing={3} padding={{ horizontal: 6, vertical: 3 }} background={c.bg} clipShape={{ type: "rect", cornerRadius: 7 }}>
       {kind === "imdb"
-        ? <Text font={"caption2"} fontWeight={"heavy"} foregroundStyle={"black"} padding={{ horizontal: 4, vertical: 1 }} background={"#F5C518"} clipShape={{ type: "rect", cornerRadius: 4 }}>IMDb</Text>
+        ? <Text font={"caption2"} fontWeight={"heavy"} foregroundStyle={"black"} padding={{ horizontal: 3, vertical: 1 }} background={"#F5C518"} clipShape={{ type: "rect", cornerRadius: 3 }}>IMDb</Text>
         : <Text font={"footnote"}>{icon}</Text>}
-      <Text font={"subheadline"} fontWeight={"bold"} foregroundStyle={c.fg}>{value}</Text>
-      {note ? <Text font={"caption2"} foregroundStyle={c.fg}>{note}</Text> : null}
+      <Text font={"footnote"} fontWeight={"bold"} foregroundStyle={c.fg}>{value + (note ? "✓" : "")}</Text>
     </HStack>
   </Button>
 }
@@ -275,7 +275,7 @@ function MovieHero({ title, slug, lines, en }: { title: string; slug?: string; l
         : x.data ? null : <ProgressView progressViewStyle={"circular"} frame={{ width: 112, height: 168 }} />}
       <VStack alignment={"leading"} spacing={4}>
         {lines.filter(Boolean).map((l) => <Text key={l} font={"subheadline"} foregroundStyle={"secondaryLabel"}>{l}</Text>)}
-        {r && (r.imdb || r.tomato || r.popcorn) ? <HStack spacing={6}>
+        {r && (r.imdb || r.tomato || r.popcorn) ? <HStack spacing={4}>
           {r.imdb ? <RatingBadge kind={"imdb"} value={r.imdb.score.toFixed(1)} tier={ratingTier("imdb", r.imdb.score)} url={r.imdb.url} /> : null}
           {r.tomato ? <RatingBadge kind={"tomato"} value={`${r.tomato.score}%`} tier={ratingTier("pct", r.tomato.score)} note={r.tomato.certified ? "認證" : undefined} url={r.tomato.url} /> : null}
           {r.popcorn ? <RatingBadge kind={"popcorn"} value={`${r.popcorn.score}%`} tier={ratingTier("pct", r.popcorn.score)} url={r.popcorn.url} /> : null}

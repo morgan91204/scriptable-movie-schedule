@@ -105,7 +105,20 @@ class App {
       const scrollTo = same && quick ? -1 : same || back ? savedY.get(view) ?? 0 : 0;
       lastView = view;
       lastDepth = depth;
+      // 海報、評分等慢慢讀的資料：讀好後在原位重畫一次（使用者還沒點別的才畫）
+      const late = this.late;
+      this.late = null;
+      let clicked = false;
+      if (late)
+        late.then(async () => {
+          if (clicked || this.ui.closed || this.stack[this.stack.length - 1] !== view) return;
+          this.late = null;
+          const again = await Promise.resolve(view()).catch(() => "");
+          this.late = null;
+          if (again && !clicked && this.stack[this.stack.length - 1] === view) await this.ui.render(again, -1);
+        });
       const hit = await this.ui.show(html, scrollTo);
+      clicked = true;
       if (!hit) break;
       savedY.set(view, hit.y);
       try {
@@ -386,27 +399,36 @@ class App {
     );
   }
 
-  /** 海報、預告與評分（同時查，最多等 3.5 秒；等不到的先不顯示，下次打開就有） */
-  async extras(title: string, slug?: string, en?: string): Promise<{ x: MovieExtras | null; r: Ratings | null }> {
-    const wait = <T,>(p: Promise<T>) => Promise.race([p.catch(() => null), sleep(3500).then(() => null)]);
-    const [x, r] = await Promise.all([wait(movieExtras(title, slug)), wait(movieRatings(title, en))]);
-    return { x, r };
+  /** 讀好後要在原位重畫的資料（海報、評分） */
+  late: Promise<unknown> | null = null;
+
+  /** 海報、預告與評分：先等 1.5 秒，還沒好就先畫頁面，讀好後自動補上 */
+  async extras(title: string, slug?: string, en?: string): Promise<{ x: MovieExtras | null; r: Ratings | null; px: Promise<MovieExtras | null>; loading: boolean }> {
+    const px = movieExtras(title, slug).catch(() => null);
+    const pr = movieRatings(title, en).catch(() => null);
+    const quick = <T,>(p: Promise<T>) => Promise.race([p, sleep(1500).then(() => undefined)]);
+    const [x, r] = await Promise.all([quick(px), quick(pr)]);
+    const loading = x === undefined || r === undefined;
+    if (loading) this.late = Promise.all([px, pr]);
+    return { x: x ?? null, r: r ?? null, px, loading };
   }
 
-  hero(e: { x: MovieExtras | null; r: Ratings | null }, title: string, lines: string[]): string {
+  hero(e: { x: MovieExtras | null; r: Ratings | null; px: Promise<MovieExtras | null>; loading: boolean }, title: string, lines: string[]): string {
     const { x, r } = e;
-    const url = x?.trailer || `https://www.youtube.com/results?search_query=${encodeURIComponent(title + " 預告")}`;
+    const search = `https://www.youtube.com/results?search_query=${encodeURIComponent(title + " 預告")}`;
     const badges: RatingBadge[] = [];
     if (r?.imdb) badges.push({ kind: "imdb", value: r.imdb.score.toFixed(1), tier: ratingTier("imdb", r.imdb.score), onTap: () => Safari.open(r.imdb!.url) });
     if (r?.tomato) badges.push({ kind: "tomato", value: `${r.tomato.score}%`, tier: ratingTier("pct", r.tomato.score), note: r.tomato.certified ? "認證" : undefined, onTap: () => Safari.open(r.tomato!.url) });
     if (r?.popcorn) badges.push({ kind: "popcorn", value: `${r.popcorn.score}%`, tier: ratingTier("pct", r.popcorn.score), onTap: () => Safari.open(r.popcorn!.url) });
+    if (!badges.length && e.loading) lines = [...lines, "評分讀取中…"];
     return (
       <Hero
         poster={x?.poster}
         lines={lines}
         badges={badges}
-        trailerLabel={x?.trailerName ? "觀看預告" : "搜尋 YouTube 預告"}
-        onTrailer={() => Safari.open(url)}
+        // 還在讀的時候先顯示「觀看預告」，點下去會等讀好再開，不會誤開成搜尋頁
+        trailerLabel={!x || x.trailerName ? "觀看預告" : "搜尋 YouTube 預告"}
+        onTrailer={async () => Safari.open((x || (await e.px))?.trailer || search)}
       />
     );
   }

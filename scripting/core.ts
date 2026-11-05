@@ -483,7 +483,9 @@ export function movieExtras(title: string, slug?: string): Promise<MovieExtras> 
       }
     };
     const hit = read()[ck];
-    if (hit && Date.now() - hit.at < (hit.poster ? 7 : 1) * 86400e3) return { poster: hit.poster, trailer: hit.trailer, trailerName: hit.trailerName };
+    // 有金鑰卻沒找到預告（可能是當時連線失敗）只記 1 小時；沒海報記 1 天；其他 7 天
+    const ttl = hasToken && !hit?.trailerName ? 3600e3 : hit?.poster ? 7 * 86400e3 : 86400e3;
+    if (hit && Date.now() - hit.at < ttl) return { poster: hit.poster, trailer: hit.trailer, trailerName: hit.trailerName };
     const out = await findExtras(title, slug);
     const all = read();
     for (const [key, v] of Object.entries(all)) if (Date.now() - v.at > 7 * 86400e3) delete all[key]; // 清掉過期的
@@ -795,16 +797,26 @@ async function findRatings(title: string, en?: string): Promise<Ratings> {
   // 爛番茄：用英文片名搜尋，年份要對得上（差一年內）才採用，避免抓到同名舊片
   if (name) {
     try {
-      const list = await parse<{ year: number; url: string; title: string }[]>(
-        "parseRtSearch",
-        await getText(`https://www.rottentomatoes.com/search?search=${encodeURIComponent(name)}`)
-      );
+      // 爛番茄頁面很大，不丟進 WebView 解析（會拖慢海報與片單），直接用字串比對取出需要的部分
+      const html = await getText(`https://www.rottentomatoes.com/search?search=${encodeURIComponent(name)}`);
+      const list: { year: number; url: string; title: string }[] = [];
+      for (const m of html.matchAll(/<search-page-media-row([\s\S]*?)<\/search-page-media-row>/g)) {
+        const b = m[1];
+        const url = (b.match(/href="(https:\/\/www\.rottentomatoes\.com\/m\/[^"]+)"[^>]*slot="title"/) || b.match(/href="(https:\/\/www\.rottentomatoes\.com\/m\/[^"]+)"/) || [])[1];
+        if (!url) continue;
+        const t = (b.match(/slot="title"[^>]*>\s*([^<]+?)\s*</) || [])[1] || "";
+        list.push({ year: Number((b.match(/release-year="(\d*)"/) || [])[1] || 0), url, title: t.replace(/&amp;/g, "&").replace(/&#39;/g, "'") });
+      }
       const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
       const pick =
         list.find((x) => norm(x.title) === norm(name) && (!year || Math.abs(x.year - year) <= 1)) ||
         list.find((x) => year && Math.abs(x.year - year) <= 1 && norm(x.title).includes(norm(name)));
       if (pick) {
-        const s = await parse<{ critics: number; certified: boolean; audience: number }>("parseRtMovie", await getText(pick.url));
+        const page = await getText(pick.url);
+        const j = (page.match(/<script[^>]*id="media-scorecard-json"[^>]*>([\s\S]*?)<\/script>/) || [])[1];
+        const d = j ? JSON.parse(j) : {};
+        const pct = (x: any) => (x && /\d/.test(String(x.scorePercent || "")) ? Number(String(x.scorePercent).replace(/\D/g, "")) : -1);
+        const s = { critics: pct(d.criticsScore), certified: !!d.criticsScore?.certified, audience: pct(d.audienceScore) };
         if (s.critics >= 0) out.tomato = { score: s.critics, certified: s.certified, url: pick.url };
         if (s.audience >= 0) out.popcorn = { score: s.audience, url: pick.url };
       }

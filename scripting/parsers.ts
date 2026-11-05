@@ -449,30 +449,3 @@ export function parseTwMovieDay(doc: Document): TwMovieDay {
   return { title, en, rating, runtime, image, date, dates, cinemas };
 }
 
-/** 爛番茄搜尋頁：電影結果（年份、網址） */
-export function parseRtSearch(doc: Document): { year: number; url: string; title: string }[] {
-  const out: { year: number; url: string; title: string }[] = [];
-  for (const row of Array.from(doc.querySelectorAll("search-page-media-row"))) {
-    const a = row.querySelector('a[slot="title"]') || row.querySelector('a[href*="/m/"]');
-    const url = a?.getAttribute("href") || "";
-    if (!/rottentomatoes\.com\/m\//.test(url)) continue;
-    out.push({ year: Number(row.getAttribute("release-year") || 0), url, title: String(a?.textContent || "").replace(/\s+/g, " ").trim() });
-  }
-  return out;
-}
-
-/** 爛番茄電影頁：番茄指數（影評）與爆米花指數（觀眾） */
-export function parseRtMovie(doc: Document): { critics: number; certified: boolean; audience: number; audienceCertified: boolean } {
-  const out = { critics: -1, certified: false, audience: -1, audienceCertified: false };
-  const el = doc.querySelector("#media-scorecard-json");
-  if (!el) return out;
-  try {
-    const d = JSON.parse(el.textContent || "{}");
-    const pct = (x: any) => (x && /\d/.test(String(x.scorePercent || "")) ? Number(String(x.scorePercent).replace(/\D/g, "")) : -1);
-    out.critics = pct(d.criticsScore);
-    out.certified = !!(d.criticsScore && d.criticsScore.certified);
-    out.audience = pct(d.audienceScore);
-    out.audienceCertified = !!(d.audienceScore && d.audienceScore.certified);
-  } catch (_) {}
-  return out;
-}
