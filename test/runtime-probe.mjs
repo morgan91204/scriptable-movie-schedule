@@ -9,7 +9,7 @@ globalThis.WebViewController = class {
   async evaluateJavaScript(body) { return new Function("DOMParser", body)(DOMParser); }
 };
 globalThis.fetch = (url, init) => new Promise((res, rej) =>
-  execFile("curl", ["-sS", "-m", "25", "-A", init.headers["User-Agent"], "-w", "\n__CODE__%{http_code}", url], { maxBuffer: 20e6 }, (e, out) => {
+  execFile("curl", ["-sS", "-m", "25", "-A", init.headers["User-Agent"] || "x", ...Object.entries(init.headers).filter(([k]) => k !== "User-Agent").flatMap(([k, v]) => ["-H", `${k}: ${v}`]), "-w", "\n__CODE__%{http_code}", url], { maxBuffer: 20e6 }, (e, out) => {
     if (e) return rej(e);
     const i = out.lastIndexOf("\n__CODE__");
     res({ status: Number(out.slice(i + 9)), text: async () => out.slice(0, i) });
@@ -33,6 +33,3 @@ await Promise.all(Array.from({ length: 6 }, async () => {
   }
 }));
 for (const s in total) console.log(s, "電影", total[s], "沒片長", missing[s]?.size || 0, [...(missing[s]||[])].slice(0, 8).join("；"));
-const idx = {}; // matcher sanity
-for (const [k,v] of [["進擊的鼓手",107],["復仇者聯盟：終局之戰",181],["奧德賽",172],["X",90]]) idx[k.toLowerCase().replace(/[\s:：]/g,"")]=v;
-for (const t of ["進擊的鼓手 4K重映","復仇者聯盟:終局之戰加碼重映","奧德賽2","X 導演剪輯版"]) console.log(t,"→",m.matchRuntime(idx,t));

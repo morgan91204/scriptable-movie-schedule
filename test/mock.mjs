@@ -34,7 +34,7 @@ globalThis.Request = class {
       return Promise.resolve(`<html><body>長度 | ${rt} min 級別 | ${rating}</body></html>`);
     }
     return new Promise((res, rej) => {
-      execFile("curl", ["-sS", "-m", "25", "-A", this.headers["User-Agent"] || "x", "-w", "\n__CODE__%{http_code}", this.url],
+      execFile("curl", ["-sS", "-m", "25", "-A", this.headers["User-Agent"] || "x", ...Object.entries(this.headers).filter(([k]) => k !== "User-Agent").flatMap(([k, v]) => ["-H", `${k}: ${v}`]), "-w", "\n__CODE__%{http_code}", this.url],
         { maxBuffer: 20e6 }, (err, out) => {
           if (err) return rej(err);
           const i = out.lastIndexOf("\n__CODE__");

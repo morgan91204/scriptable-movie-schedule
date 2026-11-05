@@ -11,7 +11,7 @@ import {
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
   loadSettings, saveSettings, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, TW,
   FORMATS, formatsOf, filterVersions, nearest, kmLabel, WINDOWS, findShowtimes, groupByMovie, shareText,
-  hallOf,
+  hallOf, tmdbTest,
 } from "./core";
 import type { TwMovie, TwMovieCinema, Format, LatLng, Hit } from "./core";
 
@@ -154,6 +154,7 @@ class App {
         <Section title="設定">
           <Item icon="📅" title="寫入的行事曆" subtitle={this.calendarName} onTap={() => this.go(() => this.calendarView())} />
           <Item icon="📺" title="廣告預告" subtitle={`預計散場時間會加上 ${this.settings.ads} 分鐘`} right="點一下切換" chevron={false} onTap={() => this.cycleAds()} />
+          <Item icon="⏱" title="補片長（TMDB）" subtitle={this.settings.tmdbToken ? "已設定：沒有片長的電影會自動補上" : "未設定"} onTap={() => this.go(() => this.tmdbView())} />
         </Section>
         <Note text="場次資料來自場次通 twshowtimes.com、開眼電影網，以及誠品、光點、樂聲官網，實際場次以影城公告為準。" />
         <Note text={`版本 ${APP_VERSION}`} />
@@ -222,6 +223,41 @@ class App {
             />
           ))}
         </Section>
+      </Page>
+    );
+  }
+
+  tmdbStatus = "";
+  tmdbView(): string {
+    return (
+      <Page title="補片長（TMDB）" onBack={() => { this.tmdbStatus = ""; this.back(); }}>
+        <Section hint="場次通的重映、修復版、演唱會有時沒有片長。填入你自己的 TMDB「API Read Access Token」後，會用片名到 TMDB 查片長自動補上（確認頁會註明「取自 TMDB」）。Token 只存在你的手機。">
+          <input class="field" name="v" value={this.settings.tmdbToken || ""} placeholder="貼上 API Read Access Token（eyJ 開頭）" />
+        </Section>
+        {this.tmdbStatus ? <Note kind={this.tmdbStatus.startsWith("❌") ? "error" : undefined} text={this.tmdbStatus} /> : null}
+        <Button
+          kind="primary"
+          enter
+          label="儲存並測試"
+          onTap={async (v: Record<string, string>) => {
+            const t = String(v.v || "").trim();
+            if (!t) {
+              this.settings.tmdbToken = "";
+              saveSettings(this.settings);
+              this.tmdbStatus = "已清除，之後沒有片長的電影不會自動補。";
+              return;
+            }
+            try {
+              const r = await tmdbTest(t);
+              this.settings.tmdbToken = t;
+              saveSettings(this.settings);
+              this.tmdbStatus = `✅ 可以使用（測試：${r}）`;
+            } catch (e) {
+              this.tmdbStatus = `❌ ${String((e as Error)?.message || e)}`;
+            }
+          }}
+        />
+        <Note text="申請：themoviedb.org 免費註冊 → 設定 → API → 複製「API Read Access Token」（很長、eyJ 開頭的那串，不是較短的 API Key）。" />
       </Page>
     );
   }
@@ -353,7 +389,7 @@ class App {
             title="片長"
             subtitle={
               this.runtime
-                ? `${this.runtime} 分鐘` + (p.movie.runtimeFrom && this.runtime === p.movie.runtime ? `（取自${p.movie.runtimeFrom}，請核對）` : "")
+                ? `${this.runtime} 分鐘` + (p.movie.runtimeFrom && this.runtime === p.movie.runtime ? `（取自 ${p.movie.runtimeFrom}，請核對）` : "")
                 : "來源沒有提供，請輸入（未填以 120 分鐘計）"
             }
             right="修改"

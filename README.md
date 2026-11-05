@@ -77,6 +77,8 @@
 
 實際場次以影城公告為準。
 
+**補片長（選用）**：場次通的重映、修復版、演唱會有時沒有片長。到 [TMDB](https://www.themoviedb.org/settings/api) 免費申請「API Read Access Token」，貼到 App 首頁「設定 → 補片長（TMDB）」，之後沒有片長的電影會自動用片名到 TMDB 查（確認頁會註明「取自 TMDB」）。Token 只存在自己的手機。
+
 ## 已知限制
 
 - Scriptable 版無法設定行程提醒；加入後可點「打開行程，加提醒」手動加上。Scripting 版可以直接設定。
@@ -89,7 +91,8 @@
 npm install
 ./build.sh                  # 型別檢查 → 編譯 dist/movie.js 與 dist/電影行程.scriptable
 node test/run.mjs vs        # 在 Node 模擬 Scriptable，用真實網路資料跑完整流程
-node test/run.mjs eslite | spoths | spot | search | filled | noruntime
+node test/run.mjs eslite | spoths | spot | search | noruntime
+TMDB_TOKEN=eyJ… node test/run.mjs filled   # 補片長（需要自己的 TMDB Token）
 node test/lux.mjs           # 樂聲（限台灣 IP，測試改讀 test/fixtures/）
 node test/at.mjs            # 開眼來源
 node test/loader.mjs online # 載入器：online / offline / 404

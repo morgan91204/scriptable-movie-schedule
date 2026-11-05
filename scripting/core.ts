@@ -37,6 +37,7 @@ export interface Settings {
   favorites: string[];
   calendar?: string;
   ads: number;
+  tmdbToken?: string; // TMDB API Read Access Token：有填才會幫沒有片長的電影補片長
 }
 
 export const TW = "https://twshowtimes.com";
@@ -366,58 +367,79 @@ export async function moviesOf(c: Cinema, date: string): Promise<{ movies: Movie
   return { movies: await fillRuntimes(m.schedules[date] || []), booking: c.url, sourceUrl: c.url, address: c.address || "" };
 }
 
-// ───────────────────────── 補片長（開眼電影網） ─────────────────────────
-// 場次通的重映、修復版、演唱會等有時沒有片長：用開眼的片單比對片名補上。
+// ───────────────────────── 補片長（TMDB） ─────────────────────────
+// 場次通的重映、修復版、演唱會等有時沒有片長：用 TMDB（themoviedb.org）查片名補上。
+// 需要使用者自己的 API Read Access Token（設定裡填），沒填就不補。
 
 const normTitle = (t: string) =>
   String(t || "").toLowerCase().replace(/[\s:：·・\-–—!！?？,，.。'"’「」『』《》()（）\[\]【】]/g, "");
-// 片名多出這些字仍視為同一部（重映、修復版）；「導演剪輯版」等片長會變的不算
-const REISSUE_RE = /^(?:加碼|數位|[248]k|修復|重映|重製|再映|經典|紀念|\d*週年|版)+$/i;
-
-let runtimeIndex: Promise<Record<string, number>> | null = null;
-function loadRuntimeIndex(): Promise<Record<string, number>> {
-  if (runtimeIndex) return runtimeIndex;
-  runtimeIndex = (async () => {
-    try {
-      const c = JSON.parse(cacheGet("runtimes.json") || "null");
-      if (c && Date.now() - c.at < 12 * 3600e3 && c.index) return c.index as Record<string, number>;
-    } catch (_) {}
-    const pages = await Promise.all(
-      ["now", "now2", "next"].map((p) => getText(`https://www.atmovies.com.tw/movie/${p}/`).catch(() => ""))
-    );
-    const lists = await parseMany<{ title: string; runtime: number }[]>("parseAtRuntimes", pages.filter(Boolean));
-    const index: Record<string, number> = {};
-    for (const list of lists) for (const x of list) index[normTitle(x.title)] ||= x.runtime;
-    if (Object.keys(index).length) cacheSet("runtimes.json", JSON.stringify({ at: Date.now(), index }));
-    return index;
-  })().catch(() => ({}));
-  return runtimeIndex;
+/** 去掉「4K重映」「數位修復版」「加碼重映」等字，查原片 */
+export function baseTitle(t: string): string {
+  return String(t || "")
+    .replace(/[《》]/g, "")
+    .replace(/[\s:：\-–—]*(?:加碼|數位|[248]K|修復|重映|重製|再映|經典|紀念|\d*週年)+版?\s*$/i, "")
+    .trim();
 }
 
-/** 依片名找片長：先找完全相同，再找「原片名＋重映／修復版」 */
-export function matchRuntime(index: Record<string, number>, title: string): number {
-  const t = normTitle(title);
-  if (!t) return 0;
-  if (index[t]) return index[t];
-  let best = "";
-  for (const k of Object.keys(index))
-    if (k.length >= 2 && k.length > best.length && t.startsWith(k) && REISSUE_RE.test(t.slice(k.length))) best = k;
-  return best ? index[best] : 0;
+const TMDB = "https://api.themoviedb.org/3";
+async function tmdb(path: string, token: string): Promise<any> {
+  const r = await platform().fetchText(TMDB + path, { Authorization: "Bearer " + token, accept: "application/json" });
+  if (r.status === 401) throw new Error("TMDB Token 無效，請到設定重新填寫");
+  if (r.status < 200 || r.status >= 300) throw new Error("TMDB 暫時讀不到");
+  return JSON.parse(r.body);
 }
 
-/** 沒有片長的電影，從開眼補上（會標記 runtimeFrom） */
+/** 用 TMDB 查片長（0 = 查不到）。結果記在快取：找到的 30 天、找不到的 1 天 */
+export async function tmdbRuntime(title: string, token: string): Promise<number> {
+  const q = baseTitle(title);
+  const key = normTitle(q);
+  if (!key || !token) return 0;
+  let cache: Record<string, { r: number; at: number }> = {};
+  try {
+    cache = JSON.parse(cacheGet("runtimes.json") || "{}") || {};
+  } catch (_) {}
+  const hit = cache[key];
+  if (hit && Date.now() - hit.at < (hit.r ? 30 : 1) * 86400e3) return hit.r;
+  const found = await tmdb(`/search/movie?language=zh-TW&query=${encodeURIComponent(q)}`, token);
+  const results: any[] = found?.results || [];
+  const pick = results.find((x) => normTitle(x.title) === key || normTitle(x.original_title) === key) || results[0];
+  let r = 0;
+  if (pick?.id) r = Number((await tmdb(`/movie/${pick.id}?language=zh-TW`, token))?.runtime) || 0;
+  try {
+    cache = JSON.parse(cacheGet("runtimes.json") || "{}") || {};
+  } catch (_) {}
+  cache[key] = { r, at: Date.now() };
+  cacheSet("runtimes.json", JSON.stringify(cache));
+  return r;
+}
+
+/** 沒有片長的電影，從 TMDB 補上（會標記 runtimeFrom）；沒設定 Token 或查詢失敗就原樣回傳 */
 export async function fillRuntimes<T extends { title: string; runtime: number; runtimeFrom?: string }>(movies: T[]): Promise<T[]> {
-  if (!movies.some((m) => !m.runtime)) return movies;
-  const index = await loadRuntimeIndex();
-  for (const m of movies)
-    if (!m.runtime) {
-      const r = matchRuntime(index, m.title);
-      if (r) {
-        m.runtime = r;
-        m.runtimeFrom = "開眼電影網";
+  const todo = movies.filter((m) => !m.runtime);
+  if (!todo.length) return movies;
+  const token = ((await loadSettings()).tmdbToken || "").trim();
+  if (!token) return movies;
+  const queue = todo.slice();
+  await Promise.all(
+    Array.from({ length: Math.min(4, queue.length) }, async () => {
+      for (let m = queue.shift(); m; m = queue.shift()) {
+        try {
+          const r = await tmdbRuntime(m.title, token);
+          if (r) {
+            m.runtime = r;
+            m.runtimeFrom = "TMDB";
+          }
+        } catch (_) {}
       }
-    }
+    })
+  );
   return movies;
+}
+
+/** 設定頁「測試」用：回傳查到的片名與片長，Token 錯誤會丟出錯誤 */
+export async function tmdbTest(token: string): Promise<string> {
+  const d = await tmdb(`/movie/244786?language=zh-TW`, token.trim());
+  return `${d.title}：${d.runtime} 分鐘`;
 }
 
 // ───────────────────────── 互動元件 ─────────────────────────

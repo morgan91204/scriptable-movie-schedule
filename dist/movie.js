@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.05-1959
+// @movie-schedule-app 電影行程 v2026.11.05-2008
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/jsx.tsx
@@ -594,21 +594,9 @@ function parseTwMovieDay(doc) {
   }
   return { title, en, rating, runtime, date, dates, cinemas };
 }
-function parseAtRuntimes(doc) {
-  const clean = (s) => String(s || "").replace(/\\s+/g, " ").trim();
-  const out = [];
-  for (const li of Array.from(doc.querySelectorAll("li"))) {
-    const a = li.querySelector('a[href^="/movie/f"]');
-    const rt = clean(li.querySelector(".runtime")?.textContent).match(/\\((\\d+)\\s*分\\)/);
-    const title = clean(a?.textContent);
-    if (title && rt && Number(rt[1]) > 0) out.push({ title, runtime: Number(rt[1]) });
-  }
-  return out;
-}
 {
   parseAtDay,
   parseAtRegion,
-  parseAtRuntimes,
   parseEslite,
   parseLux,
   parseLuxFilm,
@@ -1090,48 +1078,65 @@ async function moviesOf(c, date) {
   return { movies: await fillRuntimes(m.schedules[date] || []), booking: c.url, sourceUrl: c.url, address: c.address || "" };
 }
 var normTitle = (t) => String(t || "").toLowerCase().replace(/[\s:：·・\-–—!！?？,，.。'"’「」『』《》()（）\[\]【】]/g, "");
-var REISSUE_RE = /^(?:加碼|數位|[248]k|修復|重映|重製|再映|經典|紀念|\d*週年|版)+$/i;
-var runtimeIndex = null;
-function loadRuntimeIndex() {
-  if (runtimeIndex) return runtimeIndex;
-  runtimeIndex = (async () => {
-    try {
-      const c = JSON.parse(cacheGet("runtimes.json") || "null");
-      if (c && Date.now() - c.at < 12 * 36e5 && c.index) return c.index;
-    } catch (_) {
-    }
-    const pages = await Promise.all(
-      ["now", "now2", "next"].map((p) => getText(`https://www.atmovies.com.tw/movie/${p}/`).catch(() => ""))
-    );
-    const lists = await parseMany("parseAtRuntimes", pages.filter(Boolean));
-    const index = {};
-    for (const list of lists) for (const x of list) index[normTitle(x.title)] ||= x.runtime;
-    if (Object.keys(index).length) cacheSet("runtimes.json", JSON.stringify({ at: Date.now(), index }));
-    return index;
-  })().catch(() => ({}));
-  return runtimeIndex;
+function baseTitle(t) {
+  return String(t || "").replace(/[《》]/g, "").replace(/[\s:：\-–—]*(?:加碼|數位|[248]K|修復|重映|重製|再映|經典|紀念|\d*週年)+版?\s*$/i, "").trim();
 }
-function matchRuntime(index, title) {
-  const t = normTitle(title);
-  if (!t) return 0;
-  if (index[t]) return index[t];
-  let best = "";
-  for (const k of Object.keys(index))
-    if (k.length >= 2 && k.length > best.length && t.startsWith(k) && REISSUE_RE.test(t.slice(k.length))) best = k;
-  return best ? index[best] : 0;
+var TMDB = "https://api.themoviedb.org/3";
+async function tmdb(path, token) {
+  const r = await platform().fetchText(TMDB + path, { Authorization: "Bearer " + token, accept: "application/json" });
+  if (r.status === 401) throw new Error("TMDB Token 無效，請到設定重新填寫");
+  if (r.status < 200 || r.status >= 300) throw new Error("TMDB 暫時讀不到");
+  return JSON.parse(r.body);
+}
+async function tmdbRuntime(title, token) {
+  const q = baseTitle(title);
+  const key = normTitle(q);
+  if (!key || !token) return 0;
+  let cache = {};
+  try {
+    cache = JSON.parse(cacheGet("runtimes.json") || "{}") || {};
+  } catch (_) {
+  }
+  const hit = cache[key];
+  if (hit && Date.now() - hit.at < (hit.r ? 30 : 1) * 864e5) return hit.r;
+  const found = await tmdb(`/search/movie?language=zh-TW&query=${encodeURIComponent(q)}`, token);
+  const results = found?.results || [];
+  const pick = results.find((x) => normTitle(x.title) === key || normTitle(x.original_title) === key) || results[0];
+  let r = 0;
+  if (pick?.id) r = Number((await tmdb(`/movie/${pick.id}?language=zh-TW`, token))?.runtime) || 0;
+  try {
+    cache = JSON.parse(cacheGet("runtimes.json") || "{}") || {};
+  } catch (_) {
+  }
+  cache[key] = { r, at: Date.now() };
+  cacheSet("runtimes.json", JSON.stringify(cache));
+  return r;
 }
 async function fillRuntimes(movies) {
-  if (!movies.some((m) => !m.runtime)) return movies;
-  const index = await loadRuntimeIndex();
-  for (const m of movies)
-    if (!m.runtime) {
-      const r = matchRuntime(index, m.title);
-      if (r) {
-        m.runtime = r;
-        m.runtimeFrom = "開眼電影網";
+  const todo = movies.filter((m) => !m.runtime);
+  if (!todo.length) return movies;
+  const token = ((await loadSettings()).tmdbToken || "").trim();
+  if (!token) return movies;
+  const queue = todo.slice();
+  await Promise.all(
+    Array.from({ length: Math.min(4, queue.length) }, async () => {
+      for (let m = queue.shift(); m; m = queue.shift()) {
+        try {
+          const r = await tmdbRuntime(m.title, token);
+          if (r) {
+            m.runtime = r;
+            m.runtimeFrom = "TMDB";
+          }
+        } catch (_) {
+        }
       }
-    }
+    })
+  );
   return movies;
+}
+async function tmdbTest(token) {
+  const d = await tmdb(`/movie/244786?language=zh-TW`, token.trim());
+  return `${d.title}：${d.runtime} 分鐘`;
 }
 var moviesCache = null;
 async function loadMovies() {
@@ -1272,6 +1277,7 @@ var App = class {
     this.loadingText = "讀取中…";
     // ── 搜尋 ──
     this.query = "";
+    this.tmdbStatus = "";
     // ── 依電影找 ──
     this.movieQuery = "";
     this.movieCity = "全部";
@@ -1354,7 +1360,7 @@ var App = class {
     const cities = Array.from(new Set(this.cinemas.map((c) => c.city))).sort(
       (a, b) => (CITY_ORDER.indexOf(a) + 1 || 99) - (CITY_ORDER.indexOf(b) + 1 || 99)
     );
-    return /* @__PURE__ */ h(Page, { title: "🎬 電影行程", subtitle: `${this.cinemas.length} 間影城｜選影城 → 日期 → 電影 → 場次` }, /* @__PURE__ */ h(Section, null, /* @__PURE__ */ h(Item, { icon: "⏰", title: "現在有什麼可以看", subtitle: "選時段，一次列出常去、附近或某縣市的所有場次", onTap: () => this.go(() => this.nowView()) }), /* @__PURE__ */ h(Item, { icon: "🎬", title: "依電影找場次", subtitle: "先選電影，再看哪些影城有放映", onTap: () => this.go(() => this.movieListView(), "讀取電影清單…") }), /* @__PURE__ */ h(Item, { icon: "📍", title: "附近的影城", subtitle: "依目前位置排序", onTap: () => this.go(() => this.nearbyView(), "取得目前位置…") }), /* @__PURE__ */ h(Item, { icon: "🔍", title: "搜尋影城", subtitle: "影城、分店、行政區或縣市", onTap: () => this.go(() => this.searchView()) })), favs.length ? /* @__PURE__ */ h(Section, { title: "常去影城" }, favs.map((c) => /* @__PURE__ */ h(Item, { icon: "★", title: c.name, subtitle: `${c.city} ${c.district}`, onTap: () => this.go(() => this.cinemaView(c), `讀取 ${c.name} 的場次…`) }))) : null, /* @__PURE__ */ h(Section, { title: "全台影城", hint: "影城清單來自場次通與開眼電影網，會自動更新。" }, cities.map((city) => /* @__PURE__ */ h(Item, { title: city, badge: `${this.cinemas.filter((c) => c.city === city).length} 間`, onTap: () => this.go(() => this.cityView(city)) }))), /* @__PURE__ */ h(Section, { title: "設定" }, /* @__PURE__ */ h(Item, { icon: "📅", title: "寫入的行事曆", subtitle: this.calendarName, onTap: () => this.go(() => this.calendarView()) }), /* @__PURE__ */ h(Item, { icon: "📺", title: "廣告預告", subtitle: `預計散場時間會加上 ${this.settings.ads} 分鐘`, right: "點一下切換", chevron: false, onTap: () => this.cycleAds() })), /* @__PURE__ */ h(Note, { text: "場次資料來自場次通 twshowtimes.com、開眼電影網，以及誠品、光點、樂聲官網，實際場次以影城公告為準。" }), /* @__PURE__ */ h(Note, { text: `版本 ${"2026.11.05-1959"}` }));
+    return /* @__PURE__ */ h(Page, { title: "🎬 電影行程", subtitle: `${this.cinemas.length} 間影城｜選影城 → 日期 → 電影 → 場次` }, /* @__PURE__ */ h(Section, null, /* @__PURE__ */ h(Item, { icon: "⏰", title: "現在有什麼可以看", subtitle: "選時段，一次列出常去、附近或某縣市的所有場次", onTap: () => this.go(() => this.nowView()) }), /* @__PURE__ */ h(Item, { icon: "🎬", title: "依電影找場次", subtitle: "先選電影，再看哪些影城有放映", onTap: () => this.go(() => this.movieListView(), "讀取電影清單…") }), /* @__PURE__ */ h(Item, { icon: "📍", title: "附近的影城", subtitle: "依目前位置排序", onTap: () => this.go(() => this.nearbyView(), "取得目前位置…") }), /* @__PURE__ */ h(Item, { icon: "🔍", title: "搜尋影城", subtitle: "影城、分店、行政區或縣市", onTap: () => this.go(() => this.searchView()) })), favs.length ? /* @__PURE__ */ h(Section, { title: "常去影城" }, favs.map((c) => /* @__PURE__ */ h(Item, { icon: "★", title: c.name, subtitle: `${c.city} ${c.district}`, onTap: () => this.go(() => this.cinemaView(c), `讀取 ${c.name} 的場次…`) }))) : null, /* @__PURE__ */ h(Section, { title: "全台影城", hint: "影城清單來自場次通與開眼電影網，會自動更新。" }, cities.map((city) => /* @__PURE__ */ h(Item, { title: city, badge: `${this.cinemas.filter((c) => c.city === city).length} 間`, onTap: () => this.go(() => this.cityView(city)) }))), /* @__PURE__ */ h(Section, { title: "設定" }, /* @__PURE__ */ h(Item, { icon: "📅", title: "寫入的行事曆", subtitle: this.calendarName, onTap: () => this.go(() => this.calendarView()) }), /* @__PURE__ */ h(Item, { icon: "📺", title: "廣告預告", subtitle: `預計散場時間會加上 ${this.settings.ads} 分鐘`, right: "點一下切換", chevron: false, onTap: () => this.cycleAds() }), /* @__PURE__ */ h(Item, { icon: "⏱", title: "補片長（TMDB）", subtitle: this.settings.tmdbToken ? "已設定：沒有片長的電影會自動補上" : "未設定", onTap: () => this.go(() => this.tmdbView()) })), /* @__PURE__ */ h(Note, { text: "場次資料來自場次通 twshowtimes.com、開眼電影網，以及誠品、光點、樂聲官網，實際場次以影城公告為準。" }), /* @__PURE__ */ h(Note, { text: `版本 ${"2026.11.05-2008"}` }));
   }
   searchView() {
     const k = this.query.trim().toLowerCase().replace(/臺/g, "台");
@@ -1395,6 +1401,36 @@ var App = class {
         }
       }
     ))));
+  }
+  tmdbView() {
+    return /* @__PURE__ */ h(Page, { title: "補片長（TMDB）", onBack: () => {
+      this.tmdbStatus = "";
+      this.back();
+    } }, /* @__PURE__ */ h(Section, { hint: "場次通的重映、修復版、演唱會有時沒有片長。填入你自己的 TMDB「API Read Access Token」後，會用片名到 TMDB 查片長自動補上（確認頁會註明「取自 TMDB」）。Token 只存在你的手機。" }, /* @__PURE__ */ h("input", { class: "field", name: "v", value: this.settings.tmdbToken || "", placeholder: "貼上 API Read Access Token（eyJ 開頭）" })), this.tmdbStatus ? /* @__PURE__ */ h(Note, { kind: this.tmdbStatus.startsWith("❌") ? "error" : void 0, text: this.tmdbStatus }) : null, /* @__PURE__ */ h(
+      Button,
+      {
+        kind: "primary",
+        enter: true,
+        label: "儲存並測試",
+        onTap: async (v) => {
+          const t = String(v.v || "").trim();
+          if (!t) {
+            this.settings.tmdbToken = "";
+            saveSettings(this.settings);
+            this.tmdbStatus = "已清除，之後沒有片長的電影不會自動補。";
+            return;
+          }
+          try {
+            const r = await tmdbTest(t);
+            this.settings.tmdbToken = t;
+            saveSettings(this.settings);
+            this.tmdbStatus = `✅ 可以使用（測試：${r}）`;
+          } catch (e) {
+            this.tmdbStatus = `❌ ${String(e?.message || e)}`;
+          }
+        }
+      }
+    ), /* @__PURE__ */ h(Note, { text: "申請：themoviedb.org 免費註冊 → 設定 → API → 複製「API Read Access Token」（很長、eyJ 開頭的那串，不是較短的 API Key）。" }));
   }
   cycleAds() {
     const i = AD_STEPS.indexOf(this.settings.ads);
@@ -1474,7 +1510,7 @@ var App = class {
       {
         icon: "⏱",
         title: "片長",
-        subtitle: this.runtime ? `${this.runtime} 分鐘` + (p.movie.runtimeFrom && this.runtime === p.movie.runtime ? `（取自${p.movie.runtimeFrom}，請核對）` : "") : "來源沒有提供，請輸入（未填以 120 分鐘計）",
+        subtitle: this.runtime ? `${this.runtime} 分鐘` + (p.movie.runtimeFrom && this.runtime === p.movie.runtime ? `（取自 ${p.movie.runtimeFrom}，請核對）` : "") : "來源沒有提供，請輸入（未填以 120 分鐘計）",
         right: "修改",
         onTap: () => this.go(() => this.runtimeView())
       }

@@ -14,7 +14,7 @@ import {
   Cinema, Movie, Settings, Version, TwMovie, TwMovieCinema, CITY_ORDER, TW,
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
   loadSettings, saveSettings, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, cinemaAddress,
-  FORMATS, formatsOf, filterVersions, nearest, kmLabel, WINDOWS, findShowtimes, groupByMovie, shareText, hallOf,
+  FORMATS, formatsOf, filterVersions, nearest, kmLabel, WINDOWS, findShowtimes, groupByMovie, shareText, hallOf, tmdbTest,
 } from "./core"
 import type { Format, LatLng, Hit } from "./core"
 
@@ -198,10 +198,43 @@ function Home() {
           <Picker title={"提醒"} value={settings.alarm ?? 30} onChanged={(v: number) => update({ alarm: v })}>
             {ALARMS.map((a) => <Text key={a.minutes} tag={a.minutes}>{a.label}</Text>)}
           </Picker>
+          <NavigationLink destination={<TmdbPage />}>
+            <Row title={"補片長（TMDB）"} trailing={settings.tmdbToken ? "已設定" : "未設定"} />
+          </NavigationLink>
         </Section>
       </>}
     </List>
   </NavigationStack>
+}
+
+function TmdbPage() {
+  const [settings, update] = useSettings()
+  const [token, setToken] = useState(settings.tmdbToken || "")
+  const [status, setStatus] = useState("")
+  const save = async () => {
+    const t = token.trim()
+    if (!t) {
+      update({ tmdbToken: "" })
+      setStatus("已清除，之後沒有片長的電影不會自動補。")
+      return
+    }
+    setStatus("測試中…")
+    try {
+      const r = await tmdbTest(t)
+      update({ tmdbToken: t })
+      setStatus(`✅ 可以使用（測試：${r}）`)
+    } catch (e) {
+      setStatus(`❌ ${String((e as Error)?.message || e)}`)
+    }
+  }
+  return <Form navigationTitle={"補片長（TMDB）"} navigationBarTitleDisplayMode={"inline"}>
+    <Section footer={<Text>{"場次通的重映、修復版、演唱會有時沒有片長。填入你自己的 TMDB「API Read Access Token」後，會用片名到 TMDB 查片長自動補上（確認頁會註明「取自 TMDB」）。\n\n申請：themoviedb.org 免費註冊 → 設定 → API → 複製「API Read Access Token」（很長、eyJ 開頭的那串）。Token 只存在你的手機。"}</Text>}>
+      <TextField title={"Token"} value={token} onChanged={setToken} prompt={"貼上 API Read Access Token"} />
+      <Button title={"儲存並測試"} action={save} />
+      {settings.tmdbToken ? <Button title={"清除 Token"} role={"destructive"} action={() => { setToken(""); update({ tmdbToken: "" }); setStatus("已清除。") }} /> : null}
+    </Section>
+    {status ? <Section><Text>{status}</Text></Section> : null}
+  </Form>
 }
 
 function CinemaLink({ cinema, showCity }: { cinema: Cinema; showCity?: boolean }) {
@@ -388,7 +421,7 @@ function ConfirmPage({ pick }: { pick: Pick }) {
     </Section>
     {isLate(pick.time) ? <Section footer={<Text>這是凌晨場：已自動算到隔天日期，請再核對電影票。</Text>}><Label title={"凌晨場"} systemImage={"moon.stars"} /></Section> : null}
 
-    <Section header={<Text>可調整</Text>} footer={!pick.movie.runtime ? <Text>資料來源沒有提供片長，請手動輸入。</Text> : pick.movie.runtimeFrom ? <Text>{`片長取自${pick.movie.runtimeFrom}（原版片長），請再核對。`}</Text> : undefined}>
+    <Section header={<Text>可調整</Text>} footer={!pick.movie.runtime ? <Text>資料來源沒有提供片長，請手動輸入。</Text> : pick.movie.runtimeFrom ? <Text>{`片長取自 ${pick.movie.runtimeFrom}（重映片為原版片長），請再核對。`}</Text> : undefined}>
       <HStack>
         <Text>片長（分鐘）</Text>
         <TextField title={"片長（分鐘）"} value={runtimeText} onChanged={setRuntimeText} prompt={"例如 120"} keyboardType={"numberPad"} multilineTextAlignment={"trailing"} />

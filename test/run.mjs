@@ -57,11 +57,16 @@ const driver = (async () => {
     await tap(/加入行事曆/);
     await dump("完成頁");
   } else if (scenario === "filled") {
-    // 場次通沒給片長的重映片：應從開眼補上並註明來源
+    // 場次通沒給片長的重映片：設定 TMDB Token（環境變數 TMDB_TOKEN）後應自動補上並註明來源
+    await tap(/補片長（TMDB）/);
+    await tap(/儲存並測試/, { v: process.env.TMDB_TOKEN || "" });
+    await new Promise((r) => setTimeout(r, 5000)); // 等 TMDB 測試回來
+    await dump("TMDB 設定");
+    await tap(/返回/);
     await tap(/^台北市/);
     await tap(/台北信義威秀影城/);
     await tap(/（.）/);
-    await tap(/(修復版|重映).*開眼|(修復版|重映)/);
+    await tap(/(修復版|重映)/);
     await tap(/^\d\d:\d\d/);
     await dump("確認頁（片長取自開眼）");
   } else if (scenario === "error") {
