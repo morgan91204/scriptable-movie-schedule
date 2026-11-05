@@ -389,11 +389,17 @@ function ConfirmPage({ pick }: { pick: Pick }) {
     {isLate(pick.time) ? <Section footer={<Text>這是凌晨場：已自動算到隔天日期，請再核對電影票。</Text>}><Label title={"凌晨場"} systemImage={"moon.stars"} /></Section> : null}
 
     <Section header={<Text>可調整</Text>} footer={pick.movie.runtime ? undefined : <Text>資料來源沒有提供片長，請手動輸入。</Text>}>
-      <TextField title={"片長（分鐘）"} value={runtimeText} onChanged={setRuntimeText} prompt={"例如 120"} keyboardType={"numberPad"} />
+      <HStack>
+        <Text>片長（分鐘）</Text>
+        <TextField title={"片長（分鐘）"} value={runtimeText} onChanged={setRuntimeText} prompt={"例如 120"} keyboardType={"numberPad"} multilineTextAlignment={"trailing"} />
+      </HStack>
       <Picker title={"預留廣告預告"} value={settings.ads} onChanged={(v: number) => update({ ads: v })}>
         {ADS.map((m) => <Text key={m} tag={m}>{m ? `${m} 分鐘` : "不預留"}</Text>)}
       </Picker>
-      <TextField title={"影廳／座位"} value={seat} onChanged={setSeat} prompt={"選填，例如 7 廳 H12"} />
+      <HStack>
+        <Text>影廳／座位</Text>
+        <TextField title={"影廳／座位"} value={seat} onChanged={setSeat} prompt={"選填，例如 7 廳 H12"} multilineTextAlignment={"trailing"} />
+      </HStack>
       <Picker title={"提醒"} value={settings.alarm ?? 30} onChanged={(v: number) => update({ alarm: v })}>
         {ALARMS.map((a) => <Text key={a.minutes} tag={a.minutes}>{a.label}</Text>)}
       </Picker>
