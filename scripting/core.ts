@@ -344,11 +344,11 @@ export async function datesOf(c: Cinema): Promise<{ dates: string[]; address: st
   if (c.source === "tw") {
     const d = await twDay(c);
     const future = d.dates.filter((x) => x >= today);
-    return { dates: future.length ? future : d.dates, address: d.address, notice: "" };
+    return { dates: future.length ? future : d.dates, address: d.address, notice: "", site: d.booking || "" };
   }
   const m = await multiDay(c);
   const dates = Object.keys(m.schedules).filter((x) => x >= today).sort();
-  return { dates, address: c.address || "", notice: m.notice };
+  return { dates, address: c.address || "", notice: m.notice, site: c.url };
 }
 
 export async function moviesOf(c: Cinema, date: string): Promise<{ movies: Movie[]; booking: string; sourceUrl: string; address: string }> {

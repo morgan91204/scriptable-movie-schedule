@@ -292,8 +292,8 @@ class App {
         {notice ? <Note kind="warn" text={notice} /> : null}
         <Section>
           <Item icon={fav ? "★" : "☆"} title={fav ? "移出常去影城" : "加入常去影城"} chevron={false} onTap={() => this.toggleFav(c)} />
-          {site ? <Item icon="🏠" title="影城官網" subtitle={site.replace(/^https?:\/\//, "").replace(/\/.*$/, "")} chevron={false} accent onTap={() => Safari.open(site)} /> : null}
-          <Item icon="🌐" title={c.source === "at" ? "在 Safari 開啟開眼時刻表" : "在 Safari 開啟時刻表"} chevron={false} accent onTap={() => Safari.open(c.url)} />
+          {site ? <Item icon="🏠" title="影城官網（訂票）" subtitle={site.replace(/^https?:\/\//, "").replace(/\/.*$/, "")} chevron={false} accent onTap={() => Safari.open(site)} /> : null}
+          {site !== c.url ? <Item icon="🌐" title={c.source === "at" ? "在 Safari 開啟開眼時刻表" : "在 Safari 開啟場次通時刻表"} chevron={false} accent onTap={() => Safari.open(c.url)} /> : null}
         </Section>
       </Page>
     );

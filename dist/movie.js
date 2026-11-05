@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.05-2030
+// @movie-schedule-app 電影行程 v2026.11.05-2041
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/jsx.tsx
@@ -1066,11 +1066,11 @@ async function datesOf(c) {
   if (c.source === "tw") {
     const d = await twDay(c);
     const future = d.dates.filter((x) => x >= today);
-    return { dates: future.length ? future : d.dates, address: d.address, notice: "" };
+    return { dates: future.length ? future : d.dates, address: d.address, notice: "", site: d.booking || "" };
   }
   const m = await multiDay(c);
   const dates = Object.keys(m.schedules).filter((x) => x >= today).sort();
-  return { dates, address: c.address || "", notice: m.notice };
+  return { dates, address: c.address || "", notice: m.notice, site: c.url };
 }
 async function moviesOf(c, date) {
   if (c.source === "at") {
@@ -1426,7 +1426,7 @@ var App = class {
     const cities = Array.from(new Set(this.cinemas.map((c) => c.city))).sort(
       (a, b) => (CITY_ORDER.indexOf(a) + 1 || 99) - (CITY_ORDER.indexOf(b) + 1 || 99)
     );
-    return /* @__PURE__ */ h(Page, { title: "🎬 電影行程", subtitle: `${this.cinemas.length} 間影城｜選影城 → 日期 → 電影 → 場次` }, /* @__PURE__ */ h(Section, null, /* @__PURE__ */ h(Item, { icon: "⏰", title: "現在有什麼可以看", subtitle: "選時段，一次列出常去、附近或某縣市的所有場次", onTap: () => this.go(() => this.nowView()) }), /* @__PURE__ */ h(Item, { icon: "🎬", title: "依電影找場次", subtitle: "先選電影，再看哪些影城有放映", onTap: () => this.go(() => this.movieListView(), "讀取電影清單…") }), /* @__PURE__ */ h(Item, { icon: "📍", title: "附近的影城", subtitle: "依目前位置排序", onTap: () => this.go(() => this.nearbyView(), "取得目前位置…") }), /* @__PURE__ */ h(Item, { icon: "🔍", title: "搜尋影城", subtitle: "影城、分店、行政區或縣市", onTap: () => this.go(() => this.searchView()) })), favs.length ? /* @__PURE__ */ h(Section, { title: "常去影城" }, favs.map((c) => /* @__PURE__ */ h(Item, { icon: "★", title: c.name, subtitle: `${c.city} ${c.district}`, onTap: () => this.go(() => this.cinemaView(c), `讀取 ${c.name} 的場次…`) }))) : null, /* @__PURE__ */ h(Section, { title: "全台影城", hint: "影城清單來自場次通與開眼電影網，會自動更新。" }, cities.map((city) => /* @__PURE__ */ h(Item, { title: city, badge: `${this.cinemas.filter((c) => c.city === city).length} 間`, onTap: () => this.go(() => this.cityView(city)) }))), /* @__PURE__ */ h(Section, { title: "設定" }, /* @__PURE__ */ h(Item, { icon: "📅", title: "寫入的行事曆", subtitle: this.calendarName, onTap: () => this.go(() => this.calendarView()) }), /* @__PURE__ */ h(Item, { icon: "📺", title: "廣告預告", subtitle: `預計散場時間會加上 ${this.settings.ads} 分鐘`, right: "點一下切換", chevron: false, onTap: () => this.cycleAds() }), /* @__PURE__ */ h(Item, { icon: "⏱", title: "補片長（TMDB）", subtitle: this.settings.tmdbToken ? "已設定：沒有片長的電影會自動補上" : "未設定", onTap: () => this.go(() => this.tmdbView()) })), /* @__PURE__ */ h(Note, { text: "場次資料來自場次通 twshowtimes.com、開眼電影網，以及誠品、光點、樂聲官網，實際場次以影城公告為準。" }), /* @__PURE__ */ h(Note, { text: `版本 ${"2026.11.05-2030"}` }));
+    return /* @__PURE__ */ h(Page, { title: "🎬 電影行程", subtitle: `${this.cinemas.length} 間影城｜選影城 → 日期 → 電影 → 場次` }, /* @__PURE__ */ h(Section, null, /* @__PURE__ */ h(Item, { icon: "⏰", title: "現在有什麼可以看", subtitle: "選時段，一次列出常去、附近或某縣市的所有場次", onTap: () => this.go(() => this.nowView()) }), /* @__PURE__ */ h(Item, { icon: "🎬", title: "依電影找場次", subtitle: "先選電影，再看哪些影城有放映", onTap: () => this.go(() => this.movieListView(), "讀取電影清單…") }), /* @__PURE__ */ h(Item, { icon: "📍", title: "附近的影城", subtitle: "依目前位置排序", onTap: () => this.go(() => this.nearbyView(), "取得目前位置…") }), /* @__PURE__ */ h(Item, { icon: "🔍", title: "搜尋影城", subtitle: "影城、分店、行政區或縣市", onTap: () => this.go(() => this.searchView()) })), favs.length ? /* @__PURE__ */ h(Section, { title: "常去影城" }, favs.map((c) => /* @__PURE__ */ h(Item, { icon: "★", title: c.name, subtitle: `${c.city} ${c.district}`, onTap: () => this.go(() => this.cinemaView(c), `讀取 ${c.name} 的場次…`) }))) : null, /* @__PURE__ */ h(Section, { title: "全台影城", hint: "影城清單來自場次通與開眼電影網，會自動更新。" }, cities.map((city) => /* @__PURE__ */ h(Item, { title: city, badge: `${this.cinemas.filter((c) => c.city === city).length} 間`, onTap: () => this.go(() => this.cityView(city)) }))), /* @__PURE__ */ h(Section, { title: "設定" }, /* @__PURE__ */ h(Item, { icon: "📅", title: "寫入的行事曆", subtitle: this.calendarName, onTap: () => this.go(() => this.calendarView()) }), /* @__PURE__ */ h(Item, { icon: "📺", title: "廣告預告", subtitle: `預計散場時間會加上 ${this.settings.ads} 分鐘`, right: "點一下切換", chevron: false, onTap: () => this.cycleAds() }), /* @__PURE__ */ h(Item, { icon: "⏱", title: "補片長（TMDB）", subtitle: this.settings.tmdbToken ? "已設定：沒有片長的電影會自動補上" : "未設定", onTap: () => this.go(() => this.tmdbView()) })), /* @__PURE__ */ h(Note, { text: "場次資料來自場次通 twshowtimes.com、開眼電影網，以及誠品、光點、樂聲官網，實際場次以影城公告為準。" }), /* @__PURE__ */ h(Note, { text: `版本 ${"2026.11.05-2041"}` }));
   }
   searchView() {
     const k = this.query.trim().toLowerCase().replace(/臺/g, "台");
@@ -1514,7 +1514,7 @@ var App = class {
   async cinemaView(c) {
     const { dates, address, notice, site } = await datesOf(c);
     const fav = this.settings.favorites.indexOf(c.id) >= 0;
-    return /* @__PURE__ */ h(Page, { title: c.name, subtitle: address || `${c.city} ${c.district}`, onBack: () => this.back() }, /* @__PURE__ */ h(Section, { title: "選擇日期" }, dates.length ? null : /* @__PURE__ */ h(Empty, { icon: "🗓", text: "目前沒有公布的場次" }), dates.map((d) => /* @__PURE__ */ h(Item, { title: dateLabel(d), onTap: () => this.go(() => this.moviesView(c, d), `讀取 ${dateLabel(d)} 的片單…`) }))), notice ? /* @__PURE__ */ h(Note, { kind: "warn", text: notice }) : null, /* @__PURE__ */ h(Section, null, /* @__PURE__ */ h(Item, { icon: fav ? "★" : "☆", title: fav ? "移出常去影城" : "加入常去影城", chevron: false, onTap: () => this.toggleFav(c) }), site ? /* @__PURE__ */ h(Item, { icon: "🏠", title: "影城官網", subtitle: site.replace(/^https?:\/\//, "").replace(/\/.*$/, ""), chevron: false, accent: true, onTap: () => Safari.open(site) }) : null, /* @__PURE__ */ h(Item, { icon: "🌐", title: c.source === "at" ? "在 Safari 開啟開眼時刻表" : "在 Safari 開啟時刻表", chevron: false, accent: true, onTap: () => Safari.open(c.url) })));
+    return /* @__PURE__ */ h(Page, { title: c.name, subtitle: address || `${c.city} ${c.district}`, onBack: () => this.back() }, /* @__PURE__ */ h(Section, { title: "選擇日期" }, dates.length ? null : /* @__PURE__ */ h(Empty, { icon: "🗓", text: "目前沒有公布的場次" }), dates.map((d) => /* @__PURE__ */ h(Item, { title: dateLabel(d), onTap: () => this.go(() => this.moviesView(c, d), `讀取 ${dateLabel(d)} 的片單…`) }))), notice ? /* @__PURE__ */ h(Note, { kind: "warn", text: notice }) : null, /* @__PURE__ */ h(Section, null, /* @__PURE__ */ h(Item, { icon: fav ? "★" : "☆", title: fav ? "移出常去影城" : "加入常去影城", chevron: false, onTap: () => this.toggleFav(c) }), site ? /* @__PURE__ */ h(Item, { icon: "🏠", title: "影城官網（訂票）", subtitle: site.replace(/^https?:\/\//, "").replace(/\/.*$/, ""), chevron: false, accent: true, onTap: () => Safari.open(site) }) : null, site !== c.url ? /* @__PURE__ */ h(Item, { icon: "🌐", title: c.source === "at" ? "在 Safari 開啟開眼時刻表" : "在 Safari 開啟場次通時刻表", chevron: false, accent: true, onTap: () => Safari.open(c.url) }) : null));
   }
   // ── 電影列表 ──
   async moviesView(c, date) {

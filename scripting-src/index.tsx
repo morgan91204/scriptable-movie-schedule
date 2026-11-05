@@ -302,8 +302,8 @@ function CinemaPage({ cinema }: { cinema: Cinema }) {
       )}
     </Section>
     <Section>
-      {info.data?.site ? <Button title={"影城官網"} systemImage={"house"} action={() => Safari.openURL(info.data!.site)} /> : null}
-      <Button title={"在 Safari 開啟時刻表"} systemImage={"safari"} action={() => Safari.openURL(cinema.url)} />
+      {info.data?.site ? <Button title={"影城官網（訂票）"} systemImage={"house"} action={() => Safari.openURL(info.data!.site!)} /> : null}
+      {info.data?.site !== cinema.url ? <Button title={cinema.source === "at" ? "在 Safari 開啟開眼時刻表" : "在 Safari 開啟場次通時刻表"} systemImage={"safari"} action={() => Safari.openURL(cinema.url)} /> : null}
     </Section>
   </List>
 }
