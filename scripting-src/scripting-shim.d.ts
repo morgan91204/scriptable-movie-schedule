@@ -14,4 +14,4 @@ declare namespace JSX {
   type Element = any
   interface IntrinsicAttributes { key?: string | number }
 }
-declare function fetch(url: string, init?: any): Promise<{ status: number; text(): Promise<string> }>
+declare function fetch(url: string, init?: any): Promise<{ status: number; text(): Promise<string>; data(): Promise<any> }>

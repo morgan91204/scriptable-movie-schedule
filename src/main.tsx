@@ -12,7 +12,7 @@ import {
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
   loadSettings, saveSettings, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, TW,
   FORMATS, formatsOf, filterVersions, nearest, kmLabel, WINDOWS, findShowtimes, groupByMovie, shareText,
-  hallOf, tmdbTest, movieExtras, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, movieRatings, ratingTier,
+  hallOf, tmdbTest, movieExtras, moviePoster, posterSrc, cachePoster, prefetchPosters, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, movieRatings, ratingTier,
 } from "./core";
 import type { MovieExtras, Ratings } from "./core";
 import type { TwMovie, TwMovieCinema, Format, LatLng, Hit } from "./core";
@@ -354,6 +354,7 @@ class App {
   // ── 電影列表 ──
   async moviesView(c: Cinema, date: string): Promise<string> {
     const r = await moviesOf(c, date);
+    prefetchPosters(r.movies); // 背景先抓海報，進電影頁就不用等
     const isToday = date === todayTPE();
     const now = nowHM();
     return (
@@ -402,19 +403,23 @@ class App {
   /** 讀好後要在原位重畫的資料（海報、評分） */
   late: Promise<unknown> | null = null;
 
-  /** 海報、預告與評分：先等 1.5 秒，還沒好就先畫頁面，讀好後自動補上 */
-  async extras(title: string, slug?: string, en?: string): Promise<{ x: MovieExtras | null; r: Ratings | null; px: Promise<MovieExtras | null>; loading: boolean }> {
+  /** 海報、預告與評分：先等 1.5 秒，還沒好就先畫頁面，讀好後自動補上。海報網址另外快查（不等預告），有圖片快取就立刻顯示 */
+  async extras(title: string, slug?: string, en?: string): Promise<{ x: MovieExtras | null; r: Ratings | null; p: string; px: Promise<MovieExtras | null>; loading: boolean }> {
     const px = movieExtras(title, slug).catch(() => null);
     const pr = movieRatings(title, en).catch(() => null);
+    const pp = moviePoster(title, slug).catch(() => "");
     const quick = <T,>(p: Promise<T>) => Promise.race([p, sleep(1500).then(() => undefined)]);
-    const [x, r] = await Promise.all([quick(px), quick(pr)]);
-    const loading = x === undefined || r === undefined;
-    if (loading) this.late = Promise.all([px, pr]);
-    return { x: x ?? null, r: r ?? null, px, loading };
+    const [x, r, p] = await Promise.all([quick(px), quick(pr), quick(pp)]);
+    const loading = x === undefined || r === undefined || p === undefined;
+    if (loading) this.late = Promise.all([px, pr, pp]);
+    return { x: x ?? null, r: r ?? null, p: p || "", px, loading };
   }
 
-  hero(e: { x: MovieExtras | null; r: Ratings | null; px: Promise<MovieExtras | null>; loading: boolean }, title: string, lines: string[]): string {
+  hero(e: { x: MovieExtras | null; r: Ratings | null; p: string; px: Promise<MovieExtras | null>; loading: boolean }, title: string, lines: string[]): string {
     const { x, r } = e;
+    const posterUrl = x?.poster || e.p || "";
+    const poster = posterSrc(posterUrl);
+    if (poster && poster === posterUrl) cachePoster(posterUrl); // 這次用網址顯示，順便抓進快取
     const search = `https://www.youtube.com/results?search_query=${encodeURIComponent(title + " 預告")}`;
     // 評分讀好後三個徽章都顯示：沒有那項評分就是「-」（跟「還沒抓到」分得開）
     const badges: RatingBadge[] = [];
@@ -429,7 +434,7 @@ class App {
     if (x?.err) lines = [...lines, `預告：${x.err}`];
     return (
       <Hero
-        poster={x?.poster}
+        poster={poster}
         lines={lines}
         badges={badges}
         // 還在讀的時候先顯示「觀看預告」，點下去會等讀好再開，不會誤開成搜尋頁
@@ -648,6 +653,7 @@ class App {
     const all = await loadMovies();
     const k = this.movieQuery.trim().toLowerCase();
     const list = all.filter((m) => !k || `${m.title} ${m.en}`.toLowerCase().includes(k));
+    prefetchPosters(list); // 背景先抓海報，進電影頁就不用等
     const item = (m: TwMovie) => (
       <Item
         title={m.title}
@@ -830,6 +836,7 @@ class App {
     if (!scope.length) throw new Error("沒有可以查的影城。先在影城頁加入常去影城，或改選附近／縣市。");
     const { hits, failed } = await findShowtimes(scope, date, win, this.nowFormat as Format | "");
     const groups = groupByMovie(hits);
+    prefetchPosters(groups); // 背景先抓海報，進電影頁就不用等
     const scopeLabel = this.nowScope === "fav" ? "常去影城" : this.nowScope === "near" ? "附近 10 間" : this.nowScope;
     const open = (hit: Hit) => {
       this.runtime = hit.movie.runtime;

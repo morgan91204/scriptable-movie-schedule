@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.05-2317
+// @movie-schedule-app 電影行程 v2026.11.05-2322
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/jsx.tsx
@@ -265,6 +265,44 @@ function settingsFile() {
   return { fm, path: fm.joinPath(dir, "設定.json") };
 }
 var web = null;
+var IMG_PREFIX = "movie-img-";
+var hash = (s) => {
+  let h2 = 5381;
+  for (let i = 0; i < s.length; i++) h2 = (h2 * 33 ^ s.charCodeAt(i)) >>> 0;
+  return h2.toString(16);
+};
+var imgPath = (url) => {
+  const fm = FileManager.local();
+  return fm.joinPath(fm.cacheDirectory(), IMG_PREFIX + hash(url) + ".jpg");
+};
+var imgJobs = {};
+var pruned = false;
+function pruneImages() {
+  if (pruned) return;
+  pruned = true;
+  try {
+    const fm = FileManager.local();
+    const dir = fm.cacheDirectory();
+    for (const n of fm.listContents(dir)) {
+      if (!n.startsWith(IMG_PREFIX)) continue;
+      const p = fm.joinPath(dir, n);
+      if (Date.now() - fm.modificationDate(p).getTime() > 14 * 864e5) fm.remove(p);
+    }
+  } catch (_) {
+  }
+}
+function cachedImage(url) {
+  try {
+    const fm = FileManager.local();
+    const p = imgPath(url);
+    if (!fm.fileExists(p)) return null;
+    const b64 = fm.read(p).toBase64String();
+    if (!b64) return null;
+    return (b64.startsWith("iVBOR") ? "data:image/png;base64," : "data:image/jpeg;base64,") + b64;
+  } catch (_) {
+    return null;
+  }
+}
 var scriptablePlatform = {
   async fetchText(url, headers) {
     const r = new Request(url);
@@ -313,6 +351,21 @@ var scriptablePlatform = {
       fm.writeString(fm.joinPath(fm.cacheDirectory(), "movie-" + name), value);
     } catch (_) {
     }
+  },
+  cachedImage,
+  cacheImage(url) {
+    return imgJobs[url] ||= (async () => {
+      pruneImages();
+      const hit = cachedImage(url);
+      if (hit) return hit;
+      const r = new Request(url);
+      r.timeoutInterval = 20;
+      const d = await r.load();
+      const status = r.response && r.response.statusCode || 200;
+      if (status !== 200 || !d) return null;
+      FileManager.local().write(imgPath(url), d);
+      return cachedImage(url);
+    })().catch(() => null);
   }
 };
 
@@ -1207,18 +1260,19 @@ async function tmdbRuntime(title, token) {
   return (await tmdbFind(title, token))?.r || 0;
 }
 var extrasCache = {};
+var readExtras = () => {
+  try {
+    return JSON.parse(cacheGet("extras.json") || "{}") || {};
+  } catch (_) {
+    return {};
+  }
+};
 async function movieExtras(title, slug) {
   const hasToken = !!((await loadSettings()).tmdbToken || "").trim();
   const k = (hasToken ? "t|" : "n|") + (slug || "") + "|" + title;
   return extrasCache[k] ||= (async () => {
     const ck = (hasToken ? "t|" : "n|") + normTitle(title);
-    const read = () => {
-      try {
-        return JSON.parse(cacheGet("extras.json") || "{}") || {};
-      } catch (_) {
-        return {};
-      }
-    };
+    const read = readExtras;
     const hit = read()[ck];
     const ttl = hasToken && !hit?.trailerName ? 0 : hit?.poster ? 7 * 864e5 : 864e5;
     if (hit && Date.now() - hit.at < ttl) return { poster: hit.poster, trailer: hit.trailer, trailerName: hit.trailerName };
@@ -1248,6 +1302,63 @@ function twPoster(slug) {
     return /og-default/.test(img) ? "" : img;
   })();
 }
+async function findPoster(title, slug) {
+  if (slug) return twPoster(slug);
+  try {
+    return await twPoster(title);
+  } catch (_) {
+  }
+  const list = await loadMovies();
+  const key = normTitle(title), bkey = normTitle(baseTitle(title));
+  const s = (list.find((m) => normTitle(m.title) === key) || list.find((m) => normTitle(baseTitle(m.title)) === bkey))?.slug;
+  return s ? twPoster(s) : "";
+}
+var posterOnly = {};
+function moviePoster(title, slug) {
+  const k = (slug || "") + "|" + title;
+  return posterOnly[k] ||= (async () => {
+    const all = readExtras();
+    const hit = all["t|" + normTitle(title)] || all["n|" + normTitle(title)];
+    if (hit?.poster) return hit.poster;
+    return normImageUrl(await findPoster(title, slug).catch(() => ""));
+  })();
+}
+function posterSrc(url) {
+  if (!url) return "";
+  try {
+    return platform().cachedImage(url) || url;
+  } catch (_) {
+    return url;
+  }
+}
+function cachePoster(url) {
+  if (!url) return;
+  try {
+    platform().cacheImage(url).catch(() => null);
+  } catch (_) {
+  }
+}
+var prefetched = /* @__PURE__ */ new Set();
+function prefetchPosters(items, max = 30, trailers = 10) {
+  const queue = [];
+  items.slice(0, max).forEach((m, i) => {
+    const k = (m.slug || "") + "|" + m.title;
+    if (prefetched.has(k)) return;
+    prefetched.add(k);
+    queue.push({ title: m.title, slug: m.slug, trailer: i < trailers });
+  });
+  const run = async () => {
+    for (let m = queue.shift(); m; m = queue.shift()) {
+      try {
+        const u = await moviePoster(m.title, m.slug);
+        if (u) await platform().cacheImage(u);
+        if (m.trailer) await movieExtras(m.title, m.slug);
+      } catch (_) {
+      }
+    }
+  };
+  for (let i = 0; i < 2; i++) run();
+}
 async function findExtras(title, slug) {
   const base = baseTitle(title);
   const out = {
@@ -1255,17 +1366,7 @@ async function findExtras(title, slug) {
     trailer: `https://www.youtube.com/results?search_query=${encodeURIComponent(base + " 預告")}`,
     trailerName: ""
   };
-  const posterJob = (async () => {
-    if (slug) return twPoster(slug);
-    try {
-      return await twPoster(title);
-    } catch (_) {
-    }
-    const list = await loadMovies();
-    const key = normTitle(title), bkey = normTitle(base);
-    const s = (list.find((m) => normTitle(m.title) === key) || list.find((m) => normTitle(baseTitle(m.title)) === bkey))?.slug;
-    return s ? twPoster(s) : "";
-  })().catch(() => "");
+  const posterJob = findPoster(title, slug).catch(() => "");
   const token = ((await loadSettings()).tmdbToken || "").trim();
   const tmdbJob = (async () => {
     if (!token) return null;
@@ -1659,7 +1760,7 @@ var App = class {
     this.loadingText = "讀取中…";
     // ── 事件迴圈 ──
     // 背景查 GitHub 上的最新版本（首頁顯示是否為最新版）
-    this.latest = checkLatest("2026.11.05-2317");
+    this.latest = checkLatest("2026.11.05-2322");
     // ── 搜尋 ──
     this.query = "";
     this.tmdbStatus = "";
@@ -1763,11 +1864,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.05-2317"}`);
+          Pasteboard.copy(`版本 ${"2026.11.05-2322"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.05-2317"}`,
+      `版本 ${"2026.11.05-2322"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -1865,6 +1966,7 @@ var App = class {
   // ── 電影列表 ──
   async moviesView(c, date) {
     const r = await moviesOf(c, date);
+    prefetchPosters(r.movies);
     const isToday = date === todayTPE();
     const now = nowHM();
     return /* @__PURE__ */ h(Page, { title: dateLabel(date), subtitle: `${c.name}｜${r.movies.length} 部電影`, onBack: () => this.back() }, /* @__PURE__ */ h(Section, null, r.movies.length ? null : /* @__PURE__ */ h(Empty, { icon: "🎞", text: "這天沒有可讀取的場次" }), r.movies.map((m) => {
@@ -1901,18 +2003,22 @@ var App = class {
       }
     );
   }
-  /** 海報、預告與評分：先等 1.5 秒，還沒好就先畫頁面，讀好後自動補上 */
+  /** 海報、預告與評分：先等 1.5 秒，還沒好就先畫頁面，讀好後自動補上。海報網址另外快查（不等預告），有圖片快取就立刻顯示 */
   async extras(title, slug, en) {
     const px = movieExtras(title, slug).catch(() => null);
     const pr = movieRatings(title, en).catch(() => null);
-    const quick = (p) => Promise.race([p, sleep(1500).then(() => void 0)]);
-    const [x, r] = await Promise.all([quick(px), quick(pr)]);
-    const loading = x === void 0 || r === void 0;
-    if (loading) this.late = Promise.all([px, pr]);
-    return { x: x ?? null, r: r ?? null, px, loading };
+    const pp = moviePoster(title, slug).catch(() => "");
+    const quick = (p2) => Promise.race([p2, sleep(1500).then(() => void 0)]);
+    const [x, r, p] = await Promise.all([quick(px), quick(pr), quick(pp)]);
+    const loading = x === void 0 || r === void 0 || p === void 0;
+    if (loading) this.late = Promise.all([px, pr, pp]);
+    return { x: x ?? null, r: r ?? null, p: p || "", px, loading };
   }
   hero(e, title, lines) {
     const { x, r } = e;
+    const posterUrl = x?.poster || e.p || "";
+    const poster = posterSrc(posterUrl);
+    if (poster && poster === posterUrl) cachePoster(posterUrl);
     const search = `https://www.youtube.com/results?search_query=${encodeURIComponent(title + " 預告")}`;
     const badges = [];
     if (r) {
@@ -1927,7 +2033,7 @@ var App = class {
     return /* @__PURE__ */ h(
       Hero,
       {
-        poster: x?.poster,
+        poster,
         lines,
         badges,
         trailerLabel: !x || x.trailerName ? "觀看預告" : "搜尋預告",
@@ -2071,6 +2177,7 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
     const all = await loadMovies();
     const k = this.movieQuery.trim().toLowerCase();
     const list = all.filter((m) => !k || `${m.title} ${m.en}`.toLowerCase().includes(k));
+    prefetchPosters(list);
     const item = (m) => /* @__PURE__ */ h(
       Item,
       {
@@ -2178,6 +2285,7 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
     if (!scope.length) throw new Error("沒有可以查的影城。先在影城頁加入常去影城，或改選附近／縣市。");
     const { hits, failed } = await findShowtimes(scope, date, win, this.nowFormat);
     const groups = groupByMovie(hits);
+    prefetchPosters(groups);
     const scopeLabel = this.nowScope === "fav" ? "常去影城" : this.nowScope === "near" ? "附近 10 間" : this.nowScope;
     const open = (hit) => {
       this.runtime = hit.movie.runtime;

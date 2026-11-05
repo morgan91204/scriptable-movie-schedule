@@ -14,7 +14,7 @@ import {
   Cinema, Movie, Settings, Version, TwMovie, TwMovieCinema, CITY_ORDER, TW,
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
   loadSettings, saveSettings, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, cinemaAddress,
-  FORMATS, formatsOf, filterVersions, nearest, kmLabel, WINDOWS, findShowtimes, groupByMovie, shareText, hallOf, tmdbTest, movieExtras, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, SCRIPTING_IMPORT_URL, movieRatings, ratingTier,
+  FORMATS, formatsOf, filterVersions, nearest, kmLabel, WINDOWS, findShowtimes, groupByMovie, shareText, hallOf, tmdbTest, movieExtras, moviePoster, posterSrc, isLocalSrc, cachePoster, prefetchPosters, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, SCRIPTING_IMPORT_URL, movieRatings, ratingTier,
 } from "./core"
 import type { Format, LatLng, Hit } from "./core"
 
@@ -281,8 +281,15 @@ function RatingBadge({ kind, value, tier, note, url }: { kind: "imdb" | "tomato"
 function MovieHero({ title, slug, lines, en }: { title: string; slug?: string; lines: string[]; en?: string }) {
   const x = useLoad(() => movieExtras(title, slug), [title, slug || ""])
   const rt = useLoad(() => movieRatings(title, en), [title, en || ""])
+  const p = useLoad(() => moviePoster(title, slug), [title, slug || ""]) // 海報網址快查（不等預告）
   const [opening, setOpening] = useState(false)
   const r = rt.data
+  const posterUrl = x.data?.poster || p.data || ""
+  const poster = posterSrc(posterUrl) // 有圖片快取就用本機檔案
+  useEffect(() => {
+    if (posterUrl && poster === posterUrl) cachePoster(posterUrl) // 這次用網址顯示，順便抓進快取
+  }, [posterUrl])
+  const posterPending = !posterUrl && !x.data && p.data === null && !p.error
   const search = `https://www.youtube.com/results?search_query=${encodeURIComponent(title + " 預告")}`
   // 點「觀看預告」：還在讀就等讀好再開（movieExtras 會回傳同一個進行中的查詢），不會先開成搜尋頁
   const openTrailer = async () => {
@@ -298,10 +305,12 @@ function MovieHero({ title, slug, lines, en }: { title: string; slug?: string; l
   const loaded = !!(r && (r.imdb || r.tomato || r.popcorn))
   return <Section>
     <HStack alignment={"bottom"} spacing={12} listRowBackground={"clear"}>
-      {x.data?.poster
-        ? <Image imageUrl={x.data.poster} resizable scaleToFit frame={{ width: 104, height: 156 }}
-            clipShape={{ type: "rect", cornerRadius: 12 }} placeholder={<ProgressView progressViewStyle={"circular"} />} />
-        : x.data ? null : <ProgressView progressViewStyle={"circular"} frame={{ width: 104, height: 156 }} />}
+      {poster
+        ? isLocalSrc(poster)
+          ? <Image filePath={poster} resizable scaleToFit frame={{ width: 104, height: 156 }} clipShape={{ type: "rect", cornerRadius: 12 }} />
+          : <Image imageUrl={poster} resizable scaleToFit frame={{ width: 104, height: 156 }}
+              clipShape={{ type: "rect", cornerRadius: 12 }} placeholder={<ProgressView progressViewStyle={"circular"} />} />
+        : posterPending ? <ProgressView progressViewStyle={"circular"} frame={{ width: 104, height: 156 }} /> : null}
       <VStack alignment={"leading"} spacing={4}>
         {lines.filter(Boolean).map((l) => <Text key={l} font={"subheadline"} foregroundStyle={"secondaryLabel"}>{l}</Text>)}
         {/* 評分讀好後三個徽章都顯示：沒有那項評分就是「-」（跟「還沒抓到」分得開） */}
@@ -495,6 +504,7 @@ function CinemaPage({ cinema }: { cinema: Cinema }) {
 
 function DayPage({ cinema, date }: { cinema: Cinema; date: string }) {
   const day = useLoad(() => moviesOf(cinema, date), [cinema.id, date])
+  useEffect(() => { if (day.data) prefetchPosters(day.data.movies) }, [day.data]) // 背景先抓海報，進電影頁就不用等
   const isToday = date === todayTPE()
   const now = nowHM()
   return <List navigationTitle={dateLabel(date)} navigationBarTitleDisplayMode={"inline"} refreshable={day.reload}>
@@ -676,6 +686,7 @@ function MoviesPage() {
   const [query, setQuery] = useState("")
   const k = query.trim().toLowerCase()
   const list = (movies.data || []).filter((m) => !k || `${m.title} ${m.en}`.toLowerCase().includes(k))
+  useEffect(() => { if (movies.data) prefetchPosters(list) }, [movies.data, k]) // 背景先抓海報，進電影頁就不用等
   const now = list.filter((m) => !m.comingSoon)
   const soon = list.filter((m) => m.comingSoon)
   const row = (m: TwMovie) =>
@@ -844,6 +855,7 @@ function NowResultsPage({ date, winId, scope, format }: { date: string; winId: s
     return await findShowtimes(list, date, win, format, (d, t) => setProgress(`已查 ${d} / ${t} 間`))
   }, [date, winId, scope, format])
   const groups = res.data ? groupByMovie(res.data.hits) : []
+  useEffect(() => { if (res.data) prefetchPosters(groups) }, [res.data]) // 背景先抓海報，進電影頁就不用等
   const scopeLabel = scope === "fav" ? "常去影城" : scope === "near" ? "附近 10 間" : scope
   return <List navigationTitle={`${dateLabel(date).replace(/ .*$/, "")} ${win.label}`} navigationBarTitleDisplayMode={"inline"} refreshable={res.reload}>
     {res.error ? <ErrorRow error={res.error} retry={res.reload} /> : null}

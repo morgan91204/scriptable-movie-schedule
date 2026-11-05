@@ -24,6 +24,17 @@ globalThis.Font = { boldSystemFont: (n) => ({ bold: n }), systemFont: (n) => ({ 
 
 globalThis.Request = class {
   constructor(url) { this.url = url; this.headers = {}; this.response = null; }
+  /** 二進位下載（海報圖）：回傳 Buffer，模擬 Scriptable 的 Data */
+  load() {
+    return new Promise((res, rej) => {
+      execFile("curl", ["-sS", "-m", "25", "-A", this.headers["User-Agent"] || "x", "-o", "-", "-w", "\n__CODE__%{http_code}", this.url], { maxBuffer: 20e6, encoding: "buffer" }, (err, out) => {
+        if (err) return rej(err);
+        const s = out.toString("latin1"); const i = s.lastIndexOf("\n__CODE__");
+        this.response = { statusCode: Number(s.slice(i + 9)) };
+        res(out.subarray(0, Buffer.byteLength(s.slice(0, i), "latin1")));
+      });
+    });
+  }
   loadString() {
     // 樂聲官網只接受台灣 IP：測試時改讀從瀏覽器擷取的 fixture
     const lux = this.url.match(/luxcinema\.com\.tw\/web\/(2020\.php\?type=ShowTimes|2020-movie_item\.php\?film_id=(\d+))/);
@@ -92,8 +103,15 @@ const fm = {
   readString: (p) => fs.readFileSync(p, "utf8"),
   writeString: (p, s) => fs.writeFileSync(p, s),
   downloadFileFromiCloud: async () => {},
+  // 圖片快取用：Data 以 Buffer 模擬
+  read: (p) => fs.readFileSync(p),
+  write: (p, d) => fs.writeFileSync(p, d),
+  listContents: (p) => fs.readdirSync(p),
+  modificationDate: (p) => fs.statSync(p).mtime,
+  remove: (p) => fs.rmSync(p, { recursive: true, force: true }),
 };
 globalThis.FileManager = { iCloud: () => fm, local: () => fm };
+Buffer.prototype.toBase64String = function () { return this.toString("base64"); };
 
 // ── 測試用的操作函式 ──
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));

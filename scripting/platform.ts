@@ -12,6 +12,10 @@ export interface Platform {
   /** 本機快取 */
   cacheGet(name: string): string | null;
   cacheSet(name: string, value: string): void;
+  /** 圖片快取：已抓到手機上的圖，回傳畫面可以直接用的來源（Scriptable 是 data: 網址、Scripting 是檔案路徑），沒有就回傳 null */
+  cachedImage(url: string): string | null;
+  /** 把圖片抓到手機快取（已有就直接回傳），失敗回傳 null */
+  cacheImage(url: string): Promise<string | null>;
 }
 
 let current: Platform | null = null;

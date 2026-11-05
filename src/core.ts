@@ -468,6 +468,14 @@ export interface MovieExtras {
   err?: string; // 有金鑰卻查不到預告時的原因
 }
 const extrasCache: Record<string, Promise<MovieExtras>> = {};
+/** 手機上記的海報／預告（extras.json） */
+const readExtras = (): Record<string, MovieExtras & { at: number }> => {
+  try {
+    return JSON.parse(cacheGet("extras.json") || "{}") || {};
+  } catch (_) {
+    return {};
+  }
+};
 
 /** 海報：場次通電影頁（不需 Token）→ TMDB；預告：TMDB 的 YouTube 影片 → YouTube 搜尋 */
 export async function movieExtras(title: string, slug?: string): Promise<MovieExtras> {
@@ -476,13 +484,7 @@ export async function movieExtras(title: string, slug?: string): Promise<MovieEx
   const k = (hasToken ? "t|" : "n|") + (slug || "") + "|" + title;
   return (extrasCache[k] ||= (async () => {
     const ck = (hasToken ? "t|" : "n|") + normTitle(title);
-    const read = (): Record<string, MovieExtras & { at: number }> => {
-      try {
-        return JSON.parse(cacheGet("extras.json") || "{}") || {};
-      } catch (_) {
-        return {};
-      }
-    };
+    const read = readExtras;
     const hit = read()[ck];
     // 有金鑰卻沒找到預告（可能是當時連線失敗）只記 1 小時；沒海報記 1 天；其他 7 天
     // 有金鑰卻沒有預告：不採用舊紀錄，重新查；沒海報記 1 天；其他 7 天
@@ -521,6 +523,71 @@ function twPoster(slug: string): Promise<string> {
   })());
 }
 
+/** 場次通的海報網址（不需金鑰）：有 slug 直接查，否則用片名試，再不行從電影清單對片名 */
+async function findPoster(title: string, slug?: string): Promise<string> {
+  if (slug) return twPoster(slug);
+  // 場次通的網址就是片名：先直接試，不用先下載整份電影清單
+  try {
+    return await twPoster(title);
+  } catch (_) {}
+  const list = await loadMovies();
+  const key = normTitle(title), bkey = normTitle(baseTitle(title));
+  const s = (list.find((m) => normTitle(m.title) === key) || list.find((m) => normTitle(baseTitle(m.title)) === bkey))?.slug;
+  return s ? twPoster(s) : "";
+}
+
+/** 只查海報網址（約 0.3 秒），不等預告：電影頁先把海報畫出來。手機上記過的直接用 */
+const posterOnly: Record<string, Promise<string>> = {};
+export function moviePoster(title: string, slug?: string): Promise<string> {
+  const k = (slug || "") + "|" + title;
+  return (posterOnly[k] ||= (async () => {
+    const all = readExtras();
+    const hit = all["t|" + normTitle(title)] || all["n|" + normTitle(title)];
+    if (hit?.poster) return hit.poster;
+    return normImageUrl(await findPoster(title, slug).catch(() => ""));
+  })());
+}
+
+/** 顯示用的海報來源：手機上有圖片快取就用本機（Scriptable 是 data: 網址、Scripting 是檔案路徑），否則用網址 */
+export function posterSrc(url: string): string {
+  if (!url) return "";
+  try {
+    return platform().cachedImage(url) || url;
+  } catch (_) {
+    return url;
+  }
+}
+/** posterSrc 回傳的是本機來源（不是 http 網址） */
+export const isLocalSrc = (src: string) => /^(data:|\/)/.test(src);
+/** 背景把海報圖抓到手機快取（不等結果） */
+export function cachePoster(url: string): void {
+  if (!url) return;
+  try {
+    platform().cacheImage(url).catch(() => null);
+  } catch (_) {}
+}
+const prefetched = new Set<string>();
+/** 列表出現時在背景預抓：前 max 部的海報網址與海報圖（一次 2 個），前 trailers 部連預告也先查，之後進電影頁就不用等 */
+export function prefetchPosters(items: { title: string; slug?: string }[], max = 30, trailers = 10): void {
+  const queue: { title: string; slug?: string; trailer: boolean }[] = [];
+  items.slice(0, max).forEach((m, i) => {
+    const k = (m.slug || "") + "|" + m.title;
+    if (prefetched.has(k)) return;
+    prefetched.add(k);
+    queue.push({ title: m.title, slug: m.slug, trailer: i < trailers });
+  });
+  const run = async () => {
+    for (let m = queue.shift(); m; m = queue.shift()) {
+      try {
+        const u = await moviePoster(m.title, m.slug);
+        if (u) await platform().cacheImage(u);
+        if (m.trailer) await movieExtras(m.title, m.slug);
+      } catch (_) {}
+    }
+  };
+  for (let i = 0; i < 2; i++) run();
+}
+
 async function findExtras(title: string, slug?: string): Promise<MovieExtras> {
   const base = baseTitle(title);
   const out: MovieExtras = {
@@ -529,17 +596,7 @@ async function findExtras(title: string, slug?: string): Promise<MovieExtras> {
     trailerName: "",
   };
   // 海報（場次通）與預告（TMDB）同時查
-  const posterJob = (async () => {
-    if (slug) return twPoster(slug);
-    // 場次通的網址就是片名：先直接試，不用先下載整份電影清單
-    try {
-      return await twPoster(title);
-    } catch (_) {}
-    const list = await loadMovies();
-    const key = normTitle(title), bkey = normTitle(base);
-    const s = (list.find((m) => normTitle(m.title) === key) || list.find((m) => normTitle(baseTitle(m.title)) === bkey))?.slug;
-    return s ? twPoster(s) : "";
-  })().catch(() => "");
+  const posterJob = findPoster(title, slug).catch(() => "");
   const token = ((await loadSettings()).tmdbToken || "").trim();
   const tmdbJob = (async () => {
     if (!token) return null;
