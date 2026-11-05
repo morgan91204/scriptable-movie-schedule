@@ -741,6 +741,107 @@ export function groupByMovie(hits: Hit[]): { title: string; runtime: number; rat
   return Object.values(map).sort((a, b) => b.hits.length - a.hits.length || showMinute(a.hits[0].time) - showMinute(b.hits[0].time));
 }
 
+// ───────────────────────── 評分：IMDb、爛番茄、爆米花 ─────────────────────────
+// 不需要 TMDB 金鑰：IMDb 的搜尋建議可以直接用中文片名找到 tt 編號；有金鑰時改用 TMDB 對應的 IMDb 編號，比較準。
+
+export interface Ratings {
+  imdb?: { score: number; votes: number; url: string };
+  tomato?: { score: number; certified: boolean; url: string }; // 番茄指數（影評）
+  popcorn?: { score: number; url: string }; // 爆米花指數（觀眾）
+}
+
+const IMDB_GQL = "https://api.graphql.imdb.com/";
+async function imdbId(title: string, en?: string): Promise<string> {
+  const token = ((await loadSettings()).tmdbToken || "").trim();
+  if (token) {
+    try {
+      const hit = await tmdbFind(title, token);
+      if (hit) {
+        const ids = await tmdb(`/movie/${hit.id}/external_ids`, token);
+        if (ids?.imdb_id) return String(ids.imdb_id);
+      }
+    } catch (_) {}
+  }
+  for (const q of [en, baseTitle(title)].filter(Boolean) as string[]) {
+    const key = q.toLowerCase().replace(/[\\/?#%]/g, " ").trim();
+    try {
+      const r = await platform().fetchText(`https://v3.sg.media-imdb.com/suggestion/x/${encodeURIComponent(key)}.json`, { "User-Agent": UA });
+      const d = (JSON.parse(r.body).d || []) as any[];
+      const hit = d.find((x) => /^tt/.test(x.id) && (x.qid === "movie" || x.qid === "tvMovie" || x.qid === "video"));
+      if (hit) return hit.id;
+    } catch (_) {}
+  }
+  return "";
+}
+
+async function findRatings(title: string, en?: string): Promise<Ratings> {
+  const out: Ratings = {};
+  const id = await imdbId(title, en);
+  if (!id) return out;
+  // IMDb 評分與英文片名、年份（給爛番茄搜尋用）
+  let name = "", year = 0;
+  try {
+    const q = `{ title(id:"${id}"){ titleText{text} originalTitleText{text} releaseYear{year} ratingsSummary{aggregateRating voteCount} } }`;
+    const r = await platform().fetchText(`${IMDB_GQL}?query=${encodeURIComponent(q)}`, {
+      "content-type": "application/json",
+      "x-imdb-client-name": "imdb-web-next-localized",
+    });
+    const t = JSON.parse(r.body)?.data?.title;
+    name = t?.titleText?.text || t?.originalTitleText?.text || "";
+    year = Number(t?.releaseYear?.year) || 0;
+    const score = Number(t?.ratingsSummary?.aggregateRating) || 0;
+    if (score) out.imdb = { score, votes: Number(t.ratingsSummary.voteCount) || 0, url: `https://www.imdb.com/title/${id}/` };
+  } catch (_) {}
+  // 爛番茄：用英文片名搜尋，年份要對得上（差一年內）才採用，避免抓到同名舊片
+  if (name) {
+    try {
+      const list = await parse<{ year: number; url: string; title: string }[]>(
+        "parseRtSearch",
+        await getText(`https://www.rottentomatoes.com/search?search=${encodeURIComponent(name)}`)
+      );
+      const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+      const pick =
+        list.find((x) => norm(x.title) === norm(name) && (!year || Math.abs(x.year - year) <= 1)) ||
+        list.find((x) => year && Math.abs(x.year - year) <= 1 && norm(x.title).includes(norm(name)));
+      if (pick) {
+        const s = await parse<{ critics: number; certified: boolean; audience: number }>("parseRtMovie", await getText(pick.url));
+        if (s.critics >= 0) out.tomato = { score: s.critics, certified: s.certified, url: pick.url };
+        if (s.audience >= 0) out.popcorn = { score: s.audience, url: pick.url };
+      }
+    } catch (_) {}
+  }
+  return out;
+}
+
+const ratingsMem: Record<string, Promise<Ratings>> = {};
+/** 評分（記在手機 1 天；查不到的 1 天後再試） */
+export function movieRatings(title: string, en?: string): Promise<Ratings> {
+  const k = normTitle(title);
+  return (ratingsMem[k] ||= (async () => {
+    const read = (): Record<string, Ratings & { at: number }> => {
+      try {
+        return JSON.parse(cacheGet("ratings.json") || "{}") || {};
+      } catch (_) {
+        return {};
+      }
+    };
+    const hit = read()[k];
+    if (hit && Date.now() - hit.at < 86400e3) return hit;
+    const r = await findRatings(title, en);
+    const all = read();
+    for (const [key, v] of Object.entries(all)) if (Date.now() - v.at > 86400e3) delete all[key];
+    all[k] = { ...r, at: Date.now() };
+    cacheSet("ratings.json", JSON.stringify(all));
+    return r;
+  })());
+}
+
+/** 評分顏色等級：good（綠）／mid（黃）／bad（紅） */
+export function ratingTier(kind: "imdb" | "pct", v: number): "good" | "mid" | "bad" {
+  const x = kind === "imdb" ? v * 10 : v;
+  return x >= 75 ? "good" : x >= 60 ? "mid" : "bad";
+}
+
 // ───────────────────────── 版本檢查 ─────────────────────────
 
 const VERSION_URL = "https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/main/dist/version.json";

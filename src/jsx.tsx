@@ -164,12 +164,36 @@ export function Button(props: { label: string; onTap?: Handler; kind?: "primary"
 }
 
 /** 電影頁頂端：海報＋資訊＋預告按鈕 */
-export function Hero(props: { poster?: string; lines: string[]; trailerLabel?: string; onTrailer?: Handler }): string {
+/** 評分徽章：IMDb／番茄指數／爆米花指數，背景顏色依分數高低（綠／黃／紅） */
+export interface RatingBadge {
+  kind: "imdb" | "tomato" | "popcorn";
+  value: string; // 顯示的分數，例如 8.5、94%
+  tier: "good" | "mid" | "bad";
+  note?: string; // 例如「新鮮認證」
+  onTap?: Handler;
+}
+export function Badges(props: { items: RatingBadge[] }): string {
+  if (!props.items.length) return "";
+  return (
+    <div class="ratings">
+      {props.items.map((b) => (
+        <button class={"rate " + b.tier} onTap={b.onTap}>
+          {b.kind === "imdb" ? <span class="imdb">IMDb</span> : <span class="emo">{b.kind === "tomato" ? (b.tier === "bad" ? "🤢" : "🍅") : b.tier === "bad" ? "🫗" : "🍿"}</span>}
+          <span class="v">{esc(b.value)}</span>
+          {b.note ? <span class="n">{esc(b.note)}</span> : null}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+export function Hero(props: { poster?: string; lines: string[]; trailerLabel?: string; onTrailer?: Handler; badges?: RatingBadge[] }): string {
   return (
     <div class="hero">
       {props.poster ? <img class="poster" src={props.poster} alt="" onerror="this.style.display='none'" /> : null}
       <div class="hero-info">
         {props.lines.filter(Boolean).map((l) => <div class="hero-line">{esc(l)}</div>)}
+        {props.badges ? <Badges items={props.badges} /> : null}
         {props.onTrailer ? (
           <button class="trailer" onTap={props.onTrailer}>
             ▶︎ {esc(props.trailerLabel || "觀看預告")}

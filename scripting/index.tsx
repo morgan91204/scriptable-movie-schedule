@@ -14,7 +14,7 @@ import {
   Cinema, Movie, Settings, Version, TwMovie, TwMovieCinema, CITY_ORDER, TW,
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
   loadSettings, saveSettings, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, cinemaAddress,
-  FORMATS, formatsOf, filterVersions, nearest, kmLabel, WINDOWS, findShowtimes, groupByMovie, shareText, hallOf, tmdbTest, movieExtras, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, SCRIPTING_IMPORT_URL,
+  FORMATS, formatsOf, filterVersions, nearest, kmLabel, WINDOWS, findShowtimes, groupByMovie, shareText, hallOf, tmdbTest, movieExtras, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, SCRIPTING_IMPORT_URL, movieRatings, ratingTier,
 } from "./core"
 import type { Format, LatLng, Hit } from "./core"
 
@@ -242,8 +242,30 @@ function AddressRow({ name, address, title }: { name: string; address: string; t
 }
 
 /** 電影頁頂端：海報在左，資訊與紅色預告按鈕在右（跟 Scriptable 版一樣） */
-function MovieHero({ title, slug, lines }: { title: string; slug?: string; lines: string[] }) {
+/** 評分徽章：IMDb／番茄指數／爆米花指數，顏色依分數（綠 ≥75、黃 60–74、紅 <60） */
+const TIER = {
+  good: { fg: "#1FA34A", bg: "#30D1582E" },
+  mid: { fg: "#D98200", bg: "#FF9F0A33" },
+  bad: { fg: "#E0443A", bg: "#FF453A2E" },
+}
+function RatingBadge({ kind, value, tier, note, url }: { kind: "imdb" | "tomato" | "popcorn"; value: string; tier: "good" | "mid" | "bad"; note?: string; url: string }) {
+  const c = TIER[tier]
+  const icon = kind === "tomato" ? (tier === "bad" ? "🤢" : "🍅") : kind === "popcorn" ? (tier === "bad" ? "🫗" : "🍿") : ""
+  return <Button action={() => Safari.openURL(url)} buttonStyle={"plain"}>
+    <HStack spacing={4} padding={{ horizontal: 8, vertical: 4 }} background={c.bg} clipShape={{ type: "rect", cornerRadius: 8 }}>
+      {kind === "imdb"
+        ? <Text font={"caption2"} fontWeight={"heavy"} foregroundStyle={"black"} padding={{ horizontal: 4, vertical: 1 }} background={"#F5C518"} clipShape={{ type: "rect", cornerRadius: 4 }}>IMDb</Text>
+        : <Text font={"footnote"}>{icon}</Text>}
+      <Text font={"subheadline"} fontWeight={"bold"} foregroundStyle={c.fg}>{value}</Text>
+      {note ? <Text font={"caption2"} foregroundStyle={c.fg}>{note}</Text> : null}
+    </HStack>
+  </Button>
+}
+
+function MovieHero({ title, slug, lines, en }: { title: string; slug?: string; lines: string[]; en?: string }) {
   const x = useLoad(() => movieExtras(title, slug), [title, slug || ""])
+  const rt = useLoad(() => movieRatings(title, en), [title, en || ""])
+  const r = rt.data
   const url = x.data?.trailer || `https://www.youtube.com/results?search_query=${encodeURIComponent(title + " 預告")}`
   return <Section>
     <HStack alignment={"bottom"} spacing={14} listRowBackground={"clear"}>
@@ -253,6 +275,11 @@ function MovieHero({ title, slug, lines }: { title: string; slug?: string; lines
         : x.data ? null : <ProgressView progressViewStyle={"circular"} frame={{ width: 112, height: 168 }} />}
       <VStack alignment={"leading"} spacing={4}>
         {lines.filter(Boolean).map((l) => <Text key={l} font={"subheadline"} foregroundStyle={"secondaryLabel"}>{l}</Text>)}
+        {r && (r.imdb || r.tomato || r.popcorn) ? <HStack spacing={6}>
+          {r.imdb ? <RatingBadge kind={"imdb"} value={r.imdb.score.toFixed(1)} tier={ratingTier("imdb", r.imdb.score)} url={r.imdb.url} /> : null}
+          {r.tomato ? <RatingBadge kind={"tomato"} value={`${r.tomato.score}%`} tier={ratingTier("pct", r.tomato.score)} note={r.tomato.certified ? "認證" : undefined} url={r.tomato.url} /> : null}
+          {r.popcorn ? <RatingBadge kind={"popcorn"} value={`${r.popcorn.score}%`} tier={ratingTier("pct", r.popcorn.score)} url={r.popcorn.url} /> : null}
+        </HStack> : null}
         <Button action={() => Safari.openURL(url)} buttonStyle={"borderedProminent"} buttonBorderShape={"capsule"} tint={"systemRed"} padding={{ top: 8 }}>
           <Label title={x.data?.trailerName ? "觀看預告" : "搜尋 YouTube 預告"} systemImage={"play.fill"} font={"headline"} />
         </Button>
@@ -658,7 +685,7 @@ function MoviePage({ movie }: { movie: TwMovie }) {
     { id: c.id, name: c.name, city: c.city, district: c.district, source: "tw", url: `${TW}/cinemas/${c.id}/`, address: c.address }
 
   return <List navigationTitle={movie.title} navigationBarTitleDisplayMode={"inline"} refreshable={day.reload}>
-    <MovieHero title={movie.title} slug={movie.slug} lines={[
+    <MovieHero title={movie.title} slug={movie.slug} en={movie.en} lines={[
       movie.en,
       [movie.rating || data?.rating, runtime ? `${runtime} 分鐘` : ""].filter(Boolean).join("｜"),
       data ? `${data.cinemas.length} 間影城有放映` : "",

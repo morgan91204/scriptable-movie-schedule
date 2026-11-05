@@ -59,6 +59,16 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .hero .poster{width:112px;aspect-ratio:2/3;object-fit:cover;border-radius:12px;background:var(--chip);box-shadow:0 4px 14px rgba(0,0,0,.25);flex:none}
 .hero-info{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
 .hero-line{font-size:14px;color:var(--fg2)}
+.ratings{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.rate{display:flex;align-items:center;gap:5px;padding:4px 9px;border-radius:9px;font-size:14px;font-weight:700;font-variant-numeric:tabular-nums}
+.rate.good{background:rgba(48,209,88,.18);color:#1f9d45}
+.rate.mid{background:rgba(255,159,10,.2);color:#c77700}
+.rate.bad{background:rgba(255,69,58,.18);color:#d63a31}
+@media(prefers-color-scheme:dark){.rate.good{color:#30d158}.rate.mid{color:#ffb340}.rate.bad{color:#ff6961}}
+.rate .imdb{background:#f5c518;color:#000;font-size:11px;font-weight:800;padding:1px 4px;border-radius:4px}
+.rate .emo{font-size:14px}
+.rate .n{font-size:11px;font-weight:600;opacity:.85}
+.rate:active{opacity:.6}
 .trailer{margin-top:8px;align-self:flex-start;padding:8px 14px;border-radius:999px;background:#ff0033;color:#fff;font-size:15px;font-weight:600}
 .trailer:active{opacity:.7}
 .item.long{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}

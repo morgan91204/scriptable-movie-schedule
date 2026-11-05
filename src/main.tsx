@@ -3,6 +3,7 @@
 // 畫面：WebView（HTML/CSS），事件迴圈在 run()。資料層在 core.ts，網頁解析在 parsers.ts。
 
 import { h, Fragment, Page, Section, Item, Chips, Chip, Button, Note, Loading, Empty, Hero } from "./jsx";
+import type { RatingBadge } from "./jsx";
 import { UI } from "./ui";
 import { setPlatform } from "./platform";
 import { scriptablePlatform } from "./platform-scriptable";
@@ -11,9 +12,9 @@ import {
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
   loadSettings, saveSettings, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, TW,
   FORMATS, formatsOf, filterVersions, nearest, kmLabel, WINDOWS, findShowtimes, groupByMovie, shareText,
-  hallOf, tmdbTest, movieExtras, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest,
+  hallOf, tmdbTest, movieExtras, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, movieRatings, ratingTier,
 } from "./core";
-import type { MovieExtras } from "./core";
+import type { MovieExtras, Ratings } from "./core";
 import type { TwMovie, TwMovieCinema, Format, LatLng, Hit } from "./core";
 
 interface Pick {
@@ -385,17 +386,25 @@ class App {
     );
   }
 
-  /** 海報與預告（最多等 3 秒，等不到就先不顯示海報） */
-  async extras(title: string, slug?: string): Promise<MovieExtras | null> {
-    return Promise.race([movieExtras(title, slug).catch(() => null), sleep(3000).then(() => null)]);
+  /** 海報、預告與評分（同時查，最多等 3.5 秒；等不到的先不顯示，下次打開就有） */
+  async extras(title: string, slug?: string, en?: string): Promise<{ x: MovieExtras | null; r: Ratings | null }> {
+    const wait = <T,>(p: Promise<T>) => Promise.race([p.catch(() => null), sleep(3500).then(() => null)]);
+    const [x, r] = await Promise.all([wait(movieExtras(title, slug)), wait(movieRatings(title, en))]);
+    return { x, r };
   }
 
-  hero(x: MovieExtras | null, title: string, lines: string[]): string {
+  hero(e: { x: MovieExtras | null; r: Ratings | null }, title: string, lines: string[]): string {
+    const { x, r } = e;
     const url = x?.trailer || `https://www.youtube.com/results?search_query=${encodeURIComponent(title + " 預告")}`;
+    const badges: RatingBadge[] = [];
+    if (r?.imdb) badges.push({ kind: "imdb", value: r.imdb.score.toFixed(1), tier: ratingTier("imdb", r.imdb.score), onTap: () => Safari.open(r.imdb!.url) });
+    if (r?.tomato) badges.push({ kind: "tomato", value: `${r.tomato.score}%`, tier: ratingTier("pct", r.tomato.score), note: r.tomato.certified ? "認證" : undefined, onTap: () => Safari.open(r.tomato!.url) });
+    if (r?.popcorn) badges.push({ kind: "popcorn", value: `${r.popcorn.score}%`, tier: ratingTier("pct", r.popcorn.score), onTap: () => Safari.open(r.popcorn!.url) });
     return (
       <Hero
         poster={x?.poster}
         lines={lines}
+        badges={badges}
         trailerLabel={x?.trailerName ? "觀看預告" : "搜尋 YouTube 預告"}
         onTrailer={() => Safari.open(url)}
       />
@@ -650,7 +659,7 @@ class App {
     const replace = (nd: string) => {
       this.stack[this.stack.length - 1] = () => this.movieView(m, nd);
     };
-    const x = await this.extras(m.title, m.slug);
+    const x = await this.extras(m.title, m.slug, m.en);
     return (
       <Page title={m.title} subtitle={[m.rating || d.rating, runtime ? `${runtime} 分鐘` : "", `${d.cinemas.length} 間影城`].filter(Boolean).join("｜")} onBack={() => this.back()}>
         {this.hero(x, m.title, [m.en, [m.rating || d.rating, runtime ? `${runtime} 分鐘` : ""].filter(Boolean).join("｜"), `${d.cinemas.length} 間影城有放映`])}

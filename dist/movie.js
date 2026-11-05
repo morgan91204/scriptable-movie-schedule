@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.05-2142
+// @movie-schedule-app 電影行程 v2026.11.05-2158
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/jsx.tsx
@@ -73,8 +73,12 @@ function Chip(props) {
 function Button(props) {
   return /* @__PURE__ */ h("button", { class: "btn " + (props.kind || "primary"), onTap: props.onTap, "data-enter": props.enter ? "" : void 0 }, esc(props.label));
 }
+function Badges(props) {
+  if (!props.items.length) return "";
+  return /* @__PURE__ */ h("div", { class: "ratings" }, props.items.map((b) => /* @__PURE__ */ h("button", { class: "rate " + b.tier, onTap: b.onTap }, b.kind === "imdb" ? /* @__PURE__ */ h("span", { class: "imdb" }, "IMDb") : /* @__PURE__ */ h("span", { class: "emo" }, b.kind === "tomato" ? b.tier === "bad" ? "🤢" : "🍅" : b.tier === "bad" ? "🫗" : "🍿"), /* @__PURE__ */ h("span", { class: "v" }, esc(b.value)), b.note ? /* @__PURE__ */ h("span", { class: "n" }, esc(b.note)) : null)));
+}
 function Hero(props) {
-  return /* @__PURE__ */ h("div", { class: "hero" }, props.poster ? /* @__PURE__ */ h("img", { class: "poster", src: props.poster, alt: "", onerror: "this.style.display='none'" }) : null, /* @__PURE__ */ h("div", { class: "hero-info" }, props.lines.filter(Boolean).map((l) => /* @__PURE__ */ h("div", { class: "hero-line" }, esc(l))), props.onTrailer ? /* @__PURE__ */ h("button", { class: "trailer", onTap: props.onTrailer }, "▶︎ ", esc(props.trailerLabel || "觀看預告")) : null));
+  return /* @__PURE__ */ h("div", { class: "hero" }, props.poster ? /* @__PURE__ */ h("img", { class: "poster", src: props.poster, alt: "", onerror: "this.style.display='none'" }) : null, /* @__PURE__ */ h("div", { class: "hero-info" }, props.lines.filter(Boolean).map((l) => /* @__PURE__ */ h("div", { class: "hero-line" }, esc(l))), props.badges ? /* @__PURE__ */ h(Badges, { items: props.badges }) : null, props.onTrailer ? /* @__PURE__ */ h("button", { class: "trailer", onTap: props.onTrailer }, "▶︎ ", esc(props.trailerLabel || "觀看預告")) : null));
 }
 function Note(props) {
   return /* @__PURE__ */ h("p", { class: "note " + (props.kind || "info") }, esc(props.text));
@@ -144,6 +148,16 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .hero .poster{width:112px;aspect-ratio:2/3;object-fit:cover;border-radius:12px;background:var(--chip);box-shadow:0 4px 14px rgba(0,0,0,.25);flex:none}
 .hero-info{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
 .hero-line{font-size:14px;color:var(--fg2)}
+.ratings{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.rate{display:flex;align-items:center;gap:5px;padding:4px 9px;border-radius:9px;font-size:14px;font-weight:700;font-variant-numeric:tabular-nums}
+.rate.good{background:rgba(48,209,88,.18);color:#1f9d45}
+.rate.mid{background:rgba(255,159,10,.2);color:#c77700}
+.rate.bad{background:rgba(255,69,58,.18);color:#d63a31}
+@media(prefers-color-scheme:dark){.rate.good{color:#30d158}.rate.mid{color:#ffb340}.rate.bad{color:#ff6961}}
+.rate .imdb{background:#f5c518;color:#000;font-size:11px;font-weight:800;padding:1px 4px;border-radius:4px}
+.rate .emo{font-size:14px}
+.rate .n{font-size:11px;font-weight:600;opacity:.85}
+.rate:active{opacity:.6}
 .trailer{margin-top:8px;align-self:flex-start;padding:8px 14px;border-radius:999px;background:#ff0033;color:#fff;font-size:15px;font-weight:600}
 .trailer:active{opacity:.7}
 .item.long{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
@@ -635,12 +649,39 @@ function parseTwMovieDay(doc) {
   }
   return { title, en, rating, runtime, image, date, dates, cinemas };
 }
+function parseRtSearch(doc) {
+  const out = [];
+  for (const row of Array.from(doc.querySelectorAll("search-page-media-row"))) {
+    const a = row.querySelector('a[slot="title"]') || row.querySelector('a[href*="/m/"]');
+    const url = a?.getAttribute("href") || "";
+    if (!/rottentomatoes\\.com\\/m\\//.test(url)) continue;
+    out.push({ year: Number(row.getAttribute("release-year") || 0), url, title: String(a?.textContent || "").replace(/\\s+/g, " ").trim() });
+  }
+  return out;
+}
+function parseRtMovie(doc) {
+  const out = { critics: -1, certified: false, audience: -1, audienceCertified: false };
+  const el = doc.querySelector("#media-scorecard-json");
+  if (!el) return out;
+  try {
+    const d = JSON.parse(el.textContent || "{}");
+    const pct = (x) => x && /\\d/.test(String(x.scorePercent || "")) ? Number(String(x.scorePercent).replace(/\\D/g, "")) : -1;
+    out.critics = pct(d.criticsScore);
+    out.certified = !!(d.criticsScore && d.criticsScore.certified);
+    out.audience = pct(d.audienceScore);
+    out.audienceCertified = !!(d.audienceScore && d.audienceScore.certified);
+  } catch (_) {
+  }
+  return out;
+}
 {
   parseAtDay,
   parseAtRegion,
   parseEslite,
   parseLux,
   parseLuxFilm,
+  parseRtMovie,
+  parseRtSearch,
   parseSpotHs,
   parseSpotMovie,
   parseTwDay,
@@ -1380,6 +1421,92 @@ function groupByMovie(hits) {
   }
   return Object.values(map).sort((a, b) => b.hits.length - a.hits.length || showMinute(a.hits[0].time) - showMinute(b.hits[0].time));
 }
+var IMDB_GQL = "https://api.graphql.imdb.com/";
+async function imdbId(title, en) {
+  const token = ((await loadSettings()).tmdbToken || "").trim();
+  if (token) {
+    try {
+      const hit = await tmdbFind(title, token);
+      if (hit) {
+        const ids = await tmdb(`/movie/${hit.id}/external_ids`, token);
+        if (ids?.imdb_id) return String(ids.imdb_id);
+      }
+    } catch (_) {
+    }
+  }
+  for (const q of [en, baseTitle(title)].filter(Boolean)) {
+    const key = q.toLowerCase().replace(/[\\/?#%]/g, " ").trim();
+    try {
+      const r = await platform().fetchText(`https://v3.sg.media-imdb.com/suggestion/x/${encodeURIComponent(key)}.json`, { "User-Agent": UA });
+      const d = JSON.parse(r.body).d || [];
+      const hit = d.find((x) => /^tt/.test(x.id) && (x.qid === "movie" || x.qid === "tvMovie" || x.qid === "video"));
+      if (hit) return hit.id;
+    } catch (_) {
+    }
+  }
+  return "";
+}
+async function findRatings(title, en) {
+  const out = {};
+  const id = await imdbId(title, en);
+  if (!id) return out;
+  let name = "", year = 0;
+  try {
+    const q = `{ title(id:"${id}"){ titleText{text} originalTitleText{text} releaseYear{year} ratingsSummary{aggregateRating voteCount} } }`;
+    const r = await platform().fetchText(`${IMDB_GQL}?query=${encodeURIComponent(q)}`, {
+      "content-type": "application/json",
+      "x-imdb-client-name": "imdb-web-next-localized"
+    });
+    const t = JSON.parse(r.body)?.data?.title;
+    name = t?.titleText?.text || t?.originalTitleText?.text || "";
+    year = Number(t?.releaseYear?.year) || 0;
+    const score = Number(t?.ratingsSummary?.aggregateRating) || 0;
+    if (score) out.imdb = { score, votes: Number(t.ratingsSummary.voteCount) || 0, url: `https://www.imdb.com/title/${id}/` };
+  } catch (_) {
+  }
+  if (name) {
+    try {
+      const list = await parse(
+        "parseRtSearch",
+        await getText(`https://www.rottentomatoes.com/search?search=${encodeURIComponent(name)}`)
+      );
+      const norm = (s) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+      const pick = list.find((x) => norm(x.title) === norm(name) && (!year || Math.abs(x.year - year) <= 1)) || list.find((x) => year && Math.abs(x.year - year) <= 1 && norm(x.title).includes(norm(name)));
+      if (pick) {
+        const s = await parse("parseRtMovie", await getText(pick.url));
+        if (s.critics >= 0) out.tomato = { score: s.critics, certified: s.certified, url: pick.url };
+        if (s.audience >= 0) out.popcorn = { score: s.audience, url: pick.url };
+      }
+    } catch (_) {
+    }
+  }
+  return out;
+}
+var ratingsMem = {};
+function movieRatings(title, en) {
+  const k = normTitle(title);
+  return ratingsMem[k] ||= (async () => {
+    const read = () => {
+      try {
+        return JSON.parse(cacheGet("ratings.json") || "{}") || {};
+      } catch (_) {
+        return {};
+      }
+    };
+    const hit = read()[k];
+    if (hit && Date.now() - hit.at < 864e5) return hit;
+    const r = await findRatings(title, en);
+    const all = read();
+    for (const [key, v] of Object.entries(all)) if (Date.now() - v.at > 864e5) delete all[key];
+    all[k] = { ...r, at: Date.now() };
+    cacheSet("ratings.json", JSON.stringify(all));
+    return r;
+  })();
+}
+function ratingTier(kind, v) {
+  const x = kind === "imdb" ? v * 10 : v;
+  return x >= 75 ? "good" : x >= 60 ? "mid" : "bad";
+}
 var VERSION_URL = "https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/main/dist/version.json";
 var verNum = (v) => Number(String(v || "").replace(/\D/g, "")) || 0;
 async function checkLatest(current2) {
@@ -1452,7 +1579,7 @@ var App = class {
     this.loadingText = "讀取中…";
     // ── 事件迴圈 ──
     // 背景查 GitHub 上的最新版本（首頁顯示是否為最新版）
-    this.latest = checkLatest("2026.11.05-2142");
+    this.latest = checkLatest("2026.11.05-2158");
     // ── 搜尋 ──
     this.query = "";
     this.tmdbStatus = "";
@@ -1542,11 +1669,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.05-2142"}`);
+          Pasteboard.copy(`版本 ${"2026.11.05-2158"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.05-2142"}`,
+      `版本 ${"2026.11.05-2158"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -1680,17 +1807,25 @@ var App = class {
       }
     );
   }
-  /** 海報與預告（最多等 3 秒，等不到就先不顯示海報） */
-  async extras(title, slug) {
-    return Promise.race([movieExtras(title, slug).catch(() => null), sleep(3e3).then(() => null)]);
+  /** 海報、預告與評分（同時查，最多等 3.5 秒；等不到的先不顯示，下次打開就有） */
+  async extras(title, slug, en) {
+    const wait = (p) => Promise.race([p.catch(() => null), sleep(3500).then(() => null)]);
+    const [x, r] = await Promise.all([wait(movieExtras(title, slug)), wait(movieRatings(title, en))]);
+    return { x, r };
   }
-  hero(x, title, lines) {
+  hero(e, title, lines) {
+    const { x, r } = e;
     const url = x?.trailer || `https://www.youtube.com/results?search_query=${encodeURIComponent(title + " 預告")}`;
+    const badges = [];
+    if (r?.imdb) badges.push({ kind: "imdb", value: r.imdb.score.toFixed(1), tier: ratingTier("imdb", r.imdb.score), onTap: () => Safari.open(r.imdb.url) });
+    if (r?.tomato) badges.push({ kind: "tomato", value: `${r.tomato.score}%`, tier: ratingTier("pct", r.tomato.score), note: r.tomato.certified ? "認證" : void 0, onTap: () => Safari.open(r.tomato.url) });
+    if (r?.popcorn) badges.push({ kind: "popcorn", value: `${r.popcorn.score}%`, tier: ratingTier("pct", r.popcorn.score), onTap: () => Safari.open(r.popcorn.url) });
     return /* @__PURE__ */ h(
       Hero,
       {
         poster: x?.poster,
         lines,
+        badges,
         trailerLabel: x?.trailerName ? "觀看預告" : "搜尋 YouTube 預告",
         onTrailer: () => Safari.open(url)
       }
@@ -1862,7 +1997,7 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
     const replace = (nd) => {
       this.stack[this.stack.length - 1] = () => this.movieView(m, nd);
     };
-    const x = await this.extras(m.title, m.slug);
+    const x = await this.extras(m.title, m.slug, m.en);
     return /* @__PURE__ */ h(Page, { title: m.title, subtitle: [m.rating || d.rating, runtime ? `${runtime} 分鐘` : "", `${d.cinemas.length} 間影城`].filter(Boolean).join("｜"), onBack: () => this.back() }, this.hero(x, m.title, [m.en, [m.rating || d.rating, runtime ? `${runtime} 分鐘` : ""].filter(Boolean).join("｜"), `${d.cinemas.length} 間影城有放映`]), /* @__PURE__ */ h(Section, { title: "日期" }, /* @__PURE__ */ h(Chips, null, (dates.length ? dates : [d.date]).map((x2) => /* @__PURE__ */ h(Chip, { label: dateLabel(x2).replace(/（.）.*$/, ""), sub: x2 === d.date ? "目前" : dateLabel(x2).match(/（(.)）/)?.[1] || "", muted: x2 !== d.date, onTap: () => replace(x2) })))), /* @__PURE__ */ h(Section, { title: "縣市" }, /* @__PURE__ */ h(Chips, null, ["全部", ...cities].map((c) => /* @__PURE__ */ h(Chip, { label: c, muted: c !== city, onTap: () => {
       this.movieCity = c;
     } })))), formats.length ? /* @__PURE__ */ h(Section, { title: "特殊廳" }, /* @__PURE__ */ h(Chips, null, ["", ...formats].map((f) => /* @__PURE__ */ h(Chip, { label: f || "全部", muted: f !== fmtSel, onTap: () => {
