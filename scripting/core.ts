@@ -677,15 +677,36 @@ async function findExtras(title: string, slug?: string): Promise<MovieExtras> {
     });
   const [poster, t, at] = await Promise.all([posterJob, tmdbJob, atJob]);
   out.poster = normImageUrl(poster || (t && "poster" in t ? t.poster : "") || "");
-  // 預告來源順序：TMDB 中文預告 → 開眼 → TMDB 其他語言 → YouTube 搜尋
+  // 預告來源順序：TMDB 中文預告 → 開眼 → TMDB 其他語言 → YouTube 搜尋的第一個結果 → YouTube 搜尋頁
   const tv = t && "v" in t ? t.v : null;
-  const pick = tv && tv.zh ? tv : at || tv;
+  const pick = (tv && tv.zh ? tv : at || tv) || (await ytFirst(base + " 預告").catch(() => null));
   if (pick) {
     out.trailer = `https://www.youtube.com/watch?v=${pick.key}`;
     out.trailerName = String(pick.name || "預告片");
   }
   if (!pick) out.err = [t?.err, ...atErr].filter(Boolean).join("；") || "找不到預告";
   return out;
+}
+
+/** YouTube 搜尋結果裡的第一支影片（優先挑標題有「預告」或 trailer 的），點了直接看、不用再從搜尋頁挑。
+ *  用桌面版 UA，手機版 UA 會被轉到 m.youtube.com；結果頁約 1MB，所以只在開眼／TMDB 都沒有預告時才查 */
+async function ytFirst(query: string): Promise<{ key: string; name: string } | null> {
+  const r = await platform().fetchText(`https://www.youtube.com/results?search_query=${encodeURIComponent(query)}&hl=zh-TW&gl=TW`, {
+    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15",
+    "Accept-Language": "zh-TW,zh;q=0.9",
+  });
+  if (r.status < 200 || r.status >= 300) return null;
+  const list: { key: string; name: string }[] = [];
+  for (const m of r.body.matchAll(/"videoRenderer":\{"videoId":"([A-Za-z0-9_-]{11})"([\s\S]{0,4000}?)"title":\{"runs":\[\{"text":"((?:[^"\\]|\\.)*)"/g)) {
+    let name = m[3];
+    try {
+      name = JSON.parse('"' + name + '"');
+    } catch (_) {}
+    list.push({ key: m[1], name });
+    if (list.length >= 5) break;
+  }
+  if (!list.length) return null;
+  return list.find((v) => /預告|trailer|teaser/i.test(v.name)) || list[0];
 }
 
 /** 沒有片長的電影，從 TMDB 補上（會標記 runtimeFrom）；沒設定 Token 或查詢失敗就原樣回傳 */

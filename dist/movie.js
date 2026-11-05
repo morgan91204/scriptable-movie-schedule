@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.05-2339
+// @movie-schedule-app 電影行程 v2026.11.05-2345
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/jsx.tsx
@@ -1445,13 +1445,32 @@ async function findExtras(title, slug) {
   const [poster, t, at] = await Promise.all([posterJob, tmdbJob, atJob]);
   out.poster = normImageUrl(poster || (t && "poster" in t ? t.poster : "") || "");
   const tv = t && "v" in t ? t.v : null;
-  const pick = tv && tv.zh ? tv : at || tv;
+  const pick = (tv && tv.zh ? tv : at || tv) || await ytFirst(base + " 預告").catch(() => null);
   if (pick) {
     out.trailer = `https://www.youtube.com/watch?v=${pick.key}`;
     out.trailerName = String(pick.name || "預告片");
   }
   if (!pick) out.err = [t?.err, ...atErr].filter(Boolean).join("；") || "找不到預告";
   return out;
+}
+async function ytFirst(query) {
+  const r = await platform().fetchText(`https://www.youtube.com/results?search_query=${encodeURIComponent(query)}&hl=zh-TW&gl=TW`, {
+    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15",
+    "Accept-Language": "zh-TW,zh;q=0.9"
+  });
+  if (r.status < 200 || r.status >= 300) return null;
+  const list = [];
+  for (const m of r.body.matchAll(/"videoRenderer":\{"videoId":"([A-Za-z0-9_-]{11})"([\s\S]{0,4000}?)"title":\{"runs":\[\{"text":"((?:[^"\\]|\\.)*)"/g)) {
+    let name = m[3];
+    try {
+      name = JSON.parse('"' + name + '"');
+    } catch (_) {
+    }
+    list.push({ key: m[1], name });
+    if (list.length >= 5) break;
+  }
+  if (!list.length) return null;
+  return list.find((v) => /預告|trailer|teaser/i.test(v.name)) || list[0];
 }
 async function fillRuntimes(movies) {
   const todo = movies.filter((m) => !m.runtime);
@@ -1805,7 +1824,7 @@ var App = class {
     this.loadingText = "讀取中…";
     // ── 事件迴圈 ──
     // 背景查 GitHub 上的最新版本（首頁顯示是否為最新版）
-    this.latest = checkLatest("2026.11.05-2339");
+    this.latest = checkLatest("2026.11.05-2345");
     // ── 搜尋 ──
     this.query = "";
     this.tmdbStatus = "";
@@ -1909,11 +1928,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.05-2339"}`);
+          Pasteboard.copy(`版本 ${"2026.11.05-2345"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.05-2339"}`,
+      `版本 ${"2026.11.05-2345"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
