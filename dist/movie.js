@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.06-0027
+// @movie-schedule-app 電影行程 v2026.11.06-0045
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/jsx.tsx
@@ -1205,10 +1205,14 @@ async function moviesOf(c, date) {
 }
 var normTitle = (t) => String(t || "").toLowerCase().replace(/[\s:：·・\-–—!！?？,，.。'"’「」『』《》()（）\[\]【】]/g, "");
 var REISSUE_WORDS = "全新|加碼|數位|[248]K|修復|重映|重製|再映|經典|紀念|\\d*週年";
+var isReissue = (t) => new RegExp(REISSUE_WORDS, "i").test(String(t || ""));
+var DECOR_LEAD = /^\s*(?:[（(\[【][^）)\]】]{1,12}[）)\]】]|[A-Z]-|(?:法文|中文|英文|日文|韓文|台語|國語|粵語)版[-－:：]?)\s*/;
+var DECOR_TAIL = /\s*(?:[（(\[【]\s*(?:真人版|\d{4}|[^）)\]】]{0,8}版)\s*[）)\]】]|[-－:：]?\s*(?:海報)?特別場|特別版|口白場|中文配音版?|(?:日|英|韓|法|國|台)語版)\s*$/;
 function baseTitle(t) {
   let s = String(t || "").replace(/[《》]/g, "").trim();
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < 4; i++) {
     const before = s;
+    s = s.replace(DECOR_LEAD, "").replace(DECOR_TAIL, "");
     s = s.replace(new RegExp(`\\s*[（(\\[【][^）)\\]】]*(?:${REISSUE_WORDS})[^）)\\]】]*[）)\\]】]\\s*$`, "i"), "");
     s = s.replace(new RegExp(`[\\s:：\\-–—]*(?:${REISSUE_WORDS})+(?:版本?)?\\s*$`, "i"), "");
     if (s === before) break;
@@ -1366,7 +1370,7 @@ async function atPoster(title) {
   return (html.match(/property="og:image"\s+content="([^"]+)"/) || [])[1] || "";
 }
 async function atYearHint(title, slug, en) {
-  if (normTitle(baseTitle(title)) !== normTitle(title)) return 0;
+  if (isReissue(title)) return 0;
   try {
     const poster = await Promise.race([moviePoster(title, slug, en), delay(1500).then(() => "")]);
     const id = await atMovieId(title, poster || "");
@@ -1934,7 +1938,7 @@ var App = class {
     this.loadingText = "讀取中…";
     // ── 事件迴圈 ──
     // 背景查 GitHub 上的最新版本（首頁顯示是否為最新版）
-    this.latest = checkLatest("2026.11.06-0027");
+    this.latest = checkLatest("2026.11.06-0045");
     // ── 搜尋 ──
     this.query = "";
     this.tmdbStatus = "";
@@ -2048,11 +2052,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.06-0027"}`);
+          Pasteboard.copy(`版本 ${"2026.11.06-0045"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.06-0027"}`,
+      `版本 ${"2026.11.06-0045"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }

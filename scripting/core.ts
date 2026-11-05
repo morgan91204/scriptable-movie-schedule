@@ -385,10 +385,16 @@ export const normTitle = (t: string) =>
   String(t || "").toLowerCase().replace(/[\s:：·・\-–—!！?？,，.。'"’「」『』《》()（）\[\]【】]/g, "");
 /** 去掉「4K重映」「全新4K修復版」「(4K修復)」「加碼重映」等字，查原片 */
 const REISSUE_WORDS = "全新|加碼|數位|[248]K|修復|重映|重製|再映|經典|紀念|\\d*週年";
+/** 片名是重映、修復版（查原片時用；比對年份時不能拿重映日來比） */
+export const isReissue = (t: string) => new RegExp(REISSUE_WORDS, "i").test(String(t || ""));
+// 片名前後的裝飾字：(全台聯合首映)哥吉拉-0.0、驀然回首 (真人版)、高年級實習生(2026)、A-Stray Kids…、法文版-XXX、XXX-海報特別場
+const DECOR_LEAD = /^\s*(?:[（(\[【][^）)\]】]{1,12}[）)\]】]|[A-Z]-|(?:法文|中文|英文|日文|韓文|台語|國語|粵語)版[-－:：]?)\s*/;
+const DECOR_TAIL = /\s*(?:[（(\[【]\s*(?:真人版|\d{4}|[^）)\]】]{0,8}版)\s*[）)\]】]|[-－:：]?\s*(?:海報)?特別場|特別版|口白場|中文配音版?|(?:日|英|韓|法|國|台)語版)\s*$/;
 export function baseTitle(t: string): string {
   let s = String(t || "").replace(/[《》]/g, "").trim();
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < 4; i++) {
     const before = s;
+    s = s.replace(DECOR_LEAD, "").replace(DECOR_TAIL, "");
     // 結尾括號裡是重映字樣：讓子彈飛(4K修復)、XXX【數位修復版】
     s = s.replace(new RegExp(`\\s*[（(\\[【][^）)\\]】]*(?:${REISSUE_WORDS})[^）)\\]】]*[）)\\]】]\\s*$`, "i"), "");
     // 結尾直接接重映字樣：讓子彈飛 全新4K修復版、進擊的鼓手 4K重映
@@ -589,7 +595,7 @@ async function atPoster(title: string): Promise<string> {
 
 /** 開眼電影頁上的上映年份（用來確認 IMDb／TMDB 對到的是同一部片；重映、修復版不適用，回傳 0）。最多等 3.5 秒 */
 async function atYearHint(title: string, slug?: string, en?: string): Promise<number> {
-  if (normTitle(baseTitle(title)) !== normTitle(title)) return 0; // 重映片：開眼頁的日期是重映日，不能拿來比
+  if (isReissue(title)) return 0; // 重映片：開眼頁的日期是重映日，不能拿來比
   try {
     const poster = await Promise.race([moviePoster(title, slug, en), delay(1500).then(() => "")]);
     const id = await atMovieId(title, poster || "");
