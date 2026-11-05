@@ -68,9 +68,9 @@ document.addEventListener('click',function(e){
   var el=e.target.closest('[data-act]');if(!el)return;
   var id=el.getAttribute('data-act');var vals={};
   document.querySelectorAll('input[name],select[name]').forEach(function(i){vals[i.name]=i.value;});
-  if(window.__pending){var f=window.__pending;window.__pending=null;f(JSON.stringify({id:id,vals:vals}));}
+  if(window.__pending){var f=window.__pending;window.__pending=null;f(JSON.stringify({id:id,vals:vals,y:window.scrollY}));}
 });
-window.__render=function(html,keep){var y=window.scrollY;document.getElementById('root').innerHTML=html;window.scrollTo(0,keep?y:0);var f=document.querySelector('input[autofocus]');if(f)setTimeout(function(){f.focus()},50);};
+window.__render=function(html,to){var y=window.scrollY;document.getElementById('root').innerHTML=html;window.scrollTo(0,to<0?y:to);var f=document.querySelector('input[autofocus]');if(f)setTimeout(function(){f.focus()},50);};
 document.addEventListener('keydown',function(e){if(e.key==='Enter'){var b=document.querySelector('[data-enter]');if(b)b.click();}});
 </script></body></html>`;
 
@@ -85,11 +85,11 @@ export class UI {
   }
 
   /** 顯示畫面（不等待點擊），用於讀取中。 */
-  /** keep=true：停在原本的捲動位置（同一頁重繪時用，例如切換廣告時間） */
-  async render(html: string, keep = false): Promise<void> {
+  /** scrollTo：畫完後捲到哪裡。-1 = 停在原位（同一頁重繪，例如切換廣告時間）；0 = 頂端；其他 = 返回時還原的位置 */
+  async render(html: string, scrollTo = 0): Promise<void> {
     await this.ready;
     // 結尾回傳 true：Scriptable 只接受字串／數字／布林等回傳值，不能回傳 undefined 或函式
-    await this.wv.evaluateJavaScript(`window.__render(${JSON.stringify(html)},${keep});true`, false);
+    await this.wv.evaluateJavaScript(`window.__render(${JSON.stringify(html)},${Math.round(scrollTo)});true`, false);
     if (!this.presented) {
       this.presented = this.wv.present(true).then(() => {
         this.closed = true;
@@ -98,14 +98,14 @@ export class UI {
   }
 
   /** 顯示畫面並等待使用者點擊；回傳被點元素註冊的 handler，使用者關閉視窗時回傳 null。 */
-  async show(html: string, keep = false): Promise<{ handler: Handler; vals: Record<string, string> } | null> {
-    await this.render(html, keep);
+  async show(html: string, scrollTo = 0): Promise<{ handler: Handler; vals: Record<string, string>; y: number } | null> {
+    await this.render(html, scrollTo);
     const wait = this.wv.evaluateJavaScript(`window.__pending=function(p){completion(p)};true`, true) as Promise<string>;
     const result = await Promise.race([wait, this.presented!.then(() => null)]);
     if (result === null) return null;
-    const { id, vals } = JSON.parse(String(result));
+    const { id, vals, y } = JSON.parse(String(result));
     const handler = getHandler(String(id));
-    return handler ? { handler, vals: vals || {} } : null;
+    return handler ? { handler, vals: vals || {}, y: Number(y) || 0 } : null;
   }
 
   /** 每次重繪前清掉舊的 handler。 */

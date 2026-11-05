@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.05-1919
+// @movie-schedule-app 電影行程 v2026.11.05-1933
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/jsx.tsx
@@ -142,9 +142,9 @@ document.addEventListener('click',function(e){
   var el=e.target.closest('[data-act]');if(!el)return;
   var id=el.getAttribute('data-act');var vals={};
   document.querySelectorAll('input[name],select[name]').forEach(function(i){vals[i.name]=i.value;});
-  if(window.__pending){var f=window.__pending;window.__pending=null;f(JSON.stringify({id:id,vals:vals}));}
+  if(window.__pending){var f=window.__pending;window.__pending=null;f(JSON.stringify({id:id,vals:vals,y:window.scrollY}));}
 });
-window.__render=function(html,keep){var y=window.scrollY;document.getElementById('root').innerHTML=html;window.scrollTo(0,keep?y:0);var f=document.querySelector('input[autofocus]');if(f)setTimeout(function(){f.focus()},50);};
+window.__render=function(html,to){var y=window.scrollY;document.getElementById('root').innerHTML=html;window.scrollTo(0,to<0?y:to);var f=document.querySelector('input[autofocus]');if(f)setTimeout(function(){f.focus()},50);};
 document.addEventListener('keydown',function(e){if(e.key==='Enter'){var b=document.querySelector('[data-enter]');if(b)b.click();}});
 <\/script></body></html>`;
 var UI = class {
@@ -155,10 +155,10 @@ var UI = class {
     this.ready = this.wv.loadHTML(SHELL);
   }
   /** 顯示畫面（不等待點擊），用於讀取中。 */
-  /** keep=true：停在原本的捲動位置（同一頁重繪時用，例如切換廣告時間） */
-  async render(html, keep = false) {
+  /** scrollTo：畫完後捲到哪裡。-1 = 停在原位（同一頁重繪，例如切換廣告時間）；0 = 頂端；其他 = 返回時還原的位置 */
+  async render(html, scrollTo = 0) {
     await this.ready;
-    await this.wv.evaluateJavaScript(`window.__render(${JSON.stringify(html)},${keep});true`, false);
+    await this.wv.evaluateJavaScript(`window.__render(${JSON.stringify(html)},${Math.round(scrollTo)});true`, false);
     if (!this.presented) {
       this.presented = this.wv.present(true).then(() => {
         this.closed = true;
@@ -166,14 +166,14 @@ var UI = class {
     }
   }
   /** 顯示畫面並等待使用者點擊；回傳被點元素註冊的 handler，使用者關閉視窗時回傳 null。 */
-  async show(html, keep = false) {
-    await this.render(html, keep);
+  async show(html, scrollTo = 0) {
+    await this.render(html, scrollTo);
     const wait = this.wv.evaluateJavaScript(`window.__pending=function(p){completion(p)};true`, true);
     const result = await Promise.race([wait, this.presented.then(() => null)]);
     if (result === null) return null;
-    const { id, vals } = JSON.parse(String(result));
+    const { id, vals, y } = JSON.parse(String(result));
     const handler = getHandler(String(id));
-    return handler ? { handler, vals: vals || {} } : null;
+    return handler ? { handler, vals: vals || {}, y: Number(y) || 0 } : null;
   }
   /** 每次重繪前清掉舊的 handler。 */
   begin() {
@@ -1238,9 +1238,13 @@ var App = class {
     const input = String(args.shortcutParameter || args.urls && args.urls[0] || args.plainTexts && args.plainTexts[0] || "");
     let pendingUrl = input;
     let lastView = null;
+    let lastDepth = 0;
+    const savedY = /* @__PURE__ */ new Map();
     while (!this.ui.closed) {
       const view = this.stack[this.stack.length - 1];
+      const depth = this.stack.length;
       const same = view === lastView;
+      const back = !same && depth < lastDepth;
       this.ui.begin();
       const job = Promise.resolve().then(() => view());
       job.catch(() => {
@@ -1259,9 +1263,12 @@ var App = class {
       } catch (e) {
         html = this.errorView(e);
       }
+      const scrollTo = same && quick ? -1 : same || back ? savedY.get(view) ?? 0 : 0;
       lastView = view;
-      const hit = await this.ui.show(html, same && quick);
+      lastDepth = depth;
+      const hit = await this.ui.show(html, scrollTo);
       if (!hit) break;
+      savedY.set(view, hit.y);
       try {
         await hit.handler.call(null, hit.vals);
       } catch (e) {
@@ -1283,7 +1290,7 @@ var App = class {
     const cities = Array.from(new Set(this.cinemas.map((c) => c.city))).sort(
       (a, b) => (CITY_ORDER.indexOf(a) + 1 || 99) - (CITY_ORDER.indexOf(b) + 1 || 99)
     );
-    return /* @__PURE__ */ h(Page, { title: "🎬 電影行程", subtitle: `${this.cinemas.length} 間影城｜選影城 → 日期 → 電影 → 場次` }, /* @__PURE__ */ h(Section, null, /* @__PURE__ */ h(Item, { icon: "⏰", title: "現在有什麼可以看", subtitle: "選時段，一次列出常去、附近或某縣市的所有場次", onTap: () => this.go(() => this.nowView()) }), /* @__PURE__ */ h(Item, { icon: "🎬", title: "依電影找場次", subtitle: "先選電影，再看哪些影城有放映", onTap: () => this.go(() => this.movieListView(), "讀取電影清單…") }), /* @__PURE__ */ h(Item, { icon: "📍", title: "附近的影城", subtitle: "依目前位置排序", onTap: () => this.go(() => this.nearbyView(), "取得目前位置…") }), /* @__PURE__ */ h(Item, { icon: "🔍", title: "搜尋影城", subtitle: "影城、分店、行政區或縣市", onTap: () => this.go(() => this.searchView()) })), favs.length ? /* @__PURE__ */ h(Section, { title: "常去影城" }, favs.map((c) => /* @__PURE__ */ h(Item, { icon: "★", title: c.name, subtitle: `${c.city} ${c.district}`, onTap: () => this.go(() => this.cinemaView(c), `讀取 ${c.name} 的場次…`) }))) : null, /* @__PURE__ */ h(Section, { title: "全台影城", hint: "影城清單來自場次通與開眼電影網，會自動更新。" }, cities.map((city) => /* @__PURE__ */ h(Item, { title: city, badge: `${this.cinemas.filter((c) => c.city === city).length} 間`, onTap: () => this.go(() => this.cityView(city)) }))), /* @__PURE__ */ h(Section, { title: "設定" }, /* @__PURE__ */ h(Item, { icon: "📅", title: "寫入的行事曆", subtitle: this.calendarName, onTap: () => this.go(() => this.calendarView()) }), /* @__PURE__ */ h(Item, { icon: "📺", title: "廣告預告", subtitle: `預計散場時間會加上 ${this.settings.ads} 分鐘`, right: "點一下切換", chevron: false, onTap: () => this.cycleAds() })), /* @__PURE__ */ h(Note, { text: "場次資料來自場次通 twshowtimes.com、開眼電影網，以及誠品、光點、樂聲官網，實際場次以影城公告為準。" }), /* @__PURE__ */ h(Note, { text: `版本 ${"2026.11.05-1919"}` }));
+    return /* @__PURE__ */ h(Page, { title: "🎬 電影行程", subtitle: `${this.cinemas.length} 間影城｜選影城 → 日期 → 電影 → 場次` }, /* @__PURE__ */ h(Section, null, /* @__PURE__ */ h(Item, { icon: "⏰", title: "現在有什麼可以看", subtitle: "選時段，一次列出常去、附近或某縣市的所有場次", onTap: () => this.go(() => this.nowView()) }), /* @__PURE__ */ h(Item, { icon: "🎬", title: "依電影找場次", subtitle: "先選電影，再看哪些影城有放映", onTap: () => this.go(() => this.movieListView(), "讀取電影清單…") }), /* @__PURE__ */ h(Item, { icon: "📍", title: "附近的影城", subtitle: "依目前位置排序", onTap: () => this.go(() => this.nearbyView(), "取得目前位置…") }), /* @__PURE__ */ h(Item, { icon: "🔍", title: "搜尋影城", subtitle: "影城、分店、行政區或縣市", onTap: () => this.go(() => this.searchView()) })), favs.length ? /* @__PURE__ */ h(Section, { title: "常去影城" }, favs.map((c) => /* @__PURE__ */ h(Item, { icon: "★", title: c.name, subtitle: `${c.city} ${c.district}`, onTap: () => this.go(() => this.cinemaView(c), `讀取 ${c.name} 的場次…`) }))) : null, /* @__PURE__ */ h(Section, { title: "全台影城", hint: "影城清單來自場次通與開眼電影網，會自動更新。" }, cities.map((city) => /* @__PURE__ */ h(Item, { title: city, badge: `${this.cinemas.filter((c) => c.city === city).length} 間`, onTap: () => this.go(() => this.cityView(city)) }))), /* @__PURE__ */ h(Section, { title: "設定" }, /* @__PURE__ */ h(Item, { icon: "📅", title: "寫入的行事曆", subtitle: this.calendarName, onTap: () => this.go(() => this.calendarView()) }), /* @__PURE__ */ h(Item, { icon: "📺", title: "廣告預告", subtitle: `預計散場時間會加上 ${this.settings.ads} 分鐘`, right: "點一下切換", chevron: false, onTap: () => this.cycleAds() })), /* @__PURE__ */ h(Note, { text: "場次資料來自場次通 twshowtimes.com、開眼電影網，以及誠品、光點、樂聲官網，實際場次以影城公告為準。" }), /* @__PURE__ */ h(Note, { text: `版本 ${"2026.11.05-1933"}` }));
   }
   searchView() {
     const k = this.query.trim().toLowerCase().replace(/臺/g, "台");

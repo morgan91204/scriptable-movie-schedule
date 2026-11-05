@@ -51,7 +51,7 @@ globalThis.WebView = class {
   async loadHTML() {}
   present() { return new Promise((r) => (dismissUI = r)); }
   async evaluateJavaScript(js, cb) {
-    if (js.startsWith("window.__render(")) { const m = js.match(/^window\.__render\(([\s\S]*),(true|false)\);true$/); screenHtml = JSON.parse(m[1]); globalThis.__keep = m[2] === "true"; return true; }
+    if (js.startsWith("window.__render(")) { const m = js.match(/^window\.__render\(([\s\S]*),(-?\d+)\);true$/); screenHtml = JSON.parse(m[1]); globalThis.__scrollTo = Number(m[2]); globalThis.__keep = m[2] === "-1"; return true; }
     if (js.startsWith("window.__pending=")) return new Promise((r) => (pendingResolve = r));
     return new Function("DOMParser", "return " + js)(DOMParser);
   }
@@ -123,11 +123,11 @@ export async function waitFor(re, ms = 60000) {
   await dump("逾時，目前畫面");
   throw new Error("等不到：" + re);
 }
-export async function tap(re, vals = {}) {
+export async function tap(re, vals = {}, y = 0) {
   const hit = await waitFor(re);
   console.log(`\n👉 點「${hit.text.slice(0, 60)}」${Object.keys(vals).length ? " 輸入 " + JSON.stringify(vals) : ""}`);
   const r = pendingResolve; pendingResolve = null;
-  r(JSON.stringify({ id: hit.id, vals }));
+  r(JSON.stringify({ id: hit.id, vals, y }));
   await sleep(50);
 }
 export function closeUI() { if (dismissUI) dismissUI(); }

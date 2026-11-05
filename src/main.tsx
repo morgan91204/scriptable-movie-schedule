@@ -70,9 +70,13 @@ class App {
     let pendingUrl = input;
 
     let lastView: View | null = null;
+    let lastDepth = 0;
+    const savedY = new Map<View, number>(); // 每一頁離開時的捲動位置，返回時還原
     while (!this.ui.closed) {
       const view = this.stack[this.stack.length - 1];
+      const depth = this.stack.length;
       const same = view === lastView; // 同一頁重繪（例如切換廣告時間）：不顯示讀取中、不捲回頂端
+      const back = !same && depth < lastDepth;
       this.ui.begin();
       const job = Promise.resolve().then(() => view());
       job.catch(() => {});
@@ -91,9 +95,13 @@ class App {
       } catch (e) {
         html = this.errorView(e);
       }
+      // 同一頁、很快就畫好：停在原位；同一頁但重新讀取過、或按返回回到上一頁：還原離開時的位置；其他：頂端
+      const scrollTo = same && quick ? -1 : same || back ? savedY.get(view) ?? 0 : 0;
       lastView = view;
-      const hit = await this.ui.show(html, same && quick);
+      lastDepth = depth;
+      const hit = await this.ui.show(html, scrollTo);
       if (!hit) break;
+      savedY.set(view, hit.y);
       try {
         await hit.handler.call(null, hit.vals);
       } catch (e) {
