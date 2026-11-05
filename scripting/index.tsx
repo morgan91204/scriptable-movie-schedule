@@ -207,17 +207,24 @@ function Home() {
   </NavigationStack>
 }
 
-/** 電影海報＋YouTube 預告按鈕 */
-function MovieHero({ title, slug }: { title: string; slug?: string }) {
+/** 電影頁頂端：海報在左，資訊與紅色預告按鈕在右（跟 Scriptable 版一樣） */
+function MovieHero({ title, slug, lines }: { title: string; slug?: string; lines: string[] }) {
   const x = useLoad(() => movieExtras(title, slug), [title, slug || ""])
   const url = x.data?.trailer || `https://www.youtube.com/results?search_query=${encodeURIComponent(title + " 預告")}`
   return <Section>
-    {x.data?.poster ? <HStack>
+    <HStack alignment={"bottom"} spacing={14} listRowBackground={"clear"}>
+      {x.data?.poster
+        ? <Image imageUrl={x.data.poster} resizable scaleToFit frame={{ width: 112, height: 168 }}
+            clipShape={{ type: "rect", cornerRadius: 12 }} placeholder={<ProgressView progressViewStyle={"circular"} />} />
+        : x.data ? null : <ProgressView progressViewStyle={"circular"} frame={{ width: 112, height: 168 }} />}
+      <VStack alignment={"leading"} spacing={4}>
+        {lines.filter(Boolean).map((l) => <Text key={l} font={"subheadline"} foregroundStyle={"secondaryLabel"}>{l}</Text>)}
+        <Button action={() => Safari.openURL(url)} buttonStyle={"borderedProminent"} buttonBorderShape={"capsule"} tint={"systemRed"} padding={{ top: 8 }}>
+          <Label title={x.data?.trailerName ? "觀看預告" : "搜尋 YouTube 預告"} systemImage={"play.fill"} font={"headline"} />
+        </Button>
+      </VStack>
       <Spacer />
-      <Image imageUrl={x.data.poster} resizable scaleToFit frame={{ width: 160, height: 240 }} placeholder={<ProgressView progressViewStyle={"circular"} />} />
-      <Spacer />
-    </HStack> : null}
-    <Button title={x.data?.trailerName ? "觀看預告" : "搜尋 YouTube 預告"} systemImage={"play.rectangle.fill"} action={() => Safari.openURL(url)} />
+    </HStack>
   </Section>
 }
 
@@ -335,12 +342,13 @@ function ShowtimesPage({ cinema, date, movie, ctx }: { cinema: Cinema; date: str
   const isToday = date === todayTPE()
   const now = nowHM()
   return <List navigationTitle={movie.title} navigationBarTitleDisplayMode={"inline"}>
-    <MovieHero title={movie.title} />
+    <MovieHero title={movie.title} lines={[
+      movie.runtime ? `片長 ${movie.runtime} 分鐘` + (movie.runtimeFrom ? `（${movie.runtimeFrom}）` : "") : "片長未提供，下一步可手動輸入",
+      movie.rating || "",
+    ]} />
     <Section>
       <LabeledContent title={"影城"} value={cinema.name} />
       <LabeledContent title={"日期"} value={dateLabel(date)} />
-      <LabeledContent title={"片長"} value={movie.runtime ? `${movie.runtime} 分鐘` + (movie.runtimeFrom ? `（${movie.runtimeFrom}）` : "") : "未提供"} />
-      {movie.rating ? <LabeledContent title={"分級"} value={movie.rating} /> : null}
     </Section>
     {movie.versions.map((v) =>
       <Section key={v.label} header={<Text>{v.label}</Text>}>
@@ -520,8 +528,12 @@ function MoviePage({ movie }: { movie: TwMovie }) {
     { id: c.id, name: c.name, city: c.city, district: c.district, source: "tw", url: `${TW}/cinemas/${c.id}/`, address: c.address }
 
   return <List navigationTitle={movie.title} navigationBarTitleDisplayMode={"inline"} refreshable={day.reload}>
-    <MovieHero title={movie.title} slug={movie.slug} />
-    <Section footer={<Text>{[movie.en, movie.rating || data?.rating, runtime ? `${runtime} 分鐘` : ""].filter(Boolean).join("｜")}</Text>}>
+    <MovieHero title={movie.title} slug={movie.slug} lines={[
+      movie.en,
+      [movie.rating || data?.rating, runtime ? `${runtime} 分鐘` : ""].filter(Boolean).join("｜"),
+      data ? `${data.cinemas.length} 間影城有放映` : "",
+    ]} />
+    <Section>
       <Picker title={"日期"} value={date || data?.date || ""} onChanged={setDate}>
         {(dates.length ? dates : [data?.date || todayTPE()]).map((d) => <Text key={d} tag={d}>{dateLabel(d)}</Text>)}
       </Picker>
