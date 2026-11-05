@@ -515,7 +515,9 @@ export async function movieExtras(title: string, slug?: string): Promise<MovieEx
     const hit = read()[ck] as (MovieExtras & { at: number; v?: number }) | undefined;
     // 有找到預告：記 7 天（沒海報 1 天）。沒找到預告：只記 1 小時就重查（可能只是當時連線失敗）；
     // 舊版（v 不是 2）記下的「沒預告」一律重查，因為舊版還不會取 YouTube 搜尋的第一支影片
-    const ttl = !hit?.trailerName ? (hit?.v === EXTRAS_V ? 3600e3 : 0) : hit?.poster ? 7 * 86400e3 : 86400e3;
+    // 舊版記下的「沒海報」也重查（海報比對規則改了）
+    const stale = hit && hit.v !== EXTRAS_V && (!hit.trailerName || !hit.poster);
+    const ttl = stale ? 0 : !hit?.trailerName ? 3600e3 : hit?.poster ? 7 * 86400e3 : 86400e3;
     if (hit && Date.now() - hit.at < ttl) return { poster: hit.poster, trailer: hit.trailer, trailerName: hit.trailerName };
     const out = await findExtras(title, slug);
     // 查不到預告也保留這次執行的結果（不寫進手機快取的 err 會讓下次啟動重查）；
@@ -529,7 +531,7 @@ export async function movieExtras(title: string, slug?: string): Promise<MovieEx
   })());
 }
 /** extras.json 紀錄的版本：預告查法改了就加 1，讓舊的「沒預告」紀錄重查 */
-const EXTRAS_V = 2;
+const EXTRAS_V = 3;
 
 /** 圖片網址正規化：解掉 HTML 跳脫、\\/、//host 與 http:// 都改成 https://（iOS 的 WebView／Image 不載入 http 圖片） */
 export function normImageUrl(u: string): string {
@@ -675,11 +677,12 @@ export function moviePoster(title: string, slug?: string, en?: string): Promise<
     const all = readExtras();
     const hit = all["t|" + nk] || all["n|" + nk];
     if (hit?.poster) return hit.poster;
-    const own = all["p|" + nk]; // 只查過海報的紀錄
-    if (own && Date.now() - own.at < (own.poster ? 7 : 1) * 86400e3) return own.poster;
+    const own = all["p|" + nk] as (MovieExtras & { at: number; v?: number }) | undefined; // 只查過海報的紀錄
+    // 找到的記 7 天；沒找到的記 1 天，但舊版（比對規則改了）記下的「沒找到」一律重查
+    if (own && Date.now() - own.at < (own.poster ? 7 : own.v === EXTRAS_V ? 1 : 0) * 86400e3) return own.poster;
     const poster = normImageUrl(await findPoster(title, slug, en).catch(() => ""));
     const latest = readExtras();
-    latest["p|" + nk] = { poster, trailer: "", trailerName: "", at: Date.now() };
+    latest["p|" + nk] = { poster, trailer: "", trailerName: "", at: Date.now(), v: EXTRAS_V } as MovieExtras & { at: number };
     cacheSet("extras.json", JSON.stringify(latest));
     return poster;
   })());

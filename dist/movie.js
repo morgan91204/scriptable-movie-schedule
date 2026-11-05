@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.06-0045
+// @movie-schedule-app 電影行程 v2026.11.06-0052
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/jsx.tsx
@@ -1303,7 +1303,8 @@ async function movieExtras(title, slug) {
     const ck = (hasToken ? "t|" : "n|") + normTitle(title);
     const read = readExtras;
     const hit = read()[ck];
-    const ttl = !hit?.trailerName ? hit?.v === EXTRAS_V ? 36e5 : 0 : hit?.poster ? 7 * 864e5 : 864e5;
+    const stale = hit && hit.v !== EXTRAS_V && (!hit.trailerName || !hit.poster);
+    const ttl = stale ? 0 : !hit?.trailerName ? 36e5 : hit?.poster ? 7 * 864e5 : 864e5;
     if (hit && Date.now() - hit.at < ttl) return { poster: hit.poster, trailer: hit.trailer, trailerName: hit.trailerName };
     const out = await findExtras(title, slug);
     const all = read();
@@ -1314,7 +1315,7 @@ async function movieExtras(title, slug) {
     return out;
   })();
 }
-var EXTRAS_V = 2;
+var EXTRAS_V = 3;
 function normImageUrl(u) {
   let s = String(u || "").trim().replace(/&amp;/g, "&").replace(/\\\//g, "/");
   if (s.startsWith("//")) s = "https:" + s;
@@ -1446,10 +1447,10 @@ function moviePoster(title, slug, en) {
     const hit = all["t|" + nk] || all["n|" + nk];
     if (hit?.poster) return hit.poster;
     const own = all["p|" + nk];
-    if (own && Date.now() - own.at < (own.poster ? 7 : 1) * 864e5) return own.poster;
+    if (own && Date.now() - own.at < (own.poster ? 7 : own.v === EXTRAS_V ? 1 : 0) * 864e5) return own.poster;
     const poster = normImageUrl(await findPoster(title, slug, en).catch(() => ""));
     const latest = readExtras();
-    latest["p|" + nk] = { poster, trailer: "", trailerName: "", at: Date.now() };
+    latest["p|" + nk] = { poster, trailer: "", trailerName: "", at: Date.now(), v: EXTRAS_V };
     cacheSet("extras.json", JSON.stringify(latest));
     return poster;
   })();
@@ -1938,7 +1939,7 @@ var App = class {
     this.loadingText = "讀取中…";
     // ── 事件迴圈 ──
     // 背景查 GitHub 上的最新版本（首頁顯示是否為最新版）
-    this.latest = checkLatest("2026.11.06-0045");
+    this.latest = checkLatest("2026.11.06-0052");
     // ── 搜尋 ──
     this.query = "";
     this.tmdbStatus = "";
@@ -2052,11 +2053,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.06-0045"}`);
+          Pasteboard.copy(`版本 ${"2026.11.06-0052"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.06-0045"}`,
+      `版本 ${"2026.11.06-0052"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
