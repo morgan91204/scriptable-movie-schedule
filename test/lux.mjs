@@ -1,5 +1,6 @@
 import { tap, dump, saved, closeUI } from "./mock.mjs";
 const driver = (async () => {
+  await tap(/依縣市找影院/);
   await tap(/搜尋影城/);
   await tap(/^搜尋$/, { q: "西門" });
   await dump("搜尋西門");

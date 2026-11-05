@@ -149,7 +149,6 @@ function Home() {
 
   const list = cinemas.data || []
   const favs = settings.favorites.map((id) => list.find((c) => c.id === id)).filter(Boolean) as Cinema[]
-  const cities = useMemo(() => sortCities(Array.from(new Set(list.map((c) => c.city)))), [list])
   const k = query.trim().toLowerCase().replace(/臺/g, "台")
   const hits = k ? list.filter((c) => `${c.name} ${c.city} ${c.district} ${c.id} ${c.aliases || ""}`.toLowerCase().replace(/臺/g, "台").includes(k)) : []
 
@@ -166,13 +165,16 @@ function Home() {
       </Section> : <>
         <Section>
           <NavigationLink destination={<NowPage />}>
-            <Label title={"現在有什麼可以看"} systemImage={"clock"} />
+            <Text>{"🕘  現在有什麼可以看"}</Text>
           </NavigationLink>
           <NavigationLink destination={<MoviesPage />}>
-            <Label title={"依電影找場次"} systemImage={"film"} />
+            <Text>{"🎞️  依電影找場次"}</Text>
           </NavigationLink>
           <NavigationLink destination={<NearbyPage />}>
-            <Label title={"附近的影城"} systemImage={"location"} />
+            <Text>{"🧭  附近的影城"}</Text>
+          </NavigationLink>
+          <NavigationLink destination={<CitiesPage />}>
+            <Row title={"🎦  依縣市找影院"} trailing={cinemas.data ? `${list.length} 間` : ""} />
           </NavigationLink>
         </Section>
 
@@ -180,14 +182,6 @@ function Home() {
 
         {favs.length ? <Section header={<Text>常去影城</Text>}>
           {favs.map((c) => <CinemaLink key={c.id} cinema={c} showCity />)}
-        </Section> : null}
-
-        {cinemas.data ? <Section header={<Text>{`全台影城（${list.length} 間）`}</Text>}>
-          {cities.map((city) =>
-            <NavigationLink key={city} destination={<CityPage city={city} />}>
-              <Row title={city} trailing={`${list.filter((c) => c.city === city).length} 間`} />
-            </NavigationLink>
-          )}
         </Section> : null}
 
         <Section header={<Text>加入行事曆時</Text>} footer={<Text>{`場次資料來自場次通、開眼電影網，以及誠品、光點、樂聲官網，實際場次以影城公告為準。\n\n版本 ${appVersion()}`}</Text>}>
@@ -316,6 +310,20 @@ function TmdbPage() {
     </Section>
     {status ? <Section><Text>{status}</Text></Section> : null}
   </Form>
+}
+
+function CitiesPage() {
+  const list = store.cinemas
+  const cities = sortCities(Array.from(new Set(list.map((c) => c.city))))
+  return <List navigationTitle={"依縣市找影院"} navigationBarTitleDisplayMode={"inline"}>
+    <Section header={<Text>{`全台影城（${list.length} 間）`}</Text>} footer={<Text>影城清單來自場次通與開眼電影網，會自動更新。首頁上方的搜尋列可以直接搜尋影城。</Text>}>
+      {cities.map((city) =>
+        <NavigationLink key={city} destination={<CityPage city={city} />}>
+          <Row title={city} trailing={`${list.filter((c) => c.city === city).length} 間`} />
+        </NavigationLink>
+      )}
+    </Section>
+  </List>
 }
 
 function CinemaLink({ cinema, showCity }: { cinema: Cinema; showCity?: boolean }) {

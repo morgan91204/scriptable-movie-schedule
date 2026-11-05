@@ -1,5 +1,6 @@
 import { tap, dump, closeUI } from "./mock.mjs";
 const driver = (async () => {
+  await tap(/依縣市找影院/);
   await tap(/^南投縣/);
   await tap(/埔里山明影城/);
   await new Promise((r) => setTimeout(r, 3000));

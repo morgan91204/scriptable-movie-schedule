@@ -129,16 +129,13 @@ class App {
     if (!this.cinemas.length) this.cinemas = await loadCinemas();
     this.calendarName = (await currentCalendar(this.settings)).title;
     const favs = this.settings.favorites.map((id) => this.cinemas.find((c) => c.id === id)).filter(Boolean) as Cinema[];
-    const cities = Array.from(new Set(this.cinemas.map((c) => c.city))).sort(
-      (a, b) => (CITY_ORDER.indexOf(a) + 1 || 99) - (CITY_ORDER.indexOf(b) + 1 || 99)
-    );
     return (
       <Page title="🎬 電影行程" subtitle={`${this.cinemas.length} 間影城｜選影城 → 日期 → 電影 → 場次`}>
         <Section>
-          <Item icon="⏰" title="現在有什麼可以看" subtitle="選時段，一次列出常去、附近或某縣市的所有場次" onTap={() => this.go(() => this.nowView())} />
-          <Item icon="🎬" title="依電影找場次" subtitle="先選電影，再看哪些影城有放映" onTap={() => this.go(() => this.movieListView(), "讀取電影清單…")} />
-          <Item icon="📍" title="附近的影城" subtitle="依目前位置排序" onTap={() => this.go(() => this.nearbyView(), "取得目前位置…")} />
-          <Item icon="🔍" title="搜尋影城" subtitle="影城、分店、行政區或縣市" onTap={() => this.go(() => this.searchView())} />
+          <Item icon="🕘" title="現在有什麼可以看" subtitle="選時段，一次列出常去、附近或某縣市的所有場次" onTap={() => this.go(() => this.nowView())} />
+          <Item icon="🎞️" title="依電影找場次" subtitle="先選電影，再看哪些影城有放映" onTap={() => this.go(() => this.movieListView(), "讀取電影清單…")} />
+          <Item icon="🧭" title="附近的影城" subtitle="依目前位置排序" onTap={() => this.go(() => this.nearbyView(), "取得目前位置…")} />
+          <Item icon="🎦" title="依縣市找影院" subtitle={`全台 ${this.cinemas.length} 間，也可以搜尋影城`} onTap={() => this.go(() => this.citiesView())} />
         </Section>
         {favs.length ? (
           <Section title="常去影城">
@@ -147,11 +144,6 @@ class App {
             ))}
           </Section>
         ) : null}
-        <Section title="全台影城" hint="影城清單來自場次通與開眼電影網，會自動更新。">
-          {cities.map((city) => (
-            <Item title={city} badge={`${this.cinemas.filter((c) => c.city === city).length} 間`} onTap={() => this.go(() => this.cityView(city))} />
-          ))}
-        </Section>
         <Section title="設定">
           <Item icon="📅" title="寫入的行事曆" subtitle={this.calendarName} onTap={() => this.go(() => this.calendarView())} />
           <Item icon="📺" title="廣告預告" subtitle={`預計散場時間會加上 ${this.settings.ads} 分鐘`} right="點一下切換" chevron={false} onTap={() => this.cycleAds()} />
@@ -163,6 +155,25 @@ class App {
         </Section>
         <Note text="場次資料來自場次通 twshowtimes.com、開眼電影網，以及誠品、光點、樂聲官網，實際場次以影城公告為準。" />
         <Note text={`版本 ${APP_VERSION}`} />
+      </Page>
+    );
+  }
+
+  // ── 依縣市找影院 ──
+  citiesView(): string {
+    const cities = Array.from(new Set(this.cinemas.map((c) => c.city))).sort(
+      (a, b) => (CITY_ORDER.indexOf(a) + 1 || 99) - (CITY_ORDER.indexOf(b) + 1 || 99)
+    );
+    return (
+      <Page title="依縣市找影院" subtitle={`全台 ${this.cinemas.length} 間`} onBack={() => this.back()}>
+        <Section>
+          <Item icon="🔍" title="搜尋影城" subtitle="影城、分店、行政區或縣市" onTap={() => this.go(() => this.searchView())} />
+        </Section>
+        <Section title="縣市" hint="影城清單來自場次通與開眼電影網，會自動更新。">
+          {cities.map((city) => (
+            <Item title={city} badge={`${this.cinemas.filter((c) => c.city === city).length} 間`} onTap={() => this.go(() => this.cityView(city))} />
+          ))}
+        </Section>
       </Page>
     );
   }

@@ -4,6 +4,7 @@ const scenario = process.argv[2] || "vs";
 const driver = (async () => {
   await dump("首頁");
   if (scenario === "vs") {
+    await tap(/依縣市找影院/);
     await tap(/^台北市/);
     await tap(/台北信義威秀影城/);
     await dump("信義威秀：日期");
@@ -24,6 +25,7 @@ const driver = (async () => {
     await tap(/加入行事曆/);
     await dump("完成頁");
   } else if (scenario === "search") {
+    await tap(/依縣市找影院/);
     await tap(/搜尋影城/);
     await tap(/^搜尋$/, { q: "松仁" });
     await dump("搜尋結果");
@@ -45,6 +47,7 @@ const driver = (async () => {
     await tap(/加入行事曆/);
     await dump("完成頁");
   } else if (scenario === "noruntime") {
+    await tap(/依縣市找影院/);
     await tap(/^高雄市/);
     await tap(/高雄大遠百威秀影城/);
     await tap(/（.）/);
@@ -63,6 +66,7 @@ const driver = (async () => {
     await new Promise((r) => setTimeout(r, 5000)); // 等 TMDB 測試回來
     await dump("TMDB 設定");
     await tap(/返回/);
+    await tap(/依縣市找影院/);
     await tap(/^台北市/);
     await tap(/台北信義威秀影城/);
     await tap(/（.）/);
@@ -70,6 +74,7 @@ const driver = (async () => {
     await tap(/^\d\d:\d\d/);
     await dump("確認頁（片長取自開眼）");
   } else if (scenario === "error") {
+    await tap(/依縣市找影院/);
     await tap(/搜尋影城/);
     await tap(/^搜尋$/, { q: "zzzz" });
     await dump("無結果");

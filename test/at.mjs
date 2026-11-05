@@ -1,6 +1,7 @@
 import { tap, dump, saved, closeUI } from "./mock.mjs";
 const driver = (async () => {
   await dump("首頁");
+  await tap(/依縣市找影院/);
   await tap(/^宜蘭縣/);
   await dump("宜蘭縣");
   await tap(/新月豪華影城/);
@@ -13,6 +14,7 @@ const driver = (async () => {
   await dump("確認頁");
   await tap(/加入行事曆/);
   await tap(/再新增一部/);
+  await tap(/依縣市找影院/);
   await tap(/搜尋影城/);
   await tap(/^搜尋$/, { q: "威尼斯" });
   await tap(/威尼斯影城/);
