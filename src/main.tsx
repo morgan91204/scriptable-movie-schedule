@@ -12,7 +12,7 @@ import {
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
   loadSettings, saveSettings, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, TW,
   FORMATS, formatsOf, filterVersions, nearest, kmLabel, WINDOWS, findShowtimes, groupByMovie, shareText,
-  hallOf, tmdbTest, movieExtras, moviePoster, posterSrc, cachePoster, prefetchPosters, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, movieRatings, ratingTier,
+  hallOf, tmdbTest, movieExtras, moviePoster, posterSrc, cachePoster, prefetchPosters, foregroundTask, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, movieRatings, ratingTier,
 } from "./core";
 import type { MovieExtras, Ratings } from "./core";
 import type { TwMovie, TwMovieCinema, Format, LatLng, Hit } from "./core";
@@ -84,7 +84,7 @@ class App {
       const same = view === lastView; // 同一頁重繪（例如切換廣告時間）：不顯示讀取中、不捲回頂端
       const back = !same && depth < lastDepth;
       this.ui.begin();
-      const job = Promise.resolve().then(() => view());
+      const job = foregroundTask(Promise.resolve().then(() => view())); // 使用者在等：背景預抓暫停
       job.catch(() => {});
       // 超過 0.2 秒還沒好才顯示「讀取中」，避免快速操作時畫面閃一下
       const quick = await Promise.race([job.then(() => true, () => true), sleep(200).then(() => false)]);
@@ -105,18 +105,25 @@ class App {
       const scrollTo = same && quick ? -1 : same || back ? savedY.get(view) ?? 0 : 0;
       lastView = view;
       lastDepth = depth;
-      // 海報、評分等慢慢讀的資料：讀好後在原位重畫一次（使用者還沒點別的才畫）
+      // 海報、評分、預告等慢慢讀的資料：每一項讀好就在原位補畫一次（使用者還沒點別的才畫），不用等全部都好
       const late = this.late;
-      this.late = null;
+      this.late = [];
       let clicked = false;
-      if (late)
-        late.then(async () => {
-          if (clicked || this.ui.closed || this.stack[this.stack.length - 1] !== view) return;
-          this.late = null;
+      let painting: Promise<void> | null = null;
+      const repaint = async (): Promise<void> => {
+        if (clicked || this.ui.closed || this.stack[this.stack.length - 1] !== view) return;
+        if (painting) return painting.then(repaint); // 一次畫一張，連續兩項讀好就排隊
+        painting = (async () => {
+          this.rerendering = true;
           const again = await Promise.resolve(view()).catch(() => "");
-          this.late = null;
+          this.rerendering = false;
+          this.late = [];
           if (again && !clicked && this.stack[this.stack.length - 1] === view) await this.ui.render(again, -1);
-        });
+        })();
+        await painting;
+        painting = null;
+      };
+      for (const p of late) p.then(repaint, repaint);
       const hit = await this.ui.show(html, scrollTo);
       clicked = true;
       if (!hit) break;
@@ -400,18 +407,21 @@ class App {
     );
   }
 
-  /** 讀好後要在原位重畫的資料（海報、評分） */
-  late: Promise<unknown> | null = null;
+  /** 讀好後要在原位補畫的資料（海報、評分、預告），每一項各自觸發一次補畫 */
+  late: Promise<unknown>[] = [];
+  /** 正在補畫：只用已經讀好的資料，不再等 */
+  rerendering = false;
 
-  /** 海報、預告與評分：先等 1.5 秒，還沒好就先畫頁面，讀好後自動補上。海報網址另外快查（不等預告），有圖片快取就立刻顯示 */
+  /** 海報、預告與評分：最多等 0.4 秒就先畫頁面（有快取的會直接出現），其餘讀好後各自補上。海報網址另外快查（不等預告） */
   async extras(title: string, slug?: string, en?: string): Promise<{ x: MovieExtras | null; r: Ratings | null; p: string; px: Promise<MovieExtras | null>; loading: boolean }> {
-    const px = movieExtras(title, slug).catch(() => null);
-    const pr = movieRatings(title, en).catch(() => null);
-    const pp = moviePoster(title, slug).catch(() => "");
-    const quick = <T,>(p: Promise<T>) => Promise.race([p, sleep(1500).then(() => undefined)]);
+    const px = foregroundTask(movieExtras(title, slug).catch(() => null));
+    const pr = foregroundTask(movieRatings(title, en).catch(() => null));
+    const pp = foregroundTask(moviePoster(title, slug).catch(() => ""));
+    const wait = this.rerendering ? 0 : 400;
+    const quick = <T,>(p: Promise<T>) => Promise.race([p, sleep(wait).then(() => undefined)]);
     const [x, r, p] = await Promise.all([quick(px), quick(pr), quick(pp)]);
     const loading = x === undefined || r === undefined || p === undefined;
-    if (loading) this.late = Promise.all([px, pr, pp]);
+    if (loading) this.late = [x === undefined ? px : null, r === undefined ? pr : null, p === undefined ? pp : null].filter(Boolean) as Promise<unknown>[];
     return { x: x ?? null, r: r ?? null, p: p || "", px, loading };
   }
 

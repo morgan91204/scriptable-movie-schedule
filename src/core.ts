@@ -468,6 +468,27 @@ export interface MovieExtras {
   err?: string; // 有金鑰卻查不到預告時的原因
 }
 const extrasCache: Record<string, Promise<MovieExtras>> = {};
+
+// ── 前景優先：使用者正在等的查詢進行中時，背景預抓先暫停，不搶頻寬
+const delay = (ms: number) =>
+  new Promise<void>((r) => {
+    const g = globalThis as any;
+    if (typeof g.setTimeout === "function") g.setTimeout(r, ms);
+    else g.Timer.schedule(ms, false, r); // Scriptable 沒有 setTimeout
+  });
+let foreground = 0;
+/** 把「使用者正在等」的查詢包起來：進行中時背景預抓會暫停 */
+export function foregroundTask<T>(p: Promise<T>): Promise<T> {
+  foreground++;
+  const done = () => {
+    foreground--;
+  };
+  p.then(done, done);
+  return p;
+}
+async function waitIdle(): Promise<void> {
+  while (foreground > 0) await delay(150);
+}
 /** 手機上記的海報／預告（extras.json） */
 const readExtras = (): Record<string, MovieExtras & { at: number }> => {
   try {
@@ -614,25 +635,34 @@ export function cachePoster(url: string): void {
   } catch (_) {}
 }
 const prefetched = new Set<string>();
-/** 列表出現時在背景預抓：整份清單（最多 max 部）的海報網址與海報圖，一次 3 個；前 trailers 部連預告也先查，之後進電影頁就不用等 */
-export function prefetchPosters(items: { title: string; slug?: string }[], max = 200, trailers = 30): void {
-  const queue: { title: string; slug?: string; trailer: boolean }[] = [];
+/** 列表出現時在背景預抓（一次 2 個，使用者正在等的查詢進行中時暫停）：
+ *  整份清單（最多 max 部）的海報網址與海報圖；前 ratings 部連三大評分、前 trailers 部連預告也先查，之後進電影頁就不用等 */
+export function prefetchPosters(items: { title: string; slug?: string; en?: string }[], max = 200, trailers = 10, ratings = 12): void {
+  const queue: { title: string; slug?: string; en?: string; trailer: boolean; ratings: boolean }[] = [];
   items.slice(0, max).forEach((m, i) => {
     const k = (m.slug || "") + "|" + m.title;
     if (prefetched.has(k)) return;
     prefetched.add(k);
-    queue.push({ title: m.title, slug: m.slug, trailer: i < trailers });
+    queue.push({ title: m.title, slug: m.slug, en: m.en, trailer: i < trailers, ratings: i < ratings });
   });
   const run = async () => {
     for (let m = queue.shift(); m; m = queue.shift()) {
       try {
+        await waitIdle();
         const u = await moviePoster(m.title, m.slug);
         if (u) await platform().cacheImage(u);
-        if (m.trailer) await movieExtras(m.title, m.slug);
+        if (m.ratings) {
+          await waitIdle();
+          await movieRatings(m.title, m.en);
+        }
+        if (m.trailer) {
+          await waitIdle();
+          await movieExtras(m.title, m.slug);
+        }
       } catch (_) {}
     }
   };
-  for (let i = 0; i < 3; i++) run();
+  for (let i = 0; i < 2; i++) run();
 }
 
 async function findExtras(title: string, slug?: string): Promise<MovieExtras> {
@@ -952,7 +982,24 @@ interface Ident { id: string; name: string; year: number }
 /** 找 IMDb 編號（同時拿到英文片名與年份，給爛番茄用）：有金鑰走 TMDB，否則用 IMDb 搜尋建議 */
 async function identify(title: string, en: string | undefined, errs: string[]): Promise<Ident | null> {
   const token = ((await loadSettings()).tmdbToken || "").trim();
-  if (token) {
+  // IMDb 搜尋建議：一次請求、很小，手機上最快
+  const viaImdb = (async (): Promise<Ident | null> => {
+    for (const q of [en, baseTitle(title)].filter(Boolean) as string[]) {
+      const key = q.toLowerCase().replace(/[\\/?#%]/g, " ").trim();
+      try {
+        const r = await platform().fetchText(`https://v3.sg.media-imdb.com/suggestion/x/${encodeURIComponent(key)}.json`, { "User-Agent": UA });
+        const d = (JSON.parse(r.body).d || []) as any[];
+        const hit = d.find((x) => /^tt/.test(x.id) && (x.qid === "movie" || x.qid === "tvMovie" || x.qid === "video"));
+        if (hit) return { id: hit.id, name: String(hit.l || en || ""), year: Number(hit.y) || 0 };
+      } catch (e) {
+        errs.push("IMDb 搜尋暫時讀不到");
+      }
+    }
+    return null;
+  })();
+  if (!token) return viaImdb;
+  // 有金鑰：TMDB 對應的 IMDb 編號比較準，但要 2～3 次請求；跟 IMDb 搜尋同時查，TMDB 2.5 秒內沒回就先用 IMDb 的結果
+  const viaTmdb = (async (): Promise<Ident | null> => {
     try {
       const hit = await tmdbFind(title, token);
       if (hit) {
@@ -962,19 +1009,11 @@ async function identify(title: string, en: string | undefined, errs: string[]): 
     } catch (e) {
       errs.push("TMDB 暫時讀不到");
     }
-  }
-  for (const q of [en, baseTitle(title)].filter(Boolean) as string[]) {
-    const key = q.toLowerCase().replace(/[\\/?#%]/g, " ").trim();
-    try {
-      const r = await platform().fetchText(`https://v3.sg.media-imdb.com/suggestion/x/${encodeURIComponent(key)}.json`, { "User-Agent": UA });
-      const d = (JSON.parse(r.body).d || []) as any[];
-      const hit = d.find((x) => /^tt/.test(x.id) && (x.qid === "movie" || x.qid === "tvMovie" || x.qid === "video"));
-      if (hit) return { id: hit.id, name: String(hit.l || en || ""), year: Number(hit.y) || 0 };
-    } catch (e) {
-      errs.push("IMDb 搜尋暫時讀不到");
-    }
-  }
-  return null;
+    return null;
+  })();
+  const first = await Promise.race([viaTmdb, delay(2500).then(() => "slow" as const)]);
+  if (first && first !== "slow") return first;
+  return (await viaImdb) || (await viaTmdb);
 }
 
 /** 爛番茄網址猜測：英文片名 → /m/the_odyssey、/m/the_odyssey_2026 */
@@ -1095,12 +1134,14 @@ export function movieRatings(title: string, en?: string): Promise<Ratings> {
       }
     };
     const hit = read()[k];
-    if (hit && Date.now() - hit.at < 3 * 86400e3 && (hit.imdb || hit.tomato || hit.popcorn)) return hit;
+    const has = (x: Ratings) => !!(x.imdb || x.tomato || x.popcorn);
+    // 有分數記 7 天；查過但沒有任何評分（新片、演唱會）記 1 天，不用每次進電影頁都重查
+    if (hit && Date.now() - hit.at < (has(hit) ? 7 : 1) * 86400e3) return hit;
     const r = await findRatings(title, en);
-    // 沒查到或有錯：不寫進手機快取（下次啟動再試），但這次執行內記住結果，重畫時不用再查
-    if (r.imdb || r.tomato || r.popcorn) {
+    // 有錯（連線失敗）：不寫進手機快取（下次啟動再試），但這次執行內記住結果，重畫時不用再查
+    if (!r.err || has(r)) {
       const all = read();
-      for (const [key, v] of Object.entries(all)) if (Date.now() - v.at > 3 * 86400e3) delete all[key];
+      for (const [key, v] of Object.entries(all)) if (Date.now() - v.at > 7 * 86400e3) delete all[key];
       const { err: _e, ...keep } = r;
       all[k] = { ...keep, at: Date.now() };
       cacheSet("ratings.json", JSON.stringify(all));

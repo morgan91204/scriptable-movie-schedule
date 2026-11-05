@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.05-2354
+// @movie-schedule-app 電影行程 v2026.11.06-0006
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/jsx.tsx
@@ -1262,6 +1262,23 @@ async function tmdbRuntime(title, token) {
   return (await tmdbFind(title, token))?.r || 0;
 }
 var extrasCache = {};
+var delay = (ms) => new Promise((r) => {
+  const g = globalThis;
+  if (typeof g.setTimeout === "function") g.setTimeout(r, ms);
+  else g.Timer.schedule(ms, false, r);
+});
+var foreground = 0;
+function foregroundTask(p) {
+  foreground++;
+  const done = () => {
+    foreground--;
+  };
+  p.then(done, done);
+  return p;
+}
+async function waitIdle() {
+  while (foreground > 0) await delay(150);
+}
 var readExtras = () => {
   try {
     return JSON.parse(cacheGet("extras.json") || "{}") || {};
@@ -1385,25 +1402,33 @@ function cachePoster(url) {
   }
 }
 var prefetched = /* @__PURE__ */ new Set();
-function prefetchPosters(items, max = 200, trailers = 30) {
+function prefetchPosters(items, max = 200, trailers = 10, ratings = 12) {
   const queue = [];
   items.slice(0, max).forEach((m, i) => {
     const k = (m.slug || "") + "|" + m.title;
     if (prefetched.has(k)) return;
     prefetched.add(k);
-    queue.push({ title: m.title, slug: m.slug, trailer: i < trailers });
+    queue.push({ title: m.title, slug: m.slug, en: m.en, trailer: i < trailers, ratings: i < ratings });
   });
   const run = async () => {
     for (let m = queue.shift(); m; m = queue.shift()) {
       try {
+        await waitIdle();
         const u = await moviePoster(m.title, m.slug);
         if (u) await platform().cacheImage(u);
-        if (m.trailer) await movieExtras(m.title, m.slug);
+        if (m.ratings) {
+          await waitIdle();
+          await movieRatings(m.title, m.en);
+        }
+        if (m.trailer) {
+          await waitIdle();
+          await movieExtras(m.title, m.slug);
+        }
       } catch (_) {
       }
     }
   };
-  for (let i = 0; i < 3; i++) run();
+  for (let i = 0; i < 2; i++) run();
 }
 async function findExtras(title, slug) {
   const base = baseTitle(title);
@@ -1621,7 +1646,22 @@ var errText = (e) => {
 var IMDB_GQL = "https://api.graphql.imdb.com/";
 async function identify(title, en, errs) {
   const token = ((await loadSettings()).tmdbToken || "").trim();
-  if (token) {
+  const viaImdb = (async () => {
+    for (const q of [en, baseTitle(title)].filter(Boolean)) {
+      const key = q.toLowerCase().replace(/[\\/?#%]/g, " ").trim();
+      try {
+        const r = await platform().fetchText(`https://v3.sg.media-imdb.com/suggestion/x/${encodeURIComponent(key)}.json`, { "User-Agent": UA });
+        const d = JSON.parse(r.body).d || [];
+        const hit = d.find((x) => /^tt/.test(x.id) && (x.qid === "movie" || x.qid === "tvMovie" || x.qid === "video"));
+        if (hit) return { id: hit.id, name: String(hit.l || en || ""), year: Number(hit.y) || 0 };
+      } catch (e) {
+        errs.push("IMDb 搜尋暫時讀不到");
+      }
+    }
+    return null;
+  })();
+  if (!token) return viaImdb;
+  const viaTmdb = (async () => {
     try {
       const hit = await tmdbFind(title, token);
       if (hit) {
@@ -1631,19 +1671,11 @@ async function identify(title, en, errs) {
     } catch (e) {
       errs.push("TMDB 暫時讀不到");
     }
-  }
-  for (const q of [en, baseTitle(title)].filter(Boolean)) {
-    const key = q.toLowerCase().replace(/[\\/?#%]/g, " ").trim();
-    try {
-      const r = await platform().fetchText(`https://v3.sg.media-imdb.com/suggestion/x/${encodeURIComponent(key)}.json`, { "User-Agent": UA });
-      const d = JSON.parse(r.body).d || [];
-      const hit = d.find((x) => /^tt/.test(x.id) && (x.qid === "movie" || x.qid === "tvMovie" || x.qid === "video"));
-      if (hit) return { id: hit.id, name: String(hit.l || en || ""), year: Number(hit.y) || 0 };
-    } catch (e) {
-      errs.push("IMDb 搜尋暫時讀不到");
-    }
-  }
-  return null;
+    return null;
+  })();
+  const first = await Promise.race([viaTmdb, delay(2500).then(() => "slow")]);
+  if (first && first !== "slow") return first;
+  return await viaImdb || await viaTmdb;
 }
 var rtSlug = (name) => name.toLowerCase().replace(/&/g, " and ").replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
 async function rtPage(url) {
@@ -1747,11 +1779,12 @@ function movieRatings(title, en) {
       }
     };
     const hit = read()[k];
-    if (hit && Date.now() - hit.at < 3 * 864e5 && (hit.imdb || hit.tomato || hit.popcorn)) return hit;
+    const has = (x) => !!(x.imdb || x.tomato || x.popcorn);
+    if (hit && Date.now() - hit.at < (has(hit) ? 7 : 1) * 864e5) return hit;
     const r = await findRatings(title, en);
-    if (r.imdb || r.tomato || r.popcorn) {
+    if (!r.err || has(r)) {
       const all = read();
-      for (const [key, v] of Object.entries(all)) if (Date.now() - v.at > 3 * 864e5) delete all[key];
+      for (const [key, v] of Object.entries(all)) if (Date.now() - v.at > 7 * 864e5) delete all[key];
       const { err: _e, ...keep } = r;
       all[k] = { ...keep, at: Date.now() };
       cacheSet("ratings.json", JSON.stringify(all));
@@ -1835,12 +1868,14 @@ var App = class {
     this.loadingText = "讀取中…";
     // ── 事件迴圈 ──
     // 背景查 GitHub 上的最新版本（首頁顯示是否為最新版）
-    this.latest = checkLatest("2026.11.05-2354");
+    this.latest = checkLatest("2026.11.06-0006");
     // ── 搜尋 ──
     this.query = "";
     this.tmdbStatus = "";
-    /** 讀好後要在原位重畫的資料（海報、評分） */
-    this.late = null;
+    /** 讀好後要在原位補畫的資料（海報、評分、預告），每一項各自觸發一次補畫 */
+    this.late = [];
+    /** 正在補畫：只用已經讀好的資料，不再等 */
+    this.rerendering = false;
     // ── 依電影找 ──
     this.movieQuery = "";
     this.movieCity = "全部";
@@ -1878,7 +1913,7 @@ var App = class {
       const same = view === lastView;
       const back = !same && depth < lastDepth;
       this.ui.begin();
-      const job = Promise.resolve().then(() => view());
+      const job = foregroundTask(Promise.resolve().then(() => view()));
       job.catch(() => {
       });
       const quick = await Promise.race([job.then(() => true, () => true), sleep(200).then(() => false)]);
@@ -1899,16 +1934,23 @@ var App = class {
       lastView = view;
       lastDepth = depth;
       const late = this.late;
-      this.late = null;
+      this.late = [];
       let clicked = false;
-      if (late)
-        late.then(async () => {
-          if (clicked || this.ui.closed || this.stack[this.stack.length - 1] !== view) return;
-          this.late = null;
+      let painting = null;
+      const repaint = async () => {
+        if (clicked || this.ui.closed || this.stack[this.stack.length - 1] !== view) return;
+        if (painting) return painting.then(repaint);
+        painting = (async () => {
+          this.rerendering = true;
           const again = await Promise.resolve(view()).catch(() => "");
-          this.late = null;
+          this.rerendering = false;
+          this.late = [];
           if (again && !clicked && this.stack[this.stack.length - 1] === view) await this.ui.render(again, -1);
-        });
+        })();
+        await painting;
+        painting = null;
+      };
+      for (const p of late) p.then(repaint, repaint);
       const hit = await this.ui.show(html, scrollTo);
       clicked = true;
       if (!hit) break;
@@ -1939,11 +1981,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.05-2354"}`);
+          Pasteboard.copy(`版本 ${"2026.11.06-0006"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.05-2354"}`,
+      `版本 ${"2026.11.06-0006"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -2078,15 +2120,16 @@ var App = class {
       }
     );
   }
-  /** 海報、預告與評分：先等 1.5 秒，還沒好就先畫頁面，讀好後自動補上。海報網址另外快查（不等預告），有圖片快取就立刻顯示 */
+  /** 海報、預告與評分：最多等 0.4 秒就先畫頁面（有快取的會直接出現），其餘讀好後各自補上。海報網址另外快查（不等預告） */
   async extras(title, slug, en) {
-    const px = movieExtras(title, slug).catch(() => null);
-    const pr = movieRatings(title, en).catch(() => null);
-    const pp = moviePoster(title, slug).catch(() => "");
-    const quick = (p2) => Promise.race([p2, sleep(1500).then(() => void 0)]);
+    const px = foregroundTask(movieExtras(title, slug).catch(() => null));
+    const pr = foregroundTask(movieRatings(title, en).catch(() => null));
+    const pp = foregroundTask(moviePoster(title, slug).catch(() => ""));
+    const wait = this.rerendering ? 0 : 400;
+    const quick = (p2) => Promise.race([p2, sleep(wait).then(() => void 0)]);
     const [x, r, p] = await Promise.all([quick(px), quick(pr), quick(pp)]);
     const loading = x === void 0 || r === void 0 || p === void 0;
-    if (loading) this.late = Promise.all([px, pr, pp]);
+    if (loading) this.late = [x === void 0 ? px : null, r === void 0 ? pr : null, p === void 0 ? pp : null].filter(Boolean);
     return { x: x ?? null, r: r ?? null, p: p || "", px, loading };
   }
   hero(e, title, lines) {
