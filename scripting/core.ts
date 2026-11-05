@@ -537,7 +537,11 @@ const EXTRAS_V = 3;
 export function normImageUrl(u: string): string {
   let s = String(u || "").trim().replace(/&amp;/g, "&").replace(/\\\//g, "/");
   if (s.startsWith("//")) s = "https:" + s;
-  return s.replace(/^http:\/\//i, "https://");
+  s = s.replace(/^http:\/\//i, "https://");
+  // 開眼的 photowant.com 圖床已經把所有圖轉到首頁（不是圖片，手機上會一直轉圈），改用 atmovies 主機上同一張海報
+  const pw = s.match(/^https?:\/\/(?:www\.)?photowant\.com\/photo\d*\/(f\w+)\//);
+  if (pw) s = `${AT}/photo101/${pw[1]}/pl_${pw[1]}.jpg`;
+  return s;
 }
 
 /** 場次通電影頁的海報網址：有快取就直接用，沒有就只抓 og:image（不經過 WebView 解析，比較快） */
@@ -564,7 +568,7 @@ function atMovieIndex(): Promise<Record<string, string>> {
     } catch (_) {}
     const idx: Record<string, string> = {};
     await Promise.all(
-      ["now", "next", "now2"].map(async (p) => {
+      ["now", "new", "next", "next2", "now2"].map(async (p) => {
         const html = await getText(`${AT}/movie/${p}/`).catch(() => "");
         for (const [, id, t] of html.matchAll(/<a[^>]*href="\/movie\/(f[a-z0-9]+)\/"[^>]*>\s*([^<]{1,60}?)\s*<\/a>/g)) {
           const n = normTitle(t), b = normTitle(baseTitle(t));
@@ -592,7 +596,8 @@ async function atPoster(title: string): Promise<string> {
   const id = await atMovieId(title, "");
   if (!id) return "";
   const html = await atPage(id);
-  return (html.match(/property="og:image"\s+content="([^"]+)"/) || [])[1] || "";
+  const og = (html.match(/property="og:image"\s+content="([^"]+)"/) || [])[1] || "";
+  return og ? normImageUrl(og) : "";
 }
 
 /** 開眼電影頁上的上映年份（用來確認 IMDb／TMDB 對到的是同一部片；重映、修復版不適用，回傳 0）。最多等 3.5 秒 */
@@ -690,6 +695,7 @@ export function moviePoster(title: string, slug?: string, en?: string): Promise<
 
 /** 顯示用的海報來源：手機上有圖片快取就用本機（Scriptable 是 data: 網址、Scripting 是檔案路徑），否則用網址 */
 export function posterSrc(url: string): string {
+  url = normImageUrl(url); // 手機上記的舊網址也要修正（photowant → atmovies）
   if (!url) return "";
   try {
     return platform().cachedImage(url) || url;
@@ -701,6 +707,7 @@ export function posterSrc(url: string): string {
 export const isLocalSrc = (src: string) => /^(data:|file:|\/)/.test(src);
 /** 背景把海報圖抓到手機快取（不等結果） */
 export function cachePoster(url: string): void {
+  url = normImageUrl(url);
   if (!url) return;
   try {
     platform().cacheImage(url).catch(() => null);
@@ -1261,7 +1268,7 @@ export async function checkLatest(current: string): Promise<{ latest: string; is
 export const CINEMA_APPS: { re: RegExp; name: string; id: string; schemes: string[] }[] = [
   { re: /威秀|MUVIE|^vscinemas/i, name: "威秀影城", id: "6761522320", schemes: ["vscinemas", "vieshow", "vieshowcinemas", "com.vieshow.vscinemas"] },
   { re: /秀泰|^showtimes/i, name: "秀泰影城", id: "1152850053", schemes: ["showtimes", "showtimescinema", "maimaishowtimes", "tw.com.maimai.showtimes"] },
-  { re: /國賓|^ambassador/i, name: "國賓看電影", id: "435465064", schemes: ["ambassador", "ambassadorlookmovie", "ambassadortheatres", "tw.com.langshin.AmbassadorLookMovie"] },
+  { re: /國賓|^ambassador/i, name: "國賓看電影", id: "435465064", schemes: ["ambassador", "ambassadorlookmovie", "ambassadortheatres", "ambassadorcinemas", "ambassadorapp", "lookmovie", "langshin", "tw.com.langshin.AmbassadorLookMovie", "tw.com.langshin.ambassadorlookmovie"] },
   { re: /新光影城|^skcinemas/i, name: "新光影城", id: "6747376383", schemes: ["skcinemas", "skcinema", "com.bonjays.skcinema.test", "com.bonjays.skcinema"] },
   { re: /美麗新/, name: "美麗新影城", id: "581548701", schemes: ["miramarcinemas", "miramarcinemasbookingonline", "tw.com.miramarcinemas.MiramarCinemasBookingOnline"] },
   { re: /美麗華|^miramar/i, name: "美麗華影城", id: "1446574681", schemes: ["miramar", "mirmar", "miramarcinema", "com.movie.Mirmar"] },

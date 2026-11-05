@@ -283,9 +283,11 @@ function MovieHero({ title, slug, lines, en }: { title: string; slug?: string; l
   const rt = useLoad(() => movieRatings(title, en, slug), [title, en || ""])
   const p = useLoad(() => moviePoster(title, slug, en), [title, slug || ""]) // 海報網址快查（不等預告）
   const [opening, setOpening] = useState(false)
+  const [broken, setBroken] = useState("") // 載入失敗的海報網址：改顯示預設圖，不要一直轉圈
   const r = rt.data
   const posterUrl = x.data?.poster || p.data || ""
-  const poster = posterSrc(posterUrl) // 有圖片快取就用本機檔案
+  const poster0 = posterSrc(posterUrl) // 有圖片快取就用本機檔案
+  const poster = broken && broken === poster0 ? "" : poster0
   useEffect(() => {
     if (posterUrl && poster === posterUrl) cachePoster(posterUrl) // 這次用網址顯示，順便抓進快取
   }, [posterUrl])
@@ -309,7 +311,7 @@ function MovieHero({ title, slug, lines, en }: { title: string; slug?: string; l
         ? isLocalSrc(poster)
           ? <Image filePath={poster} resizable scaleToFit frame={{ width: 104, height: 156 }} clipShape={{ type: "rect", cornerRadius: 12 }} />
           : <Image imageUrl={poster} resizable scaleToFit frame={{ width: 104, height: 156 }}
-              clipShape={{ type: "rect", cornerRadius: 12 }} placeholder={<ProgressView progressViewStyle={"circular"} />} />
+              clipShape={{ type: "rect", cornerRadius: 12 }} placeholder={<ProgressView progressViewStyle={"circular"} />} onError={() => setBroken(poster)} />
         : <VStack frame={{ width: 104, height: 156 }} background={"rgba(120, 120, 128, 0.22)"} clipShape={{ type: "rect", cornerRadius: 12 }}>
             {posterPending ? <ProgressView progressViewStyle={"circular"} /> : <Image systemName={"film"} font={"largeTitle"} foregroundStyle={"tertiaryLabel"} />}
           </VStack>}

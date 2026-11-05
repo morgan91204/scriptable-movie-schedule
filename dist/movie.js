@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.06-0052
+// @movie-schedule-app 電影行程 v2026.11.06-0110
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/jsx.tsx
@@ -1319,7 +1319,10 @@ var EXTRAS_V = 3;
 function normImageUrl(u) {
   let s = String(u || "").trim().replace(/&amp;/g, "&").replace(/\\\//g, "/");
   if (s.startsWith("//")) s = "https:" + s;
-  return s.replace(/^http:\/\//i, "https://");
+  s = s.replace(/^http:\/\//i, "https://");
+  const pw = s.match(/^https?:\/\/(?:www\.)?photowant\.com\/photo\d*\/(f\w+)\//);
+  if (pw) s = `${AT}/photo101/${pw[1]}/pl_${pw[1]}.jpg`;
+  return s;
 }
 var posterMem = {};
 function twPoster(slug) {
@@ -1343,7 +1346,7 @@ function atMovieIndex() {
     }
     const idx = {};
     await Promise.all(
-      ["now", "next", "now2"].map(async (p) => {
+      ["now", "new", "next", "next2", "now2"].map(async (p) => {
         const html = await getText(`${AT}/movie/${p}/`).catch(() => "");
         for (const [, id, t] of html.matchAll(/<a[^>]*href="\/movie\/(f[a-z0-9]+)\/"[^>]*>\s*([^<]{1,60}?)\s*<\/a>/g)) {
           const n = normTitle(t), b = normTitle(baseTitle(t));
@@ -1368,7 +1371,8 @@ async function atPoster(title) {
   const id = await atMovieId(title, "");
   if (!id) return "";
   const html = await atPage(id);
-  return (html.match(/property="og:image"\s+content="([^"]+)"/) || [])[1] || "";
+  const og = (html.match(/property="og:image"\s+content="([^"]+)"/) || [])[1] || "";
+  return og ? normImageUrl(og) : "";
 }
 async function atYearHint(title, slug, en) {
   if (isReissue(title)) return 0;
@@ -1456,6 +1460,7 @@ function moviePoster(title, slug, en) {
   })();
 }
 function posterSrc(url) {
+  url = normImageUrl(url);
   if (!url) return "";
   try {
     return platform().cachedImage(url) || url;
@@ -1464,6 +1469,7 @@ function posterSrc(url) {
   }
 }
 function cachePoster(url) {
+  url = normImageUrl(url);
   if (!url) return;
   try {
     platform().cacheImage(url).catch(() => null);
@@ -1883,7 +1889,7 @@ async function checkLatest(current2) {
 var CINEMA_APPS = [
   { re: /威秀|MUVIE|^vscinemas/i, name: "威秀影城", id: "6761522320", schemes: ["vscinemas", "vieshow", "vieshowcinemas", "com.vieshow.vscinemas"] },
   { re: /秀泰|^showtimes/i, name: "秀泰影城", id: "1152850053", schemes: ["showtimes", "showtimescinema", "maimaishowtimes", "tw.com.maimai.showtimes"] },
-  { re: /國賓|^ambassador/i, name: "國賓看電影", id: "435465064", schemes: ["ambassador", "ambassadorlookmovie", "ambassadortheatres", "tw.com.langshin.AmbassadorLookMovie"] },
+  { re: /國賓|^ambassador/i, name: "國賓看電影", id: "435465064", schemes: ["ambassador", "ambassadorlookmovie", "ambassadortheatres", "ambassadorcinemas", "ambassadorapp", "lookmovie", "langshin", "tw.com.langshin.AmbassadorLookMovie", "tw.com.langshin.ambassadorlookmovie"] },
   { re: /新光影城|^skcinemas/i, name: "新光影城", id: "6747376383", schemes: ["skcinemas", "skcinema", "com.bonjays.skcinema.test", "com.bonjays.skcinema"] },
   { re: /美麗新/, name: "美麗新影城", id: "581548701", schemes: ["miramarcinemas", "miramarcinemasbookingonline", "tw.com.miramarcinemas.MiramarCinemasBookingOnline"] },
   { re: /美麗華|^miramar/i, name: "美麗華影城", id: "1446574681", schemes: ["miramar", "mirmar", "miramarcinema", "com.movie.Mirmar"] },
@@ -1939,7 +1945,7 @@ var App = class {
     this.loadingText = "讀取中…";
     // ── 事件迴圈 ──
     // 背景查 GitHub 上的最新版本（首頁顯示是否為最新版）
-    this.latest = checkLatest("2026.11.06-0052");
+    this.latest = checkLatest("2026.11.06-0110");
     // ── 搜尋 ──
     this.query = "";
     this.tmdbStatus = "";
@@ -2053,11 +2059,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.06-0052"}`);
+          Pasteboard.copy(`版本 ${"2026.11.06-0110"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.06-0052"}`,
+      `版本 ${"2026.11.06-0110"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
