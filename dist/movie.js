@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.05-2312
+// @movie-schedule-app 電影行程 v2026.11.05-2317
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/jsx.tsx
@@ -1436,7 +1436,12 @@ function groupByMovie(hits) {
   }
   return Object.values(map).sort((a, b) => b.hits.length - a.hits.length || showMinute(a.hits[0].time) - showMinute(b.hits[0].time));
 }
-var errText = (e) => String(e?.message || e).slice(0, 80);
+var errText = (e) => {
+  const m = String(e?.message || e || "");
+  if (/JSON|Unexpected|Unrecognized|token|SyntaxError|<|\{/i.test(m)) return "回傳的內容不是預期格式";
+  if (/time|network|offline|connect|cancel|host|SSL|TLS|socket/i.test(m)) return "連線失敗";
+  return m.replace(/[{}"\[\]]/g, "").trim().slice(0, 40) || "讀取失敗";
+};
 var IMDB_GQL = "https://api.graphql.imdb.com/";
 async function identify(title, en, errs) {
   const token = ((await loadSettings()).tmdbToken || "").trim();
@@ -1448,7 +1453,7 @@ async function identify(title, en, errs) {
         if (ids?.imdb_id) return { id: String(ids.imdb_id), name: d?.title || d?.original_title || en || "", year: Number(String(d?.release_date || "").slice(0, 4)) || 0 };
       }
     } catch (e) {
-      errs.push("TMDB " + errText(e));
+      errs.push("TMDB 暫時讀不到");
     }
   }
   for (const q of [en, baseTitle(title)].filter(Boolean)) {
@@ -1459,7 +1464,7 @@ async function identify(title, en, errs) {
       const hit = d.find((x) => /^tt/.test(x.id) && (x.qid === "movie" || x.qid === "tvMovie" || x.qid === "video"));
       if (hit) return { id: hit.id, name: String(hit.l || en || ""), year: Number(hit.y) || 0 };
     } catch (e) {
-      errs.push("IMDb 搜尋 " + errText(e));
+      errs.push("IMDb 搜尋暫時讀不到");
     }
   }
   return null;
@@ -1516,7 +1521,7 @@ async function findRatings(title, en) {
   const errs = [];
   const who = await identify(title, en, errs);
   if (!who) {
-    out.err = errs.join("；") || "IMDb 找不到這部片";
+    out.err = errs.join("；") || "IMDb 上找不到這部片";
     return out;
   }
   const imdbJob = (async () => {
@@ -1524,14 +1529,12 @@ async function findRatings(title, en) {
     try {
       const r2 = await platform().fetchText(`https://p.media-imdb.com/static-content/documents/v1/title/${who.id}/ratings%3Fjsonp=imdb.rating.run:imdb.api.title.ratings/data.json`, { "User-Agent": UA });
       const j = JSON.parse(r2.body.replace(/^[^{]*/, "").replace(/\)\s*$/, ""));
-      const score2 = Number(j?.resource?.rating) || 0;
-      if (score2) {
-        out.imdb = { score: score2, votes: Number(j.resource.ratingCount) || 0, url };
+      if (j?.resource) {
+        const score2 = Number(j.resource.rating) || 0;
+        if (score2) out.imdb = { score: score2, votes: Number(j.resource.ratingCount) || 0, url };
         return;
       }
-      errs.push("IMDb 沒有評分");
-    } catch (e) {
-      errs.push("IMDb 評分檔 " + errText(e));
+    } catch (_) {
     }
     const q = `{ title(id:"${who.id}"){ ratingsSummary{aggregateRating voteCount} } }`;
     const r = await platform().fetchText(`${IMDB_GQL}?query=${encodeURIComponent(q)}`, {
@@ -1540,20 +1543,18 @@ async function findRatings(title, en) {
       "x-imdb-client-name": "imdb-web-next-localized",
       Referer: "https://www.imdb.com/"
     });
+    if (r.status < 200 || r.status >= 300) throw new Error("status " + r.status);
     const t = JSON.parse(r.body)?.data?.title;
     const score = Number(t?.ratingsSummary?.aggregateRating) || 0;
-    if (score) {
-      out.imdb = { score, votes: Number(t.ratingsSummary.voteCount) || 0, url };
-      errs.pop();
-    } else errs.push("IMDb 評分 " + r.status + " " + r.body.slice(0, 60));
-  })().catch((e) => errs.push("IMDb 評分 " + errText(e)));
+    if (score) out.imdb = { score, votes: Number(t.ratingsSummary.voteCount) || 0, url };
+  })().catch(() => errs.push("IMDb 評分暫時讀不到"));
   const rtJob = (async () => {
     if (!who.name) return;
     const f = await rtFind(who.name, who.year);
     if (!f) return;
     if (f.s.critics >= 0) out.tomato = { score: f.s.critics, certified: f.s.certified, url: f.url };
     if (f.s.audience >= 0) out.popcorn = { score: f.s.audience, url: f.url };
-  })().catch((e) => errs.push("爛番茄 " + errText(e)));
+  })().catch(() => errs.push("爛番茄暫時讀不到"));
   await Promise.all([imdbJob, rtJob]);
   if (errs.length) out.err = errs.join("；");
   return out;
@@ -1658,7 +1659,7 @@ var App = class {
     this.loadingText = "讀取中…";
     // ── 事件迴圈 ──
     // 背景查 GitHub 上的最新版本（首頁顯示是否為最新版）
-    this.latest = checkLatest("2026.11.05-2312");
+    this.latest = checkLatest("2026.11.05-2317");
     // ── 搜尋 ──
     this.query = "";
     this.tmdbStatus = "";
@@ -1762,11 +1763,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.05-2312"}`);
+          Pasteboard.copy(`版本 ${"2026.11.05-2317"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.05-2312"}`,
+      `版本 ${"2026.11.05-2317"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }

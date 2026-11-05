@@ -803,7 +803,13 @@ export interface Ratings {
   popcorn?: { score: number; url: string }; // 爆米花指數（觀眾）
   err?: string; // 查詢失敗的原因（不會存進快取，方便回報問題）
 }
-const errText = (e: unknown) => String((e as Error)?.message || e).slice(0, 80);
+/** 把例外變成一句看得懂的話（不把 JSON、HTML 內容印到畫面上） */
+const errText = (e: unknown): string => {
+  const m = String((e as Error)?.message || e || "");
+  if (/JSON|Unexpected|Unrecognized|token|SyntaxError|<|\{/i.test(m)) return "回傳的內容不是預期格式";
+  if (/time|network|offline|connect|cancel|host|SSL|TLS|socket/i.test(m)) return "連線失敗";
+  return m.replace(/[{}"\[\]]/g, "").trim().slice(0, 40) || "讀取失敗";
+};
 
 const IMDB_GQL = "https://api.graphql.imdb.com/";
 interface Ident { id: string; name: string; year: number }
@@ -819,7 +825,7 @@ async function identify(title: string, en: string | undefined, errs: string[]): 
         if (ids?.imdb_id) return { id: String(ids.imdb_id), name: d?.title || d?.original_title || en || "", year: Number(String(d?.release_date || "").slice(0, 4)) || 0 };
       }
     } catch (e) {
-      errs.push("TMDB " + errText(e));
+      errs.push("TMDB 暫時讀不到");
     }
   }
   for (const q of [en, baseTitle(title)].filter(Boolean) as string[]) {
@@ -830,7 +836,7 @@ async function identify(title: string, en: string | undefined, errs: string[]): 
       const hit = d.find((x) => /^tt/.test(x.id) && (x.qid === "movie" || x.qid === "tvMovie" || x.qid === "video"));
       if (hit) return { id: hit.id, name: String(hit.l || en || ""), year: Number(hit.y) || 0 };
     } catch (e) {
-      errs.push("IMDb 搜尋 " + errText(e));
+      errs.push("IMDb 搜尋暫時讀不到");
     }
   }
   return null;
@@ -896,24 +902,24 @@ async function findRatings(title: string, en?: string): Promise<Ratings> {
   const errs: string[] = [];
   const who = await identify(title, en, errs);
   if (!who) {
-    out.err = errs.join("；") || "IMDb 找不到這部片";
+    out.err = errs.join("；") || "IMDb 上找不到這部片";
     return out;
   }
   // IMDb 評分與爛番茄同時查
   const imdbJob = (async () => {
     const url = `https://www.imdb.com/title/${who.id}/`;
+    // 找到片但 IMDb 還沒有評分（新片、兒童片常見）：不算錯誤，畫面上就顯示「-」
     // 1) IMDb 的公開評分檔（不需要特殊標頭，手機上最穩）
     try {
       const r = await platform().fetchText(`https://p.media-imdb.com/static-content/documents/v1/title/${who.id}/ratings%3Fjsonp=imdb.rating.run:imdb.api.title.ratings/data.json`, { "User-Agent": UA });
       const j = JSON.parse(r.body.replace(/^[^{]*/, "").replace(/\)\s*$/, ""));
-      const score = Number(j?.resource?.rating) || 0;
-      if (score) {
-        out.imdb = { score, votes: Number(j.resource.ratingCount) || 0, url };
-        return;
+      if (j?.resource) {
+        const score = Number(j.resource.rating) || 0;
+        if (score) out.imdb = { score, votes: Number(j.resource.ratingCount) || 0, url };
+        return; // 有回資料：有分就有分，沒分就是還沒有評分
       }
-      errs.push("IMDb 沒有評分");
-    } catch (e) {
-      errs.push("IMDb 評分檔 " + errText(e));
+    } catch (_) {
+      // 評分檔讀不到或不是 JSON（例如回 HTML 錯誤頁）：改用備用來源
     }
     // 2) 備用：IMDb GraphQL（需要特定標頭）
     const q = `{ title(id:"${who.id}"){ ratingsSummary{aggregateRating voteCount} } }`;
@@ -923,20 +929,19 @@ async function findRatings(title: string, en?: string): Promise<Ratings> {
       "x-imdb-client-name": "imdb-web-next-localized",
       Referer: "https://www.imdb.com/",
     });
+    if (r.status < 200 || r.status >= 300) throw new Error("status " + r.status);
     const t = JSON.parse(r.body)?.data?.title;
     const score = Number(t?.ratingsSummary?.aggregateRating) || 0;
-    if (score) {
-      out.imdb = { score, votes: Number(t.ratingsSummary.voteCount) || 0, url };
-      errs.pop();
-    } else errs.push("IMDb 評分 " + r.status + " " + r.body.slice(0, 60));
-  })().catch((e) => errs.push("IMDb 評分 " + errText(e)));
+    if (score) out.imdb = { score, votes: Number(t.ratingsSummary.voteCount) || 0, url };
+    // 沒分數：IMDb 上還沒有評分，不算錯誤
+  })().catch(() => errs.push("IMDb 評分暫時讀不到"));
   const rtJob = (async () => {
     if (!who.name) return;
     const f = await rtFind(who.name, who.year);
     if (!f) return;
     if (f.s.critics >= 0) out.tomato = { score: f.s.critics, certified: f.s.certified, url: f.url };
     if (f.s.audience >= 0) out.popcorn = { score: f.s.audience, url: f.url };
-  })().catch((e) => errs.push("爛番茄 " + errText(e)));
+  })().catch(() => errs.push("爛番茄暫時讀不到"));
   await Promise.all([imdbJob, rtJob]);
   if (errs.length) out.err = errs.join("；");
   return out;
