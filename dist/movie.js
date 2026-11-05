@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.05-2332
+// @movie-schedule-app 電影行程 v2026.11.05-2335
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/jsx.tsx
@@ -1302,6 +1302,36 @@ function twPoster(slug) {
     return /og-default/.test(img) ? "" : img;
   })();
 }
+var atIndexMem = null;
+function atMovieIndex() {
+  return atIndexMem ||= (async () => {
+    try {
+      const c = JSON.parse(cacheGet("at-movies.json") || "null");
+      if (c && Date.now() - c.at < 864e5 && c.idx) return c.idx;
+    } catch (_) {
+    }
+    const idx = {};
+    await Promise.all(
+      ["now", "next", "now2"].map(async (p) => {
+        const html = await getText(`${AT}/movie/${p}/`).catch(() => "");
+        for (const [, id, t] of html.matchAll(/<a[^>]*href="\/movie\/(f[a-z0-9]+)\/"[^>]*>\s*([^<]{1,60}?)\s*<\/a>/g)) {
+          const n = normTitle(t), b = normTitle(baseTitle(t));
+          if (n) idx[n] ||= id;
+          if (b) idx[b] ||= id;
+        }
+      })
+    );
+    if (Object.keys(idx).length) cacheSet("at-movies.json", JSON.stringify({ at: Date.now(), idx }));
+    return idx;
+  })();
+}
+async function atPoster(title) {
+  const idx = await atMovieIndex();
+  const id = idx[normTitle(title)] || idx[normTitle(baseTitle(title))];
+  if (!id) return "";
+  const html = await getText(`${AT}/movie/${id}/`);
+  return (html.match(/property="og:image"\s+content="([^"]+)"/) || [])[1] || "";
+}
 async function findPoster(title, slug) {
   let p = await twPoster(slug || title).catch(() => "");
   if (p) return p;
@@ -1312,7 +1342,7 @@ async function findPoster(title, slug) {
     p = await twPoster(c.slug).catch(() => "");
     if (p) return p;
   }
-  return "";
+  return atPoster(title).catch(() => "");
 }
 var posterOnly = {};
 function moviePoster(title, slug) {
@@ -1768,7 +1798,7 @@ var App = class {
     this.loadingText = "讀取中…";
     // ── 事件迴圈 ──
     // 背景查 GitHub 上的最新版本（首頁顯示是否為最新版）
-    this.latest = checkLatest("2026.11.05-2332");
+    this.latest = checkLatest("2026.11.05-2335");
     // ── 搜尋 ──
     this.query = "";
     this.tmdbStatus = "";
@@ -1872,11 +1902,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.05-2332"}`);
+          Pasteboard.copy(`版本 ${"2026.11.05-2335"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.05-2332"}`,
+      `版本 ${"2026.11.05-2335"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }

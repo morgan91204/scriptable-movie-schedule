@@ -381,7 +381,7 @@ export async function moviesOf(c: Cinema, date: string): Promise<{ movies: Movie
 // 場次通的重映、修復版、演唱會等有時沒有片長：用 TMDB（themoviedb.org）查片名補上。
 // 需要使用者自己的 API Read Access Token（設定裡填），沒填就不補。
 
-const normTitle = (t: string) =>
+export const normTitle = (t: string) =>
   String(t || "").toLowerCase().replace(/[\s:：·・\-–—!！?？,，.。'"’「」『』《》()（）\[\]【】]/g, "");
 /** 去掉「4K重映」「全新4K修復版」「(4K修復)」「加碼重映」等字，查原片 */
 const REISSUE_WORDS = "全新|加碼|數位|[248]K|修復|重映|重製|再映|經典|紀念|\\d*週年";
@@ -523,7 +523,39 @@ function twPoster(slug: string): Promise<string> {
   })());
 }
 
-/** 場次通的海報網址（不需金鑰）：有 slug 直接查，否則用片名試；沒有海報（重映、修復版常見）再從電影清單找同片名的其他場次通頁 */
+/** 開眼電影網的電影清單（本期首輪、近期上映、二輪）：片名 → 開眼電影編號。記在手機 1 天 */
+let atIndexMem: Promise<Record<string, string>> | null = null;
+function atMovieIndex(): Promise<Record<string, string>> {
+  return (atIndexMem ||= (async () => {
+    try {
+      const c = JSON.parse(cacheGet("at-movies.json") || "null");
+      if (c && Date.now() - c.at < 86400e3 && c.idx) return c.idx as Record<string, string>;
+    } catch (_) {}
+    const idx: Record<string, string> = {};
+    await Promise.all(
+      ["now", "next", "now2"].map(async (p) => {
+        const html = await getText(`${AT}/movie/${p}/`).catch(() => "");
+        for (const [, id, t] of html.matchAll(/<a[^>]*href="\/movie\/(f[a-z0-9]+)\/"[^>]*>\s*([^<]{1,60}?)\s*<\/a>/g)) {
+          const n = normTitle(t), b = normTitle(baseTitle(t));
+          if (n) idx[n] ||= id;
+          if (b) idx[b] ||= id;
+        }
+      })
+    );
+    if (Object.keys(idx).length) cacheSet("at-movies.json", JSON.stringify({ at: Date.now(), idx }));
+    return idx;
+  })());
+}
+/** 開眼電影頁的海報（場次通沒有海報時的第二來源；重映、修復版常只有開眼有） */
+async function atPoster(title: string): Promise<string> {
+  const idx = await atMovieIndex();
+  const id = idx[normTitle(title)] || idx[normTitle(baseTitle(title))];
+  if (!id) return "";
+  const html = await getText(`${AT}/movie/${id}/`);
+  return (html.match(/property="og:image"\s+content="([^"]+)"/) || [])[1] || "";
+}
+
+/** 海報網址（不需金鑰）：場次通電影頁 → 同片名的其他場次通頁（重映、修復版）→ 開眼電影網 */
 async function findPoster(title: string, slug?: string): Promise<string> {
   let p = await twPoster(slug || title).catch(() => ""); // 場次通的網址就是片名：先直接試，不用先下載整份電影清單
   if (p) return p;
@@ -534,7 +566,7 @@ async function findPoster(title: string, slug?: string): Promise<string> {
     p = await twPoster(c.slug).catch(() => "");
     if (p) return p;
   }
-  return "";
+  return atPoster(title).catch(() => "");
 }
 
 /** 只查海報網址（約 0.3 秒），不等預告：電影頁先把海報畫出來。手機上記過的直接用（找到的 7 天、沒找到的 1 天） */
