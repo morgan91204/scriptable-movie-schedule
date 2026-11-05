@@ -2,8 +2,9 @@
 declare module "scripting" {
   type C = (props: any) => any
   export const Button: C, ContentUnavailableView: C, Form: C, Group: C, HStack: C, Image: C, Label: C, LabeledContent: C, List: C,
-    NavigationLink: C, NavigationStack: C, Picker: C, ProgressView: C, Section: C, Spacer: C, Text: C, TextField: C,
+    NavigationLink: C, NavigationStack: C, Picker: C, ProgressView: C, Section: C, Spacer: C, Tab: C, TabView: C, Text: C, TextField: C,
     Toggle: C, VStack: C
+  export function useObservable<T>(init: T): { value: T; setValue(v: T): void }
   export const Navigation: { present(o: { element: any }): Promise<void>; useDismiss(): () => void }
   export const Script: { exit(result?: any): void }
   export function useState<T>(init: T | (() => T)): [T, (v: T | ((prev: T) => T)) => void]

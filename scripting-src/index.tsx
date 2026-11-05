@@ -5,8 +5,8 @@
 
 import {
   Button, ContentUnavailableView, Form, Group, HStack, Image, Label, LabeledContent, List, Navigation, NavigationLink,
-  NavigationStack, Picker, ProgressView, Script, Section, Spacer, Text, TextField, Toggle, VStack,
-  useEffect, useMemo, useState,
+  NavigationStack, Picker, ProgressView, Script, Section, Spacer, Tab, TabView, Text, TextField, Toggle, VStack,
+  useEffect, useMemo, useObservable, useState,
 } from "scripting"
 import { setPlatform } from "./platform"
 import { scriptingPlatform } from "./platform-scripting"
@@ -126,46 +126,95 @@ function sortCities(cities: string[]): string[] {
   return cities.sort((a, b) => (CITY_ORDER.indexOf(a) + 1 || 99) - (CITY_ORDER.indexOf(b) + 1 || 99))
 }
 
-// ───────────────────────── 首頁 ─────────────────────────
+// ───────────────────────── 根畫面：底部分頁 ─────────────────────────
+// iOS 26 的分頁列是 Liquid Glass 浮動膠囊，往下捲會自動縮小（tabBarMinimizeBehavior）；每個分頁各自一個 NavigationStack
 
-function Home() {
-  const dismiss = Navigation.useDismiss()
-  useUpdatePrompt()
-  const [settings, update] = useSettings()
-  const [query, setQuery] = useState("")
-  const [calendars, setCalendars] = useState<string[]>([])
+type CinemasLoad = ReturnType<typeof useLoad<Cinema[]>>
+
+function RootTabs() {
+  const selection = useObservable<string>("home")
+  const [, update] = useSettings()
   const cinemas = useLoad(async () => {
     store.cinemas = await loadCinemas()
     return store.cinemas
   }, [])
-
   useEffect(() => {
     ;(async () => {
-      const list = (await Calendar.forEvents()).filter((c: any) => c.allowsContentModifications).map((c: any) => c.title)
-      setCalendars(list)
       if (!store.settings.calendar) {
         const def = await Calendar.defaultForEvents()
         if (def) update({ calendar: def.title })
       }
     })()
   }, [])
+  return <TabView selection={selection} tabBarMinimizeBehavior={"onScrollDown"}>
+    <Tab title={"首頁"} systemImage={"house.fill"} value={"home"}>
+      <Home cinemas={cinemas} />
+    </Tab>
+    <Tab title={"電影"} systemImage={"film"} value={"movies"}>
+      <NavigationStack><MoviesPage /></NavigationStack>
+    </Tab>
+    <Tab title={"影城"} systemImage={"building.2.fill"} value={"cinemas"}>
+      <NavigationStack><CitiesPage cinemas={cinemas} /></NavigationStack>
+    </Tab>
+    <Tab title={"設定"} systemImage={"gearshape.fill"} value={"settings"}>
+      <NavigationStack><SettingsPage /></NavigationStack>
+    </Tab>
+  </TabView>
+}
 
+// ───────────────────────── 設定 ─────────────────────────
+
+function SettingsPage() {
+  const [settings, update] = useSettings()
+  const [calendars, setCalendars] = useState<string[]>([])
+  useEffect(() => {
+    ;(async () => {
+      setCalendars((await Calendar.forEvents()).filter((c: any) => c.allowsContentModifications).map((c: any) => c.title))
+    })()
+  }, [])
+  return <List navigationTitle={"設定"}>
+    <Section header={<Text>加入行事曆時</Text>}>
+      <Picker title={"寫入的行事曆"} value={settings.calendar || ""} onChanged={(v: string) => update({ calendar: v })}>
+        {calendars.map((t) => <Text key={t} tag={t}>{t}</Text>)}
+      </Picker>
+      <Picker title={"預留廣告預告"} value={settings.ads} onChanged={(v: number) => update({ ads: v })}>
+        {ADS.map((m) => <Text key={m} tag={m}>{m ? `${m} 分鐘` : "不預留"}</Text>)}
+      </Picker>
+      <Picker title={"提醒"} value={settings.alarm ?? 30} onChanged={(v: number) => update({ alarm: v })}>
+        {ALARMS.map((a) => <Text key={a.minutes} tag={a.minutes}>{a.label}</Text>)}
+      </Picker>
+      <Picker title={"導航地圖"} value={settings.maps || "apple"} onChanged={(v: string) => update({ maps: v as any })}>
+        {(["apple", "google"] as const).map((k) => <Text key={k} tag={k}>{MAPS_LABEL[k]}</Text>)}
+      </Picker>
+    </Section>
+    <Section footer={<Text>場次通的重映、修復版、演唱會有時沒有片長或海報，填了金鑰會自動用片名到 TMDB 補。</Text>}>
+      <NavigationLink destination={<TmdbPage />}>
+        <Row title={"補片長（TMDB）"} trailing={settings.tmdbToken ? "已設定" : "未設定"} />
+      </NavigationLink>
+    </Section>
+    <Section footer={<Text>場次資料來自場次通、開眼電影網，以及誠品、光點、樂聲官網，實際場次以影城公告為準。</Text>}>
+      <VersionRow />
+    </Section>
+  </List>
+}
+
+// ───────────────────────── 首頁 ─────────────────────────
+
+function Home({ cinemas }: { cinemas: CinemasLoad }) {
+  const dismiss = Navigation.useDismiss()
+  useUpdatePrompt()
+  const [settings] = useSettings()
   const list = cinemas.data || []
   const favs = settings.favorites.map((id) => list.find((c) => c.id === id)).filter(Boolean) as Cinema[]
-  const k = query.trim().toLowerCase().replace(/臺/g, "台")
-  const hits = k ? list.filter((c) => `${c.name} ${c.city} ${c.district} ${c.id} ${c.aliases || ""}`.toLowerCase().replace(/臺/g, "台").includes(k)) : []
 
   return <NavigationStack>
     <List
       navigationTitle={"電影行程"}
-      searchable={{ value: query, onChanged: setQuery, prompt: "搜尋影城、分店或縣市" } as any}
       toolbar={{ cancellationAction: <Button title={"關閉"} action={dismiss} /> }}
     >
       {cinemas.error ? <ErrorRow error={cinemas.error} retry={cinemas.reload} /> : null}
 
-      {k ? <Section header={<Text>{`搜尋結果 ${hits.length} 間`}</Text>}>
-        {hits.map((c) => <CinemaLink key={c.id} cinema={c} />)}
-      </Section> : <>
+      {<>
         <Section>
           <NavigationLink destination={<NowPage />}>
             <Text>{"🕘  現在有什麼可以看"}</Text>
@@ -183,31 +232,9 @@ function Home() {
 
         {!cinemas.data && !cinemas.error ? <Section><Loading text={"讀取影城清單…"} /></Section> : null}
 
-        {favs.length ? <Section header={<Text>常去影城</Text>}>
+        {favs.length ? <Section header={<Text>常去影城</Text>} footer={<Text>在影城頁可以加入或移除常去影城。影城搜尋在「影城」分頁，行事曆與提醒在「設定」分頁。</Text>}>
           {favs.map((c) => <CinemaLink key={c.id} cinema={c} showCity />)}
         </Section> : null}
-
-        <Section header={<Text>加入行事曆時</Text>}>
-          <Picker title={"寫入的行事曆"} value={settings.calendar || ""} onChanged={(v: string) => update({ calendar: v })}>
-            {calendars.map((t) => <Text key={t} tag={t}>{t}</Text>)}
-          </Picker>
-          <Picker title={"預留廣告預告"} value={settings.ads} onChanged={(v: number) => update({ ads: v })}>
-            {ADS.map((m) => <Text key={m} tag={m}>{m ? `${m} 分鐘` : "不預留"}</Text>)}
-          </Picker>
-          <Picker title={"提醒"} value={settings.alarm ?? 30} onChanged={(v: number) => update({ alarm: v })}>
-            {ALARMS.map((a) => <Text key={a.minutes} tag={a.minutes}>{a.label}</Text>)}
-          </Picker>
-          <Picker title={"導航地圖"} value={settings.maps || "apple"} onChanged={(v: string) => update({ maps: v as any })}>
-            {(["apple", "google"] as const).map((k) => <Text key={k} tag={k}>{MAPS_LABEL[k]}</Text>)}
-          </Picker>
-          <NavigationLink destination={<TmdbPage />}>
-            <Row title={"補片長（TMDB）"} trailing={settings.tmdbToken ? "已設定" : "未設定"} />
-          </NavigationLink>
-        </Section>
-
-        <Section footer={<Text>場次資料來自場次通、開眼電影網，以及誠品、光點、樂聲官網，實際場次以影城公告為準。</Text>}>
-          <VersionRow />
-        </Section>
       </>}
     </List>
   </NavigationStack>
@@ -309,8 +336,8 @@ function MovieHero({ title, slug, lines, en }: { title: string; slug?: string; l
     <HStack alignment={"bottom"} spacing={12} listRowBackground={"clear"}>
       {poster
         ? isLocalSrc(poster)
-          ? <Image filePath={poster} resizable scaleToFit frame={{ width: 104, height: 156 }} clipShape={{ type: "rect", cornerRadius: 12 }} />
-          : <Image imageUrl={poster} resizable scaleToFit frame={{ width: 104, height: 156 }}
+          ? <Image filePath={poster} resizable scaleToFill frame={{ width: 104, height: 156 }} clipShape={{ type: "rect", cornerRadius: 12 }} />
+          : <Image imageUrl={poster} resizable scaleToFill frame={{ width: 104, height: 156 }}
               clipShape={{ type: "rect", cornerRadius: 12 }} placeholder={<ProgressView progressViewStyle={"circular"} />} onError={() => setBroken(poster)} />
         : <VStack frame={{ width: 104, height: 156 }} background={"rgba(120, 120, 128, 0.22)"} clipShape={{ type: "rect", cornerRadius: 12 }}>
             {posterPending ? <ProgressView progressViewStyle={"circular"} /> : <Image systemName={"film"} font={"largeTitle"} foregroundStyle={"tertiaryLabel"} />}
@@ -442,17 +469,26 @@ function useUpdatePrompt() {
   }, [])
 }
 
-function CitiesPage() {
-  const list = store.cinemas
+function CitiesPage({ cinemas }: { cinemas?: CinemasLoad }) {
+  const [query, setQuery] = useState("")
+  const list = cinemas?.data || store.cinemas
   const cities = sortCities(Array.from(new Set(list.map((c) => c.city))))
-  return <List navigationTitle={"依縣市找影院"} navigationBarTitleDisplayMode={"inline"}>
-    <Section header={<Text>{`全台影城（${list.length} 間）`}</Text>} footer={<Text>影城清單來自場次通與開眼電影網，會自動更新。首頁上方的搜尋列可以直接搜尋影城。</Text>}>
+  const k = query.trim().toLowerCase().replace(/臺/g, "台")
+  const hits = k ? list.filter((c) => `${c.name} ${c.city} ${c.district} ${c.id} ${c.aliases || ""}`.toLowerCase().replace(/臺/g, "台").includes(k)) : []
+  return <List navigationTitle={cinemas ? "影城" : "依縣市找影院"} navigationBarTitleDisplayMode={cinemas ? "large" : "inline"}
+    searchable={{ value: query, onChanged: setQuery, prompt: "搜尋影城、分店或縣市" } as any}>
+    {cinemas?.error ? <ErrorRow error={cinemas.error} retry={cinemas.reload} /> : null}
+    {cinemas && !cinemas.data && !cinemas.error ? <Section><Loading text={"讀取影城清單…"} /></Section> : null}
+    {k ? <Section header={<Text>{`搜尋結果 ${hits.length} 間`}</Text>}>
+      {hits.map((c) => <CinemaLink key={c.id} cinema={c} showCity />)}
+    </Section>
+    : <Section header={<Text>{`全台影城（${list.length} 間）`}</Text>} footer={<Text>影城清單來自場次通與開眼電影網，會自動更新。</Text>}>
       {cities.map((city) =>
         <NavigationLink key={city} destination={<CityPage city={city} />}>
           <Row title={city} trailing={`${list.filter((c) => c.city === city).length} 間`} />
         </NavigationLink>
       )}
-    </Section>
+    </Section>}
   </List>
 }
 
@@ -901,7 +937,7 @@ function NowResultsPage({ date, winId, scope, format }: { date: string; winId: s
 async function run() {
   // 先讀設定再顯示畫面，避免還沒讀到就被預設值蓋掉
   store.settings = { ...store.settings, ...(await loadSettings()) }
-  await Navigation.present({ element: <Home /> })
+  await Navigation.present({ element: <RootTabs /> })
   Script.exit()
 }
 

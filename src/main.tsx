@@ -15,6 +15,7 @@ import {
   hallOf, tmdbTest, movieExtras, moviePoster, movieRuntime, posterSrc, cachePoster, prefetchPosters, foregroundTask, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, movieRatings, ratingTier,
 } from "./core";
 import type { MovieExtras, Ratings } from "./core";
+import { setTabBar, setBackGuard } from "./jsx";
 import type { TwMovie, TwMovieCinema, Format, LatLng, Hit } from "./core";
 
 interface Pick {
@@ -58,6 +59,26 @@ class App {
     this.loadingText = loading;
     this.stack.push(view);
   }
+  // ── 底部分頁：首頁／電影／影城／設定，各自是一個根畫面；點目前的分頁會回到該分頁的根
+  tab = "home";
+  readonly TABS = [
+    { id: "home", label: "首頁", icon: "house" },
+    { id: "movies", label: "電影", icon: "film" },
+    { id: "cinemas", label: "影城", icon: "building" },
+    { id: "settings", label: "設定", icon: "gear" },
+  ];
+  switchTab(id: string) {
+    this.tab = id;
+    const root: Record<string, [View, string]> = {
+      home: [() => this.homeView(), "讀取中…"],
+      movies: [() => this.movieListView(), "讀取電影清單…"],
+      cinemas: [() => this.citiesView(), "讀取中…"],
+      settings: [() => this.settingsView(), "讀取中…"],
+    };
+    const [view, loading] = root[id] || root.home;
+    this.loadingText = loading;
+    this.stack = [view];
+  }
   back() {
     if (this.stack.length > 1) this.stack.pop();
   }
@@ -71,6 +92,8 @@ class App {
 
   async run() {
     this.settings = await loadSettings();
+    setTabBar(() => ({ active: this.tab, items: this.TABS, onTap: (id) => this.switchTab(id) }));
+    setBackGuard(() => this.stack.length > 1);
     this.go(() => this.homeView(), "讀取影城清單…");
     const input = String(args.shortcutParameter || (args.urls && args.urls[0]) || (args.plainTexts && args.plainTexts[0]) || "");
     let pendingUrl = input;
@@ -162,13 +185,23 @@ class App {
           <Item icon="🎦" title="依縣市找影院" subtitle={`全台 ${this.cinemas.length} 間，也可以搜尋影城`} onTap={() => this.go(() => this.citiesView())} />
         </Section>
         {favs.length ? (
-          <Section title="常去影城">
+          <Section title="常去影城" hint="影城搜尋在「影城」分頁，行事曆與提醒在「設定」分頁。">
             {favs.map((c) => (
               <Item icon="★" title={c.name} subtitle={`${c.city} ${c.district}`} onTap={() => this.go(() => this.cinemaView(c), `讀取 ${c.name} 的場次…`)} />
             ))}
           </Section>
         ) : null}
-        <Section title="設定">
+        {await this.versionNote()}
+      </Page>
+    );
+  }
+
+  // ── 設定 ──
+  async settingsView(): Promise<string> {
+    this.calendarName = (await currentCalendar(this.settings)).title;
+    return (
+      <Page title="設定">
+        <Section title="加入行事曆時">
           <Item icon="📅" title="寫入的行事曆" subtitle={this.calendarName} onTap={() => this.go(() => this.calendarView())} />
           <Item icon="📺" title="廣告預告" subtitle={`預計散場時間會加上 ${this.settings.ads} 分鐘`} right="點一下切換" chevron={false} onTap={() => this.cycleAds()} />
           <Item icon="🗺" title="導航地圖" subtitle="點地址、分享、行程備註的導航連結" right={MAPS_LABEL[this.settings.maps || "apple"]} chevron={false} onTap={() => {

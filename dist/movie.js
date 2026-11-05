@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.06-0140
+// @movie-schedule-app 電影行程 v2026.11.06-0200
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/jsx.tsx
@@ -54,8 +54,28 @@ function h(type, props, ...children) {
 function Fragment(props) {
   return flat(props.children || []);
 }
+var tabBarProvider = null;
+function setTabBar(fn) {
+  tabBarProvider = fn;
+}
+var canGoBack = () => true;
+function setBackGuard(fn) {
+  canGoBack = fn;
+}
+var TAB_ICONS = {
+  house: '<svg viewBox="0 0 24 24"><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v10h5v-6h4v6h5V10"/></svg>',
+  film: '<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 4v16M17 4v16M3 9h4M3 15h4M17 9h4M17 15h4"/></svg>',
+  building: '<svg viewBox="0 0 24 24"><path d="M3 21h18"/><path d="M5 21V7l5-3v17"/><path d="M10 21V11l9-3v13"/><path d="M14 13h2M14 17h2"/></svg>',
+  gear: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>'
+};
+function TabBarView() {
+  const t = tabBarProvider ? tabBarProvider() : null;
+  if (!t) return "";
+  return /* @__PURE__ */ h("nav", { class: "tabbar", "aria-label": "分頁" }, t.items.map((it) => /* @__PURE__ */ h("button", { class: "tab" + (it.id === t.active ? " on" : ""), onTap: () => t.onTap(it.id), "aria-label": it.label }, TAB_ICONS[it.icon] || "", /* @__PURE__ */ h("span", null, esc(it.label)))));
+}
 function Page(props) {
-  return /* @__PURE__ */ h("div", { class: "page" }, /* @__PURE__ */ h("header", { class: "bar" }, props.onBack ? /* @__PURE__ */ h("button", { class: "back", onTap: props.onBack }, "‹ 返回") : /* @__PURE__ */ h("span", { class: "back-spacer" }), /* @__PURE__ */ h("div", { class: "bar-title" }, /* @__PURE__ */ h("div", { class: "t" }, esc(props.title)), props.subtitle ? /* @__PURE__ */ h("div", { class: "s" }, esc(props.subtitle)) : null), props.right ? /* @__PURE__ */ h("span", { class: "bar-right" }, props.right) : /* @__PURE__ */ h("span", { class: "back-spacer" })), /* @__PURE__ */ h("main", { class: "content" }, props.children));
+  const back = props.onBack && canGoBack() ? props.onBack : void 0;
+  return /* @__PURE__ */ h("div", { class: "page" + (tabBarProvider && !props.noTabs ? " with-tabs" : "") }, /* @__PURE__ */ h("header", { class: "bar" }, back ? /* @__PURE__ */ h("button", { class: "back", onTap: back }, "‹ 返回") : /* @__PURE__ */ h("span", { class: "back-spacer" }), /* @__PURE__ */ h("div", { class: "bar-title" }, /* @__PURE__ */ h("div", { class: "t" }, esc(props.title)), props.subtitle ? /* @__PURE__ */ h("div", { class: "s" }, esc(props.subtitle)) : null), props.right ? /* @__PURE__ */ h("span", { class: "bar-right" }, props.right) : /* @__PURE__ */ h("span", { class: "back-spacer" })), /* @__PURE__ */ h("main", { class: "content" }, props.children), props.noTabs ? null : /* @__PURE__ */ h(TabBarView, null));
 }
 function Section(props) {
   return /* @__PURE__ */ h("section", { class: "sec" }, props.title ? /* @__PURE__ */ h("h2", { class: "sec-title" }, esc(props.title)) : null, /* @__PURE__ */ h("div", { class: "group" }, props.children), props.hint ? /* @__PURE__ */ h("p", { class: "hint" }, esc(props.hint)) : null);
@@ -228,6 +248,17 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .bar-title .s{font-size:12px;color:var(--fg2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .bar-right{min-width:64px;text-align:right;font-size:13px;color:var(--fg2);white-space:nowrap}
 .content{flex:1;padding:8px 16px calc(env(safe-area-inset-bottom) + 32px)}
+.page.with-tabs .content{padding-bottom:calc(env(safe-area-inset-bottom) + 104px)}
+.tabbar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom) + 12px);z-index:10;width:min(92vw,420px);
+ display:flex;align-items:center;padding:5px;border-radius:999px;
+ background:rgba(255,255,255,.55);-webkit-backdrop-filter:blur(28px) saturate(190%);backdrop-filter:blur(28px) saturate(190%);
+ border:1px solid rgba(255,255,255,.55);box-shadow:0 10px 36px rgba(0,0,0,.16),0 1px 2px rgba(0,0,0,.06),inset 0 1px 0 rgba(255,255,255,.7)}
+@media(prefers-color-scheme:dark){.tabbar{background:rgba(40,40,44,.55);border-color:rgba(255,255,255,.1);box-shadow:0 10px 36px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.08)}}
+.tab{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:7px 4px 6px;border-radius:999px;color:var(--fg2);font-size:10.5px;font-weight:600;line-height:1;transition:background .2s,color .2s}
+.tab svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.tab.on{color:var(--accent);background:rgba(10,132,255,.14);box-shadow:inset 0 1px 0 rgba(255,255,255,.35)}
+@media(prefers-color-scheme:dark){.tab.on{background:rgba(10,132,255,.22)}}
+.tab:active{opacity:.6}
 .sec{margin:14px 0 0}
 .sec-title{margin:0 0 6px 12px;font-size:13px;font-weight:600;color:var(--fg2);text-transform:uppercase;letter-spacing:.3px}
 .group{background:var(--card);border-radius:14px;overflow:hidden}
@@ -1555,6 +1586,10 @@ async function findExtras(title, slug) {
   if (pick) {
     out.trailer = `https://www.youtube.com/watch?v=${pick.key}`;
     out.trailerName = String(pick.name || "預告片");
+    if (!out.poster) {
+      out.poster = `https://i.ytimg.com/vi/${pick.key}/hqdefault.jpg`;
+      out.posterKind = "thumb";
+    }
   }
   if (!pick) out.err = [t?.err, ...atErr].filter(Boolean).join("；") || "找不到預告";
   return out;
@@ -1944,9 +1979,17 @@ var App = class {
     this.runtime = 0;
     this.seat = "";
     this.loadingText = "讀取中…";
+    // ── 底部分頁：首頁／電影／影城／設定，各自是一個根畫面；點目前的分頁會回到該分頁的根
+    this.tab = "home";
+    this.TABS = [
+      { id: "home", label: "首頁", icon: "house" },
+      { id: "movies", label: "電影", icon: "film" },
+      { id: "cinemas", label: "影城", icon: "building" },
+      { id: "settings", label: "設定", icon: "gear" }
+    ];
     // ── 事件迴圈 ──
     // 背景查 GitHub 上的最新版本（首頁顯示是否為最新版）
-    this.latest = checkLatest("2026.11.06-0140");
+    this.latest = checkLatest("2026.11.06-0200");
     // ── 搜尋 ──
     this.query = "";
     this.tmdbStatus = "";
@@ -1971,6 +2014,18 @@ var App = class {
     this.loadingText = loading;
     this.stack.push(view);
   }
+  switchTab(id) {
+    this.tab = id;
+    const root = {
+      home: [() => this.homeView(), "讀取中…"],
+      movies: [() => this.movieListView(), "讀取電影清單…"],
+      cinemas: [() => this.citiesView(), "讀取中…"],
+      settings: [() => this.settingsView(), "讀取中…"]
+    };
+    const [view, loading] = root[id] || root.home;
+    this.loadingText = loading;
+    this.stack = [view];
+  }
   back() {
     if (this.stack.length > 1) this.stack.pop();
   }
@@ -1979,6 +2034,8 @@ var App = class {
   }
   async run() {
     this.settings = await loadSettings();
+    setTabBar(() => ({ active: this.tab, items: this.TABS, onTap: (id) => this.switchTab(id) }));
+    setBackGuard(() => this.stack.length > 1);
     this.go(() => this.homeView(), "讀取影城清單…");
     const input = String(args.shortcutParameter || args.urls && args.urls[0] || args.plainTexts && args.plainTexts[0] || "");
     let pendingUrl = input;
@@ -2052,7 +2109,12 @@ var App = class {
     if (!this.cinemas.length) this.cinemas = await loadCinemas();
     this.calendarName = (await currentCalendar(this.settings)).title;
     const favs = this.settings.favorites.map((id) => this.cinemas.find((c) => c.id === id)).filter(Boolean);
-    return /* @__PURE__ */ h(Page, { title: "🎬 電影行程", subtitle: `${this.cinemas.length} 間影城｜選影城 → 日期 → 電影 → 場次` }, /* @__PURE__ */ h(Section, null, /* @__PURE__ */ h(Item, { icon: "🕘", title: "現在有什麼可以看", subtitle: "選時段，一次列出常去、附近或某縣市的所有場次", onTap: () => this.go(() => this.nowView()) }), /* @__PURE__ */ h(Item, { icon: "🎞️", title: "依電影找場次", subtitle: "先選電影，再看哪些影城有放映", onTap: () => this.go(() => this.movieListView(), "讀取電影清單…") }), /* @__PURE__ */ h(Item, { icon: "🧭", title: "附近的影城", subtitle: "依目前位置排序", onTap: () => this.go(() => this.nearbyView(), "取得目前位置…") }), /* @__PURE__ */ h(Item, { icon: "🎦", title: "依縣市找影院", subtitle: `全台 ${this.cinemas.length} 間，也可以搜尋影城`, onTap: () => this.go(() => this.citiesView()) })), favs.length ? /* @__PURE__ */ h(Section, { title: "常去影城" }, favs.map((c) => /* @__PURE__ */ h(Item, { icon: "★", title: c.name, subtitle: `${c.city} ${c.district}`, onTap: () => this.go(() => this.cinemaView(c), `讀取 ${c.name} 的場次…`) }))) : null, /* @__PURE__ */ h(Section, { title: "設定" }, /* @__PURE__ */ h(Item, { icon: "📅", title: "寫入的行事曆", subtitle: this.calendarName, onTap: () => this.go(() => this.calendarView()) }), /* @__PURE__ */ h(Item, { icon: "📺", title: "廣告預告", subtitle: `預計散場時間會加上 ${this.settings.ads} 分鐘`, right: "點一下切換", chevron: false, onTap: () => this.cycleAds() }), /* @__PURE__ */ h(Item, { icon: "🗺", title: "導航地圖", subtitle: "點地址、分享、行程備註的導航連結", right: MAPS_LABEL[this.settings.maps || "apple"], chevron: false, onTap: () => {
+    return /* @__PURE__ */ h(Page, { title: "🎬 電影行程", subtitle: `${this.cinemas.length} 間影城｜選影城 → 日期 → 電影 → 場次` }, /* @__PURE__ */ h(Section, null, /* @__PURE__ */ h(Item, { icon: "🕘", title: "現在有什麼可以看", subtitle: "選時段，一次列出常去、附近或某縣市的所有場次", onTap: () => this.go(() => this.nowView()) }), /* @__PURE__ */ h(Item, { icon: "🎞️", title: "依電影找場次", subtitle: "先選電影，再看哪些影城有放映", onTap: () => this.go(() => this.movieListView(), "讀取電影清單…") }), /* @__PURE__ */ h(Item, { icon: "🧭", title: "附近的影城", subtitle: "依目前位置排序", onTap: () => this.go(() => this.nearbyView(), "取得目前位置…") }), /* @__PURE__ */ h(Item, { icon: "🎦", title: "依縣市找影院", subtitle: `全台 ${this.cinemas.length} 間，也可以搜尋影城`, onTap: () => this.go(() => this.citiesView()) })), favs.length ? /* @__PURE__ */ h(Section, { title: "常去影城", hint: "影城搜尋在「影城」分頁，行事曆與提醒在「設定」分頁。" }, favs.map((c) => /* @__PURE__ */ h(Item, { icon: "★", title: c.name, subtitle: `${c.city} ${c.district}`, onTap: () => this.go(() => this.cinemaView(c), `讀取 ${c.name} 的場次…`) }))) : null, await this.versionNote());
+  }
+  // ── 設定 ──
+  async settingsView() {
+    this.calendarName = (await currentCalendar(this.settings)).title;
+    return /* @__PURE__ */ h(Page, { title: "設定" }, /* @__PURE__ */ h(Section, { title: "加入行事曆時" }, /* @__PURE__ */ h(Item, { icon: "📅", title: "寫入的行事曆", subtitle: this.calendarName, onTap: () => this.go(() => this.calendarView()) }), /* @__PURE__ */ h(Item, { icon: "📺", title: "廣告預告", subtitle: `預計散場時間會加上 ${this.settings.ads} 分鐘`, right: "點一下切換", chevron: false, onTap: () => this.cycleAds() }), /* @__PURE__ */ h(Item, { icon: "🗺", title: "導航地圖", subtitle: "點地址、分享、行程備註的導航連結", right: MAPS_LABEL[this.settings.maps || "apple"], chevron: false, onTap: () => {
       this.settings.maps = this.settings.maps === "google" ? "apple" : "google";
       saveSettings(this.settings);
     } }), /* @__PURE__ */ h(Item, { icon: "⏱", title: "補片長（TMDB）", subtitle: this.settings.tmdbToken ? "已設定：沒有片長的電影會自動補上" : "未設定", onTap: () => this.go(() => this.tmdbView()) })), /* @__PURE__ */ h(Note, { text: "場次資料來自場次通 twshowtimes.com、開眼電影網，以及誠品、光點、樂聲官網，實際場次以影城公告為準。" }), /* @__PURE__ */ h(
@@ -2060,11 +2122,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.06-0140"}`);
+          Pasteboard.copy(`版本 ${"2026.11.06-0200"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.06-0140"}`,
+      `版本 ${"2026.11.06-0200"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }

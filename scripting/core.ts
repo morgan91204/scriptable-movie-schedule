@@ -469,6 +469,7 @@ export async function tmdbRuntime(title: string, token: string): Promise<number>
 
 export interface MovieExtras {
   poster: string; // 海報網址（可能是空字串）
+  posterKind?: "poster" | "thumb"; // thumb = 找不到海報，用 YouTube 預告的縮圖代替
   trailer: string; // YouTube 預告網址；找不到時是 YouTube 搜尋頁
   trailerName: string; // 找到的影片標題；空字串 = 只是搜尋
   err?: string; // 有金鑰卻查不到預告時的原因
@@ -799,6 +800,11 @@ async function findExtras(title: string, slug?: string): Promise<MovieExtras> {
   if (pick) {
     out.trailer = `https://www.youtube.com/watch?v=${pick.key}`;
     out.trailerName = String(pick.name || "預告片");
+    // 演唱會轉播、特別場等哪裡都沒有海報：用預告影片的縮圖代替，總比灰色預設圖好
+    if (!out.poster) {
+      out.poster = `https://i.ytimg.com/vi/${pick.key}/hqdefault.jpg`;
+      out.posterKind = "thumb";
+    }
   }
   if (!pick) out.err = [t?.err, ...atErr].filter(Boolean).join("；") || "找不到預告";
   return out;
