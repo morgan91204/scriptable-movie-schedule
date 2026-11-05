@@ -265,13 +265,14 @@ type Tier = keyof typeof TIER
 function RatingBadge({ kind, value, tier, note, url }: { kind: "imdb" | "tomato" | "popcorn"; value: string; tier: Tier; note?: string; url?: string }) {
   const c = TIER[tier]
   const icon = kind === "tomato" ? (tier === "bad" ? "🤢" : "🍅") : kind === "popcorn" ? (tier === "bad" ? "🫗" : "🍿") : ""
-  // 字體用 caption2、留白縮到最小：三個徽章在 iPhone mini／SE 的寬度也放得下一排，不會被截斷
+  // 徽章內的字都用 fixedSize + lineLimit 1：SwiftUI 不會把「IMDb」壓成兩行或把分數截斷；
+  // 字體用 caption2、留白縮到最小，三個徽章在 iPhone mini／SE 的寬度也放得下一排
   return <Button action={() => (url ? Safari.openURL(url) : undefined)} buttonStyle={"plain"} disabled={!url}>
-    <HStack spacing={2} padding={{ horizontal: 4, vertical: 2 }} background={c.bg} clipShape={{ type: "rect", cornerRadius: 6 }}>
+    <HStack spacing={2} padding={{ horizontal: 4, vertical: 2 }} background={c.bg} clipShape={{ type: "rect", cornerRadius: 6 }} fixedSize>
       {kind === "imdb"
-        ? <Text font={"caption2"} fontWeight={"heavy"} foregroundStyle={"black"} padding={{ horizontal: 2, vertical: 0 }} background={tier === "none" ? "#C7C7CC" : "#F5C518"} clipShape={{ type: "rect", cornerRadius: 3 }}>IMDb</Text>
-        : <Text font={"caption2"}>{icon}</Text>}
-      <Text font={"caption2"} fontWeight={"bold"} foregroundStyle={c.fg} lineLimit={1}>{value + (note ? "✓" : "")}</Text>
+        ? <Text font={"caption2"} fontWeight={"heavy"} foregroundStyle={"black"} lineLimit={1} fixedSize padding={{ horizontal: 2, vertical: 0 }} background={tier === "none" ? "#C7C7CC" : "#F5C518"} clipShape={{ type: "rect", cornerRadius: 3 }}>IMDb</Text>
+        : <Text font={"caption2"} lineLimit={1} fixedSize>{icon}</Text>}
+      <Text font={"caption2"} fontWeight={"bold"} foregroundStyle={c.fg} lineLimit={1} fixedSize>{value + (note ? "✓" : "")}</Text>
     </HStack>
   </Button>
 }
