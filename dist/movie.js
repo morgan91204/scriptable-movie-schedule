@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.05-2209
+// @movie-schedule-app 電影行程 v2026.11.05-2217
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/jsx.tsx
@@ -1204,10 +1204,10 @@ async function tmdbRuntime(title, token) {
   return (await tmdbFind(title, token))?.r || 0;
 }
 var extrasCache = {};
-function movieExtras(title, slug) {
-  const k = (slug || "") + "|" + title;
+async function movieExtras(title, slug) {
+  const hasToken = !!((await loadSettings()).tmdbToken || "").trim();
+  const k = (hasToken ? "t|" : "n|") + (slug || "") + "|" + title;
   return extrasCache[k] ||= (async () => {
-    const hasToken = !!((await loadSettings()).tmdbToken || "").trim();
     const ck = (hasToken ? "t|" : "n|") + normTitle(title);
     const read = () => {
       try {
@@ -1217,12 +1217,14 @@ function movieExtras(title, slug) {
       }
     };
     const hit = read()[ck];
-    const ttl = hasToken && !hit?.trailerName ? 36e5 : hit?.poster ? 7 * 864e5 : 864e5;
+    const ttl = hasToken && !hit?.trailerName ? 0 : hit?.poster ? 7 * 864e5 : 864e5;
     if (hit && Date.now() - hit.at < ttl) return { poster: hit.poster, trailer: hit.trailer, trailerName: hit.trailerName };
     const out = await findExtras(title, slug);
+    if (out.err) delete extrasCache[k];
     const all = read();
     for (const [key, v] of Object.entries(all)) if (Date.now() - v.at > 7 * 864e5) delete all[key];
-    all[ck] = { ...out, at: Date.now() };
+    const { err: _e, ...keep } = out;
+    all[ck] = { ...keep, at: Date.now() };
     cacheSet("extras.json", JSON.stringify(all));
     return out;
   })();
@@ -1258,9 +1260,10 @@ async function findExtras(title, slug) {
           if (v) {
             out.trailer = `https://www.youtube.com/watch?v=${v.key}`;
             out.trailerName = String(v.name || "預告片");
-          }
-        }
-      } catch (_) {
+          } else out.err = "TMDB 沒有這部片的預告";
+        } else out.err = "TMDB 找不到這部片";
+      } catch (e) {
+        out.err = "TMDB " + errText(e);
       }
     }
     return out;
@@ -1395,8 +1398,9 @@ function groupByMovie(hits) {
   }
   return Object.values(map).sort((a, b) => b.hits.length - a.hits.length || showMinute(a.hits[0].time) - showMinute(b.hits[0].time));
 }
+var errText = (e) => String(e?.message || e).slice(0, 80);
 var IMDB_GQL = "https://api.graphql.imdb.com/";
-async function imdbId(title, en) {
+async function imdbId(title, en, errs = []) {
   const token = ((await loadSettings()).tmdbToken || "").trim();
   if (token) {
     try {
@@ -1405,7 +1409,8 @@ async function imdbId(title, en) {
         const ids = await tmdb(`/movie/${hit.id}/external_ids`, token);
         if (ids?.imdb_id) return String(ids.imdb_id);
       }
-    } catch (_) {
+    } catch (e) {
+      errs.push("TMDB " + errText(e));
     }
   }
   for (const q of [en, baseTitle(title)].filter(Boolean)) {
@@ -1415,15 +1420,20 @@ async function imdbId(title, en) {
       const d = JSON.parse(r.body).d || [];
       const hit = d.find((x) => /^tt/.test(x.id) && (x.qid === "movie" || x.qid === "tvMovie" || x.qid === "video"));
       if (hit) return hit.id;
-    } catch (_) {
+    } catch (e) {
+      errs.push("IMDb 搜尋 " + errText(e));
     }
   }
   return "";
 }
 async function findRatings(title, en) {
   const out = {};
-  const id = await imdbId(title, en);
-  if (!id) return out;
+  const errs = [];
+  const id = await imdbId(title, en, errs);
+  if (!id) {
+    out.err = errs.join("；") || "IMDb 找不到這部片";
+    return out;
+  }
   let name = "", year = 0;
   try {
     const q = `{ title(id:"${id}"){ titleText{text} originalTitleText{text} releaseYear{year} ratingsSummary{aggregateRating voteCount} } }`;
@@ -1436,7 +1446,9 @@ async function findRatings(title, en) {
     year = Number(t?.releaseYear?.year) || 0;
     const score = Number(t?.ratingsSummary?.aggregateRating) || 0;
     if (score) out.imdb = { score, votes: Number(t.ratingsSummary.voteCount) || 0, url: `https://www.imdb.com/title/${id}/` };
-  } catch (_) {
+    else if (!t) errs.push("IMDb 評分 " + r.status + " " + r.body.slice(0, 60));
+  } catch (e) {
+    errs.push("IMDb 評分 " + errText(e));
   }
   if (name) {
     try {
@@ -1460,9 +1472,11 @@ async function findRatings(title, en) {
         if (s.critics >= 0) out.tomato = { score: s.critics, certified: s.certified, url: pick.url };
         if (s.audience >= 0) out.popcorn = { score: s.audience, url: pick.url };
       }
-    } catch (_) {
+    } catch (e) {
+      errs.push("爛番茄 " + errText(e));
     }
   }
+  if (errs.length) out.err = errs.join("；");
   return out;
 }
 var ratingsMem = {};
@@ -1477,12 +1491,16 @@ function movieRatings(title, en) {
       }
     };
     const hit = read()[k];
-    if (hit && Date.now() - hit.at < 864e5) return hit;
+    if (hit && Date.now() - hit.at < 864e5 && (hit.imdb || hit.tomato || hit.popcorn)) return hit;
     const r = await findRatings(title, en);
-    const all = read();
-    for (const [key, v] of Object.entries(all)) if (Date.now() - v.at > 864e5) delete all[key];
-    all[k] = { ...r, at: Date.now() };
-    cacheSet("ratings.json", JSON.stringify(all));
+    if (!(r.imdb || r.tomato || r.popcorn) || r.err) delete ratingsMem[k];
+    if (r.imdb || r.tomato || r.popcorn) {
+      const all = read();
+      for (const [key, v] of Object.entries(all)) if (Date.now() - v.at > 864e5) delete all[key];
+      const { err: _e, ...keep } = r;
+      all[k] = { ...keep, at: Date.now() };
+      cacheSet("ratings.json", JSON.stringify(all));
+    }
     return r;
   })();
 }
@@ -1562,7 +1580,7 @@ var App = class {
     this.loadingText = "讀取中…";
     // ── 事件迴圈 ──
     // 背景查 GitHub 上的最新版本（首頁顯示是否為最新版）
-    this.latest = checkLatest("2026.11.05-2209");
+    this.latest = checkLatest("2026.11.05-2217");
     // ── 搜尋 ──
     this.query = "";
     this.tmdbStatus = "";
@@ -1666,11 +1684,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.05-2209"}`);
+          Pasteboard.copy(`版本 ${"2026.11.05-2217"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.05-2209"}`,
+      `版本 ${"2026.11.05-2217"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -1822,13 +1840,15 @@ var App = class {
     if (r?.tomato) badges.push({ kind: "tomato", value: `${r.tomato.score}%`, tier: ratingTier("pct", r.tomato.score), note: r.tomato.certified ? "認證" : void 0, onTap: () => Safari.open(r.tomato.url) });
     if (r?.popcorn) badges.push({ kind: "popcorn", value: `${r.popcorn.score}%`, tier: ratingTier("pct", r.popcorn.score), onTap: () => Safari.open(r.popcorn.url) });
     if (!badges.length && e.loading) lines = [...lines, "評分讀取中…"];
+    else if (!badges.length && r?.err) lines = [...lines, `評分讀不到：${r.err}`];
+    if (x?.err) lines = [...lines, `預告：${x.err}`];
     return /* @__PURE__ */ h(
       Hero,
       {
         poster: x?.poster,
         lines,
         badges,
-        trailerLabel: !x || x.trailerName ? "觀看預告" : "搜尋 YouTube 預告",
+        trailerLabel: !x || x.trailerName ? "觀看預告" : "搜尋預告",
         onTrailer: async () => Safari.open((x || await e.px)?.trailer || search)
       }
     );

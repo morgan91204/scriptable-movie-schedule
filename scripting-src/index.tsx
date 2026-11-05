@@ -280,9 +280,14 @@ function MovieHero({ title, slug, lines, en }: { title: string; slug?: string; l
           {r.tomato ? <RatingBadge kind={"tomato"} value={`${r.tomato.score}%`} tier={ratingTier("pct", r.tomato.score)} note={r.tomato.certified ? "認證" : undefined} url={r.tomato.url} /> : null}
           {r.popcorn ? <RatingBadge kind={"popcorn"} value={`${r.popcorn.score}%`} tier={ratingTier("pct", r.popcorn.score)} url={r.popcorn.url} /> : null}
         </HStack> : null}
-        <Button action={() => Safari.openURL(url)} buttonStyle={"borderedProminent"} buttonBorderShape={"capsule"} tint={"systemRed"} padding={{ top: 8 }}>
-          <Label title={x.data?.trailerName ? "觀看預告" : "搜尋 YouTube 預告"} systemImage={"play.fill"} font={"headline"} />
+        {!r && !rt.error ? <Text font={"caption"} foregroundStyle={"tertiaryLabel"}>評分讀取中…</Text> : null}
+        {(r && !(r.imdb || r.tomato || r.popcorn)) || rt.error
+          ? <Text font={"caption2"} foregroundStyle={"tertiaryLabel"}>{`評分讀不到：${rt.error || r?.err || "查無資料"}`}</Text> : null}
+        <Button action={() => Safari.openURL(url)} buttonStyle={"borderedProminent"} buttonBorderShape={"capsule"} tint={"systemRed"} padding={{ top: 6 }}>
+          <Label title={!x.data || x.data.trailerName ? "觀看預告" : "搜尋預告"} systemImage={"play.fill"} font={"subheadline"} fontWeight={"semibold"} lineLimit={1} />
         </Button>
+        {x.data?.err ? <Text font={"caption2"} foregroundStyle={"tertiaryLabel"}>{`預告：${x.data.err}`}</Text> : null}
+        {x.error ? <Text font={"caption2"} foregroundStyle={"tertiaryLabel"}>{`預告讀不到：${x.error}`}</Text> : null}
       </VStack>
       <Spacer />
     </HStack>

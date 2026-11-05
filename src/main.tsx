@@ -421,13 +421,15 @@ class App {
     if (r?.tomato) badges.push({ kind: "tomato", value: `${r.tomato.score}%`, tier: ratingTier("pct", r.tomato.score), note: r.tomato.certified ? "認證" : undefined, onTap: () => Safari.open(r.tomato!.url) });
     if (r?.popcorn) badges.push({ kind: "popcorn", value: `${r.popcorn.score}%`, tier: ratingTier("pct", r.popcorn.score), onTap: () => Safari.open(r.popcorn!.url) });
     if (!badges.length && e.loading) lines = [...lines, "評分讀取中…"];
+    else if (!badges.length && r?.err) lines = [...lines, `評分讀不到：${r.err}`];
+    if (x?.err) lines = [...lines, `預告：${x.err}`];
     return (
       <Hero
         poster={x?.poster}
         lines={lines}
         badges={badges}
         // 還在讀的時候先顯示「觀看預告」，點下去會等讀好再開，不會誤開成搜尋頁
-        trailerLabel={!x || x.trailerName ? "觀看預告" : "搜尋 YouTube 預告"}
+        trailerLabel={!x || x.trailerName ? "觀看預告" : "搜尋預告"}
         onTrailer={async () => Safari.open((x || (await e.px))?.trailer || search)}
       />
     );

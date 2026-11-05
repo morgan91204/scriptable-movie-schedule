@@ -465,15 +465,16 @@ export interface MovieExtras {
   poster: string; // 海報網址（可能是空字串）
   trailer: string; // YouTube 預告網址；找不到時是 YouTube 搜尋頁
   trailerName: string; // 找到的影片標題；空字串 = 只是搜尋
+  err?: string; // 有金鑰卻查不到預告時的原因
 }
 const extrasCache: Record<string, Promise<MovieExtras>> = {};
 
 /** 海報：場次通電影頁（不需 Token）→ TMDB；預告：TMDB 的 YouTube 影片 → YouTube 搜尋 */
-export function movieExtras(title: string, slug?: string): Promise<MovieExtras> {
-  const k = (slug || "") + "|" + title;
+export async function movieExtras(title: string, slug?: string): Promise<MovieExtras> {
+  // 找過的海報／預告網址記在手機上（找到的 7 天、沒找到的 1 天），之後不用再查；填了金鑰要重新查
+  const hasToken = !!((await loadSettings()).tmdbToken || "").trim();
+  const k = (hasToken ? "t|" : "n|") + (slug || "") + "|" + title;
   return (extrasCache[k] ||= (async () => {
-    // 找過的海報／預告網址記在手機上（找到的 7 天、沒找到的 1 天），之後不用再查
-    const hasToken = !!((await loadSettings()).tmdbToken || "").trim();
     const ck = (hasToken ? "t|" : "n|") + normTitle(title);
     const read = (): Record<string, MovieExtras & { at: number }> => {
       try {
@@ -484,12 +485,15 @@ export function movieExtras(title: string, slug?: string): Promise<MovieExtras> 
     };
     const hit = read()[ck];
     // 有金鑰卻沒找到預告（可能是當時連線失敗）只記 1 小時；沒海報記 1 天；其他 7 天
-    const ttl = hasToken && !hit?.trailerName ? 3600e3 : hit?.poster ? 7 * 86400e3 : 86400e3;
+    // 有金鑰卻沒有預告：不採用舊紀錄，重新查；沒海報記 1 天；其他 7 天
+    const ttl = hasToken && !hit?.trailerName ? 0 : hit?.poster ? 7 * 86400e3 : 86400e3;
     if (hit && Date.now() - hit.at < ttl) return { poster: hit.poster, trailer: hit.trailer, trailerName: hit.trailerName };
     const out = await findExtras(title, slug);
+    if (out.err) delete extrasCache[k]; // 出錯：下次打開再試
     const all = read();
     for (const [key, v] of Object.entries(all)) if (Date.now() - v.at > 7 * 86400e3) delete all[key]; // 清掉過期的
-    all[ck] = { ...out, at: Date.now() };
+    const { err: _e, ...keep } = out;
+    all[ck] = { ...keep, at: Date.now() };
     cacheSet("extras.json", JSON.stringify(all));
     return out;
   })());
@@ -527,9 +531,11 @@ async function findExtras(title: string, slug?: string): Promise<MovieExtras> {
           if (v) {
             out.trailer = `https://www.youtube.com/watch?v=${v.key}`;
             out.trailerName = String(v.name || "預告片");
-          }
-        }
-      } catch (_) {}
+          } else out.err = "TMDB 沒有這部片的預告";
+        } else out.err = "TMDB 找不到這部片";
+      } catch (e) {
+        out.err = "TMDB " + errText(e);
+      }
     }
     return out;
   }
@@ -750,10 +756,12 @@ export interface Ratings {
   imdb?: { score: number; votes: number; url: string };
   tomato?: { score: number; certified: boolean; url: string }; // 番茄指數（影評）
   popcorn?: { score: number; url: string }; // 爆米花指數（觀眾）
+  err?: string; // 查詢失敗的原因（不會存進快取，方便回報問題）
 }
+const errText = (e: unknown) => String((e as Error)?.message || e).slice(0, 80);
 
 const IMDB_GQL = "https://api.graphql.imdb.com/";
-async function imdbId(title: string, en?: string): Promise<string> {
+async function imdbId(title: string, en?: string, errs: string[] = []): Promise<string> {
   const token = ((await loadSettings()).tmdbToken || "").trim();
   if (token) {
     try {
@@ -762,7 +770,9 @@ async function imdbId(title: string, en?: string): Promise<string> {
         const ids = await tmdb(`/movie/${hit.id}/external_ids`, token);
         if (ids?.imdb_id) return String(ids.imdb_id);
       }
-    } catch (_) {}
+    } catch (e) {
+      errs.push("TMDB " + errText(e));
+    }
   }
   for (const q of [en, baseTitle(title)].filter(Boolean) as string[]) {
     const key = q.toLowerCase().replace(/[\\/?#%]/g, " ").trim();
@@ -771,15 +781,21 @@ async function imdbId(title: string, en?: string): Promise<string> {
       const d = (JSON.parse(r.body).d || []) as any[];
       const hit = d.find((x) => /^tt/.test(x.id) && (x.qid === "movie" || x.qid === "tvMovie" || x.qid === "video"));
       if (hit) return hit.id;
-    } catch (_) {}
+    } catch (e) {
+      errs.push("IMDb 搜尋 " + errText(e));
+    }
   }
   return "";
 }
 
 async function findRatings(title: string, en?: string): Promise<Ratings> {
   const out: Ratings = {};
-  const id = await imdbId(title, en);
-  if (!id) return out;
+  const errs: string[] = [];
+  const id = await imdbId(title, en, errs);
+  if (!id) {
+    out.err = errs.join("；") || "IMDb 找不到這部片";
+    return out;
+  }
   // IMDb 評分與英文片名、年份（給爛番茄搜尋用）
   let name = "", year = 0;
   try {
@@ -793,7 +809,10 @@ async function findRatings(title: string, en?: string): Promise<Ratings> {
     year = Number(t?.releaseYear?.year) || 0;
     const score = Number(t?.ratingsSummary?.aggregateRating) || 0;
     if (score) out.imdb = { score, votes: Number(t.ratingsSummary.voteCount) || 0, url: `https://www.imdb.com/title/${id}/` };
-  } catch (_) {}
+    else if (!t) errs.push("IMDb 評分 " + r.status + " " + r.body.slice(0, 60));
+  } catch (e) {
+    errs.push("IMDb 評分 " + errText(e));
+  }
   // 爛番茄：用英文片名搜尋，年份要對得上（差一年內）才採用，避免抓到同名舊片
   if (name) {
     try {
@@ -820,8 +839,11 @@ async function findRatings(title: string, en?: string): Promise<Ratings> {
         if (s.critics >= 0) out.tomato = { score: s.critics, certified: s.certified, url: pick.url };
         if (s.audience >= 0) out.popcorn = { score: s.audience, url: pick.url };
       }
-    } catch (_) {}
+    } catch (e) {
+      errs.push("爛番茄 " + errText(e));
+    }
   }
+  if (errs.length) out.err = errs.join("；");
   return out;
 }
 
@@ -838,12 +860,16 @@ export function movieRatings(title: string, en?: string): Promise<Ratings> {
       }
     };
     const hit = read()[k];
-    if (hit && Date.now() - hit.at < 86400e3) return hit;
+    if (hit && Date.now() - hit.at < 86400e3 && (hit.imdb || hit.tomato || hit.popcorn)) return hit;
     const r = await findRatings(title, en);
-    const all = read();
-    for (const [key, v] of Object.entries(all)) if (Date.now() - v.at > 86400e3) delete all[key];
-    all[k] = { ...r, at: Date.now() };
-    cacheSet("ratings.json", JSON.stringify(all));
+    if (!(r.imdb || r.tomato || r.popcorn) || r.err) delete ratingsMem[k]; // 沒查到或有錯：下次打開再試，不記住
+    if (r.imdb || r.tomato || r.popcorn) {
+      const all = read();
+      for (const [key, v] of Object.entries(all)) if (Date.now() - v.at > 86400e3) delete all[key];
+      const { err: _e, ...keep } = r;
+      all[k] = { ...keep, at: Date.now() };
+      cacheSet("ratings.json", JSON.stringify(all));
+    }
     return r;
   })());
 }
