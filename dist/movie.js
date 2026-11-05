@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.05-2100
+// @movie-schedule-app 電影行程 v2026.11.05-2109
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/jsx.tsx
@@ -1132,9 +1132,23 @@ function baseTitle(t) {
   return s.trim() || String(t || "").trim();
 }
 var TMDB = "https://api.themoviedb.org/3";
+var isV3Key = (t) => /^[0-9a-f]{32}$/i.test(t);
+var TMDB_LINKS = {
+  signup: "https://www.themoviedb.org/signup",
+  login: "https://www.themoviedb.org/login",
+  api: "https://www.themoviedb.org/settings/api",
+  request: "https://www.themoviedb.org/settings/api/request"
+};
+function extractTmdbKey(text) {
+  const s = String(text || "");
+  return (s.match(/eyJ[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+/) || s.match(/\b[0-9a-f]{32}\b/i) || [""])[0] || s.trim();
+}
 async function tmdb(path, token) {
-  const r = await platform().fetchText(TMDB + path, { Authorization: "Bearer " + token, accept: "application/json" });
-  if (r.status === 401) throw new Error("TMDB Token 無效，請到設定重新填寫");
+  const url = TMDB + path + (isV3Key(token) ? (path.includes("?") ? "&" : "?") + "api_key=" + token : "");
+  const headers = { accept: "application/json" };
+  if (!isV3Key(token)) headers.Authorization = "Bearer " + token;
+  const r = await platform().fetchText(url, headers);
+  if (r.status === 401) throw new Error("TMDB 金鑰無效，請到設定重新貼上");
   if (r.status < 200 || r.status >= 300) throw new Error("TMDB 暫時讀不到");
   return JSON.parse(r.body);
 }
@@ -1461,7 +1475,7 @@ var App = class {
     return /* @__PURE__ */ h(Page, { title: "🎬 電影行程", subtitle: `${this.cinemas.length} 間影城｜選影城 → 日期 → 電影 → 場次` }, /* @__PURE__ */ h(Section, null, /* @__PURE__ */ h(Item, { icon: "⏰", title: "現在有什麼可以看", subtitle: "選時段，一次列出常去、附近或某縣市的所有場次", onTap: () => this.go(() => this.nowView()) }), /* @__PURE__ */ h(Item, { icon: "🎬", title: "依電影找場次", subtitle: "先選電影，再看哪些影城有放映", onTap: () => this.go(() => this.movieListView(), "讀取電影清單…") }), /* @__PURE__ */ h(Item, { icon: "📍", title: "附近的影城", subtitle: "依目前位置排序", onTap: () => this.go(() => this.nearbyView(), "取得目前位置…") }), /* @__PURE__ */ h(Item, { icon: "🔍", title: "搜尋影城", subtitle: "影城、分店、行政區或縣市", onTap: () => this.go(() => this.searchView()) })), favs.length ? /* @__PURE__ */ h(Section, { title: "常去影城" }, favs.map((c) => /* @__PURE__ */ h(Item, { icon: "★", title: c.name, subtitle: `${c.city} ${c.district}`, onTap: () => this.go(() => this.cinemaView(c), `讀取 ${c.name} 的場次…`) }))) : null, /* @__PURE__ */ h(Section, { title: "全台影城", hint: "影城清單來自場次通與開眼電影網，會自動更新。" }, cities.map((city) => /* @__PURE__ */ h(Item, { title: city, badge: `${this.cinemas.filter((c) => c.city === city).length} 間`, onTap: () => this.go(() => this.cityView(city)) }))), /* @__PURE__ */ h(Section, { title: "設定" }, /* @__PURE__ */ h(Item, { icon: "📅", title: "寫入的行事曆", subtitle: this.calendarName, onTap: () => this.go(() => this.calendarView()) }), /* @__PURE__ */ h(Item, { icon: "📺", title: "廣告預告", subtitle: `預計散場時間會加上 ${this.settings.ads} 分鐘`, right: "點一下切換", chevron: false, onTap: () => this.cycleAds() }), /* @__PURE__ */ h(Item, { icon: "🗺", title: "導航地圖", subtitle: "點地址、分享、行程備註的導航連結", right: MAPS_LABEL[this.settings.maps || "apple"], chevron: false, onTap: () => {
       this.settings.maps = this.settings.maps === "google" ? "apple" : "google";
       saveSettings(this.settings);
-    } }), /* @__PURE__ */ h(Item, { icon: "⏱", title: "補片長（TMDB）", subtitle: this.settings.tmdbToken ? "已設定：沒有片長的電影會自動補上" : "未設定", onTap: () => this.go(() => this.tmdbView()) })), /* @__PURE__ */ h(Note, { text: "場次資料來自場次通 twshowtimes.com、開眼電影網，以及誠品、光點、樂聲官網，實際場次以影城公告為準。" }), /* @__PURE__ */ h(Note, { text: `版本 ${"2026.11.05-2100"}` }));
+    } }), /* @__PURE__ */ h(Item, { icon: "⏱", title: "補片長（TMDB）", subtitle: this.settings.tmdbToken ? "已設定：沒有片長的電影會自動補上" : "未設定", onTap: () => this.go(() => this.tmdbView()) })), /* @__PURE__ */ h(Note, { text: "場次資料來自場次通 twshowtimes.com、開眼電影網，以及誠品、光點、樂聲官網，實際場次以影城公告為準。" }), /* @__PURE__ */ h(Note, { text: `版本 ${"2026.11.05-2109"}` }));
   }
   searchView() {
     const k = this.query.trim().toLowerCase().replace(/臺/g, "台");
@@ -1503,35 +1517,31 @@ var App = class {
       }
     ))));
   }
+  async saveTmdb(raw) {
+    const t = extractTmdbKey(raw);
+    if (!t) {
+      this.settings.tmdbToken = "";
+      saveSettings(this.settings);
+      this.tmdbStatus = "已清除，之後沒有片長的電影不會自動補。";
+      return;
+    }
+    try {
+      const r = await tmdbTest(t);
+      this.settings.tmdbToken = t;
+      saveSettings(this.settings);
+      this.tmdbStatus = `✅ 設定完成（測試：${r}）`;
+    } catch (e) {
+      this.tmdbStatus = `❌ ${String(e?.message || e)}`;
+    }
+  }
   tmdbView() {
+    const open = (url) => async () => {
+      await Safari.openInApp(url, false);
+    };
     return /* @__PURE__ */ h(Page, { title: "補片長（TMDB）", onBack: () => {
       this.tmdbStatus = "";
       this.back();
-    } }, /* @__PURE__ */ h(Section, { hint: "場次通的重映、修復版、演唱會有時沒有片長。填入你自己的 TMDB「API Read Access Token」後，會用片名到 TMDB 查片長自動補上（確認頁會註明「取自 TMDB」）。Token 只存在你的手機。" }, /* @__PURE__ */ h("input", { class: "field", name: "v", value: this.settings.tmdbToken || "", placeholder: "貼上 API Read Access Token（eyJ 開頭）" })), this.tmdbStatus ? /* @__PURE__ */ h(Note, { kind: this.tmdbStatus.startsWith("❌") ? "error" : void 0, text: this.tmdbStatus }) : null, /* @__PURE__ */ h(
-      Button,
-      {
-        kind: "primary",
-        enter: true,
-        label: "儲存並測試",
-        onTap: async (v) => {
-          const t = String(v.v || "").trim();
-          if (!t) {
-            this.settings.tmdbToken = "";
-            saveSettings(this.settings);
-            this.tmdbStatus = "已清除，之後沒有片長的電影不會自動補。";
-            return;
-          }
-          try {
-            const r = await tmdbTest(t);
-            this.settings.tmdbToken = t;
-            saveSettings(this.settings);
-            this.tmdbStatus = `✅ 可以使用（測試：${r}）`;
-          } catch (e) {
-            this.tmdbStatus = `❌ ${String(e?.message || e)}`;
-          }
-        }
-      }
-    ), /* @__PURE__ */ h(Note, { text: "申請：themoviedb.org 免費註冊 → 設定 → API → 複製「API Read Access Token」（很長、eyJ 開頭的那串，不是較短的 API Key）。" }));
+    } }, /* @__PURE__ */ h(Note, { text: "場次通的重映、修復版、演唱會有時沒有片長。設定 TMDB 金鑰後，會自動用片名查片長，也會顯示海報和預告片。免費，金鑰只存在你的手機。" }), /* @__PURE__ */ h(Section, { title: "① 註冊並登入 TMDB" }, /* @__PURE__ */ h(Item, { icon: "👤", title: "註冊 TMDB 帳號", subtitle: "填完後到信箱點驗證信", accent: true, chevron: false, onTap: open(TMDB_LINKS.signup) }), /* @__PURE__ */ h(Item, { icon: "🔑", title: "已經有帳號：登入", accent: true, chevron: false, onTap: open(TMDB_LINKS.login) })), /* @__PURE__ */ h(Section, { title: "② 申請 API" }, /* @__PURE__ */ h(Item, { icon: "📝", title: "開啟 API 申請頁", subtitle: "選 Developer → 同意條款 → 用途填 Personal use（個人使用）、網址可填 https://github.com", accent: true, chevron: false, onTap: open(TMDB_LINKS.request) }), /* @__PURE__ */ h(Item, { icon: "📋", title: "開啟 API 金鑰頁", subtitle: "複製「API Read Access Token」（eyJ 開頭）或「API Key」（32 碼）都可以", accent: true, chevron: false, onTap: open(TMDB_LINKS.api) })), /* @__PURE__ */ h(Section, { title: "③ 回到這裡貼上" }, /* @__PURE__ */ h(Item, { icon: "📥", title: "從剪貼簿貼上並測試", subtitle: "複製好金鑰後點這裡", accent: true, chevron: false, onTap: () => this.saveTmdb(Pasteboard.paste() || "") }), /* @__PURE__ */ h("input", { class: "field", name: "v", value: this.settings.tmdbToken || "", placeholder: "或手動貼上金鑰" })), this.tmdbStatus ? /* @__PURE__ */ h(Note, { kind: this.tmdbStatus.startsWith("❌") ? "error" : void 0, text: this.tmdbStatus }) : null, /* @__PURE__ */ h(Button, { kind: "primary", enter: true, label: "儲存並測試", onTap: (v) => this.saveTmdb(String(v.v || "")) }), this.settings.tmdbToken ? /* @__PURE__ */ h(Button, { kind: "danger", label: "清除金鑰", onTap: () => this.saveTmdb("") }) : null);
   }
   cycleAds() {
     const i = AD_STEPS.indexOf(this.settings.ads);

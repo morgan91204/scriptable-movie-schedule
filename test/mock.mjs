@@ -17,8 +17,8 @@ globalThis.Timer = { schedule(ms, rep, cb) { return setTimeout(cb, ms); } };
 // 台北 101 附近
 globalThis.Location = { setAccuracyToHundredMeters() {}, async current() { return { latitude: 25.0339, longitude: 121.5645 }; } };
 globalThis.ShareSheet = { async present(items) { log.push("ShareSheet:\n" + items.join("\n")); return {}; } };
-globalThis.Pasteboard = { copy(t) { log.push("Pasteboard.copy " + t); } };
-globalThis.Safari = { open(u) { log.push("Safari.open " + u); } };
+globalThis.Pasteboard = { copy(t) { log.push("Pasteboard.copy " + t); }, paste() { return process.env.PASTE || ""; } };
+globalThis.Safari = { open(u) { log.push("Safari.open " + u); }, async openInApp(u) { log.push("Safari.openInApp " + u); } };
 globalThis.Color = class { constructor(hex) { this.hex = hex; } };
 globalThis.Font = { boldSystemFont: (n) => ({ bold: n }), systemFont: (n) => ({ size: n }) };
 

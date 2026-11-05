@@ -14,7 +14,7 @@ import {
   Cinema, Movie, Settings, Version, TwMovie, TwMovieCinema, CITY_ORDER, TW,
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
   loadSettings, saveSettings, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, cinemaAddress,
-  FORMATS, formatsOf, filterVersions, nearest, kmLabel, WINDOWS, findShowtimes, groupByMovie, shareText, hallOf, tmdbTest, movieExtras, mapsUrl, MAPS_LABEL,
+  FORMATS, formatsOf, filterVersions, nearest, kmLabel, WINDOWS, findShowtimes, groupByMovie, shareText, hallOf, tmdbTest, movieExtras, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey,
 } from "./core"
 import type { Format, LatLng, Hit } from "./core"
 
@@ -265,8 +265,9 @@ function TmdbPage() {
   const [settings, update] = useSettings()
   const [token, setToken] = useState(settings.tmdbToken || "")
   const [status, setStatus] = useState("")
-  const save = async () => {
-    const t = token.trim()
+  const save = async (raw: string) => {
+    const t = extractTmdbKey(raw)
+    setToken(t)
     if (!t) {
       update({ tmdbToken: "" })
       setStatus("已清除，之後沒有片長的電影不會自動補。")
@@ -276,16 +277,42 @@ function TmdbPage() {
     try {
       const r = await tmdbTest(t)
       update({ tmdbToken: t })
-      setStatus(`✅ 可以使用（測試：${r}）`)
+      setStatus(`✅ 設定完成（測試：${r}）`)
     } catch (e) {
       setStatus(`❌ ${String((e as Error)?.message || e)}`)
     }
   }
+  // 在 App 內開網頁（關掉就回到這頁）；不支援時改用 Safari
+  const open = async (url: string) => {
+    try {
+      await Safari.present(url, false)
+    } catch (_) {
+      await Safari.openURL(url)
+    }
+  }
+  const paste = async () => {
+    let text = ""
+    try { text = (await Pasteboard.getString()) || "" } catch (_) {}
+    if (!text) return setStatus("❌ 剪貼簿是空的，請先到 TMDB 複製金鑰")
+    await save(text)
+  }
   return <Form navigationTitle={"補片長（TMDB）"} navigationBarTitleDisplayMode={"inline"}>
-    <Section footer={<Text>{"場次通的重映、修復版、演唱會有時沒有片長。填入你自己的 TMDB「API Read Access Token」後，會用片名到 TMDB 查片長自動補上（確認頁會註明「取自 TMDB」）。\n\n申請：themoviedb.org 免費註冊 → 設定 → API → 複製「API Read Access Token」（很長、eyJ 開頭的那串）。Token 只存在你的手機。"}</Text>}>
-      <TextField title={"Token"} value={token} onChanged={setToken} prompt={"貼上 API Read Access Token"} />
-      <Button title={"儲存並測試"} action={save} />
-      {settings.tmdbToken ? <Button title={"清除 Token"} role={"destructive"} action={() => { setToken(""); update({ tmdbToken: "" }); setStatus("已清除。") }} /> : null}
+    <Section footer={<Text>{"場次通的重映、修復版、演唱會有時沒有片長。設定 TMDB 金鑰後，會自動用片名查片長，也會顯示海報和預告片。免費，金鑰只存在你的手機。"}</Text>}>
+      <LabeledContent title={"狀態"} value={settings.tmdbToken ? "已設定" : "未設定"} />
+    </Section>
+    <Section header={<Text>① 註冊並登入 TMDB</Text>} footer={<Text>註冊後到信箱點驗證信。</Text>}>
+      <Button title={"註冊 TMDB 帳號"} systemImage={"person.badge.plus"} action={() => open(TMDB_LINKS.signup)} />
+      <Button title={"已經有帳號：登入"} systemImage={"person.crop.circle"} action={() => open(TMDB_LINKS.login)} />
+    </Section>
+    <Section header={<Text>② 申請 API</Text>} footer={<Text>{"申請頁選 Developer → 同意條款 → 用途填 Personal use（個人使用），網址可填 https://github.com。\n金鑰頁複製「API Read Access Token」（eyJ 開頭）或「API Key」（32 碼）都可以。"}</Text>}>
+      <Button title={"開啟 API 申請頁"} systemImage={"square.and.pencil"} action={() => open(TMDB_LINKS.request)} />
+      <Button title={"開啟 API 金鑰頁"} systemImage={"key"} action={() => open(TMDB_LINKS.api)} />
+    </Section>
+    <Section header={<Text>③ 回到這裡貼上</Text>}>
+      <Button title={"從剪貼簿貼上並測試"} systemImage={"doc.on.clipboard"} action={paste} />
+      <TextField title={"金鑰"} value={token} onChanged={setToken} prompt={"或手動貼上金鑰"} />
+      <Button title={"儲存並測試"} systemImage={"checkmark.circle"} action={() => save(token)} />
+      {settings.tmdbToken ? <Button title={"清除金鑰"} role={"destructive"} action={() => save("")} /> : null}
     </Section>
     {status ? <Section><Text>{status}</Text></Section> : null}
   </Form>

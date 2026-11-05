@@ -399,9 +399,26 @@ export function baseTitle(t: string): string {
 }
 
 const TMDB = "https://api.themoviedb.org/3";
+// TMDB 有兩種金鑰都可以用：API Key（32 碼英數）或 API Read Access Token（很長、eyJ 開頭）
+const isV3Key = (t: string) => /^[0-9a-f]{32}$/i.test(t);
+export const TMDB_LINKS = {
+  signup: "https://www.themoviedb.org/signup",
+  login: "https://www.themoviedb.org/login",
+  api: "https://www.themoviedb.org/settings/api",
+  request: "https://www.themoviedb.org/settings/api/request",
+};
+/** 從剪貼簿或輸入的文字裡找出 TMDB 金鑰（貼上整段也沒關係） */
+export function extractTmdbKey(text: string): string {
+  const s = String(text || "");
+  return (s.match(/eyJ[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+/) || s.match(/\b[0-9a-f]{32}\b/i) || [""])[0] || s.trim();
+}
+
 async function tmdb(path: string, token: string): Promise<any> {
-  const r = await platform().fetchText(TMDB + path, { Authorization: "Bearer " + token, accept: "application/json" });
-  if (r.status === 401) throw new Error("TMDB Token 無效，請到設定重新填寫");
+  const url = TMDB + path + (isV3Key(token) ? (path.includes("?") ? "&" : "?") + "api_key=" + token : "");
+  const headers: Record<string, string> = { accept: "application/json" };
+  if (!isV3Key(token)) headers.Authorization = "Bearer " + token;
+  const r = await platform().fetchText(url, headers);
+  if (r.status === 401) throw new Error("TMDB 金鑰無效，請到設定重新貼上");
   if (r.status < 200 || r.status >= 300) throw new Error("TMDB 暫時讀不到");
   return JSON.parse(r.body);
 }
