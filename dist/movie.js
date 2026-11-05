@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.06-0110
+// @movie-schedule-app 電影行程 v2026.11.06-0140
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/jsx.tsx
@@ -1857,18 +1857,19 @@ function movieRatings(title, en, slug) {
     };
     const hit = read()[k];
     const has = (x) => !!(x.imdb || x.tomato || x.popcorn);
-    if (hit && Date.now() - hit.at < (has(hit) ? 7 : 1) * 864e5) return hit;
+    if (hit && hit.v === RATINGS_V && Date.now() - hit.at < (has(hit) ? 7 : 1) * 864e5) return hit;
     const r = await findRatings(title, en, slug);
     if (!r.err || has(r)) {
       const all = read();
       for (const [key, v] of Object.entries(all)) if (Date.now() - v.at > 7 * 864e5) delete all[key];
       const { err: _e, ...keep } = r;
-      all[k] = { ...keep, at: Date.now() };
+      all[k] = { ...keep, at: Date.now(), v: RATINGS_V };
       cacheSet("ratings.json", JSON.stringify(all));
     }
     return r;
   })();
 }
+var RATINGS_V = 2;
 function ratingTier(kind, v) {
   const x = kind === "imdb" ? v * 10 : v;
   return x >= 75 ? "good" : x >= 60 ? "mid" : "bad";
@@ -1945,7 +1946,7 @@ var App = class {
     this.loadingText = "讀取中…";
     // ── 事件迴圈 ──
     // 背景查 GitHub 上的最新版本（首頁顯示是否為最新版）
-    this.latest = checkLatest("2026.11.06-0110");
+    this.latest = checkLatest("2026.11.06-0140");
     // ── 搜尋 ──
     this.query = "";
     this.tmdbStatus = "";
@@ -2059,11 +2060,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.06-0110"}`);
+          Pasteboard.copy(`版本 ${"2026.11.06-0140"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.06-0110"}`,
+      `版本 ${"2026.11.06-0140"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }

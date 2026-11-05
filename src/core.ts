@@ -1215,22 +1215,25 @@ export function movieRatings(title: string, en?: string, slug?: string): Promise
         return {};
       }
     };
-    const hit = read()[k];
+    const hit = read()[k] as (Ratings & { at: number; v?: number }) | undefined;
     const has = (x: Ratings) => !!(x.imdb || x.tomato || x.popcorn);
-    // 有分數記 7 天；查過但沒有任何評分（新片、演唱會）記 1 天，不用每次進電影頁都重查
-    if (hit && Date.now() - hit.at < (has(hit) ? 7 : 1) * 86400e3) return hit;
+    // 有分數記 7 天；查過但沒有任何評分（新片、演唱會）記 1 天，不用每次進電影頁都重查。
+    // 舊版（比對規則改了，例如加了年份檢查）記下的一律重查，避免手機上留著對錯片的分數
+    if (hit && hit.v === RATINGS_V && Date.now() - hit.at < (has(hit) ? 7 : 1) * 86400e3) return hit;
     const r = await findRatings(title, en, slug);
     // 有錯（連線失敗）：不寫進手機快取（下次啟動再試），但這次執行內記住結果，重畫時不用再查
     if (!r.err || has(r)) {
       const all = read();
       for (const [key, v] of Object.entries(all)) if (Date.now() - v.at > 7 * 86400e3) delete all[key];
       const { err: _e, ...keep } = r;
-      all[k] = { ...keep, at: Date.now() };
+      all[k] = { ...keep, at: Date.now(), v: RATINGS_V } as Ratings & { at: number };
       cacheSet("ratings.json", JSON.stringify(all));
     }
     return r;
   })());
 }
+/** ratings.json 紀錄的版本：比對規則改了就加 1，讓舊紀錄重查 */
+const RATINGS_V = 2;
 
 /** 評分顏色等級：good（綠）／mid（黃）／bad（紅） */
 export function ratingTier(kind: "imdb" | "pct", v: number): "good" | "mid" | "bad" {
