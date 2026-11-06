@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.06-2109
+// @movie-schedule-app 電影行程 v2026.11.06-2112
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/jsx.tsx
@@ -82,7 +82,8 @@ function Section(props) {
 }
 function Item(props) {
   const cls = ["item", props.onTap ? "tap" : "", props.muted ? "muted" : "", props.accent ? "accent" : "", props.onLongPress ? "long" : ""].join(" ");
-  return /* @__PURE__ */ h("div", { class: cls, onTap: props.onTap, onLongPress: props.onLongPress }, props.icon ? /* @__PURE__ */ h("span", { class: "ico" }, props.icon) : null, /* @__PURE__ */ h("div", { class: "body" }, /* @__PURE__ */ h("div", { class: "title" }, esc(props.title)), props.subtitle ? /* @__PURE__ */ h("div", { class: "sub" }, esc(props.subtitle)) : null), props.badge ? /* @__PURE__ */ h("span", { class: "badge" }, esc(props.badge)) : null, props.right ? /* @__PURE__ */ h("span", { class: "right" }, esc(props.right)) : null, props.onTap && props.chevron !== false ? /* @__PURE__ */ h("span", { class: "chev" }, "›") : null);
+  const fallback = "if(this.dataset.url&&this.src!==this.dataset.url){this.src=this.dataset.url}else{this.replaceWith(Object.assign(document.createElement('span'),{className:'thumb none',textContent:'🎬'}))}";
+  return /* @__PURE__ */ h("div", { class: cls, onTap: props.onTap, onLongPress: props.onLongPress }, props.rank ? /* @__PURE__ */ h("span", { class: "rank" + (props.rank <= 3 ? " top" : "") }, props.rank) : null, props.thumb ? props.thumb.src ? /* @__PURE__ */ h("img", { class: "thumb", src: props.thumb.src, "data-url": props.thumb.url && props.thumb.url !== props.thumb.src ? props.thumb.url : void 0, alt: "", loading: "lazy", onerror: fallback }) : /* @__PURE__ */ h("span", { class: "thumb none" }, props.thumb.pending ? "" : "🎬") : null, props.icon ? /* @__PURE__ */ h("span", { class: "ico" }, props.icon) : null, /* @__PURE__ */ h("div", { class: "body" }, /* @__PURE__ */ h("div", { class: "title" }, esc(props.title)), props.subtitle ? /* @__PURE__ */ h("div", { class: "sub" }, esc(props.subtitle)) : null), props.badge ? /* @__PURE__ */ h("span", { class: "badge" }, esc(props.badge)) : null, props.right ? /* @__PURE__ */ h("span", { class: "right" }, esc(props.right)) : null, props.onTap && props.chevron !== false ? /* @__PURE__ */ h("span", { class: "chev" }, "›") : null);
 }
 function Chips(props) {
   return /* @__PURE__ */ h("div", { class: "chips" }, props.children);
@@ -269,6 +270,10 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .group .item:last-child{border-bottom:0}
 .item.tap:active{background:var(--line)}
 .item .ico{font-size:20px;width:26px;text-align:center;flex:none}
+.item .rank{flex:none;width:22px;text-align:center;font-size:17px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--fg2)}
+.item .rank.top{color:#ff9f0a}
+.item .thumb{flex:none;width:44px;height:66px;border-radius:6px;object-fit:cover;background:var(--chip)}
+.item .thumb.none{display:flex;align-items:center;justify-content:center;font-size:20px;filter:grayscale(1);opacity:.8}
 .item .body{flex:1;min-width:0}
 .item .title{font-size:16px;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
 .item .sub{font-size:13px;color:var(--fg2);margin-top:2px;white-space:pre-line;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
@@ -2083,7 +2088,7 @@ var App = class {
     ];
     // ── 事件迴圈 ──
     // 背景查 GitHub 上的最新版本（首頁顯示是否為最新版）
-    this.latest = checkLatest("2026.11.06-2109");
+    this.latest = checkLatest("2026.11.06-2112");
     // ── 搜尋 ──
     this.query = "";
     this.tmdbStatus = "";
@@ -2218,11 +2223,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.06-2109"}`);
+          Pasteboard.copy(`版本 ${"2026.11.06-2112"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.06-2109"}`,
+      `版本 ${"2026.11.06-2112"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -2579,12 +2584,26 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
   }
   async boxOfficeView() {
     const [b, all] = await Promise.all([loadBoxOffice(), loadMovies().catch(() => [])]);
-    return /* @__PURE__ */ h(Page, { title: "依電影找場次", subtitle: boxOfficeLabel(b), onBack: () => this.back() }, this.movieModeChips(), /* @__PURE__ */ h(Section, { title: boxOfficeLabel(b), hint: `資料來源：${b.source}。官方每週更新一次。` }, b.list.map((x) => {
-      const m = matchBoxOffice(x.name, all);
+    const rows = b.list.map((x) => ({ x, m: matchBoxOffice(x.name, all) }));
+    const jobs = rows.map(({ x, m }) => foregroundTask(moviePoster(m ? m.title : x.name, m?.slug, m?.en).catch(() => "")));
+    const wait = this.rerendering ? 0 : 600;
+    const posters = await Promise.all(jobs.map((p) => Promise.race([p, sleep(wait).then(() => void 0)])));
+    const late = jobs.filter((_, i) => posters[i] === void 0);
+    if (late.length) this.late = [Promise.all(late)];
+    prefetchPosters(rows.map(({ x, m }) => ({ title: m ? m.title : x.name, slug: m?.slug, en: m?.en })), 20, 0, 0);
+    const thumb = (u) => {
+      if (u === void 0) return { src: "", pending: true };
+      const src = posterSrc(u);
+      if (src && src === u) cachePoster(u);
+      return { src, url: u };
+    };
+    return /* @__PURE__ */ h(Page, { title: "依電影找場次", subtitle: boxOfficeLabel(b), onBack: () => this.back() }, this.movieModeChips(), /* @__PURE__ */ h(Section, { title: boxOfficeLabel(b), hint: `資料來源：${b.source}。官方每週更新一次。` }, rows.map(({ x, m }, i) => {
+      const t = thumb(posters[i]);
       return /* @__PURE__ */ h(
         Item,
         {
-          icon: String(x.rank),
+          rank: x.rank,
+          thumb: t,
           title: x.name,
           subtitle: [x.week !== null ? `本週 ${money(x.week)}` : "", `累計 ${money(x.total)}`, x.theaters ? `${x.theaters} 間戲院` : ""].filter(Boolean).join("｜"),
           chevron: !!m,

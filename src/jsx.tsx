@@ -166,10 +166,22 @@ export function Item(props: {
   muted?: boolean;
   accent?: boolean;
   chevron?: boolean;
+  /** 小海報：src 是顯示來源（本機或網址），url 是載入失敗時改用的網址；空字串 = 沒有海報（灰色預設圖） */
+  thumb?: { src: string; url?: string; pending?: boolean };
+  rank?: number; // 排行名次（前三名橘色）
 }): string {
   const cls = ["item", props.onTap ? "tap" : "", props.muted ? "muted" : "", props.accent ? "accent" : "", props.onLongPress ? "long" : ""].join(" ");
+  const fallback = "if(this.dataset.url&&this.src!==this.dataset.url){this.src=this.dataset.url}else{this.replaceWith(Object.assign(document.createElement('span'),{className:'thumb none',textContent:'🎬'}))}";
   return (
     <div class={cls} onTap={props.onTap} onLongPress={props.onLongPress}>
+      {props.rank ? <span class={"rank" + (props.rank <= 3 ? " top" : "")}>{props.rank}</span> : null}
+      {props.thumb ? (
+        props.thumb.src ? (
+          <img class="thumb" src={props.thumb.src} data-url={props.thumb.url && props.thumb.url !== props.thumb.src ? props.thumb.url : undefined} alt="" loading="lazy" onerror={fallback} />
+        ) : (
+          <span class="thumb none">{props.thumb.pending ? "" : "🎬"}</span>
+        )
+      ) : null}
       {props.icon ? <span class="ico">{props.icon}</span> : null}
       <div class="body">
         <div class="title">{esc(props.title)}</div>

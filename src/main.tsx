@@ -789,15 +789,30 @@ class App {
 
   async boxOfficeView(): Promise<string> {
     const [b, all] = await Promise.all([loadBoxOffice(), loadMovies().catch(() => [] as TwMovie[])]);
+    const rows = b.list.map((x) => ({ x, m: matchBoxOffice(x.name, all) }));
+    // 海報：手機上記過的立刻有；沒記過的最多等 0.6 秒，其餘讀好後自動補畫
+    const jobs = rows.map(({ x, m }) => foregroundTask(moviePoster(m ? m.title : x.name, m?.slug, m?.en).catch(() => "")));
+    const wait = this.rerendering ? 0 : 600;
+    const posters = await Promise.all(jobs.map((p) => Promise.race([p, sleep(wait).then(() => undefined)])));
+    const late = jobs.filter((_, i) => posters[i] === undefined);
+    if (late.length) this.late = [Promise.all(late)];
+    prefetchPosters(rows.map(({ x, m }) => ({ title: m ? m.title : x.name, slug: m?.slug, en: m?.en })), 20, 0, 0);
+    const thumb = (u: string | undefined) => {
+      if (u === undefined) return { src: "" , pending: true };
+      const src = posterSrc(u);
+      if (src && src === u) cachePoster(u);
+      return { src, url: u };
+    };
     return (
       <Page title="依電影找場次" subtitle={boxOfficeLabel(b)} onBack={() => this.back()}>
         {this.movieModeChips()}
         <Section title={boxOfficeLabel(b)} hint={`資料來源：${b.source}。官方每週更新一次。`}>
-          {b.list.map((x) => {
-            const m = matchBoxOffice(x.name, all);
+          {rows.map(({ x, m }, i) => {
+            const t = thumb(posters[i] as string | undefined);
             return (
               <Item
-                icon={String(x.rank)}
+                rank={x.rank}
+                thumb={t}
                 title={x.name}
                 subtitle={[x.week !== null ? `本週 ${money(x.week)}` : "", `累計 ${money(x.total)}`, x.theaters ? `${x.theaters} 間戲院` : ""].filter(Boolean).join("｜")}
                 chevron={!!m}

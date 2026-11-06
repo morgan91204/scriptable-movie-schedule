@@ -785,6 +785,23 @@ function ConfirmPage({ pick }: { pick: Pick }) {
 
 // ───────────────────────── 依電影找 ─────────────────────────
 
+/** 排行列表的小海報：有快取用本機檔，沒有就用網址；沒有海報是灰色預設圖 */
+function Thumb({ title, slug, en }: { title: string; slug?: string; en?: string }) {
+  const p = useLoad(() => moviePoster(title, slug, en), [title, slug || ""])
+  const [broken, setBroken] = useState(false)
+  const url = p.data || ""
+  const src = url ? posterSrc(url) : ""
+  useEffect(() => { if (url && src === url) cachePoster(url) }, [url])
+  const box = { frame: { width: 44, height: 66 }, clipShape: { type: "rect", cornerRadius: 6 } as any }
+  if (src && !broken)
+    return isLocalSrc(src)
+      ? <Image filePath={src} resizable scaleToFill {...box} />
+      : <Image imageUrl={src} resizable scaleToFill {...box} placeholder={<ProgressView />} onError={() => setBroken(true)} />
+  return <VStack {...box} background={"rgba(120, 120, 128, 0.18)"}>
+    {p.data === null && !p.error ? <ProgressView /> : <Image systemName={"film"} foregroundStyle={"tertiaryLabel"} />}
+  </VStack>
+}
+
 /** 票房排行（官方開放資料，每週更新）；對得到場次通的片可以點進去看場次 */
 function BoxOfficeSections({ movies }: { movies: TwMovie[] }) {
   const box = useLoad(() => loadBoxOffice(), [])
@@ -794,8 +811,9 @@ function BoxOfficeSections({ movies }: { movies: TwMovie[] }) {
   return <Section header={<Text>{boxOfficeLabel(b)}</Text>} footer={<Text>{`資料來源：${b.source}。官方每週更新一次。`}</Text>}>
     {b.list.map((x) => {
       const m = matchBoxOffice(x.name, movies)
-      const body = <HStack spacing={12}>
-        <Text font={"title3"} fontWeight={"bold"} monospacedDigit foregroundStyle={x.rank <= 3 ? "systemOrange" : "secondaryLabel"} frame={{ width: 28 }}>{String(x.rank)}</Text>
+      const body = <HStack spacing={10}>
+        <Text font={"title3"} fontWeight={"bold"} monospacedDigit foregroundStyle={x.rank <= 3 ? "systemOrange" : "secondaryLabel"} frame={{ width: 26 }}>{String(x.rank)}</Text>
+        <Thumb title={m ? m.title : x.name} slug={m?.slug} en={m?.en} />
         <VStack alignment={"leading"} spacing={2}>
           <Text foregroundStyle={m ? "label" : "secondaryLabel"} lineLimit={2}>{x.name}</Text>
           <Text font={"subheadline"} foregroundStyle={"secondaryLabel"}>{[x.week !== null ? `本週 ${money(x.week)}` : "", `累計 ${money(x.total)}`].filter(Boolean).join("｜")}</Text>

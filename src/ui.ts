@@ -40,6 +40,10 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .group .item:last-child{border-bottom:0}
 .item.tap:active{background:var(--line)}
 .item .ico{font-size:20px;width:26px;text-align:center;flex:none}
+.item .rank{flex:none;width:22px;text-align:center;font-size:17px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--fg2)}
+.item .rank.top{color:#ff9f0a}
+.item .thumb{flex:none;width:44px;height:66px;border-radius:6px;object-fit:cover;background:var(--chip)}
+.item .thumb.none{display:flex;align-items:center;justify-content:center;font-size:20px;filter:grayscale(1);opacity:.8}
 .item .body{flex:1;min-width:0}
 .item .title{font-size:16px;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
 .item .sub{font-size:13px;color:var(--fg2);margin-top:2px;white-space:pre-line;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
