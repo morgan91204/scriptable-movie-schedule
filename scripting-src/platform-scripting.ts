@@ -8,6 +8,41 @@ declare const Path: any
 
 let web: any = null
 
+// ── 設定：同時存三處，任何一處被清掉（例如重新匯入、自動更新換掉腳本資料夾，腳本私有儲存區變成空的）都能救回來
+//   1. 腳本私有儲存區（原本的位置）
+//   2. Scripting 文件夾裡的檔案：電影行程/設定.json（不跟著腳本走，更新不會被換掉）
+//   3. 共用儲存區（以 movie-schedule. 開頭的鍵）
+const KEEP_DIR = () => Path.join(FileManager.documentsDirectory, "電影行程")
+const keepFile = (name: string) => Path.join(KEEP_DIR(), name)
+const SHARED_SETTINGS = "movie-schedule.settings"
+/** Storage 可能回傳字串以外的型別：一律轉成字串 */
+const asText = (v: any): string | null => (v === null || v === undefined || v === "" ? null : typeof v === "string" ? v : JSON.stringify(v))
+const validJSON = (t: string | null): t is string => {
+  if (!t) return false
+  try {
+    const o = JSON.parse(t)
+    return !!o && typeof o === "object"
+  } catch (_) {
+    return false
+  }
+}
+function readKeep(name: string): string | null {
+  try {
+    const p = keepFile(name)
+    return FileManager.existsSync(p) ? FileManager.readAsStringSync(p) : null
+  } catch (_) {
+    return null
+  }
+}
+function writeKeep(name: string, text: string) {
+  try {
+    FileManager.createDirectorySync(KEEP_DIR(), true)
+  } catch (_) {}
+  try {
+    FileManager.writeAsStringSync(keepFile(name), text)
+  } catch (_) {}
+}
+
 // ── 圖片快取：存在 Documents/movie-cache/<網址雜湊>.jpg，畫面用 Image 的 filePath 顯示
 const hash = (s: string) => {
   let h = 5381
@@ -56,16 +91,30 @@ export const scriptingPlatform: Platform = {
     return await web.evaluateJavaScript(body)
   },
   async loadSettingsJSON() {
-    return Storage.get("settings") ?? null
+    const candidates = [asText(Storage.get("settings")), readKeep("設定.json"), asText(Storage.get(SHARED_SETTINGS, { shared: true }))]
+    const found = candidates.find(validJSON) || null
+    // 有一處是空的就補回去，下次被清掉也還有備份
+    if (found) {
+      if (!validJSON(candidates[0])) Storage.set("settings", found)
+      if (!validJSON(candidates[1])) writeKeep("設定.json", found)
+      if (!validJSON(candidates[2])) Storage.set(SHARED_SETTINGS, found, { shared: true })
+    }
+    return found
   },
   saveSettingsJSON(json) {
     Storage.set("settings", json)
+    writeKeep("設定.json", json) // 同步寫檔：馬上關掉 App 也不會遺失
+    Storage.set(SHARED_SETTINGS, json, { shared: true })
   },
   cacheGet(name) {
-    return Storage.get("cache:" + name) ?? null
+    const v = asText(Storage.get("cache:" + name))
+    // 觀眾評分的裝置代號也要保住，不然更新後會變成新手機、可以再投一票
+    if (!v && name === "device-id.txt") return readKeep("device-id.txt")
+    return v
   },
   cacheSet(name, value) {
     Storage.set("cache:" + name, value)
+    if (name === "device-id.txt") writeKeep("device-id.txt", value)
   },
   cachedImage,
   cacheImage(url) {
