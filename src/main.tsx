@@ -14,7 +14,7 @@ import {
   FORMATS, formatsOf, filterVersions, nearest, kmLabel, WINDOWS, findShowtimes, groupByMovie, shareText,
   hallOf, tmdbTest, movieExtras, moviePoster, movieRuntime, posterSrc, cachePoster, prefetchPosters, foregroundTask, communityStats, communityCached, communityVote, loadBoxOffice, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, movieRatings, ratingTier,
 } from "./core";
-import type { MovieExtras, Ratings, Community } from "./core";
+import type { MovieExtras, Ratings, Community, BoxOfficeItem } from "./core";
 import { setTabBar, setBackGuard, esc } from "./jsx";
 import type { TwMovie, TwMovieCinema, Format, LatLng, Hit } from "./core";
 
@@ -815,13 +815,29 @@ class App {
                 thumb={t}
                 title={x.name}
                 subtitle={[x.week !== null ? `本週 ${money(x.week)}` : "", `累計 ${money(x.total)}`, x.theaters ? `${x.theaters} 間戲院` : ""].filter(Boolean).join("｜")}
-                chevron={!!m}
-                muted={!m}
-                onTap={m ? () => this.go(() => this.movieView(m, ""), `讀取《${m.title}》的放映影城…`) : undefined}
+                onTap={m ? () => this.go(() => this.movieView(m, ""), `讀取《${m.title}》的放映影城…`) : () => this.go(() => this.boxMovieView(x), `讀取《${x.name}》…`)}
               />
             );
           })}
         </Section>
+      </Page>
+    );
+  }
+
+  /** 票房排行上、場次通已經沒有場次的片：海報、評分、預告、觀眾評分與票房 */
+  async boxMovieView(x: BoxOfficeItem): Promise<string> {
+    const e = await this.extras(x.name);
+    const date = x.release.replace(/-/g, "/");
+    return (
+      <Page title={x.name} subtitle={`票房第 ${x.rank} 名`} onBack={() => this.back()}>
+        {this.hero(e, x.name, [x.country, `${date} 上映`])}
+        <Section title="票房" hint="資料來源：國家電影及視聽文化中心「全國電影票房統計」。">
+          {x.week !== null ? <Item title="本週票房" right={money(x.week)} /> : null}
+          <Item title="累計票房" right={money(x.total)} />
+          {x.theaters ? <Item title="上映戲院" right={`${x.theaters} 間`} /> : null}
+          <Item title="上映日期" right={date} />
+        </Section>
+        <Note text="場次通目前沒有這部片的場次，可能已經下檔，或只在少數戲院放映。" />
       </Page>
     );
   }

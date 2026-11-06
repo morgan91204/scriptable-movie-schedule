@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.06-2112
+// @movie-schedule-app 電影行程 v2026.11.06-2118
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/jsx.tsx
@@ -2088,7 +2088,7 @@ var App = class {
     ];
     // ── 事件迴圈 ──
     // 背景查 GitHub 上的最新版本（首頁顯示是否為最新版）
-    this.latest = checkLatest("2026.11.06-2112");
+    this.latest = checkLatest("2026.11.06-2118");
     // ── 搜尋 ──
     this.query = "";
     this.tmdbStatus = "";
@@ -2223,11 +2223,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.06-2112"}`);
+          Pasteboard.copy(`版本 ${"2026.11.06-2118"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.06-2112"}`,
+      `版本 ${"2026.11.06-2118"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -2606,12 +2606,16 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
           thumb: t,
           title: x.name,
           subtitle: [x.week !== null ? `本週 ${money(x.week)}` : "", `累計 ${money(x.total)}`, x.theaters ? `${x.theaters} 間戲院` : ""].filter(Boolean).join("｜"),
-          chevron: !!m,
-          muted: !m,
-          onTap: m ? () => this.go(() => this.movieView(m, ""), `讀取《${m.title}》的放映影城…`) : void 0
+          onTap: m ? () => this.go(() => this.movieView(m, ""), `讀取《${m.title}》的放映影城…`) : () => this.go(() => this.boxMovieView(x), `讀取《${x.name}》…`)
         }
       );
     })));
+  }
+  /** 票房排行上、場次通已經沒有場次的片：海報、評分、預告、觀眾評分與票房 */
+  async boxMovieView(x) {
+    const e = await this.extras(x.name);
+    const date = x.release.replace(/-/g, "/");
+    return /* @__PURE__ */ h(Page, { title: x.name, subtitle: `票房第 ${x.rank} 名`, onBack: () => this.back() }, this.hero(e, x.name, [x.country, `${date} 上映`]), /* @__PURE__ */ h(Section, { title: "票房", hint: "資料來源：國家電影及視聽文化中心「全國電影票房統計」。" }, x.week !== null ? /* @__PURE__ */ h(Item, { title: "本週票房", right: money(x.week) }) : null, /* @__PURE__ */ h(Item, { title: "累計票房", right: money(x.total) }), x.theaters ? /* @__PURE__ */ h(Item, { title: "上映戲院", right: `${x.theaters} 間` }) : null, /* @__PURE__ */ h(Item, { title: "上映日期", right: date })), /* @__PURE__ */ h(Note, { text: "場次通目前沒有這部片的場次，可能已經下檔，或只在少數戲院放映。" }));
   }
   async movieListView() {
     if (this.movieMode === "box") return this.boxOfficeView();

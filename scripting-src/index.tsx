@@ -16,7 +16,7 @@ import {
   loadSettings, saveSettings, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, cinemaAddress,
   FORMATS, formatsOf, filterVersions, nearest, kmLabel, WINDOWS, findShowtimes, groupByMovie, shareText, hallOf, tmdbTest, movieExtras, moviePoster, movieRuntime, posterSrc, isLocalSrc, cachePoster, prefetchPosters, foregroundTask, communityStats, communityVote, loadBoxOffice, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, SCRIPTING_IMPORT_URL, movieRatings, ratingTier,
 } from "./core"
-import type { Format, LatLng, Hit, Community } from "./core"
+import type { Format, LatLng, Hit, Community, BoxOfficeItem } from "./core"
 
 declare const Safari: any
 declare const Dialog: any
@@ -802,7 +802,21 @@ function Thumb({ title, slug, en }: { title: string; slug?: string; en?: string 
   </VStack>
 }
 
-/** 票房排行（官方開放資料，每週更新）；對得到場次通的片可以點進去看場次 */
+/** 票房排行上、場次通已經沒有場次的片：海報、評分、預告、觀眾評分與票房 */
+function BoxOfficeMoviePage({ item: x }: { item: BoxOfficeItem }) {
+  const date = x.release.replace(/-/g, "/")
+  return <List navigationTitle={x.name} navigationBarTitleDisplayMode={"inline"}>
+    <MovieHero title={x.name} lines={[x.country, `${date} 上映`]} />
+    <Section header={<Text>{`票房第 ${x.rank} 名`}</Text>} footer={<Text>資料來源：國家電影及視聽文化中心「全國電影票房統計」。場次通目前沒有這部片的場次，可能已經下檔，或只在少數戲院放映。</Text>}>
+      {x.week !== null ? <LabeledContent title={"本週票房"} value={money(x.week)} /> : null}
+      <LabeledContent title={"累計票房"} value={money(x.total)} />
+      {x.theaters ? <LabeledContent title={"上映戲院"} value={`${x.theaters} 間`} /> : null}
+      <LabeledContent title={"上映日期"} value={date} />
+    </Section>
+  </List>
+}
+
+/** 票房排行（官方開放資料，每週更新）；每一部都可以點：有場次的進電影頁，沒有的進精簡頁 */
 function BoxOfficeSections({ movies }: { movies: TwMovie[] }) {
   const box = useLoad(() => loadBoxOffice(), [])
   const b = box.data
@@ -815,15 +829,13 @@ function BoxOfficeSections({ movies }: { movies: TwMovie[] }) {
         <Text font={"title3"} fontWeight={"bold"} monospacedDigit foregroundStyle={x.rank <= 3 ? "systemOrange" : "secondaryLabel"} frame={{ width: 26 }}>{String(x.rank)}</Text>
         <Thumb title={m ? m.title : x.name} slug={m?.slug} en={m?.en} />
         <VStack alignment={"leading"} spacing={2}>
-          <Text foregroundStyle={m ? "label" : "secondaryLabel"} lineLimit={2}>{x.name}</Text>
+          <Text foregroundStyle={"label"} lineLimit={2}>{x.name}</Text>
           <Text font={"subheadline"} foregroundStyle={"secondaryLabel"}>{[x.week !== null ? `本週 ${money(x.week)}` : "", `累計 ${money(x.total)}`].filter(Boolean).join("｜")}</Text>
         </VStack>
         <Spacer />
         {x.theaters ? <Text font={"caption"} foregroundStyle={"tertiaryLabel"}>{`${x.theaters} 間`}</Text> : null}
       </HStack>
-      return m
-        ? <NavigationLink key={x.rank} destination={<MoviePage movie={m} />}>{body}</NavigationLink>
-        : <Group key={x.rank}>{body}</Group>
+      return <NavigationLink key={x.rank} destination={m ? <MoviePage movie={m} /> : <BoxOfficeMoviePage item={x} />}>{body}</NavigationLink>
     })}
   </Section>
 }
