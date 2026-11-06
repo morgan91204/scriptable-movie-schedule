@@ -58,10 +58,12 @@ export function imageCacheBaseUrl(): string {
 }
 
 export const scriptablePlatform: Platform = {
-  async fetchText(url, headers) {
+  async fetchText(url, headers, opts) {
     const r = new Request(url);
     r.headers = headers;
     r.timeoutInterval = 20;
+    if (opts?.method) r.method = opts.method;
+    if (opts?.body !== undefined) r.body = opts.body;
     const body = await r.loadString();
     return { status: (r.response && (r.response as any).statusCode) || 200, body };
   },

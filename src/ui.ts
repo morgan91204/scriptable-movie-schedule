@@ -88,6 +88,26 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .rate:active{opacity:.6}
 .trailer{margin-top:8px;align-self:flex-start;padding:7px 13px;border-radius:999px;background:#ff0033;color:#fff;font-size:14px;font-weight:600;white-space:nowrap}
 .trailer:active{opacity:.7}
+.cm{padding:14px 16px}
+.cm-top{display:flex;align-items:center;gap:12px}
+.cm-avg{font-size:40px;font-weight:700;line-height:1;font-variant-numeric:tabular-nums;min-width:58px;text-align:center}
+.cm-meta{display:flex;flex-direction:column;gap:4px;min-width:0}
+.cm-stars{position:relative;display:inline-block;font-size:17px;letter-spacing:1px;line-height:1}
+.cm-stars .bg{color:var(--line)}
+@media(prefers-color-scheme:dark){.cm-stars .bg{color:#3a3a3c}}
+.cm-stars .fg{position:absolute;left:0;top:0;overflow:hidden;white-space:nowrap;color:#ff9f0a}
+.cm-n{font-size:13px;color:var(--fg2)}
+.cm-dist{flex:1;display:flex;flex-direction:column;gap:2px;min-width:70px;max-width:130px;margin-left:auto}
+.cm-row{display:flex;align-items:center;gap:5px;font-size:9px;color:var(--fg2);line-height:1}
+.cm-row span{width:7px;text-align:right;flex:none}
+.cm-row i{display:block;height:4px;border-radius:2px;background:var(--fg2);opacity:.55;min-width:2px}
+.cm-mine{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:12px;padding-top:10px;border-top:1px solid var(--line);font-size:15px}
+.cm-pick{display:flex;gap:2px}
+.cm-star{font-size:28px;line-height:1;padding:2px 3px;color:var(--line)}
+@media(prefers-color-scheme:dark){.cm-star{color:#48484a}}
+.cm-star.on{color:#ff9f0a}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.cm-star:active{transform:scale(.9)}
 .item.long{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
 .toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom) + 28px);transform:translateX(-50%);z-index:20;background:rgba(40,40,44,.92);color:#fff;
  padding:10px 18px;border-radius:999px;font-size:15px;pointer-events:none;animation:toast 1.8s ease forwards}

@@ -1247,6 +1247,60 @@ export function ratingTier(kind: "imdb" | "pct", v: number): "good" | "mid" | "b
   return x >= 75 ? "good" : x >= 60 ? "mid" : "bad";
 }
 
+// ───────────────────────── 觀眾評分（大家一起統計） ─────────────────────────
+// 後端是 Cloudflare Worker（worker/ 資料夾）：每部片一個計數器，一台手機一票，可以改票或取消。
+// 片名鍵用去掉裝飾字、重映字樣後的片名，所以兩個 App、同一部片的不同場次條目都算在一起。
+
+export const COMMUNITY_API = "https://movie-ratings.morgan91204.workers.dev";
+export interface Community {
+  n: number; // 評分人數
+  avg: number; // 平均（1～5，一位小數；沒人評分是 0）
+  dist: number[]; // 1 星～5 星各幾人
+  mine: number; // 這支手機給的分數（0 = 還沒評）
+}
+/** 這支手機的匿名代號：第一次用時隨機產生，存在本機；只用來做「一台一票、可以改票」 */
+function deviceId(): string {
+  const ok = (x: string | null): x is string => !!x && /^[A-Za-z0-9_-]{16,64}$/.test(x);
+  const saved = cacheGet("device-id.txt");
+  if (ok(saved)) return saved;
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  let id = "";
+  for (let i = 0; i < 24; i++) id += chars[Math.floor(Math.random() * chars.length)];
+  cacheSet("device-id.txt", id);
+  return id;
+}
+export const communityKey = (title: string) => normTitle(baseTitle(title)).slice(0, 120);
+const communityMem: Record<string, Community & { at: number }> = {};
+/** 已經讀過的觀眾評分（畫面重畫時用，不用再等網路） */
+export function communityCached(title: string): Community | null {
+  return communityMem[communityKey(title)] || null;
+}
+/** 讀觀眾評分（5 秒內讀過或剛投過票就直接用） */
+export async function communityStats(title: string): Promise<Community> {
+  const k = communityKey(title);
+  const hit = communityMem[k];
+  if (hit && Date.now() - hit.at < 5000) return { n: hit.n, avg: hit.avg, dist: hit.dist, mine: hit.mine };
+  const r = await platform().fetchText(`${COMMUNITY_API}/v1/stats?m=${encodeURIComponent(k)}&d=${encodeURIComponent(deviceId())}`, { accept: "application/json" });
+  if (r.status !== 200) throw new Error("觀眾評分暫時讀不到");
+  const c = JSON.parse(r.body) as Community;
+  communityMem[k] = { ...c, at: Date.now() };
+  return c;
+}
+/** 投票：score 1～5；0 = 取消。回傳更新後的統計 */
+export async function communityVote(title: string, score: number): Promise<Community> {
+  const k = communityKey(title);
+  const r = await platform().fetchText(
+    `${COMMUNITY_API}/v1/vote`,
+    { accept: "application/json", "content-type": "application/json" },
+    { method: "POST", body: JSON.stringify({ m: k, d: deviceId(), s: score }) }
+  );
+  if (r.status === 429) throw new Error("投票太頻繁，請稍後再試");
+  if (r.status !== 200) throw new Error("評分沒有送出，請稍後再試");
+  const c = JSON.parse(r.body) as Community;
+  communityMem[k] = { ...c, at: Date.now() };
+  return c;
+}
+
 // ───────────────────────── 版本檢查 ─────────────────────────
 
 const VERSION_URL = "https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/main/dist/version.json";

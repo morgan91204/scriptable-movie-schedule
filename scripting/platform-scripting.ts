@@ -43,8 +43,8 @@ function cachedImage(url: string): string | null {
 }
 
 export const scriptingPlatform: Platform = {
-  async fetchText(url, headers) {
-    const r = await fetch(url, { headers, timeout: 20 } as any)
+  async fetchText(url, headers, opts) {
+    const r = await fetch(url, { headers, timeout: 20, method: opts?.method || "GET", body: opts?.body } as any)
     return { status: r.status, body: await r.text() }
   },
   async runInWebView(body) {

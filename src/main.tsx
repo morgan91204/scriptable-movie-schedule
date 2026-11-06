@@ -12,10 +12,10 @@ import {
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
   loadSettings, saveSettings, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, TW,
   FORMATS, formatsOf, filterVersions, nearest, kmLabel, WINDOWS, findShowtimes, groupByMovie, shareText,
-  hallOf, tmdbTest, movieExtras, moviePoster, movieRuntime, posterSrc, cachePoster, prefetchPosters, foregroundTask, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, movieRatings, ratingTier,
+  hallOf, tmdbTest, movieExtras, moviePoster, movieRuntime, posterSrc, cachePoster, prefetchPosters, foregroundTask, communityStats, communityCached, communityVote, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, movieRatings, ratingTier,
 } from "./core";
-import type { MovieExtras, Ratings } from "./core";
-import { setTabBar, setBackGuard } from "./jsx";
+import type { MovieExtras, Ratings, Community } from "./core";
+import { setTabBar, setBackGuard, esc } from "./jsx";
 import type { TwMovie, TwMovieCinema, Format, LatLng, Hit } from "./core";
 
 interface Pick {
@@ -33,6 +33,8 @@ declare const APP_VERSION: string;
 
 type View = () => string | Promise<string>;
 
+/** 電影頁頂端要用的資料：預告／海報（x）、三大評分（r）、海報網址（p）、觀眾評分（c：undefined 讀取中、false 讀不到） */
+type Extras = { x: MovieExtras | null; r: Ratings | null; p: string; px: Promise<MovieExtras | null>; loading: boolean; c: Community | false | undefined };
 const sleep = (ms: number) => new Promise<void>((r) => Timer.schedule(ms, false, () => r()));
 
 async function currentCalendar(s: Settings): Promise<Calendar> {
@@ -464,19 +466,75 @@ class App {
   }
 
   /** 海報、預告與評分：最多等 0.4 秒就先畫頁面（有快取的會直接出現），其餘讀好後各自補上。海報網址另外快查（不等預告） */
-  async extras(title: string, slug?: string, en?: string): Promise<{ x: MovieExtras | null; r: Ratings | null; p: string; px: Promise<MovieExtras | null>; loading: boolean }> {
+  async extras(title: string, slug?: string, en?: string): Promise<Extras> {
     const px = foregroundTask(movieExtras(title, slug).catch(() => null));
     const pr = foregroundTask(movieRatings(title, en, slug).catch(() => null));
     const pp = foregroundTask(moviePoster(title, slug, en).catch(() => ""));
+    // 觀眾評分：剛投過票或 5 秒內讀過就直接用；失敗回傳 false（顯示讀不到）
+    const pc = communityStats(title).catch(() => false as const);
     const wait = this.rerendering ? 0 : 400;
     const quick = <T,>(p: Promise<T>) => Promise.race([p, sleep(wait).then(() => undefined)]);
-    const [x, r, p] = await Promise.all([quick(px), quick(pr), quick(pp)]);
+    const [x, r, p, c] = await Promise.all([quick(px), quick(pr), quick(pp), quick(pc)]);
     const loading = x === undefined || r === undefined || p === undefined;
-    if (loading) this.late = [x === undefined ? px : null, r === undefined ? pr : null, p === undefined ? pp : null].filter(Boolean) as Promise<unknown>[];
-    return { x: x ?? null, r: r ?? null, p: p || "", px, loading };
+    const late = [x === undefined ? px : null, r === undefined ? pr : null, p === undefined ? pp : null, c === undefined ? pc : null].filter(Boolean) as Promise<unknown>[];
+    if (late.length) this.late = late;
+    return { x: x ?? null, r: r ?? null, p: p || "", px, loading, c: c === undefined ? communityCached(title) || undefined : c };
   }
 
-  hero(e: { x: MovieExtras | null; r: Ratings | null; p: string; px: Promise<MovieExtras | null>; loading: boolean }, title: string, lines: string[]): string {
+  /** 觀眾評分卡片：平均、人數、分布，以及「你的評分」五顆星（點已選的那顆可以取消） */
+  community(title: string, c: Community | false | undefined): string {
+    const n = c ? c.n : 0;
+    const avg = c && n ? c.avg : 0;
+    const mine = c ? c.mine : 0;
+    const status = c === undefined ? "讀取中…" : c === false ? "觀眾評分暫時讀不到" : n ? `${n} 人評分` : "還沒有人評分，來當第一個";
+    const max = c ? Math.max(1, ...c.dist) : 1;
+    const vote = async (s: number) => {
+      try {
+        await communityVote(title, s === mine ? 0 : s);
+        await this.ui.toast(s === mine ? "已取消你的評分" : `已送出 ${s} 星`);
+      } catch (e) {
+        await this.ui.toast(String((e as Error)?.message || e));
+      }
+    };
+    return (
+      <Section title="觀眾評分" hint="匿名評分，一台手機一票，可以隨時更改；點已選的星星可以取消。兩個版本的評分會一起統計。">
+        <div class="cm">
+          <div class="cm-top">
+            <div class="cm-avg">{n ? avg.toFixed(1) : "-"}</div>
+            <div class="cm-meta">
+              <span class="cm-stars" aria-label={n ? `平均 ${avg} 星` : "還沒有評分"}>
+                <span class="bg">★★★★★</span>
+                <span class="fg" style={`width:${(avg / 5) * 100}%`}>★★★★★</span>
+              </span>
+              <span class="cm-n">{esc(status)}</span>
+            </div>
+            {c && n ? (
+              <div class="cm-dist">
+                {[5, 4, 3, 2, 1].map((s) => (
+                  <div class="cm-row">
+                    <span>{s}</span>
+                    <i style={`width:${Math.round((c.dist[s - 1] / max) * 100)}%`} />
+                  </div>
+                ))}
+              </div>
+            ) : null}
+          </div>
+          <div class="cm-mine">
+            <span>{mine ? `你給 ${mine} 星` : "點星星評分"}</span>
+            <span class="cm-pick">
+              {[1, 2, 3, 4, 5].map((s) => (
+                <button class={"cm-star" + (s <= mine ? " on" : "")} aria-label={`${s} 星`} onTap={() => vote(s)}>
+                  ★<span class="sr">{s}</span>
+                </button>
+              ))}
+            </span>
+          </div>
+        </div>
+      </Section>
+    );
+  }
+
+  hero(e: Extras, title: string, lines: string[]): string {
     const { x, r } = e;
     const posterUrl = x?.poster || e.p || "";
     const poster = posterSrc(posterUrl);
@@ -504,7 +562,7 @@ class App {
         trailerLabel={!x || x.trailerName ? "觀看預告" : "搜尋預告"}
         onTrailer={async () => Safari.open((x || (await e.px))?.trailer || search)}
       />
-    );
+    ) + this.community(title, e.c);
   }
 
   // ── 場次 ──

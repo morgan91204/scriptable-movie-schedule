@@ -2,8 +2,8 @@
 // 讓同一份資料層可以同時給 Scriptable 版（src/main.tsx）和 Scripting 版（scripting/）使用。
 
 export interface Platform {
-  /** 下載網頁文字 */
-  fetchText(url: string, headers: Record<string, string>): Promise<{ status: number; body: string }>;
+  /** 下載網頁文字（opts 可以改成 POST 並帶 body，給觀眾評分投票用） */
+  fetchText(url: string, headers: Record<string, string>, opts?: { method?: string; body?: string }): Promise<{ status: number; body: string }>;
   /** 在隱藏的 WebView 執行一段 JavaScript 函式本體（內含 return），回傳字串 */
   runInWebView(body: string): Promise<string>;
   /** 使用者設定（會跟著 iCloud／App 同步） */

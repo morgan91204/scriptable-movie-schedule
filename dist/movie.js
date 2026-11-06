@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.06-0200
+// @movie-schedule-app 電影行程 v2026.11.06-1804
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/jsx.tsx
@@ -163,10 +163,12 @@ function imageCacheBaseUrl() {
   return "file://" + FileManager.local().cacheDirectory() + "/";
 }
 var scriptablePlatform = {
-  async fetchText(url, headers) {
+  async fetchText(url, headers, opts) {
     const r = new Request(url);
     r.headers = headers;
     r.timeoutInterval = 20;
+    if (opts?.method) r.method = opts.method;
+    if (opts?.body !== void 0) r.body = opts.body;
     const body = await r.loadString();
     return { status: r.response && r.response.statusCode || 200, body };
   },
@@ -315,6 +317,26 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .rate:active{opacity:.6}
 .trailer{margin-top:8px;align-self:flex-start;padding:7px 13px;border-radius:999px;background:#ff0033;color:#fff;font-size:14px;font-weight:600;white-space:nowrap}
 .trailer:active{opacity:.7}
+.cm{padding:14px 16px}
+.cm-top{display:flex;align-items:center;gap:12px}
+.cm-avg{font-size:40px;font-weight:700;line-height:1;font-variant-numeric:tabular-nums;min-width:58px;text-align:center}
+.cm-meta{display:flex;flex-direction:column;gap:4px;min-width:0}
+.cm-stars{position:relative;display:inline-block;font-size:17px;letter-spacing:1px;line-height:1}
+.cm-stars .bg{color:var(--line)}
+@media(prefers-color-scheme:dark){.cm-stars .bg{color:#3a3a3c}}
+.cm-stars .fg{position:absolute;left:0;top:0;overflow:hidden;white-space:nowrap;color:#ff9f0a}
+.cm-n{font-size:13px;color:var(--fg2)}
+.cm-dist{flex:1;display:flex;flex-direction:column;gap:2px;min-width:70px;max-width:130px;margin-left:auto}
+.cm-row{display:flex;align-items:center;gap:5px;font-size:9px;color:var(--fg2);line-height:1}
+.cm-row span{width:7px;text-align:right;flex:none}
+.cm-row i{display:block;height:4px;border-radius:2px;background:var(--fg2);opacity:.55;min-width:2px}
+.cm-mine{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:12px;padding-top:10px;border-top:1px solid var(--line);font-size:15px}
+.cm-pick{display:flex;gap:2px}
+.cm-star{font-size:28px;line-height:1;padding:2px 3px;color:var(--line)}
+@media(prefers-color-scheme:dark){.cm-star{color:#48484a}}
+.cm-star.on{color:#ff9f0a}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.cm-star:active{transform:scale(.9)}
 .item.long{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
 .toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom) + 28px);transform:translateX(-50%);z-index:20;background:rgba(40,40,44,.92);color:#fff;
  padding:10px 18px;border-radius:999px;font-size:15px;pointer-events:none;animation:toast 1.8s ease forwards}
@@ -1909,6 +1931,45 @@ function ratingTier(kind, v) {
   const x = kind === "imdb" ? v * 10 : v;
   return x >= 75 ? "good" : x >= 60 ? "mid" : "bad";
 }
+var COMMUNITY_API = "https://movie-ratings.morgan91204.workers.dev";
+function deviceId() {
+  const ok = (x) => !!x && /^[A-Za-z0-9_-]{16,64}$/.test(x);
+  const saved = cacheGet("device-id.txt");
+  if (ok(saved)) return saved;
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  let id = "";
+  for (let i = 0; i < 24; i++) id += chars[Math.floor(Math.random() * chars.length)];
+  cacheSet("device-id.txt", id);
+  return id;
+}
+var communityKey = (title) => normTitle(baseTitle(title)).slice(0, 120);
+var communityMem = {};
+function communityCached(title) {
+  return communityMem[communityKey(title)] || null;
+}
+async function communityStats(title) {
+  const k = communityKey(title);
+  const hit = communityMem[k];
+  if (hit && Date.now() - hit.at < 5e3) return { n: hit.n, avg: hit.avg, dist: hit.dist, mine: hit.mine };
+  const r = await platform().fetchText(`${COMMUNITY_API}/v1/stats?m=${encodeURIComponent(k)}&d=${encodeURIComponent(deviceId())}`, { accept: "application/json" });
+  if (r.status !== 200) throw new Error("觀眾評分暫時讀不到");
+  const c = JSON.parse(r.body);
+  communityMem[k] = { ...c, at: Date.now() };
+  return c;
+}
+async function communityVote(title, score) {
+  const k = communityKey(title);
+  const r = await platform().fetchText(
+    `${COMMUNITY_API}/v1/vote`,
+    { accept: "application/json", "content-type": "application/json" },
+    { method: "POST", body: JSON.stringify({ m: k, d: deviceId(), s: score }) }
+  );
+  if (r.status === 429) throw new Error("投票太頻繁，請稍後再試");
+  if (r.status !== 200) throw new Error("評分沒有送出，請稍後再試");
+  const c = JSON.parse(r.body);
+  communityMem[k] = { ...c, at: Date.now() };
+  return c;
+}
 var VERSION_URL = "https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/main/dist/version.json";
 var verNum = (v) => Number(String(v || "").replace(/\D/g, "")) || 0;
 async function checkLatest(current2) {
@@ -1989,7 +2050,7 @@ var App = class {
     ];
     // ── 事件迴圈 ──
     // 背景查 GitHub 上的最新版本（首頁顯示是否為最新版）
-    this.latest = checkLatest("2026.11.06-0200");
+    this.latest = checkLatest("2026.11.06-1804");
     // ── 搜尋 ──
     this.query = "";
     this.tmdbStatus = "";
@@ -2122,11 +2183,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.06-0200"}`);
+          Pasteboard.copy(`版本 ${"2026.11.06-1804"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.06-0200"}`,
+      `版本 ${"2026.11.06-1804"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -2282,12 +2343,31 @@ var App = class {
     const px = foregroundTask(movieExtras(title, slug).catch(() => null));
     const pr = foregroundTask(movieRatings(title, en, slug).catch(() => null));
     const pp = foregroundTask(moviePoster(title, slug, en).catch(() => ""));
+    const pc = communityStats(title).catch(() => false);
     const wait = this.rerendering ? 0 : 400;
     const quick = (p2) => Promise.race([p2, sleep(wait).then(() => void 0)]);
-    const [x, r, p] = await Promise.all([quick(px), quick(pr), quick(pp)]);
+    const [x, r, p, c] = await Promise.all([quick(px), quick(pr), quick(pp), quick(pc)]);
     const loading = x === void 0 || r === void 0 || p === void 0;
-    if (loading) this.late = [x === void 0 ? px : null, r === void 0 ? pr : null, p === void 0 ? pp : null].filter(Boolean);
-    return { x: x ?? null, r: r ?? null, p: p || "", px, loading };
+    const late = [x === void 0 ? px : null, r === void 0 ? pr : null, p === void 0 ? pp : null, c === void 0 ? pc : null].filter(Boolean);
+    if (late.length) this.late = late;
+    return { x: x ?? null, r: r ?? null, p: p || "", px, loading, c: c === void 0 ? communityCached(title) || void 0 : c };
+  }
+  /** 觀眾評分卡片：平均、人數、分布，以及「你的評分」五顆星（點已選的那顆可以取消） */
+  community(title, c) {
+    const n = c ? c.n : 0;
+    const avg = c && n ? c.avg : 0;
+    const mine = c ? c.mine : 0;
+    const status = c === void 0 ? "讀取中…" : c === false ? "觀眾評分暫時讀不到" : n ? `${n} 人評分` : "還沒有人評分，來當第一個";
+    const max = c ? Math.max(1, ...c.dist) : 1;
+    const vote = async (s) => {
+      try {
+        await communityVote(title, s === mine ? 0 : s);
+        await this.ui.toast(s === mine ? "已取消你的評分" : `已送出 ${s} 星`);
+      } catch (e) {
+        await this.ui.toast(String(e?.message || e));
+      }
+    };
+    return /* @__PURE__ */ h(Section, { title: "觀眾評分", hint: "匿名評分，一台手機一票，可以隨時更改；點已選的星星可以取消。兩個版本的評分會一起統計。" }, /* @__PURE__ */ h("div", { class: "cm" }, /* @__PURE__ */ h("div", { class: "cm-top" }, /* @__PURE__ */ h("div", { class: "cm-avg" }, n ? avg.toFixed(1) : "-"), /* @__PURE__ */ h("div", { class: "cm-meta" }, /* @__PURE__ */ h("span", { class: "cm-stars", "aria-label": n ? `平均 ${avg} 星` : "還沒有評分" }, /* @__PURE__ */ h("span", { class: "bg" }, "★★★★★"), /* @__PURE__ */ h("span", { class: "fg", style: `width:${avg / 5 * 100}%` }, "★★★★★")), /* @__PURE__ */ h("span", { class: "cm-n" }, esc(status))), c && n ? /* @__PURE__ */ h("div", { class: "cm-dist" }, [5, 4, 3, 2, 1].map((s) => /* @__PURE__ */ h("div", { class: "cm-row" }, /* @__PURE__ */ h("span", null, s), /* @__PURE__ */ h("i", { style: `width:${Math.round(c.dist[s - 1] / max * 100)}%` })))) : null), /* @__PURE__ */ h("div", { class: "cm-mine" }, /* @__PURE__ */ h("span", null, mine ? `你給 ${mine} 星` : "點星星評分"), /* @__PURE__ */ h("span", { class: "cm-pick" }, [1, 2, 3, 4, 5].map((s) => /* @__PURE__ */ h("button", { class: "cm-star" + (s <= mine ? " on" : ""), "aria-label": `${s} 星`, onTap: () => vote(s) }, "★", /* @__PURE__ */ h("span", { class: "sr" }, s)))))));
   }
   hero(e, title, lines) {
     const { x, r } = e;
@@ -2316,7 +2396,7 @@ var App = class {
         trailerLabel: !x || x.trailerName ? "觀看預告" : "搜尋預告",
         onTrailer: async () => Safari.open((x || await e.px)?.trailer || search)
       }
-    );
+    ) + this.community(title, e.c);
   }
   // ── 場次 ──
   async timesView(c, date, m, r) {

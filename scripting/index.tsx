@@ -14,9 +14,9 @@ import {
   Cinema, Movie, Settings, Version, TwMovie, TwMovieCinema, CITY_ORDER, TW,
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
   loadSettings, saveSettings, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, cinemaAddress,
-  FORMATS, formatsOf, filterVersions, nearest, kmLabel, WINDOWS, findShowtimes, groupByMovie, shareText, hallOf, tmdbTest, movieExtras, moviePoster, movieRuntime, posterSrc, isLocalSrc, cachePoster, prefetchPosters, foregroundTask, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, SCRIPTING_IMPORT_URL, movieRatings, ratingTier,
+  FORMATS, formatsOf, filterVersions, nearest, kmLabel, WINDOWS, findShowtimes, groupByMovie, shareText, hallOf, tmdbTest, movieExtras, moviePoster, movieRuntime, posterSrc, isLocalSrc, cachePoster, prefetchPosters, foregroundTask, communityStats, communityVote, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, SCRIPTING_IMPORT_URL, movieRatings, ratingTier,
 } from "./core"
-import type { Format, LatLng, Hit } from "./core"
+import type { Format, LatLng, Hit, Community } from "./core"
 
 declare const Safari: any
 declare const Dialog: any
@@ -304,6 +304,55 @@ function RatingBadge({ kind, value, tier, note, url }: { kind: "imdb" | "tomato"
   </Button>
 }
 
+/** 觀眾評分（大家一起統計）：平均、人數，以及「你的評分」五顆星；點已選的那顆可以取消 */
+function CommunitySection({ title }: { title: string }) {
+  const load = useLoad(() => communityStats(title), [title])
+  const [voted, setVoted] = useState<Community | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState("")
+  const c = voted || load.data
+  const n = c ? c.n : 0
+  const avg = c && n ? c.avg : 0
+  const mine = c ? c.mine : 0
+  const vote = async (s: number) => {
+    if (busy) return
+    setBusy(true)
+    setMsg("")
+    try {
+      setVoted(await communityVote(title, s === mine ? 0 : s))
+      try { HapticFeedback.selection() } catch (_) {}
+    } catch (e) {
+      setMsg(String((e as Error)?.message || e))
+    }
+    setBusy(false)
+  }
+  const starIcon = (i: number) => (avg >= i - 0.25 ? "star.fill" : avg >= i - 0.75 ? "star.leadinghalf.filled" : "star")
+  const status = c ? (n ? `${n} 人評分` : "還沒有人評分，來當第一個") : load.error ? "觀眾評分暫時讀不到" : "讀取中…"
+  return <Section header={<Text>觀眾評分</Text>} footer={<Text>匿名評分，一台手機一票，可以隨時更改；點已選的星星可以取消。兩個版本的評分會一起統計。</Text>}>
+    <HStack spacing={14}>
+      <Text font={"largeTitle"} fontWeight={"bold"} monospacedDigit>{n ? avg.toFixed(1) : "-"}</Text>
+      <VStack alignment={"leading"} spacing={4}>
+        <HStack spacing={2}>
+          {[1, 2, 3, 4, 5].map((i) => <Image key={i} systemName={starIcon(i)} foregroundStyle={n ? "systemOrange" : "tertiaryLabel"} font={"subheadline"} />)}
+        </HStack>
+        <Text font={"caption"} foregroundStyle={"secondaryLabel"}>{status}</Text>
+      </VStack>
+      <Spacer />
+      {load.error && !c ? <Button title={"重試"} action={load.reload} buttonStyle={"plain"} foregroundStyle={"systemBlue"} /> : null}
+    </HStack>
+    <HStack>
+      <Text>{mine ? `你給 ${mine} 星` : "點星星評分"}</Text>
+      <Spacer />
+      {[1, 2, 3, 4, 5].map((s) =>
+        <Button key={s} action={() => vote(s)} buttonStyle={"plain"} disabled={busy || !c}>
+          <Image systemName={s <= mine ? "star.fill" : "star"} foregroundStyle={s <= mine ? "systemOrange" : "tertiaryLabel"} font={"title2"} />
+        </Button>
+      )}
+    </HStack>
+    {msg ? <Text font={"caption"} foregroundStyle={"systemRed"}>{msg}</Text> : null}
+  </Section>
+}
+
 /** 電影頁頂端：海報在左，資訊、評分與紅色預告按鈕在右（跟 Scriptable 版一樣） */
 function MovieHero({ title, slug, lines, en }: { title: string; slug?: string; lines: string[]; en?: string }) {
   const x = useLoad(() => movieExtras(title, slug), [title, slug || ""])
@@ -332,7 +381,8 @@ function MovieHero({ title, slug, lines, en }: { title: string; slug?: string; l
   }
   const trailerLabel = opening ? "預告讀取中…" : !x.data || x.data.trailerName ? "觀看預告" : "搜尋預告"
   const loaded = !!(r && (r.imdb || r.tomato || r.popcorn))
-  return <Section>
+  return <>
+  <Section>
     <HStack alignment={"bottom"} spacing={12} listRowBackground={"clear"}>
       {poster
         ? isLocalSrc(poster)
@@ -362,6 +412,8 @@ function MovieHero({ title, slug, lines, en }: { title: string; slug?: string; l
       <Spacer />
     </HStack>
   </Section>
+  <CommunitySection title={title} />
+  </>
 }
 
 function TmdbPage() {
