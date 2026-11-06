@@ -12,7 +12,7 @@ import {
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
   loadSettings, saveSettings, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, TW,
   FORMATS, formatsOf, filterVersions, nearest, kmLabel, WINDOWS, findShowtimes, groupByMovie, shareText,
-  hallOf, tmdbTest, movieExtras, moviePoster, movieRuntime, posterSrc, cachePoster, prefetchPosters, foregroundTask, communityStats, communityCached, communityVote, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, movieRatings, ratingTier,
+  hallOf, tmdbTest, movieExtras, moviePoster, movieRuntime, posterSrc, cachePoster, prefetchPosters, foregroundTask, communityStats, communityCached, communityVote, loadBoxOffice, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, movieRatings, ratingTier,
 } from "./core";
 import type { MovieExtras, Ratings, Community } from "./core";
 import { setTabBar, setBackGuard, esc } from "./jsx";
@@ -776,7 +776,43 @@ class App {
 
   // ── 依電影找 ──
   movieQuery = "";
+  /** 電影分頁上方的切換：上映中／票房排行 */
+  movieMode: "now" | "box" = "now";
+  movieModeChips(): string {
+    return (
+      <Chips>
+        <Chip label="上映中" muted={this.movieMode !== "now"} onTap={() => { this.movieMode = "now"; }} />
+        <Chip label="票房排行" muted={this.movieMode !== "box"} onTap={() => { this.movieMode = "box"; }} />
+      </Chips>
+    );
+  }
+
+  async boxOfficeView(): Promise<string> {
+    const [b, all] = await Promise.all([loadBoxOffice(), loadMovies().catch(() => [] as TwMovie[])]);
+    return (
+      <Page title="依電影找場次" subtitle={boxOfficeLabel(b)} onBack={() => this.back()}>
+        {this.movieModeChips()}
+        <Section title={boxOfficeLabel(b)} hint={`資料來源：${b.source}。官方每週更新一次。`}>
+          {b.list.map((x) => {
+            const m = matchBoxOffice(x.name, all);
+            return (
+              <Item
+                icon={String(x.rank)}
+                title={x.name}
+                subtitle={[x.week !== null ? `本週 ${money(x.week)}` : "", `累計 ${money(x.total)}`, x.theaters ? `${x.theaters} 間戲院` : ""].filter(Boolean).join("｜")}
+                chevron={!!m}
+                muted={!m}
+                onTap={m ? () => this.go(() => this.movieView(m, ""), `讀取《${m.title}》的放映影城…`) : undefined}
+              />
+            );
+          })}
+        </Section>
+      </Page>
+    );
+  }
+
   async movieListView(): Promise<string> {
+    if (this.movieMode === "box") return this.boxOfficeView();
     const all = await loadMovies();
     const k = this.movieQuery.trim().toLowerCase();
     const list = all.filter((m) => !k || `${m.title} ${m.en}`.toLowerCase().includes(k));
@@ -793,6 +829,7 @@ class App {
     const soon = list.filter((m) => m.comingSoon);
     return (
       <Page title="依電影找場次" subtitle={`${all.length} 部電影`} onBack={() => this.back()}>
+        {this.movieModeChips()}
         <input class="field" name="q" value={this.movieQuery} placeholder="搜尋片名" />
         <Button label="搜尋" kind="secondary" enter onTap={(v) => { this.movieQuery = v.q || ""; }} />
         {now.length ? <Section title={`上映中（${now.length}）`} hint="依今天放映的影城數排序，資料來自場次通。">{now.map(item)}</Section> : null}

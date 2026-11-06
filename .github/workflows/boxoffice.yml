@@ -1,0 +1,34 @@
+# 全台票房排行：每天檢查國家電影及視聽文化中心的開放資料，有新的一週就更新 dist/boxoffice.json
+name: 更新票房排行
+on:
+  schedule:
+    - cron: "17 1 * * *" # 每天台灣時間 09:17
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: boxoffice
+  cancel-in-progress: false
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: 讀官方資料、算排行
+        run: node tools/boxoffice.mjs
+      - name: 有變化才提交
+        run: |
+          if git diff --quiet -- dist/boxoffice.json data/boxoffice-snapshot.json; then
+            echo "官方資料沒有更新"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add dist/boxoffice.json data/boxoffice-snapshot.json
+          git commit -m "更新票房排行（$(node -p "require('./dist/boxoffice.json').end")）"
+          git pull --rebase origin main
+          git push origin HEAD:main

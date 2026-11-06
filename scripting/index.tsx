@@ -14,7 +14,7 @@ import {
   Cinema, Movie, Settings, Version, TwMovie, TwMovieCinema, CITY_ORDER, TW,
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
   loadSettings, saveSettings, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, cinemaAddress,
-  FORMATS, formatsOf, filterVersions, nearest, kmLabel, WINDOWS, findShowtimes, groupByMovie, shareText, hallOf, tmdbTest, movieExtras, moviePoster, movieRuntime, posterSrc, isLocalSrc, cachePoster, prefetchPosters, foregroundTask, communityStats, communityVote, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, SCRIPTING_IMPORT_URL, movieRatings, ratingTier,
+  FORMATS, formatsOf, filterVersions, nearest, kmLabel, WINDOWS, findShowtimes, groupByMovie, shareText, hallOf, tmdbTest, movieExtras, moviePoster, movieRuntime, posterSrc, isLocalSrc, cachePoster, prefetchPosters, foregroundTask, communityStats, communityVote, loadBoxOffice, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, SCRIPTING_IMPORT_URL, movieRatings, ratingTier,
 } from "./core"
 import type { Format, LatLng, Hit, Community } from "./core"
 
@@ -785,8 +785,34 @@ function ConfirmPage({ pick }: { pick: Pick }) {
 
 // ───────────────────────── 依電影找 ─────────────────────────
 
+/** 票房排行（官方開放資料，每週更新）；對得到場次通的片可以點進去看場次 */
+function BoxOfficeSections({ movies }: { movies: TwMovie[] }) {
+  const box = useLoad(() => loadBoxOffice(), [])
+  const b = box.data
+  if (box.error) return <ErrorRow error={box.error} retry={box.reload} />
+  if (!b) return <Section><Loading text={"讀取票房排行…"} /></Section>
+  return <Section header={<Text>{boxOfficeLabel(b)}</Text>} footer={<Text>{`資料來源：${b.source}。官方每週更新一次。`}</Text>}>
+    {b.list.map((x) => {
+      const m = matchBoxOffice(x.name, movies)
+      const body = <HStack spacing={12}>
+        <Text font={"title3"} fontWeight={"bold"} monospacedDigit foregroundStyle={x.rank <= 3 ? "systemOrange" : "secondaryLabel"} frame={{ width: 28 }}>{String(x.rank)}</Text>
+        <VStack alignment={"leading"} spacing={2}>
+          <Text foregroundStyle={m ? "label" : "secondaryLabel"} lineLimit={2}>{x.name}</Text>
+          <Text font={"subheadline"} foregroundStyle={"secondaryLabel"}>{[x.week !== null ? `本週 ${money(x.week)}` : "", `累計 ${money(x.total)}`].filter(Boolean).join("｜")}</Text>
+        </VStack>
+        <Spacer />
+        {x.theaters ? <Text font={"caption"} foregroundStyle={"tertiaryLabel"}>{`${x.theaters} 間`}</Text> : null}
+      </HStack>
+      return m
+        ? <NavigationLink key={x.rank} destination={<MoviePage movie={m} />}>{body}</NavigationLink>
+        : <Group key={x.rank}>{body}</Group>
+    })}
+  </Section>
+}
+
 function MoviesPage() {
   const movies = useLoad(() => loadMovies(), [])
+  const [mode, setMode] = useState<string>("now")
   const [query, setQuery] = useState("")
   const k = query.trim().toLowerCase()
   const list = (movies.data || []).filter((m) => !k || `${m.title} ${m.en}`.toLowerCase().includes(k))
@@ -804,10 +830,18 @@ function MoviesPage() {
     searchable={{ value: query, onChanged: setQuery, prompt: "搜尋片名" } as any}
     refreshable={movies.reload}
   >
-    {movies.error ? <ErrorRow error={movies.error} retry={movies.reload} /> : null}
-    {!movies.data && !movies.error ? <Section><Loading text={"讀取電影清單…"} /></Section> : null}
-    {now.length ? <Section header={<Text>{`上映中（${now.length}）`}</Text>} footer={<Text>依今天放映的影城數排序，資料來自場次通。</Text>}>{now.map(row)}</Section> : null}
-    {soon.length ? <Section header={<Text>{`即將上映（${soon.length}）`}</Text>}>{soon.map(row)}</Section> : null}
+    <Section>
+      <Picker title={"顯示"} value={mode} onChanged={(v: string) => setMode(v)} pickerStyle={"segmented"}>
+        <Text tag={"now"}>上映中</Text>
+        <Text tag={"box"}>票房排行</Text>
+      </Picker>
+    </Section>
+    {mode === "box" ? <BoxOfficeSections movies={movies.data || []} /> : <>
+      {movies.error ? <ErrorRow error={movies.error} retry={movies.reload} /> : null}
+      {!movies.data && !movies.error ? <Section><Loading text={"讀取電影清單…"} /></Section> : null}
+      {now.length ? <Section header={<Text>{`上映中（${now.length}）`}</Text>} footer={<Text>依今天放映的影城數排序，資料來自場次通。</Text>}>{now.map(row)}</Section> : null}
+      {soon.length ? <Section header={<Text>{`即將上映（${soon.length}）`}</Text>}>{soon.map(row)}</Section> : null}
+    </>}
   </List>
 }
 

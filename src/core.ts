@@ -1301,6 +1301,64 @@ export async function communityVote(title: string, score: number): Promise<Commu
   return c;
 }
 
+// ───────────────────────── 全台票房排行 ─────────────────────────
+// 來源：國家電影及視聽文化中心「全國電影票房統計」開放資料（政府資料開放授權條款第 1 版）。
+// 官方只給累計票房，所以由 GitHub Actions 每週存快照算出週票房（tools/boxoffice.mjs），App 只讀算好的小檔。
+
+export const BOXOFFICE_URL = "https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/main/dist/boxoffice.json";
+export interface BoxOfficeItem {
+  rank: number;
+  name: string;
+  country: string;
+  release: string; // 上映日 YYYY-MM-DD
+  theaters: number; // 上映戲院數
+  week: number | null; // 這週票房（元）；mode 是 total 時沒有
+  total: number; // 累計票房（元）
+}
+export interface BoxOffice {
+  mode: "week" | "total"; // week = 週票房排行；total = 還沒有上週資料，先列近 8 週上映片的累計
+  start: string;
+  end: string;
+  source: string;
+  sourceUrl: string;
+  list: BoxOfficeItem[];
+}
+let boxMem: Promise<BoxOffice> | null = null;
+/** 讀票房排行（手機上記 6 小時；官方一週才更新一次） */
+export function loadBoxOffice(): Promise<BoxOffice> {
+  return (boxMem ||= (async () => {
+    try {
+      const c = JSON.parse(cacheGet("boxoffice.json") || "null");
+      if (c && c.data && Date.now() - c.at < 6 * 3600e3) return c.data as BoxOffice;
+    } catch (_) {}
+    const r = await platform().fetchText(BOXOFFICE_URL + "?t=" + Math.floor(Date.now() / 3600e3), { accept: "application/json" });
+    if (r.status !== 200) throw new Error("票房排行暫時讀不到");
+    const data = JSON.parse(r.body) as BoxOffice;
+    if (!data || !Array.isArray(data.list)) throw new Error("票房排行格式不對");
+    cacheSet("boxoffice.json", JSON.stringify({ at: Date.now(), data }));
+    return data;
+  })().catch((e) => {
+    boxMem = null;
+    throw e;
+  }));
+}
+/** 金額：1.53 億、1,534 萬 */
+export function money(n: number): string {
+  if (n >= 1e8) return (n / 1e8).toFixed(2).replace(/\.?0+$/, "") + " 億";
+  if (n >= 1e4) return String(Math.round(n / 1e4)).replace(/\B(?=(\d{3})+(?!\d))/g, ",") + " 萬";
+  return String(Math.round(n)) + " 元";
+}
+/** 票房上的片名對到場次通的電影（對得到就能點進去看場次） */
+export function matchBoxOffice<T extends { title: string }>(name: string, movies: T[]): T | undefined {
+  const k = communityKey(name);
+  return movies.find((m) => communityKey(m.title) === k);
+}
+/** 排行的期間說明：「10/26–11/1 週票房」或「截至 11/1 累計」 */
+export function boxOfficeLabel(b: BoxOffice): string {
+  const md = (d: string) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`;
+  return b.mode === "week" ? `${md(b.start)}–${md(b.end)} 全台週票房` : `近期上映電影累計票房（截至 ${md(b.end)}）`;
+}
+
 // ───────────────────────── 版本檢查 ─────────────────────────
 
 const VERSION_URL = "https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/main/dist/version.json";

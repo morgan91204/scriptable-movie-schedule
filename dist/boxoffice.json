@@ -1,0 +1,230 @@
+{
+ "updated": "2026-11-06T13:08:48.884Z",
+ "mode": "total",
+ "start": "2026-09-06",
+ "end": "2026-11-01",
+ "source": "國家電影及視聽文化中心「全國電影票房統計」（政府資料開放授權條款第 1 版）",
+ "sourceUrl": "https://boxofficetw.tfai.org.tw/",
+ "list": [
+  {
+   "rank": 1,
+   "name": "惡靈古堡：爆發夜",
+   "country": "美國",
+   "release": "2026-09-17",
+   "theaters": 91,
+   "week": null,
+   "weekTickets": null,
+   "total": 153429391,
+   "tickets": 502393
+  },
+  {
+   "rank": 2,
+   "name": "野獸之心",
+   "country": "美國",
+   "release": "2026-09-17",
+   "theaters": 91,
+   "week": null,
+   "weekTickets": null,
+   "total": 44115114,
+   "tickets": 160358
+  },
+  {
+   "rank": 3,
+   "name": "復仇者聯盟：終局之戰 加碼重映",
+   "country": "美國",
+   "release": "2026-09-24",
+   "theaters": 83,
+   "week": null,
+   "weekTickets": null,
+   "total": 32739525,
+   "tickets": 84899
+  },
+  {
+   "rank": 4,
+   "name": "泥面人",
+   "country": "美國",
+   "release": "2026-10-21",
+   "theaters": 89,
+   "week": null,
+   "weekTickets": null,
+   "total": 31289563,
+   "tickets": 105192
+  },
+  {
+   "rank": 5,
+   "name": "另一個媽咪",
+   "country": "美國",
+   "release": "2026-10-08",
+   "theaters": 83,
+   "week": null,
+   "weekTickets": null,
+   "total": 29609628,
+   "tickets": 102060
+  },
+  {
+   "rank": 6,
+   "name": "挖掘者",
+   "country": "美國",
+   "release": "2026-10-01",
+   "theaters": 91,
+   "week": null,
+   "weekTickets": null,
+   "total": 20327041,
+   "tickets": 69366
+  },
+  {
+   "rank": 7,
+   "name": "怎麼可能我家的祖先是你家的鬼",
+   "country": "中華民國",
+   "release": "2026-09-10",
+   "theaters": 90,
+   "week": null,
+   "weekTickets": null,
+   "total": 16585101,
+   "tickets": 62249
+  },
+  {
+   "rank": 8,
+   "name": "快打旋風",
+   "country": "美國",
+   "release": "2026-10-13",
+   "theaters": 90,
+   "week": null,
+   "weekTickets": null,
+   "total": 14585140,
+   "tickets": 48413
+  },
+  {
+   "rank": 9,
+   "name": "逃出鯨吞",
+   "country": "美國",
+   "release": "2026-10-15",
+   "theaters": 88,
+   "week": null,
+   "weekTickets": null,
+   "total": 12629397,
+   "tickets": 42452
+  },
+  {
+   "rank": 10,
+   "name": "驀然回首",
+   "country": "日本",
+   "release": "2026-09-11",
+   "theaters": 76,
+   "week": null,
+   "weekTickets": null,
+   "total": 10021946,
+   "tickets": 36545
+  },
+  {
+   "rank": 11,
+   "name": "YORUSHIKA LIVE「盜作」",
+   "country": "日本",
+   "release": "2026-10-09",
+   "theaters": 11,
+   "week": null,
+   "weekTickets": null,
+   "total": 9138950,
+   "tickets": 18659
+  },
+  {
+   "rank": 12,
+   "name": "劇場版 「BanG Dream! Ave Mujica prima aurora」",
+   "country": "日本",
+   "release": "2026-10-16",
+   "theaters": 14,
+   "week": null,
+   "weekTickets": null,
+   "total": 9118340,
+   "tickets": 30420
+  },
+  {
+   "rank": 13,
+   "name": "不存在的罪人",
+   "country": "美國",
+   "release": "2026-10-08",
+   "theaters": 90,
+   "week": null,
+   "weekTickets": null,
+   "total": 9089207,
+   "tickets": 32491
+  },
+  {
+   "rank": 14,
+   "name": "宛如星辰的你",
+   "country": "日本",
+   "release": "2026-10-16",
+   "theaters": 71,
+   "week": null,
+   "weekTickets": null,
+   "total": 8944876,
+   "tickets": 31385
+  },
+  {
+   "rank": 15,
+   "name": "實境誘捕",
+   "country": "美國",
+   "release": "2026-09-24",
+   "theaters": 62,
+   "week": null,
+   "weekTickets": null,
+   "total": 6368296,
+   "tickets": 23978
+  },
+  {
+   "rank": 16,
+   "name": "誤闖遺忘島",
+   "country": "美國",
+   "release": "2026-09-19",
+   "theaters": 84,
+   "week": null,
+   "weekTickets": null,
+   "total": 5407219,
+   "tickets": 20358
+  },
+  {
+   "rank": 17,
+   "name": "特種快遞",
+   "country": "美國",
+   "release": "2026-09-24",
+   "theaters": 71,
+   "week": null,
+   "weekTickets": null,
+   "total": 5150750,
+   "tickets": 20783
+  },
+  {
+   "rank": 18,
+   "name": "IU CONCERT: THE GOLDEN HOUR",
+   "country": "韓國",
+   "release": "2026-10-23",
+   "theaters": 15,
+   "week": null,
+   "weekTickets": null,
+   "total": 5082275,
+   "tickets": 9469
+  },
+  {
+   "rank": 19,
+   "name": "金劫任務",
+   "country": "美國",
+   "release": "2026-10-08",
+   "theaters": 72,
+   "week": null,
+   "weekTickets": null,
+   "total": 5014521,
+   "tickets": 20261
+  },
+  {
+   "rank": 20,
+   "name": "進擊的鼓手 4K重映",
+   "country": "美國",
+   "release": "2026-10-16",
+   "theaters": 29,
+   "week": null,
+   "weekTickets": null,
+   "total": 4927699,
+   "tickets": 14143
+  }
+ ]
+}
