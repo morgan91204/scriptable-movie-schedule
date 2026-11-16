@@ -9,7 +9,7 @@ import {
   useEffect, useMemo, useObservable, useState,
 } from "scripting"
 import { setPlatform } from "./platform"
-import { scriptingPlatform, posterImageNow, loadPosterImage } from "./platform-scripting"
+import { scriptingPlatform, posterImageNow, loadPosterImage, posterError } from "./platform-scripting"
 import {
   Cinema, Movie, Settings, Version, TwMovie, TwMovieCinema, CITY_ORDER, TW,
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
@@ -355,23 +355,23 @@ function CommunitySection({ title }: { title: string }) {
 
 /** 海報圖：快取有的同步拿到（切換頁面回來立刻有圖），沒有的自己下載縮圖。
  *  不用 Image 的 imageUrl：列表重畫時系統會中斷正在下載的圖，被當成失敗後就一直缺圖 */
-function usePosterImage(url: string): { img: any; failed: boolean } {
-  const [img, setImg] = useState<any>(() => posterImageNow(url))
-  const [failed, setFailed] = useState(false)
+function usePosterImage(url: string): { img: any; failed: boolean; err: string } {
+  // 圖跟著網址記：網址中途改了（例如換成另一個來源的海報），不會沿用前一張
+  const [st, setSt] = useState<{ url: string; img: any; failed: boolean }>(() => ({ url, img: posterImageNow(url), failed: false }))
   useEffect(() => {
     let alive = true
+    if (st.url === url && st.img) return // 第一個畫面已經從記憶體／快取拿到了
     const now = posterImageNow(url)
-    setImg(now)
-    setFailed(false)
+    setSt({ url, img: now, failed: false })
     if (url && !now)
       loadPosterImage(url).then((ui) => {
-        if (!alive) return
-        setImg(ui)
-        setFailed(!ui)
+        if (alive) setSt({ url, img: ui, failed: !ui })
       })
     return () => { alive = false }
   }, [url])
-  return { img, failed }
+  const mine = st.url === url
+  const failed = mine && st.failed
+  return { img: mine ? st.img : null, failed, err: failed ? posterError(url) : "" }
 }
 
 /** 電影頁頂端：海報在左，資訊、評分與紅色預告按鈕在右（跟 Scriptable 版一樣） */
@@ -799,11 +799,12 @@ function ConfirmPage({ pick }: { pick: Pick }) {
 // ───────────────────────── 依電影找 ─────────────────────────
 
 /** 排行列表的小海報：有快取用本機檔，沒有就用網址；沒有海報是灰色預設圖 */
-function Thumb({ title, slug, en }: { title: string; slug?: string; en?: string }) {
+function Thumb({ title, slug, en, onFail }: { title: string; slug?: string; en?: string; onFail?: (why: string) => void }) {
   const p = useLoad(() => moviePoster(title, slug, en), [title, slug || ""])
   const ready = posterReady(title, slug) // 這次已經查過：切回來直接畫，不用先轉圈
   const url = normImageUrl(p.data || ready || "")
   const pi = usePosterImage(url) // 快取有的立刻顯示，沒有的自己下載縮圖
+  useEffect(() => { if (pi.failed && onFail) onFail(pi.err || "讀取失敗") }, [pi.failed])
   const box = { frame: { width: 44, height: 66 }, clipShape: { type: "rect", cornerRadius: 6 } as any }
   if (pi.img) return <Image image={pi.img} resizable scaleToFill {...box} />
   const pending = (!url && p.data === null && ready === undefined && !p.error) || (!!url && !pi.failed)
@@ -829,15 +830,19 @@ function BoxOfficeMoviePage({ item: x }: { item: BoxOfficeItem }) {
 /** 票房排行（官方開放資料，每週更新）；每一部都可以點：有場次的進電影頁，沒有的進精簡頁 */
 function BoxOfficeSections({ movies }: { movies: TwMovie[] }) {
   const box = useLoad(() => loadBoxOffice(), [])
+  const [fails, setFails] = useState<Record<string, string>>({}) // 海報讀不到的名次與原因（診斷用）
   const b = box.data
   if (box.error) return <ErrorRow error={box.error} retry={box.reload} />
   if (!b) return <Section><Loading text={"讀取票房排行…"} /></Section>
-  return <Section header={<Text>{boxOfficeLabel(b)}</Text>} footer={<Text>{`資料來源：${b.source}。官方每週更新一次。`}</Text>}>
+  const failNote = Object.keys(fails).length
+    ? `\n第 ${Object.keys(fails).sort((p, q) => Number(p) - Number(q)).join("、")} 名的海報讀不到（${Array.from(new Set(Object.values(fails))).join("；")}），下次進來會再試。`
+    : ""
+  return <Section header={<Text>{boxOfficeLabel(b)}</Text>} footer={<Text>{`資料來源：${b.source}。官方每週更新一次。${failNote}`}</Text>}>
     {b.list.map((x) => {
       const m = matchBoxOffice(x.name, movies)
       const body = <HStack spacing={10}>
         <Text font={"title3"} fontWeight={"bold"} monospacedDigit foregroundStyle={x.rank <= 3 ? "systemOrange" : "secondaryLabel"} frame={{ width: 26 }}>{String(x.rank)}</Text>
-        <Thumb title={m ? m.title : x.name} slug={m?.slug} en={m?.en} />
+        <Thumb title={m ? m.title : x.name} slug={m?.slug} en={m?.en} onFail={(why) => setFails((f) => ({ ...f, [String(x.rank)]: why }))} />
         <VStack alignment={"leading"} spacing={2}>
           <Text foregroundStyle={"label"} lineLimit={2}>{x.name}</Text>
           <Text font={"subheadline"} foregroundStyle={"secondaryLabel"}>{[x.week !== null ? `本週 ${money(x.week)}` : "", `累計 ${money(x.total)}`].filter(Boolean).join("｜")}</Text>
