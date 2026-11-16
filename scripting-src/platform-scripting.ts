@@ -99,6 +99,58 @@ export function localImage(path: string): any {
   return null
 }
 
+/** 下載海報並縮成縮圖：回傳畫面可以直接顯示的 UIImage，順便（盡量）存進手機快取 */
+const memImg: Record<string, any> = {} // 存檔失敗時的備援：這次執行內記在記憶體
+async function downloadPoster(url: string): Promise<any> {
+  const r = await fetch(url, { timeout: 20 } as any)
+  if (r.status !== 200) return null
+  const d = await r.data()
+  const img = UIImage.fromData(d)
+  if (!img || !(img.width > 0)) return null // 不是圖片（例如被轉到首頁的 HTML）：不存
+  const thumb = img.width > THUMB_W ? img.preparingThumbnail({ width: THUMB_W, height: Math.round((img.height * THUMB_W) / img.width) }) : null
+  const out = (thumb && thumb.toJPEGData(0.85)) || d
+  try {
+    await FileManager.createDirectory(imgDir(), true)
+    pruneImages()
+    const p = imgPath(url)
+    const tmp = p + ".tmp"
+    await FileManager.writeAsData(tmp, out)
+    try {
+      if (FileManager.existsSync(p)) await FileManager.remove(p)
+      await FileManager.rename(tmp, p)
+    } catch (_) {
+      await FileManager.writeAsData(p, out) // 不支援改名：直接寫
+    }
+  } catch (_) {}
+  return thumb || img
+}
+
+/** 海報圖（同步）：手機快取有就每次重新解碼一張新的 UIImage 給畫面用；沒有回傳 null */
+export function posterImageNow(url: string): any {
+  if (!url) return null
+  const p = cachedImage(url)
+  if (p) {
+    const ui = localImage(p)
+    if (ui) {
+      delete uiMem[p] // 不共用同一個物件：每次進畫面都給新的，避免切換頁面後舊的不能再顯示
+      return ui
+    }
+  }
+  return memImg[url] || null
+}
+/** 海報圖（非同步）：快取 → 下載縮圖。全部自己處理，不用 Image 的 imageUrl（列表重畫時系統會中斷下載，當成失敗） */
+const posterImgJobs: Record<string, Promise<any>> = {}
+export function loadPosterImage(url: string): Promise<any> {
+  const now = posterImageNow(url)
+  if (now) return Promise.resolve(now)
+  return (posterImgJobs[url] ||= (async () => {
+    const img = await downloadPoster(url).catch(() => null)
+    delete posterImgJobs[url] // 失敗的話下次再試
+    if (!img) return null
+    return posterImageNow(url) || (memImg[url] = img)
+  })())
+}
+
 export const scriptingPlatform: Platform = {
   async fetchText(url, headers, opts) {
     const r = await fetch(url, { headers, timeout: 20, method: opts?.method || "GET", body: opts?.body } as any)
@@ -143,25 +195,12 @@ export const scriptingPlatform: Platform = {
     return (imgJobs[url] ||= (async () => {
       const hit = cachedImage(url)
       if (hit) return hit
-      await FileManager.createDirectory(imgDir(), true)
-      pruneImages()
-      const r = await fetch(url, { timeout: 20 } as any)
-      if (r.status !== 200) return null
-      const d = await r.data()
-      const img = UIImage.fromData(d)
-      if (!img || !(img.width > 0)) return null // 不是圖片（例如被轉到首頁的 HTML）：不存
-      const thumb = img.width > THUMB_W ? img.preparingThumbnail({ width: THUMB_W, height: Math.round((img.height * THUMB_W) / img.width) }) : null
-      const out = (thumb && thumb.toJPEGData(0.85)) || d
-      const p = imgPath(url)
-      const tmp = p + ".tmp"
-      await FileManager.writeAsData(tmp, out)
-      try {
-        if (FileManager.existsSync(p)) await FileManager.remove(p)
-        await FileManager.rename(tmp, p)
-      } catch (_) {
-        await FileManager.writeAsData(p, out) // 不支援改名：直接寫
-      }
-      return cachedImage(url)
-    })().catch(() => null))
+      const img = await downloadPoster(url)
+      delete imgJobs[url] // 這次的結果不記住：失敗的下次再試
+      return img ? cachedImage(url) : null
+    })().catch(() => {
+      delete imgJobs[url]
+      return null
+    }))
   },
 }

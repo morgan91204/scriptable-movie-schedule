@@ -9,12 +9,12 @@ import {
   useEffect, useMemo, useObservable, useState,
 } from "scripting"
 import { setPlatform } from "./platform"
-import { scriptingPlatform, localImage } from "./platform-scripting"
+import { scriptingPlatform, posterImageNow, loadPosterImage } from "./platform-scripting"
 import {
   Cinema, Movie, Settings, Version, TwMovie, TwMovieCinema, CITY_ORDER, TW,
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
   loadSettings, saveSettings, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, cinemaAddress,
-  FORMATS, formatsOf, filterVersions, nearest, kmLabel, WINDOWS, findShowtimes, groupByMovie, shareText, hallOf, tmdbTest, movieExtras, moviePoster, posterReady, movieRuntime, posterSrc, isLocalSrc, cachePoster, prefetchPosters, foregroundTask, communityStats, communityVote, loadBoxOffice, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, SCRIPTING_IMPORT_URL, movieRatings, ratingTier,
+  FORMATS, formatsOf, filterVersions, nearest, kmLabel, WINDOWS, findShowtimes, groupByMovie, shareText, hallOf, tmdbTest, movieExtras, moviePoster, posterReady, normImageUrl, movieRuntime, posterSrc, isLocalSrc, cachePoster, prefetchPosters, foregroundTask, communityStats, communityVote, loadBoxOffice, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, SCRIPTING_IMPORT_URL, movieRatings, ratingTier,
 } from "./core"
 import type { Format, LatLng, Hit, Community, BoxOfficeItem } from "./core"
 
@@ -353,24 +353,37 @@ function CommunitySection({ title }: { title: string }) {
   </Section>
 }
 
+/** 海報圖：快取有的同步拿到（切換頁面回來立刻有圖），沒有的自己下載縮圖。
+ *  不用 Image 的 imageUrl：列表重畫時系統會中斷正在下載的圖，被當成失敗後就一直缺圖 */
+function usePosterImage(url: string): { img: any; failed: boolean } {
+  const [img, setImg] = useState<any>(() => posterImageNow(url))
+  const [failed, setFailed] = useState(false)
+  useEffect(() => {
+    let alive = true
+    const now = posterImageNow(url)
+    setImg(now)
+    setFailed(false)
+    if (url && !now)
+      loadPosterImage(url).then((ui) => {
+        if (!alive) return
+        setImg(ui)
+        setFailed(!ui)
+      })
+    return () => { alive = false }
+  }, [url])
+  return { img, failed }
+}
+
 /** 電影頁頂端：海報在左，資訊、評分與紅色預告按鈕在右（跟 Scriptable 版一樣） */
 function MovieHero({ title, slug, lines, en }: { title: string; slug?: string; lines: string[]; en?: string }) {
   const x = useLoad(() => movieExtras(title, slug), [title, slug || ""])
   const rt = useLoad(() => movieRatings(title, en, slug), [title, en || ""])
   const p = useLoad(() => moviePoster(title, slug, en), [title, slug || ""]) // 海報網址快查（不等預告）
   const [opening, setOpening] = useState(false)
-  const [broken, setBroken] = useState("") // 載入失敗的海報網址：改顯示預設圖，不要一直轉圈
   const r = rt.data
-  const posterUrl = x.data?.poster || p.data || posterReady(title, slug) || ""
-  // 有圖片快取就先解碼本機檔；解不開（壞檔）就改用網址，不會留空白
-  const local0 = posterSrc(posterUrl)
-  const localUi = local0 && isLocalSrc(local0) ? localImage(local0) : null
-  const poster0 = localUi ? local0 : posterUrl
-  const poster = broken && broken === poster0 ? "" : poster0
-  useEffect(() => {
-    if (posterUrl && poster === posterUrl) cachePoster(posterUrl) // 這次用網址顯示，順便抓進快取
-  }, [posterUrl])
-  const posterPending = !posterUrl && !x.data && p.data === null && !p.error
+  const posterUrl = normImageUrl(x.data?.poster || p.data || posterReady(title, slug) || "")
+  const pi = usePosterImage(posterUrl) // 快取有的立刻顯示，沒有的自己下載縮圖
+  const posterPending = (!posterUrl && !x.data && p.data === null && !p.error) || (!!posterUrl && !pi.img && !pi.failed)
   const search = `https://www.youtube.com/results?search_query=${encodeURIComponent(title + " 預告")}`
   // 點「觀看預告」：還在讀就等讀好再開（movieExtras 會回傳同一個進行中的查詢），不會先開成搜尋頁
   const openTrailer = async () => {
@@ -387,11 +400,8 @@ function MovieHero({ title, slug, lines, en }: { title: string; slug?: string; l
   return <>
   <Section>
     <HStack alignment={"bottom"} spacing={12} listRowBackground={"clear"}>
-      {poster
-        ? localUi && poster === local0
-          ? <Image image={localUi} resizable scaleToFill frame={{ width: 104, height: 156 }} clipShape={{ type: "rect", cornerRadius: 12 }} />
-          : <Image imageUrl={poster} resizable scaleToFill frame={{ width: 104, height: 156 }}
-              clipShape={{ type: "rect", cornerRadius: 12 }} placeholder={<ProgressView progressViewStyle={"circular"} />} onError={() => setBroken(poster)} />
+      {pi.img
+        ? <Image image={pi.img} resizable scaleToFill frame={{ width: 104, height: 156 }} clipShape={{ type: "rect", cornerRadius: 12 }} />
         : <VStack frame={{ width: 104, height: 156 }} background={"rgba(120, 120, 128, 0.22)"} clipShape={{ type: "rect", cornerRadius: 12 }}>
             {posterPending ? <ProgressView progressViewStyle={"circular"} /> : <Image systemName={"film"} font={"largeTitle"} foregroundStyle={"tertiaryLabel"} />}
           </VStack>}
@@ -791,17 +801,14 @@ function ConfirmPage({ pick }: { pick: Pick }) {
 /** 排行列表的小海報：有快取用本機檔，沒有就用網址；沒有海報是灰色預設圖 */
 function Thumb({ title, slug, en }: { title: string; slug?: string; en?: string }) {
   const p = useLoad(() => moviePoster(title, slug, en), [title, slug || ""])
-  const [broken, setBroken] = useState(false)
   const ready = posterReady(title, slug) // 這次已經查過：切回來直接畫，不用先轉圈
-  const url = p.data || ready || ""
-  const local = url ? posterSrc(url) : ""
-  const ui = local && isLocalSrc(local) ? localImage(local) : null // 本機快取先解碼，壞檔就改用網址
-  useEffect(() => { if (url && !ui) cachePoster(url) }, [url])
+  const url = normImageUrl(p.data || ready || "")
+  const pi = usePosterImage(url) // 快取有的立刻顯示，沒有的自己下載縮圖
   const box = { frame: { width: 44, height: 66 }, clipShape: { type: "rect", cornerRadius: 6 } as any }
-  if (ui) return <Image image={ui} resizable scaleToFill {...box} />
-  if (url && !broken) return <Image imageUrl={url} resizable scaleToFill {...box} placeholder={<ProgressView />} onError={() => setBroken(true)} />
+  if (pi.img) return <Image image={pi.img} resizable scaleToFill {...box} />
+  const pending = (!url && p.data === null && ready === undefined && !p.error) || (!!url && !pi.failed)
   return <VStack {...box} background={"rgba(120, 120, 128, 0.18)"}>
-    {p.data === null && ready === undefined && !p.error ? <ProgressView /> : <Image systemName={"film"} foregroundStyle={"tertiaryLabel"} />}
+    {pending ? <ProgressView /> : <Image systemName={"film"} foregroundStyle={"tertiaryLabel"} />}
   </VStack>
 }
 
