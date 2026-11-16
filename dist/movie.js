@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.16-2236
+// @movie-schedule-app 電影行程 v2026.11.16-2242
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/jsx.tsx
@@ -2116,7 +2116,7 @@ var App = class {
     ];
     // ── 事件迴圈 ──
     // 背景查 GitHub 上的最新版本（首頁顯示是否為最新版）
-    this.latest = checkLatest("2026.11.16-2236");
+    this.latest = checkLatest("2026.11.16-2242");
     // ── 搜尋 ──
     this.query = "";
     this.tmdbStatus = "";
@@ -2251,11 +2251,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.16-2236"}`);
+          Pasteboard.copy(`版本 ${"2026.11.16-2242"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.16-2236"}`,
+      `版本 ${"2026.11.16-2242"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }

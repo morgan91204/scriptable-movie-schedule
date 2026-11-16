@@ -361,17 +361,7 @@ function usePosterImage(url: string): { img: any; ver: number; failed: boolean; 
   const [st, setSt] = useState<{ url: string; img: any; failed: boolean; ver: number }>(() => ({ url, img: posterImageNow(url), failed: false, ver: 0 }))
   useEffect(() => {
     let alive = true
-    const timers: any[] = []
-    // 切換頁面的當下就交給畫面的圖，Scripting 有時畫不出來（要滑一下才出現）：
-    // 0.4 秒和 1.2 秒後各補交一張新的圖、並重建圖片元件，等於自動「滑一下」
-    const refresh = () => {
-      for (const ms of [400, 1200])
-        timers.push(setTimeout(() => {
-          if (!alive) return
-          const again = posterImageNow(url)
-          if (again) setSt((s) => (s.url === url ? { url, img: again, failed: false, ver: s.ver + 1 } : s))
-        }, ms))
-    }
+    const refresh = () => {}
     const now = st.url === url && st.img ? st.img : posterImageNow(url)
     if (now) {
       if (st.url !== url || st.img !== now) setSt((s) => ({ url, img: now, failed: false, ver: s.ver + 1 }))
@@ -385,10 +375,7 @@ function usePosterImage(url: string): { img: any; ver: number; failed: boolean; 
           if (ui) refresh()
         })
     }
-    return () => {
-      alive = false
-      for (const t of timers) clearTimeout(t)
-    }
+    return () => { alive = false }
   }, [url])
   const mine = st.url === url
   const failed = mine && st.failed
@@ -399,7 +386,7 @@ function usePosterImage(url: string): { img: any; ver: number; failed: boolean; 
 function PosterBox({ w, h, r, img, ver, pending, iconFont }: { w: number; h: number; r: number; img: any; ver: number; pending: boolean; iconFont?: string }) {
   return <VStack frame={{ width: w, height: h }} background={"rgba(120, 120, 128, 0.18)"} clipShape={{ type: "rect", cornerRadius: r }}>
     {img
-      ? <Image key={"p" + ver} image={img} resizable scaleToFill frame={{ width: w, height: h }} clipShape={{ type: "rect", cornerRadius: r }} />
+      ? <Image image={img} resizable scaleToFill frame={{ width: w, height: h }} clipShape={{ type: "rect", cornerRadius: r }} />
       : pending ? <ProgressView progressViewStyle={"circular"} /> : <Image systemName={"film"} font={iconFont || "body"} foregroundStyle={"tertiaryLabel"} />}
   </VStack>
 }
@@ -824,17 +811,6 @@ function ConfirmPage({ pick }: { pick: Pick }) {
 
 // ───────────────────────── 依電影找 ─────────────────────────
 
-/** 排行列表的小海報：有快取用本機檔，沒有就用網址；沒有海報是灰色預設圖 */
-function Thumb({ title, slug, en, onFail }: { title: string; slug?: string; en?: string; onFail?: (why: string) => void }) {
-  const p = useLoad(() => moviePoster(title, slug, en), [title, slug || ""])
-  const ready = posterReady(title, slug) // 這次已經查過：切回來直接畫，不用先轉圈
-  const url = normImageUrl(p.data || ready || "")
-  const pi = usePosterImage(url) // 快取有的立刻顯示，沒有的自己下載縮圖
-  useEffect(() => { if (pi.failed && onFail) onFail(pi.err || "讀取失敗") }, [pi.failed])
-  const pending = !pi.img && ((!url && p.data === null && ready === undefined && !p.error) || (!!url && !pi.failed))
-  return <PosterBox w={44} h={66} r={6} img={pi.img} ver={pi.ver} pending={pending} />
-}
-
 /** 票房排行上、場次通已經沒有場次的片：海報、評分、預告、觀眾評分與票房 */
 function BoxOfficeMoviePage({ item: x }: { item: BoxOfficeItem }) {
   const date = x.release.replace(/-/g, "/")
@@ -852,19 +828,45 @@ function BoxOfficeMoviePage({ item: x }: { item: BoxOfficeItem }) {
 /** 票房排行（官方開放資料，每週更新）；每一部都可以點：有場次的進電影頁，沒有的進精簡頁 */
 function BoxOfficeSections({ movies }: { movies: TwMovie[] }) {
   const box = useLoad(() => loadBoxOffice(), [])
-  const [fails, setFails] = useState<Record<string, string>>({}) // 海報讀不到的名次與原因（診斷用）
+  // 每一格的小海報都不帶自己的狀態（列表裡一掛上就更新狀態的元件，Scripting 偶爾會整格漏畫）：
+  // 這裡統一查網址、下載，好了再整批重畫一次
+  const [, setTick] = useState(0)
+  const imgs = useMemo(() => ({} as Record<string, any>), []) // 這次進畫面解碼好的圖
   const b = box.data
+  useEffect(() => {
+    if (!b) return
+    let alive = true
+    let timer: any = null
+    const bump = () => {
+      if (!alive || timer) return
+      timer = setTimeout(() => { timer = null; if (alive) setTick((n) => n + 1) }, 250) // 幾張一起好就只重畫一次
+    }
+    for (const x of b.list) {
+      const m = matchBoxOffice(x.name, movies)
+      moviePoster(m ? m.title : x.name, m?.slug, m?.en).then((u) => loadPosterImage(normImageUrl(u || ""))).then(bump, bump)
+    }
+    return () => { alive = false; if (timer) clearTimeout(timer) }
+  }, [b, movies.length])
   if (box.error) return <ErrorRow error={box.error} retry={box.reload} />
   if (!b) return <Section><Loading text={"讀取票房排行…"} /></Section>
-  const failNote = Object.keys(fails).length
-    ? `\n第 ${Object.keys(fails).sort((p, q) => Number(p) - Number(q)).join("、")} 名的海報讀不到（${Array.from(new Set(Object.values(fails))).join("；")}），下次進來會再試。`
+  const thumbs = b.list.map((x) => {
+    const m = matchBoxOffice(x.name, movies)
+    const ready = posterReady(m ? m.title : x.name, m?.slug)
+    const url = normImageUrl(ready || "")
+    const img = url ? (imgs[url] ||= posterImageNow(url)) : null
+    const why = url && !img ? posterError(url) : ""
+    return { img, why, pending: !img && (ready === undefined || (!!url && !why)) }
+  })
+  const bad = b.list.filter((_, i) => thumbs[i].why)
+  const failNote = bad.length
+    ? `\n第 ${bad.map((x) => x.rank).join("、")} 名的海報讀不到（${Array.from(new Set(thumbs.map((t) => t.why).filter(Boolean))).join("；")}），下次進來會再試。`
     : ""
   return <Section header={<Text>{boxOfficeLabel(b)}</Text>} footer={<Text>{`資料來源：${b.source}。官方每週更新一次。${failNote}`}</Text>}>
-    {b.list.map((x) => {
+    {b.list.map((x, i) => {
       const m = matchBoxOffice(x.name, movies)
       const body = <HStack spacing={10}>
         <Text font={"title3"} fontWeight={"bold"} monospacedDigit foregroundStyle={x.rank <= 3 ? "systemOrange" : "secondaryLabel"} frame={{ width: 26 }}>{String(x.rank)}</Text>
-        <Thumb title={m ? m.title : x.name} slug={m?.slug} en={m?.en} onFail={(why) => setFails((f) => ({ ...f, [String(x.rank)]: why }))} />
+        {PosterBox({ w: 44, h: 66, r: 6, img: thumbs[i].img, ver: 0, pending: thumbs[i].pending })}
         <VStack alignment={"leading"} spacing={2}>
           <Text foregroundStyle={"label"} lineLimit={2}>{x.name}</Text>
           <Text font={"subheadline"} foregroundStyle={"secondaryLabel"}>{[x.week !== null ? `本週 ${money(x.week)}` : "", `累計 ${money(x.total)}`].filter(Boolean).join("｜")}</Text>
