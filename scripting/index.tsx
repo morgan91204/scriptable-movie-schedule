@@ -9,12 +9,12 @@ import {
   useEffect, useMemo, useObservable, useState,
 } from "scripting"
 import { setPlatform } from "./platform"
-import { scriptingPlatform } from "./platform-scripting"
+import { scriptingPlatform, localImage } from "./platform-scripting"
 import {
   Cinema, Movie, Settings, Version, TwMovie, TwMovieCinema, CITY_ORDER, TW,
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
   loadSettings, saveSettings, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, cinemaAddress,
-  FORMATS, formatsOf, filterVersions, nearest, kmLabel, WINDOWS, findShowtimes, groupByMovie, shareText, hallOf, tmdbTest, movieExtras, moviePoster, movieRuntime, posterSrc, isLocalSrc, cachePoster, prefetchPosters, foregroundTask, communityStats, communityVote, loadBoxOffice, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, SCRIPTING_IMPORT_URL, movieRatings, ratingTier,
+  FORMATS, formatsOf, filterVersions, nearest, kmLabel, WINDOWS, findShowtimes, groupByMovie, shareText, hallOf, tmdbTest, movieExtras, moviePoster, posterReady, movieRuntime, posterSrc, isLocalSrc, cachePoster, prefetchPosters, foregroundTask, communityStats, communityVote, loadBoxOffice, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, SCRIPTING_IMPORT_URL, movieRatings, ratingTier,
 } from "./core"
 import type { Format, LatLng, Hit, Community, BoxOfficeItem } from "./core"
 
@@ -361,8 +361,11 @@ function MovieHero({ title, slug, lines, en }: { title: string; slug?: string; l
   const [opening, setOpening] = useState(false)
   const [broken, setBroken] = useState("") // 載入失敗的海報網址：改顯示預設圖，不要一直轉圈
   const r = rt.data
-  const posterUrl = x.data?.poster || p.data || ""
-  const poster0 = posterSrc(posterUrl) // 有圖片快取就用本機檔案
+  const posterUrl = x.data?.poster || p.data || posterReady(title, slug) || ""
+  // 有圖片快取就先解碼本機檔；解不開（壞檔）就改用網址，不會留空白
+  const local0 = posterSrc(posterUrl)
+  const localUi = local0 && isLocalSrc(local0) ? localImage(local0) : null
+  const poster0 = localUi ? local0 : posterUrl
   const poster = broken && broken === poster0 ? "" : poster0
   useEffect(() => {
     if (posterUrl && poster === posterUrl) cachePoster(posterUrl) // 這次用網址顯示，順便抓進快取
@@ -385,8 +388,8 @@ function MovieHero({ title, slug, lines, en }: { title: string; slug?: string; l
   <Section>
     <HStack alignment={"bottom"} spacing={12} listRowBackground={"clear"}>
       {poster
-        ? isLocalSrc(poster)
-          ? <Image filePath={poster} resizable scaleToFill frame={{ width: 104, height: 156 }} clipShape={{ type: "rect", cornerRadius: 12 }} />
+        ? localUi && poster === local0
+          ? <Image image={localUi} resizable scaleToFill frame={{ width: 104, height: 156 }} clipShape={{ type: "rect", cornerRadius: 12 }} />
           : <Image imageUrl={poster} resizable scaleToFill frame={{ width: 104, height: 156 }}
               clipShape={{ type: "rect", cornerRadius: 12 }} placeholder={<ProgressView progressViewStyle={"circular"} />} onError={() => setBroken(poster)} />
         : <VStack frame={{ width: 104, height: 156 }} background={"rgba(120, 120, 128, 0.22)"} clipShape={{ type: "rect", cornerRadius: 12 }}>
@@ -789,16 +792,16 @@ function ConfirmPage({ pick }: { pick: Pick }) {
 function Thumb({ title, slug, en }: { title: string; slug?: string; en?: string }) {
   const p = useLoad(() => moviePoster(title, slug, en), [title, slug || ""])
   const [broken, setBroken] = useState(false)
-  const url = p.data || ""
-  const src = url ? posterSrc(url) : ""
-  useEffect(() => { if (url && src === url) cachePoster(url) }, [url])
+  const ready = posterReady(title, slug) // 這次已經查過：切回來直接畫，不用先轉圈
+  const url = p.data || ready || ""
+  const local = url ? posterSrc(url) : ""
+  const ui = local && isLocalSrc(local) ? localImage(local) : null // 本機快取先解碼，壞檔就改用網址
+  useEffect(() => { if (url && !ui) cachePoster(url) }, [url])
   const box = { frame: { width: 44, height: 66 }, clipShape: { type: "rect", cornerRadius: 6 } as any }
-  if (src && !broken)
-    return isLocalSrc(src)
-      ? <Image filePath={src} resizable scaleToFill {...box} />
-      : <Image imageUrl={src} resizable scaleToFill {...box} placeholder={<ProgressView />} onError={() => setBroken(true)} />
+  if (ui) return <Image image={ui} resizable scaleToFill {...box} />
+  if (url && !broken) return <Image imageUrl={url} resizable scaleToFill {...box} placeholder={<ProgressView />} onError={() => setBroken(true)} />
   return <VStack {...box} background={"rgba(120, 120, 128, 0.18)"}>
-    {p.data === null && !p.error ? <ProgressView /> : <Image systemName={"film"} foregroundStyle={"tertiaryLabel"} />}
+    {p.data === null && ready === undefined && !p.error ? <ProgressView /> : <Image systemName={"film"} foregroundStyle={"tertiaryLabel"} />}
   </VStack>
 }
 

@@ -5,6 +5,7 @@ declare const WebViewController: any
 declare const Storage: any
 declare const FileManager: any
 declare const Path: any
+declare const UIImage: any
 
 let web: any = null
 
@@ -43,13 +44,17 @@ function writeKeep(name: string, text: string) {
   } catch (_) {}
 }
 
-// ── 圖片快取：存在 Documents/movie-cache/<網址雜湊>.jpg，畫面用 Image 的 filePath 顯示
+// ── 圖片快取：存在 Documents/movie-cache2/<網址雜湊>.jpg。
+// 存之前先解碼確認真的是圖片、縮成 300 像素寬，再一次寫好（先寫暫存檔再改名），不會留下半張圖。
+// 畫面用 localImage() 先解碼成 UIImage 再顯示；解不開就刪檔並改用網址，不會留空白。
 const hash = (s: string) => {
   let h = 5381
   for (let i = 0; i < s.length; i++) h = ((h * 33) ^ s.charCodeAt(i)) >>> 0
   return h.toString(16)
 }
-const imgDir = () => Path.join(FileManager.documentsDirectory, "movie-cache")
+const imgDir = () => Path.join(FileManager.documentsDirectory, "movie-cache2")
+const OLD_DIR = () => Path.join(FileManager.documentsDirectory, "movie-cache") // 舊版存的原圖，一律清掉
+const THUMB_W = 300
 const imgPath = (url: string) => Path.join(imgDir(), hash(url) + ".jpg")
 const imgJobs: Record<string, Promise<string | null>> = {}
 let pruned = false
@@ -57,6 +62,9 @@ let pruned = false
 async function pruneImages() {
   if (pruned) return
   pruned = true
+  try {
+    if (FileManager.existsSync(OLD_DIR())) await FileManager.remove(OLD_DIR())
+  } catch (_) {}
   try {
     const dir = imgDir()
     for (const n of (await FileManager.readDirectory(dir)) as string[]) {
@@ -75,6 +83,20 @@ function cachedImage(url: string): string | null {
   } catch (_) {
     return null
   }
+}
+
+/** 本機快取圖解碼成 UIImage（記在記憶體）；解不開就刪掉壞檔、回傳 null，畫面改用網址 */
+const uiMem: Record<string, any> = {}
+export function localImage(path: string): any {
+  if (uiMem[path]) return uiMem[path]
+  try {
+    const img = UIImage.fromFile(path)
+    if (img && img.width > 0) return (uiMem[path] = img)
+  } catch (_) {}
+  try {
+    FileManager.removeSync(path)
+  } catch (_) {}
+  return null
 }
 
 export const scriptingPlatform: Platform = {
@@ -126,7 +148,19 @@ export const scriptingPlatform: Platform = {
       const r = await fetch(url, { timeout: 20 } as any)
       if (r.status !== 200) return null
       const d = await r.data()
-      await FileManager.writeAsData(imgPath(url), d)
+      const img = UIImage.fromData(d)
+      if (!img || !(img.width > 0)) return null // 不是圖片（例如被轉到首頁的 HTML）：不存
+      const thumb = img.width > THUMB_W ? img.preparingThumbnail({ width: THUMB_W, height: Math.round((img.height * THUMB_W) / img.width) }) : null
+      const out = (thumb && thumb.toJPEGData(0.85)) || d
+      const p = imgPath(url)
+      const tmp = p + ".tmp"
+      await FileManager.writeAsData(tmp, out)
+      try {
+        if (FileManager.existsSync(p)) await FileManager.remove(p)
+        await FileManager.rename(tmp, p)
+      } catch (_) {
+        await FileManager.writeAsData(p, out) // 不支援改名：直接寫
+      }
       return cachedImage(url)
     })().catch(() => null))
   },

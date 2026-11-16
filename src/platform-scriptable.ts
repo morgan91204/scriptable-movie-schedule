@@ -16,8 +16,12 @@ function settingsFile(): { fm: FileManager; path: string } {
 
 let web: WebView | null = null;
 
-// ── 圖片快取：存在 Scriptable 的 cache 資料夾（movie-img-<網址雜湊>.jpg），畫面用 data: 網址顯示
-const IMG_PREFIX = "movie-img-";
+// ── 圖片快取：存在 Scriptable 的 cache 資料夾（movie-thumb2-<網址雜湊>.jpg）。
+// 存之前先確認真的是圖片、縮成 300 像素寬的縮圖，再一次寫好（先寫暫存檔再改名），不會留下半張圖。
+// 畫面用 data: 網址顯示：WebView 用 HTML 字串載入時，iOS 常常不准讀 file:// 本機檔，切換頁面後海報會變空白。
+const IMG_PREFIX = "movie-thumb2-";
+const OLD_PREFIX = "movie-img-"; // 舊版存的原圖（file:// 顯示用），一律清掉
+const THUMB_W = 300;
 const hash = (s: string) => {
   let h = 5381;
   for (let i = 0; i < s.length; i++) h = ((h * 33) ^ s.charCodeAt(i)) >>> 0;
@@ -37,24 +41,49 @@ function pruneImages() {
     const fm = FileManager.local();
     const dir = fm.cacheDirectory();
     for (const n of fm.listContents(dir)) {
-      if (!n.startsWith(IMG_PREFIX)) continue;
       const p = fm.joinPath(dir, n);
-      if (Date.now() - fm.modificationDate(p).getTime() > 14 * 86400e3) fm.remove(p);
+      if (n.startsWith(OLD_PREFIX)) fm.remove(p);
+      else if (n.startsWith(IMG_PREFIX) && Date.now() - fm.modificationDate(p).getTime() > 14 * 86400e3) fm.remove(p);
     }
   } catch (_) {}
 }
-/** 快取圖的 file:// 網址：畫面的 WebView 以 cache 資料夾為 baseURL 載入，所以可以直接顯示本機檔 */
+/** base64 開頭判斷是不是圖片（JPEG／PNG／GIF／WebP） */
+const isImageB64 = (b64: string) => /^(\/9j\/|iVBOR|R0lGOD|UklGR)/.test(b64);
+/** 讀過的縮圖 data: 網址記在記憶體，重畫時不用再讀檔 */
+const dataUrlMem: Record<string, string> = {};
 function cachedImage(url: string): string | null {
+  if (dataUrlMem[url]) return dataUrlMem[url];
   try {
+    const fm = FileManager.local();
     const p = imgPath(url);
-    return FileManager.local().fileExists(p) ? "file://" + p : null;
+    if (!fm.fileExists(p)) return null;
+    const b64 = fm.read(p).toBase64String();
+    if (!b64 || b64.length < 200 || !isImageB64(b64)) {
+      fm.remove(p); // 壞檔：刪掉，下次重抓
+      return null;
+    }
+    return (dataUrlMem[url] = (b64.startsWith("iVBOR") ? "data:image/png;base64," : "data:image/jpeg;base64,") + b64);
   } catch (_) {
     return null;
   }
 }
-/** 圖片快取資料夾的 file:// 網址（給 WebView 當 baseURL） */
-export function imageCacheBaseUrl(): string {
-  return "file://" + FileManager.local().cacheDirectory() + "/";
+/** 縮成 THUMB_W 寬的 JPEG（縮圖失敗就用原圖） */
+function toThumb(d: Data): Data {
+  try {
+    const img = Image.fromData(d);
+    if (!img || !img.size.width) return d;
+    if (img.size.width <= THUMB_W) return d;
+    const w = THUMB_W;
+    const h = Math.round((img.size.height * w) / img.size.width);
+    const ctx = new DrawContext();
+    ctx.size = new Size(w, h);
+    ctx.respectScreenScale = false;
+    ctx.opaque = true;
+    ctx.drawImageInRect(img, new Rect(0, 0, w, h));
+    return Data.fromJPEG(ctx.getImage()) || d;
+  } catch (_) {
+    return d;
+  }
 }
 
 export const scriptablePlatform: Platform = {
@@ -117,8 +146,14 @@ export const scriptablePlatform: Platform = {
       const d = await r.load();
       const status = (r.response && (r.response as any).statusCode) || 200;
       if (status !== 200 || !d) return null;
-      if (d.toBase64String().length < 100) return null; // 空檔不算
-      FileManager.local().write(imgPath(url), d);
+      const b64 = d.toBase64String();
+      if (b64.length < 200 || !isImageB64(b64)) return null; // 不是圖片（例如被轉到首頁的 HTML）：不存
+      const fm = FileManager.local();
+      const p = imgPath(url);
+      const tmp = p + ".tmp";
+      fm.write(tmp, toThumb(d));
+      if (fm.fileExists(p)) fm.remove(p);
+      fm.move(tmp, p);
       return cachedImage(url);
     })().catch(() => null));
   },

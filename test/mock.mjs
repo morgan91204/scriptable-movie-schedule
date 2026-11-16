@@ -109,7 +109,14 @@ const fm = {
   listContents: (p) => fs.readdirSync(p),
   modificationDate: (p) => fs.statSync(p).mtime,
   remove: (p) => fs.rmSync(p, { recursive: true, force: true }),
+  move: (a, b) => fs.renameSync(a, b),
 };
+// 縮圖用：不真的縮，原圖照存（只驗證流程）
+globalThis.Size = class { constructor(w, h) { this.width = w; this.height = h; } };
+globalThis.Rect = class { constructor(x, y, w, h) { Object.assign(this, { x, y, width: w, height: h }); } };
+globalThis.Image = { fromData: (d) => ({ size: { width: 500, height: 750 }, data: d }) };
+globalThis.DrawContext = class { drawImageInRect(img) { this.img = img; } getImage() { return this.img; } };
+globalThis.Data = { fromJPEG: (img) => img.data };
 globalThis.FileManager = { iCloud: () => fm, local: () => fm };
 Buffer.prototype.toBase64String = function () { return this.toString("base64"); };
 

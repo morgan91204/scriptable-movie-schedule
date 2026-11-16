@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.06-2118
+// @movie-schedule-app 電影行程 v2026.11.16-1821
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/jsx.tsx
@@ -111,126 +111,6 @@ function Loading(props) {
 function Empty(props) {
   return /* @__PURE__ */ h("div", { class: "empty" }, /* @__PURE__ */ h("div", { class: "big" }, props.icon || "🎬"), /* @__PURE__ */ h("div", null, esc(props.text)));
 }
-
-// src/platform-scriptable.ts
-function settingsFile() {
-  let fm;
-  try {
-    fm = FileManager.iCloud();
-    fm.documentsDirectory();
-  } catch (_) {
-    fm = FileManager.local();
-  }
-  const dir = fm.joinPath(fm.documentsDirectory(), "電影行程");
-  if (!fm.fileExists(dir)) fm.createDirectory(dir, true);
-  return { fm, path: fm.joinPath(dir, "設定.json") };
-}
-var web = null;
-var IMG_PREFIX = "movie-img-";
-var hash = (s) => {
-  let h2 = 5381;
-  for (let i = 0; i < s.length; i++) h2 = (h2 * 33 ^ s.charCodeAt(i)) >>> 0;
-  return h2.toString(16);
-};
-var imgPath = (url) => {
-  const fm = FileManager.local();
-  return fm.joinPath(fm.cacheDirectory(), IMG_PREFIX + hash(url) + ".jpg");
-};
-var imgJobs = {};
-var pruned = false;
-function pruneImages() {
-  if (pruned) return;
-  pruned = true;
-  try {
-    const fm = FileManager.local();
-    const dir = fm.cacheDirectory();
-    for (const n of fm.listContents(dir)) {
-      if (!n.startsWith(IMG_PREFIX)) continue;
-      const p = fm.joinPath(dir, n);
-      if (Date.now() - fm.modificationDate(p).getTime() > 14 * 864e5) fm.remove(p);
-    }
-  } catch (_) {
-  }
-}
-function cachedImage(url) {
-  try {
-    const p = imgPath(url);
-    return FileManager.local().fileExists(p) ? "file://" + p : null;
-  } catch (_) {
-    return null;
-  }
-}
-function imageCacheBaseUrl() {
-  return "file://" + FileManager.local().cacheDirectory() + "/";
-}
-var scriptablePlatform = {
-  async fetchText(url, headers, opts) {
-    const r = new Request(url);
-    r.headers = headers;
-    r.timeoutInterval = 20;
-    if (opts?.method) r.method = opts.method;
-    if (opts?.body !== void 0) r.body = opts.body;
-    const body = await r.loadString();
-    return { status: r.response && r.response.statusCode || 200, body };
-  },
-  async runInWebView(body) {
-    if (!web) {
-      web = new WebView();
-      await web.loadHTML("<html><body></body></html>", "https://twshowtimes.com/");
-    }
-    return await web.evaluateJavaScript(`(function(){${body}
-})()`, false);
-  },
-  async loadSettingsJSON() {
-    try {
-      const { fm, path } = settingsFile();
-      if (!fm.fileExists(path)) return null;
-      await fm.downloadFileFromiCloud(path);
-      return fm.readString(path);
-    } catch (_) {
-      return null;
-    }
-  },
-  saveSettingsJSON(json) {
-    try {
-      const { fm, path } = settingsFile();
-      fm.writeString(path, json);
-    } catch (_) {
-    }
-  },
-  cacheGet(name) {
-    try {
-      const fm = FileManager.local();
-      const p = fm.joinPath(fm.cacheDirectory(), "movie-" + name);
-      return fm.fileExists(p) ? fm.readString(p) : null;
-    } catch (_) {
-      return null;
-    }
-  },
-  cacheSet(name, value) {
-    try {
-      const fm = FileManager.local();
-      fm.writeString(fm.joinPath(fm.cacheDirectory(), "movie-" + name), value);
-    } catch (_) {
-    }
-  },
-  cachedImage,
-  cacheImage(url) {
-    return imgJobs[url] ||= (async () => {
-      pruneImages();
-      const hit = cachedImage(url);
-      if (hit) return hit;
-      const r = new Request(url);
-      r.timeoutInterval = 20;
-      const d = await r.load();
-      const status = r.response && r.response.statusCode || 200;
-      if (status !== 200 || !d) return null;
-      if (d.toBase64String().length < 100) return null;
-      FileManager.local().write(imgPath(url), d);
-      return cachedImage(url);
-    })().catch(() => null);
-  }
-};
 
 // src/ui.ts
 var CSS = `
@@ -383,12 +263,7 @@ var UI = class {
     this.wv = new WebView();
     this.presented = null;
     this.closed = false;
-    let base = "";
-    try {
-      base = imageCacheBaseUrl();
-    } catch (_) {
-    }
-    this.ready = (base ? this.wv.loadHTML(SHELL, base) : this.wv.loadHTML(SHELL)).catch(() => this.wv.loadHTML(SHELL));
+    this.ready = this.wv.loadHTML(SHELL);
   }
   /** 顯示畫面（不等待點擊），用於讀取中。 */
   /** scrollTo：畫完後捲到哪裡。-1 = 停在原位（同一頁重繪，例如切換廣告時間）；0 = 頂端；其他 = 返回時還原的位置 */
@@ -434,6 +309,158 @@ function platform() {
   if (!current) throw new Error("platform 尚未設定");
   return current;
 }
+
+// src/platform-scriptable.ts
+function settingsFile() {
+  let fm;
+  try {
+    fm = FileManager.iCloud();
+    fm.documentsDirectory();
+  } catch (_) {
+    fm = FileManager.local();
+  }
+  const dir = fm.joinPath(fm.documentsDirectory(), "電影行程");
+  if (!fm.fileExists(dir)) fm.createDirectory(dir, true);
+  return { fm, path: fm.joinPath(dir, "設定.json") };
+}
+var web = null;
+var IMG_PREFIX = "movie-thumb2-";
+var OLD_PREFIX = "movie-img-";
+var THUMB_W = 300;
+var hash = (s) => {
+  let h2 = 5381;
+  for (let i = 0; i < s.length; i++) h2 = (h2 * 33 ^ s.charCodeAt(i)) >>> 0;
+  return h2.toString(16);
+};
+var imgPath = (url) => {
+  const fm = FileManager.local();
+  return fm.joinPath(fm.cacheDirectory(), IMG_PREFIX + hash(url) + ".jpg");
+};
+var imgJobs = {};
+var pruned = false;
+function pruneImages() {
+  if (pruned) return;
+  pruned = true;
+  try {
+    const fm = FileManager.local();
+    const dir = fm.cacheDirectory();
+    for (const n of fm.listContents(dir)) {
+      const p = fm.joinPath(dir, n);
+      if (n.startsWith(OLD_PREFIX)) fm.remove(p);
+      else if (n.startsWith(IMG_PREFIX) && Date.now() - fm.modificationDate(p).getTime() > 14 * 864e5) fm.remove(p);
+    }
+  } catch (_) {
+  }
+}
+var isImageB64 = (b64) => /^(\/9j\/|iVBOR|R0lGOD|UklGR)/.test(b64);
+var dataUrlMem = {};
+function cachedImage(url) {
+  if (dataUrlMem[url]) return dataUrlMem[url];
+  try {
+    const fm = FileManager.local();
+    const p = imgPath(url);
+    if (!fm.fileExists(p)) return null;
+    const b64 = fm.read(p).toBase64String();
+    if (!b64 || b64.length < 200 || !isImageB64(b64)) {
+      fm.remove(p);
+      return null;
+    }
+    return dataUrlMem[url] = (b64.startsWith("iVBOR") ? "data:image/png;base64," : "data:image/jpeg;base64,") + b64;
+  } catch (_) {
+    return null;
+  }
+}
+function toThumb(d) {
+  try {
+    const img = Image.fromData(d);
+    if (!img || !img.size.width) return d;
+    if (img.size.width <= THUMB_W) return d;
+    const w = THUMB_W;
+    const h2 = Math.round(img.size.height * w / img.size.width);
+    const ctx = new DrawContext();
+    ctx.size = new Size(w, h2);
+    ctx.respectScreenScale = false;
+    ctx.opaque = true;
+    ctx.drawImageInRect(img, new Rect(0, 0, w, h2));
+    return Data.fromJPEG(ctx.getImage()) || d;
+  } catch (_) {
+    return d;
+  }
+}
+var scriptablePlatform = {
+  async fetchText(url, headers, opts) {
+    const r = new Request(url);
+    r.headers = headers;
+    r.timeoutInterval = 20;
+    if (opts?.method) r.method = opts.method;
+    if (opts?.body !== void 0) r.body = opts.body;
+    const body = await r.loadString();
+    return { status: r.response && r.response.statusCode || 200, body };
+  },
+  async runInWebView(body) {
+    if (!web) {
+      web = new WebView();
+      await web.loadHTML("<html><body></body></html>", "https://twshowtimes.com/");
+    }
+    return await web.evaluateJavaScript(`(function(){${body}
+})()`, false);
+  },
+  async loadSettingsJSON() {
+    try {
+      const { fm, path } = settingsFile();
+      if (!fm.fileExists(path)) return null;
+      await fm.downloadFileFromiCloud(path);
+      return fm.readString(path);
+    } catch (_) {
+      return null;
+    }
+  },
+  saveSettingsJSON(json) {
+    try {
+      const { fm, path } = settingsFile();
+      fm.writeString(path, json);
+    } catch (_) {
+    }
+  },
+  cacheGet(name) {
+    try {
+      const fm = FileManager.local();
+      const p = fm.joinPath(fm.cacheDirectory(), "movie-" + name);
+      return fm.fileExists(p) ? fm.readString(p) : null;
+    } catch (_) {
+      return null;
+    }
+  },
+  cacheSet(name, value) {
+    try {
+      const fm = FileManager.local();
+      fm.writeString(fm.joinPath(fm.cacheDirectory(), "movie-" + name), value);
+    } catch (_) {
+    }
+  },
+  cachedImage,
+  cacheImage(url) {
+    return imgJobs[url] ||= (async () => {
+      pruneImages();
+      const hit = cachedImage(url);
+      if (hit) return hit;
+      const r = new Request(url);
+      r.timeoutInterval = 20;
+      const d = await r.load();
+      const status = r.response && r.response.statusCode || 200;
+      if (status !== 200 || !d) return null;
+      const b64 = d.toBase64String();
+      if (b64.length < 200 || !isImageB64(b64)) return null;
+      const fm = FileManager.local();
+      const p = imgPath(url);
+      const tmp = p + ".tmp";
+      fm.write(tmp, toThumb(d));
+      if (fm.fileExists(p)) fm.remove(p);
+      fm.move(tmp, p);
+      return cachedImage(url);
+    })().catch(() => null);
+  }
+};
 
 // src/parsers.gen.ts
 var PARSERS_JS = `function parseTwIndex(doc) {
@@ -1501,13 +1528,14 @@ async function findPoster(title, slug, en) {
   return hit?.p ? "https://image.tmdb.org/t/p/w500" + hit.p : "";
 }
 var posterOnly = {};
+var posterDone = {};
 function moviePoster(title, slug, en) {
   const k = (slug || "") + "|" + title;
   return posterOnly[k] ||= (async () => {
     const nk = normTitle(title);
     const all = readExtras();
     const hit = all["t|" + nk] || all["n|" + nk];
-    if (hit?.poster) return hit.poster;
+    if (hit?.poster) return normImageUrl(hit.poster);
     const own = all["p|" + nk];
     if (own && Date.now() - own.at < (own.poster ? 7 : own.v === EXTRAS_V ? 1 : 0) * 864e5) return own.poster;
     const poster = normImageUrl(await findPoster(title, slug, en).catch(() => ""));
@@ -1515,7 +1543,7 @@ function moviePoster(title, slug, en) {
     latest["p|" + nk] = { poster, trailer: "", trailerName: "", at: Date.now(), v: EXTRAS_V };
     cacheSet("extras.json", JSON.stringify(latest));
     return poster;
-  })();
+  })().then((u) => posterDone[k] = u);
 }
 function posterSrc(url) {
   url = normImageUrl(url);
@@ -2088,7 +2116,7 @@ var App = class {
     ];
     // ── 事件迴圈 ──
     // 背景查 GitHub 上的最新版本（首頁顯示是否為最新版）
-    this.latest = checkLatest("2026.11.06-2118");
+    this.latest = checkLatest("2026.11.16-1821");
     // ── 搜尋 ──
     this.query = "";
     this.tmdbStatus = "";
@@ -2223,11 +2251,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.06-2118"}`);
+          Pasteboard.copy(`版本 ${"2026.11.16-1821"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.06-2118"}`,
+      `版本 ${"2026.11.16-1821"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }

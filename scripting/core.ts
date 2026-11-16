@@ -676,13 +676,18 @@ async function findPoster(title: string, slug?: string, en?: string): Promise<st
 
 /** 只查海報網址（約 0.3 秒），不等預告：電影頁先把海報畫出來。手機上記過的直接用（找到的 7 天、沒找到的 1 天） */
 const posterOnly: Record<string, Promise<string>> = {};
+const posterDone: Record<string, string> = {};
+/** 這次執行已經查好的海報網址（同步拿，沒查過回傳 undefined）：切換頁面回來時直接畫，不用先閃空白 */
+export function posterReady(title: string, slug?: string): string | undefined {
+  return posterDone[(slug || "") + "|" + title];
+}
 export function moviePoster(title: string, slug?: string, en?: string): Promise<string> {
   const k = (slug || "") + "|" + title;
   return (posterOnly[k] ||= (async () => {
     const nk = normTitle(title);
     const all = readExtras();
     const hit = all["t|" + nk] || all["n|" + nk];
-    if (hit?.poster) return hit.poster;
+    if (hit?.poster) return normImageUrl(hit.poster);
     const own = all["p|" + nk] as (MovieExtras & { at: number; v?: number }) | undefined; // 只查過海報的紀錄
     // 找到的記 7 天；沒找到的記 1 天，但舊版（比對規則改了）記下的「沒找到」一律重查
     if (own && Date.now() - own.at < (own.poster ? 7 : own.v === EXTRAS_V ? 1 : 0) * 86400e3) return own.poster;
@@ -691,7 +696,7 @@ export function moviePoster(title: string, slug?: string, en?: string): Promise<
     latest["p|" + nk] = { poster, trailer: "", trailerName: "", at: Date.now(), v: EXTRAS_V } as MovieExtras & { at: number };
     cacheSet("extras.json", JSON.stringify(latest));
     return poster;
-  })());
+  })().then((u) => (posterDone[k] = u)));
 }
 
 /** 顯示用的海報來源：手機上有圖片快取就用本機（Scriptable 是 data: 網址、Scripting 是檔案路徑），否則用網址 */
