@@ -28,6 +28,7 @@ declare const Location: any
 declare const Pasteboard: any
 declare const HapticFeedback: any
 declare function setTimeout(fn: () => void, ms: number): any
+declare function clearTimeout(t: any): void
 declare const Storage: any
 
 setPlatform(scriptingPlatform)
@@ -355,23 +356,52 @@ function CommunitySection({ title }: { title: string }) {
 
 /** 海報圖：快取有的同步拿到（切換頁面回來立刻有圖），沒有的自己下載縮圖。
  *  不用 Image 的 imageUrl：列表重畫時系統會中斷正在下載的圖，被當成失敗後就一直缺圖 */
-function usePosterImage(url: string): { img: any; failed: boolean; err: string } {
+function usePosterImage(url: string): { img: any; ver: number; failed: boolean; err: string } {
   // 圖跟著網址記：網址中途改了（例如換成另一個來源的海報），不會沿用前一張
-  const [st, setSt] = useState<{ url: string; img: any; failed: boolean }>(() => ({ url, img: posterImageNow(url), failed: false }))
+  const [st, setSt] = useState<{ url: string; img: any; failed: boolean; ver: number }>(() => ({ url, img: posterImageNow(url), failed: false, ver: 0 }))
   useEffect(() => {
     let alive = true
-    if (st.url === url && st.img) return // 第一個畫面已經從記憶體／快取拿到了
-    const now = posterImageNow(url)
-    setSt({ url, img: now, failed: false })
-    if (url && !now)
-      loadPosterImage(url).then((ui) => {
-        if (alive) setSt({ url, img: ui, failed: !ui })
-      })
-    return () => { alive = false }
+    const timers: any[] = []
+    // 切換頁面的當下就交給畫面的圖，Scripting 有時畫不出來（要滑一下才出現）：
+    // 0.4 秒和 1.2 秒後各補交一張新的圖、並重建圖片元件，等於自動「滑一下」
+    const refresh = () => {
+      for (const ms of [400, 1200])
+        timers.push(setTimeout(() => {
+          if (!alive) return
+          const again = posterImageNow(url)
+          if (again) setSt((s) => (s.url === url ? { url, img: again, failed: false, ver: s.ver + 1 } : s))
+        }, ms))
+    }
+    const now = st.url === url && st.img ? st.img : posterImageNow(url)
+    if (now) {
+      if (st.url !== url || st.img !== now) setSt((s) => ({ url, img: now, failed: false, ver: s.ver + 1 }))
+      refresh()
+    } else {
+      setSt((s) => ({ url, img: null, failed: false, ver: s.ver + 1 }))
+      if (url)
+        loadPosterImage(url).then((ui) => {
+          if (!alive) return
+          setSt((s) => ({ url, img: ui, failed: !ui, ver: s.ver + 1 }))
+          if (ui) refresh()
+        })
+    }
+    return () => {
+      alive = false
+      for (const t of timers) clearTimeout(t)
+    }
   }, [url])
   const mine = st.url === url
   const failed = mine && st.failed
-  return { img: mine ? st.img : null, failed, err: failed ? posterError(url) : "" }
+  return { img: mine ? st.img : null, ver: st.ver, failed, err: failed ? posterError(url) : "" }
+}
+
+/** 海報框：固定大小的灰底框，圖放在裡面。圖萬一沒畫出來，也只是看到灰框，不會整格消失、文字跳位 */
+function PosterBox({ w, h, r, img, ver, pending, iconFont }: { w: number; h: number; r: number; img: any; ver: number; pending: boolean; iconFont?: string }) {
+  return <VStack frame={{ width: w, height: h }} background={"rgba(120, 120, 128, 0.18)"} clipShape={{ type: "rect", cornerRadius: r }}>
+    {img
+      ? <Image key={"p" + ver} image={img} resizable scaleToFill frame={{ width: w, height: h }} clipShape={{ type: "rect", cornerRadius: r }} />
+      : pending ? <ProgressView progressViewStyle={"circular"} /> : <Image systemName={"film"} font={iconFont || "body"} foregroundStyle={"tertiaryLabel"} />}
+  </VStack>
 }
 
 /** 電影頁頂端：海報在左，資訊、評分與紅色預告按鈕在右（跟 Scriptable 版一樣） */
@@ -400,11 +430,7 @@ function MovieHero({ title, slug, lines, en }: { title: string; slug?: string; l
   return <>
   <Section>
     <HStack alignment={"bottom"} spacing={12} listRowBackground={"clear"}>
-      {pi.img
-        ? <Image image={pi.img} resizable scaleToFill frame={{ width: 104, height: 156 }} clipShape={{ type: "rect", cornerRadius: 12 }} />
-        : <VStack frame={{ width: 104, height: 156 }} background={"rgba(120, 120, 128, 0.22)"} clipShape={{ type: "rect", cornerRadius: 12 }}>
-            {posterPending ? <ProgressView progressViewStyle={"circular"} /> : <Image systemName={"film"} font={"largeTitle"} foregroundStyle={"tertiaryLabel"} />}
-          </VStack>}
+      <PosterBox w={104} h={156} r={12} img={pi.img} ver={pi.ver} pending={posterPending} iconFont={"largeTitle"} />
       <VStack alignment={"leading"} spacing={4}>
         {lines.filter(Boolean).map((l) => <Text key={l} font={"subheadline"} foregroundStyle={"secondaryLabel"}>{l}</Text>)}
         {/* 評分讀好後三個徽章都顯示：沒有那項評分就是「-」（跟「還沒抓到」分得開） */}
@@ -805,12 +831,8 @@ function Thumb({ title, slug, en, onFail }: { title: string; slug?: string; en?:
   const url = normImageUrl(p.data || ready || "")
   const pi = usePosterImage(url) // 快取有的立刻顯示，沒有的自己下載縮圖
   useEffect(() => { if (pi.failed && onFail) onFail(pi.err || "讀取失敗") }, [pi.failed])
-  const box = { frame: { width: 44, height: 66 }, clipShape: { type: "rect", cornerRadius: 6 } as any }
-  if (pi.img) return <Image image={pi.img} resizable scaleToFill {...box} />
-  const pending = (!url && p.data === null && ready === undefined && !p.error) || (!!url && !pi.failed)
-  return <VStack {...box} background={"rgba(120, 120, 128, 0.18)"}>
-    {pending ? <ProgressView /> : <Image systemName={"film"} foregroundStyle={"tertiaryLabel"} />}
-  </VStack>
+  const pending = !pi.img && ((!url && p.data === null && ready === undefined && !p.error) || (!!url && !pi.failed))
+  return <PosterBox w={44} h={66} r={6} img={pi.img} ver={pi.ver} pending={pending} />
 }
 
 /** 票房排行上、場次通已經沒有場次的片：海報、評分、預告、觀眾評分與票房 */
