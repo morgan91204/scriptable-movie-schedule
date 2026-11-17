@@ -28,6 +28,7 @@ struct CinemasView: View {
                                         Text("\(c.city) \(c.district ?? "")").font(.subheadline).foregroundStyle(.secondary)
                                     }
                                 }
+                                .accessibilityIdentifier("cinema-row")
                             }
                         }
                     }
@@ -82,6 +83,7 @@ struct CinemaView: View {
                         NavigationLink(Fmt.dateLabel(date)) {
                             CinemaDayView(cinema: cinema, date: date, fallbackAddress: d.address ?? cinema.address ?? "")
                         }
+                        .accessibilityIdentifier("date-row")
                     }
                 }
                 if let site = d.site, let u = URL(string: site) {

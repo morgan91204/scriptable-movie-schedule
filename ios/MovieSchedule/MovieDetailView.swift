@@ -145,6 +145,7 @@ struct MovieDetailView: View {
                                     }
                                 }
                             }
+                            .accessibilityIdentifier("movie-cinema-row")
                         }
                     }
                 }
@@ -203,6 +204,7 @@ struct TimesView: View {
                                         .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 10))
                                 }
                                 .buttonStyle(.plain)
+                                .accessibilityIdentifier("time-button")
                             }
                         }
                     }

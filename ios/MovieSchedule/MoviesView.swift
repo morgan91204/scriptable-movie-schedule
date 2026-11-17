@@ -74,6 +74,7 @@ struct MoviesView: View {
                 }
             }
         }
+        .accessibilityIdentifier("movie-row")
     }
 
     private func load() async {
@@ -100,7 +101,7 @@ struct BoxOfficeSection: View {
                 Section {
                     ForEach(b.rows) { r in
                         if let m = r.m {
-                            NavigationLink { MovieDetailView(movie: m) } label: { rowLabel(r) }
+                            NavigationLink { MovieDetailView(movie: m) } label: { rowLabel(r) }.accessibilityIdentifier("box-row")
                         } else {
                             rowLabel(r)
                         }
