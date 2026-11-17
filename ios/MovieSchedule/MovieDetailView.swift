@@ -122,7 +122,8 @@ struct MovieDetailView: View {
                 let cities = Fmt.sortCities(Array(Set(d.cinemas.map { $0.city })))
                 Section {
                     Picker("日期", selection: $date) {
-                        ForEach(dates.isEmpty ? [d.date] : dates, id: \.self) { Text(Fmt.dateLabel($0)).tag($0) }
+                        // 目前顯示的那天一定要在選項裡（剛過午夜時，來源的「今天」可能還是前一天）
+                        ForEach(dates.contains(d.date) ? dates : [d.date] + dates, id: \.self) { Text(Fmt.dateLabel($0)).tag($0) }
                     }
                     Picker("縣市", selection: $city) {
                         Text("全部").tag("全部")
