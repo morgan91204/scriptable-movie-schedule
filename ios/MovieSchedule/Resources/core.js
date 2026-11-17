@@ -1828,7 +1828,19 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     const [b, all] = await Promise.all([loadBoxOffice(), loadMovies().catch(() => [])]);
     return { label: boxOfficeLabel(b), source: b.source, rows: b.list.map((x) => ({ x, m: matchBoxOffice(x.name, all) || null })) };
   }
-  var extra = { boxOffice };
+  async function nowShowing(scope, date, winId, format) {
+    const win = WINDOWS.find((w) => w.id === winId) || WINDOWS[WINDOWS.length - 1];
+    const { hits, failed } = await findShowtimes(scope, date, win, format || "");
+    return { groups: groupByMovie(hits), failed };
+  }
+  async function nearby(lat, lng, limit) {
+    return nearest(await loadCinemas(), { lat, lng }, limit || 20);
+  }
+  async function patchSettings(patch) {
+    saveSettings({ ...await loadSettings(), ...patch });
+    return true;
+  }
+  var extra = { boxOffice, nowShowing, nearby, patchSettings };
   globalThis.MS = {
     init(saved) {
       cache = saved || {};

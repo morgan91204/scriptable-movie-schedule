@@ -127,5 +127,56 @@ struct ShowPick: Hashable {
     var date: String // 片單日期（影城營業日）
     var time: String // HH:mm
     var runtime: Int
-    var bookingUrl: String
+    var bookingUrl: String // 已知的訂票網址；空的話到確認頁再查影城官網
+    var cinema: Cinema? = nil // 用來補地址、查訂票網址與官方 App
+}
+
+struct ScopedCinema: Codable, Hashable, Identifiable {
+    var cinema: Cinema
+    var km: Double?
+    var id: String { cinema.id }
+}
+
+/// 「現在有什麼可以看」的一場
+struct Hit: Codable, Hashable {
+    struct Context: Codable, Hashable {
+        var booking: String?
+        var sourceUrl: String?
+        var address: String?
+    }
+    var cinema: Cinema
+    var movie: Movie
+    var version: ShowVersion
+    var time: String
+    var date: String
+    var km: Double?
+    var ctx: Context?
+}
+
+struct NowGroup: Codable, Identifiable {
+    var title: String
+    var runtime: Int?
+    var rating: String?
+    var hits: [Hit]
+    var id: String { title }
+}
+
+struct NowResult: Codable {
+    var groups: [NowGroup]
+    var failed: [String]?
+}
+
+/// 觀眾評分
+struct Community: Codable {
+    var n: Int
+    var avg: Double
+    var dist: [Int]?
+    var mine: Int?
+}
+
+struct CinemaAppInfo: Codable {
+    var name: String
+    var id: String
+    var url: String
+    var schemes: [String]
 }

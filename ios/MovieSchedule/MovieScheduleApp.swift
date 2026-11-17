@@ -5,6 +5,8 @@ struct MovieScheduleApp: App {
     var body: some Scene {
         WindowGroup {
             TabView {
+                HomeView()
+                    .tabItem { Label("首頁", systemImage: "house") }
                 MoviesView()
                     .tabItem { Label("電影", systemImage: "film") }
                 CinemasView()
@@ -12,6 +14,7 @@ struct MovieScheduleApp: App {
                 SettingsView()
                     .tabItem { Label("設定", systemImage: "gearshape") }
             }
+            .task { SettingsStore.shared.sync() } // 啟動時把常去影城、TMDB 金鑰交給資料層
         }
     }
 }

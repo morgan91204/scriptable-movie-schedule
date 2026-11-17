@@ -54,6 +54,7 @@ struct CinemasView: View {
 struct CinemaView: View {
     let cinema: Cinema
     @Environment(\.openURL) private var openURL
+    @ObservedObject private var settings = SettingsStore.shared
     @State private var info: Loadable<CinemaDates> = .loading
 
     var body: some View {
@@ -67,8 +68,7 @@ struct CinemaView: View {
                 if let address = d.address ?? cinema.address, !address.isEmpty {
                     Section {
                         Button {
-                            let q = "\(cinema.name) \(address)".addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
-                            if let u = URL(string: "https://maps.apple.com/?q=\(q)") { openURL(u) }
+                            if let u = settings.mapsURL(name: cinema.name, address: address) { openURL(u) }
                         } label: {
                             Label(address, systemImage: "mappin.and.ellipse")
                         }
@@ -93,6 +93,16 @@ struct CinemaView: View {
         }
         .navigationTitle(cinema.name)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    settings.toggleFavorite(cinema.id)
+                } label: {
+                    Image(systemName: settings.isFavorite(cinema.id) ? "star.fill" : "star")
+                }
+                .accessibilityLabel(settings.isFavorite(cinema.id) ? "移出常去影城" : "加入常去影城")
+            }
+        }
         .task { if info.value == nil { await load() } }
     }
 
@@ -126,7 +136,7 @@ struct CinemaDayView: View {
                 Section {
                     ForEach(d.movies, id: \.self) { m in
                         NavigationLink {
-                            TimesView(title: m.title, runtime: m.runtime ?? 0, cinemaName: cinema.name, address: (d.address ?? "").isEmpty ? fallbackAddress : (d.address ?? ""), date: date, versions: m.versions, bookingUrl: (d.booking ?? "").isEmpty ? (d.sourceUrl ?? cinema.url) : (d.booking ?? ""))
+                            TimesView(title: m.title, runtime: m.runtime ?? 0, cinemaName: cinema.name, address: (d.address ?? "").isEmpty ? fallbackAddress : (d.address ?? ""), date: date, versions: m.versions, bookingUrl: (d.booking ?? "").isEmpty ? (d.sourceUrl ?? cinema.url) : (d.booking ?? ""), cinema: cinema)
                         } label: {
                             HStack(spacing: 10) {
                                 PosterView(title: m.title)

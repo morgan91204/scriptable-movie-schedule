@@ -47,7 +47,16 @@ final class ScreenshotTests: XCTestCase {
     }
 
     func testScreens() {
+        // 0. 首頁 → 現在有什麼可以看
+        _ = row("now-link").waitForExistence(timeout: 40)
+        shot("home", wait: 5)
+        if tap(row("now-link"), "現在有什麼可以看") {
+            shot("now", wait: 15)
+            back()
+        }
+
         // 1. 電影清單
+        tap(app.tabBars.buttons["電影"], "電影分頁")
         _ = row("movie-row").waitForExistence(timeout: 40)
         shot("movies", wait: 8)
 
@@ -86,10 +95,5 @@ final class ScreenshotTests: XCTestCase {
         tap(app.tabBars.buttons["設定"], "設定分頁")
         shot("settings", wait: 2)
 
-        // 6. 深色模式的電影清單
-        XCUIDevice.shared.appearance = .dark
-        tap(app.tabBars.buttons["電影"], "電影分頁")
-        shot("dark", wait: 4)
-        XCUIDevice.shared.appearance = .light
     }
 }

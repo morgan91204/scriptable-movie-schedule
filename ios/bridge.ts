@@ -13,7 +13,22 @@ async function boxOffice() {
   const [b, all] = await Promise.all([core.loadBoxOffice(), core.loadMovies().catch(() => [])]);
   return { label: core.boxOfficeLabel(b), source: b.source, rows: b.list.map((x) => ({ x, m: core.matchBoxOffice(x.name, all) || null })) };
 }
-const extra: Record<string, (...a: any[]) => any> = { boxOffice };
+/** 現在有什麼可以看：在指定的影城裡找某天某時段的場次，依電影分組 */
+async function nowShowing(scope: { cinema: core.Cinema; km: number | null }[], date: string, winId: string, format: string) {
+  const win = core.WINDOWS.find((w) => w.id === winId) || core.WINDOWS[core.WINDOWS.length - 1];
+  const { hits, failed } = await core.findShowtimes(scope, date, win, (format || "") as any);
+  return { groups: core.groupByMovie(hits), failed };
+}
+/** 離我最近的影城 */
+async function nearby(lat: number, lng: number, limit: number) {
+  return core.nearest(await core.loadCinemas(), { lat, lng }, limit || 20);
+}
+/** 更新設定裡的部分欄位（常去影城、地圖、TMDB 金鑰），其餘保留 */
+async function patchSettings(patch: Record<string, unknown>) {
+  core.saveSettings({ ...(await core.loadSettings()), ...patch } as core.Settings);
+  return true;
+}
+const extra: Record<string, (...a: any[]) => any> = { boxOffice, nowShowing, nearby, patchSettings };
 
 (globalThis as any).MS = {
   init(saved: Record<string, string>) {

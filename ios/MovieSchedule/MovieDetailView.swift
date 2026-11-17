@@ -111,6 +111,7 @@ struct MovieDetailView: View {
                     data.map { "\($0.cinemas.count) 間影城有放映" } ?? "",
                 ])
             }
+            CommunitySection(title: movie.title)
             switch day {
             case .loading:
                 Section { LoadingRow(text: "讀取放映影城…") }
@@ -137,7 +138,8 @@ struct MovieDetailView: View {
                     Section("\(c)（\(rows.count) 間）") {
                         ForEach(rows) { cinema in
                             NavigationLink {
-                                TimesView(title: d.title, runtime: runtime, cinemaName: cinema.name, address: cinema.address ?? "", date: d.date, versions: cinema.versions, bookingUrl: "https://twshowtimes.com/cinemas/\(cinema.id)/\(d.date)/")
+                                TimesView(title: d.title, runtime: runtime, cinemaName: cinema.name, address: cinema.address ?? "", date: d.date, versions: cinema.versions, bookingUrl: "",
+                                          cinema: Cinema(id: cinema.id, name: cinema.name, city: cinema.city, district: cinema.district, source: "tw", url: "https://twshowtimes.com/cinemas/\(cinema.id)/", address: (cinema.address ?? "").isEmpty ? nil : cinema.address, aliases: nil))
                             } label: {
                                 VStack(alignment: .leading, spacing: 3) {
                                     Text(cinema.name)
@@ -183,6 +185,7 @@ struct TimesView: View {
     let date: String
     let versions: [ShowVersion]
     let bookingUrl: String
+    var cinema: Cinema? = nil
 
     var body: some View {
         // 用 ScrollView 而不是 List：一列裡有很多個時間按鈕，List 會把整列當成一個可點的項目
@@ -198,7 +201,7 @@ struct TimesView: View {
                         LazyVGrid(columns: [GridItem(.adaptive(minimum: 76), spacing: 8)], spacing: 8) {
                             ForEach(v.times, id: \.self) { t in
                                 NavigationLink {
-                                    ConfirmView(pick: ShowPick(title: title, versionLabel: v.label, cinemaName: cinemaName, address: address, date: date, time: t, runtime: runtime, bookingUrl: bookingUrl))
+                                    ConfirmView(pick: ShowPick(title: title, versionLabel: v.label, cinemaName: cinemaName, address: address, date: date, time: t, runtime: runtime, bookingUrl: bookingUrl, cinema: cinema))
                                 } label: {
                                     Text(t).font(.body.monospacedDigit().weight(.semibold))
                                         .frame(maxWidth: .infinity).padding(.vertical, 10)

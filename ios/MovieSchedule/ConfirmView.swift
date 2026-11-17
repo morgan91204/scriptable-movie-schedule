@@ -6,6 +6,9 @@ struct ConfirmView: View {
     let pick: ShowPick
 
     @Environment(\.openURL) private var openURL
+    @ObservedObject private var settings = SettingsStore.shared
+    @State private var address: String
+    @State private var appInfo: CinemaAppInfo?
     @AppStorage("ads") private var ads = 15
     @AppStorage("alarm") private var alarm = 60
     @State private var runtimeText: String
@@ -17,6 +20,30 @@ struct ConfirmView: View {
     init(pick: ShowPick) {
         self.pick = pick
         _runtimeText = State(initialValue: pick.runtime > 0 ? String(pick.runtime) : "")
+        _address = State(initialValue: pick.address)
+    }
+
+    /// 分享給朋友的文字
+    private var shareText: String {
+        guard let start else { return pick.title }
+        let maps = settings.mapsURL(name: pick.cinemaName, address: address)?.absoluteString ?? ""
+        return [
+            "🎬 \(pick.title)",
+            "🕒 \(Fmt.full(start))" + (runtime > 0 ? " – \(end.map { Fmt.hm($0) } ?? "")" : ""),
+            "📍 \(pick.cinemaName)（\(pick.versionLabel)）",
+            seat.trimmingCharacters(in: .whitespaces).isEmpty ? "" : "💺 \(seat)",
+            address.isEmpty ? "" : "🏠 \(address)",
+            maps.isEmpty ? "" : "🗺 \(maps)",
+        ].filter { !$0.isEmpty }.joined(separator: "\n")
+    }
+
+    /// 訂票網址：已知的官方連結 → 影城官網 → 時刻表
+    private func openBooking() async {
+        var target = pick.bookingUrl
+        if target.isEmpty, let cinema = pick.cinema {
+            target = (try? await Bridge.shared.call("bookingUrl", [["cinema": Bridge.json(cinema), "booking": ""] as [String: Any]], as: String.self)) ?? cinema.url
+        }
+        if let u = URL(string: target) { openURL(u) }
     }
 
     private var runtime: Int { Int(runtimeText.trimmingCharacters(in: .whitespaces)) ?? 0 }
@@ -29,7 +56,13 @@ struct ConfirmView: View {
                 LabeledContent("電影", value: pick.title)
                 LabeledContent("版本", value: pick.versionLabel)
                 LabeledContent("影城", value: pick.cinemaName)
-                if !pick.address.isEmpty { LabeledContent("地址", value: pick.address) }
+                if !address.isEmpty {
+                    Button {
+                        if let u = settings.mapsURL(name: pick.cinemaName, address: address) { openURL(u) }
+                    } label: {
+                        LabeledContent("地址") { Text(address).multilineTextAlignment(.trailing) }
+                    }
+                }
                 if let start, let end {
                     LabeledContent("時間", value: Fmt.full(start))
                     LabeledContent("預計散場", value: Fmt.hm(end))
@@ -74,14 +107,27 @@ struct ConfirmView: View {
                 if let message { Text(message).font(.footnote).foregroundStyle(.red) }
             }
 
-            if let u = URL(string: pick.bookingUrl) {
-                Section {
-                    Button { openURL(u) } label: { Label("以瀏覽器訂票", systemImage: "globe") }
+            Section {
+                Button { Task { await openBooking() } } label: { Label("以瀏覽器訂票", systemImage: "globe") }
+                if let appInfo {
+                    Button { Task { await openCinemaApp(appInfo) } } label: { Label("以 App 訂票（\(appInfo.name)）", systemImage: "iphone") }
                 }
+            } footer: {
+                if let appInfo { Text("已安裝「\(appInfo.name)」App 會直接開啟；開不了時會打開 App Store 頁面。") }
+            }
+
+            Section {
+                ShareLink(item: shareText) { Label("分享這場給朋友", systemImage: "square.and.arrow.up") }
             }
         }
         .navigationTitle("確認行程")
         .navigationBarTitleDisplayMode(.inline)
+        .task {
+            guard let cinema = pick.cinema else { return }
+            let c = Bridge.json(cinema)
+            if address.isEmpty, let a = try? await Bridge.shared.call("cinemaAddress", [c], as: String.self) { address = a }
+            appInfo = try? await Bridge.shared.callOptional("cinemaApp", [c])
+        }
     }
 
     private func save() async {
@@ -106,7 +152,7 @@ struct ConfirmView: View {
             event.title = pick.title
             event.startDate = start
             event.endDate = end
-            event.location = pick.address.isEmpty ? pick.cinemaName : "\(pick.cinemaName)\n\(pick.address)"
+            event.location = address.isEmpty ? pick.cinemaName : "\(pick.cinemaName)\n\(address)"
             event.notes = [
                 "\(pick.cinemaName)（\(pick.versionLabel)）",
                 seat.trimmingCharacters(in: .whitespaces).isEmpty ? "" : "影廳／座位：\(seat)",
