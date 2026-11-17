@@ -1,0 +1,34 @@
+# 原生 iOS App：在 macOS 上產生專案、編譯，並在模擬器用真實網路跑資料層測試
+name: iOS 編譯與測試
+on:
+  push:
+    branches: [main]
+    paths: ["ios/**", ".github/workflows/ios.yml"]
+  workflow_dispatch:
+concurrency:
+  group: ios
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: 產生 Xcode 專案
+        run: |
+          brew install xcodegen >/dev/null
+          cd ios && xcodegen
+      - name: 編譯並測試
+        run: |
+          cd ios
+          xcodebuild -version
+          DEVICE=$(xcrun simctl list devices available | grep -E "iPhone 1[5-9]|iPhone [2-9][0-9]" | head -1 | sed -E 's/^ *([^(]+) \(.*/\1/' | sed 's/ *$//')
+          echo "模擬器：$DEVICE"
+          set -o pipefail
+          xcodebuild test -project MovieSchedule.xcodeproj -scheme MovieSchedule \
+            -destination "platform=iOS Simulator,name=$DEVICE" CODE_SIGNING_ALLOWED=NO 2>&1 | tee build.log \
+            | grep -E "error:|warning: var|✅|Test Case .*(passed|failed)|\*\* TEST|\*\* BUILD|Executed [0-9]+ tests|XCTAssert|failed -" || true
+          grep -q "\*\* TEST SUCCEEDED \*\*" build.log
+      - name: 失敗時顯示紀錄結尾
+        if: failure()
+        run: tail -60 ios/build.log || true

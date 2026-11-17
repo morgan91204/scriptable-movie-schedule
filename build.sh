@@ -31,3 +31,8 @@ node -e '
 const fs=require("fs");const m=JSON.parse(fs.readFileSync("scripting-src/script.json","utf8"));
 m.version=process.argv[1];fs.writeFileSync("scripting/script.json",JSON.stringify(m,null,2)+"\n");' "$(echo $VERSION | tr - .)"
 echo "scripting/ ready"
+
+# ── 原生 iOS App：共用資料層包成一支 JS（ios/MovieSchedule/Resources/core.js），在 App 內的 WKWebView 執行
+npx esbuild ios/bridge.ts --bundle --format=iife --target=safari16 --charset=utf8 --legal-comments=none --log-level=warning \
+  --define:APP_VERSION="\"$VERSION\"" --outfile=ios/MovieSchedule/Resources/core.js
+echo "ios core.js ready"
