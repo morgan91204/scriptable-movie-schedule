@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.16-2242
+// @movie-schedule-app 電影行程 v2026.11.17-1324
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/jsx.tsx
@@ -1980,14 +1980,60 @@ var communityMem = {};
 function communityCached(title) {
   return communityMem[communityKey(title)] || null;
 }
+var COMMUNITY_SUMMARY_URL = "https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/data/community.json";
+var summaryMem = null;
+function loadSummary() {
+  if (summaryMem && Date.now() - summaryMem.at < 3e5) return summaryMem.job;
+  const job = (async () => {
+    try {
+      const r = await platform().fetchText(COMMUNITY_SUMMARY_URL + "?t=" + Math.floor(Date.now() / 3e5), { accept: "application/json" });
+      if (r.status !== 200) return null;
+      const m = JSON.parse(r.body)?.movies;
+      return m && typeof m === "object" ? m : null;
+    } catch (_) {
+      return null;
+    }
+  })();
+  summaryMem = { at: Date.now(), job };
+  return job;
+}
+var readMyVotes = () => {
+  try {
+    return JSON.parse(cacheGet("my-votes.json") || "{}") || {};
+  } catch (_) {
+    return {};
+  }
+};
+function saveMyVote(k, c, fresh) {
+  const all = readMyVotes();
+  for (const [key, v] of Object.entries(all)) if (!v.s && Date.now() - v.at > 60 * 864e5) delete all[key];
+  all[k] = fresh ? { s: c.mine, at: Date.now(), dist: c.dist, dat: Date.now() } : { s: c.mine, at: Date.now() };
+  cacheSet("my-votes.json", JSON.stringify(all));
+}
+var fromDist = (dist, mine) => {
+  const d = [0, 1, 2, 3, 4].map((i) => Number(dist[i]) || 0);
+  const n = d.reduce((a, b) => a + b, 0);
+  const sum = d.reduce((a, c, i) => a + c * (i + 1), 0);
+  return { n, avg: n ? Math.round(sum / n * 10) / 10 : 0, dist: d, mine };
+};
 async function communityStats(title) {
   const k = communityKey(title);
   const hit = communityMem[k];
   if (hit && Date.now() - hit.at < 5e3) return { n: hit.n, avg: hit.avg, dist: hit.dist, mine: hit.mine };
+  const mine = readMyVotes()[k];
+  if (mine && Date.now() - mine.at < 30 * 864e5) {
+    const summary = await loadSummary();
+    if (summary) {
+      const c2 = fromDist(mine.dist && mine.dat && Date.now() - mine.dat < 45 * 6e4 ? mine.dist : summary[k] || [], mine.s);
+      communityMem[k] = { ...c2, at: Date.now() };
+      return c2;
+    }
+  }
   const r = await platform().fetchText(`${COMMUNITY_API}/v1/stats?m=${encodeURIComponent(k)}&d=${encodeURIComponent(deviceId())}`, { accept: "application/json" });
   if (r.status !== 200) throw new Error("觀眾評分暫時讀不到");
   const c = JSON.parse(r.body);
   communityMem[k] = { ...c, at: Date.now() };
+  saveMyVote(k, c, false);
   return c;
 }
 async function communityVote(title, score) {
@@ -2001,6 +2047,7 @@ async function communityVote(title, score) {
   if (r.status !== 200) throw new Error("評分沒有送出，請稍後再試");
   const c = JSON.parse(r.body);
   communityMem[k] = { ...c, at: Date.now() };
+  saveMyVote(k, c, true);
   return c;
 }
 var BOXOFFICE_URL = "https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/main/dist/boxoffice.json";
@@ -2116,7 +2163,7 @@ var App = class {
     ];
     // ── 事件迴圈 ──
     // 背景查 GitHub 上的最新版本（首頁顯示是否為最新版）
-    this.latest = checkLatest("2026.11.16-2242");
+    this.latest = checkLatest("2026.11.17-1324");
     // ── 搜尋 ──
     this.query = "";
     this.tmdbStatus = "";
@@ -2251,11 +2298,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.16-2242"}`);
+          Pasteboard.copy(`版本 ${"2026.11.17-1324"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.16-2242"}`,
+      `版本 ${"2026.11.17-1324"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }

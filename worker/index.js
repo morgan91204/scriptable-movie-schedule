@@ -3,6 +3,8 @@
 // API：
 //   GET  /v1/stats?m=<片名鍵>&d=<裝置代號>   → { n, avg, dist:[1星..5星人數], mine }
 //   POST /v1/vote  { m, d, s }               → 同上（s = 1～5；0 = 取消評分）
+//   GET  /v1/all                             → { movies: { <片名鍵>: [1星..5星人數] } }（所有有人評分的片）
+// 省請求數：GitHub Actions 每 30 分鐘把 /v1/all 存成靜態檔，App 平常讀靜態檔，只有投票（和每部片第一次查自己的票）才會打到這裡。
 import { DurableObject } from "cloudflare:workers";
 
 const HEADERS = {
@@ -31,7 +33,11 @@ export default {
         const m = url.searchParams.get("m") || "";
         const d = url.searchParams.get("d") || "";
         if (!okMovie(m)) return json({ error: "bad movie" }, 400);
-        return json(await env.MOVIE.get(env.MOVIE.idFromName(m)).stats(okDevice(d) ? d : ""));
+        return json(await env.MOVIE.get(env.MOVIE.idFromName(m)).stats(okDevice(d) ? d : "", m));
+      }
+
+      if (url.pathname === "/v1/all" && req.method === "GET") {
+        return json({ movies: await env.INDEX.get(env.INDEX.idFromName("all")).all() });
       }
 
       if (url.pathname === "/v1/vote" && req.method === "POST") {
@@ -45,7 +51,7 @@ export default {
         if (!okMovie(m) || !okDevice(d) || !Number.isInteger(s) || s < 0 || s > 5) return json({ error: "bad request" }, 400);
         const ip = req.headers.get("cf-connecting-ip") || "unknown";
         if (!(await env.LIMIT.get(env.LIMIT.idFromName(ip)).hit(LIMIT_MAX, LIMIT_WINDOW))) return json({ error: "too many votes, try later" }, 429);
-        return json(await env.MOVIE.get(env.MOVIE.idFromName(m)).vote(d, s));
+        return json(await env.MOVIE.get(env.MOVIE.idFromName(m)).vote(d, s, m));
       }
 
       return json({ error: "not found" }, 404);
@@ -59,10 +65,33 @@ export default {
 export class Movie extends DurableObject {
   constructor(ctx, env) {
     super(ctx, env);
+    this.env = env;
     this.sql = ctx.storage.sql;
     this.sql.exec("CREATE TABLE IF NOT EXISTS votes (dev TEXT PRIMARY KEY, score INTEGER NOT NULL, at INTEGER NOT NULL)");
   }
-  stats(dev) {
+  /** 把這部片的統計同步到總表（有變才送）；失敗不影響投票 */
+  async sync(key, dist) {
+    if (!key) return;
+    const sig = dist.join(",");
+    if ((await this.ctx.storage.get("indexed")) === sig) return;
+    try {
+      await this.env.INDEX.get(this.env.INDEX.idFromName("all")).put(key, dist);
+      await this.ctx.storage.put("indexed", sig);
+    } catch (_) {}
+  }
+  async stats(dev, key) {
+    const out = this.count(dev);
+    if (out.n > 0) await this.sync(key, out.dist); // 總表上線前就有的評分：有人來讀時補進總表
+    return out;
+  }
+  async vote(dev, score, key) {
+    if (score === 0) this.sql.exec("DELETE FROM votes WHERE dev = ?", dev);
+    else this.sql.exec("INSERT INTO votes (dev, score, at) VALUES (?, ?, ?) ON CONFLICT(dev) DO UPDATE SET score = excluded.score, at = excluded.at", dev, score, Date.now());
+    const out = this.count(dev);
+    await this.sync(key, out.dist);
+    return out;
+  }
+  count(dev) {
     const dist = [0, 0, 0, 0, 0];
     for (const r of this.sql.exec("SELECT score, COUNT(*) AS c FROM votes GROUP BY score")) dist[r.score - 1] = r.c;
     const n = dist.reduce((a, b) => a + b, 0);
@@ -74,10 +103,23 @@ export class Movie extends DurableObject {
     }
     return { n, avg: n ? Math.round((sum / n) * 10) / 10 : 0, dist, mine };
   }
-  vote(dev, score) {
-    if (score === 0) this.sql.exec("DELETE FROM votes WHERE dev = ?", dev);
-    else this.sql.exec("INSERT INTO votes (dev, score, at) VALUES (?, ?, ?) ON CONFLICT(dev) DO UPDATE SET score = excluded.score, at = excluded.at", dev, score, Date.now());
-    return this.stats(dev);
+}
+
+/** 總表：所有有人評分的片，各星等人數（給 /v1/all 一次讀完） */
+export class Index extends DurableObject {
+  constructor(ctx, env) {
+    super(ctx, env);
+    this.sql = ctx.storage.sql;
+    this.sql.exec("CREATE TABLE IF NOT EXISTS summary (k TEXT PRIMARY KEY, d TEXT NOT NULL)");
+  }
+  put(key, dist) {
+    if (dist.every((x) => !x)) this.sql.exec("DELETE FROM summary WHERE k = ?", key);
+    else this.sql.exec("INSERT INTO summary (k, d) VALUES (?, ?) ON CONFLICT(k) DO UPDATE SET d = excluded.d", key, dist.join(","));
+  }
+  all() {
+    const out = {};
+    for (const r of this.sql.exec("SELECT k, d FROM summary ORDER BY k")) out[r.k] = String(r.d).split(",").map(Number);
+    return out;
   }
 }
 

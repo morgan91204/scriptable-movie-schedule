@@ -1280,15 +1280,69 @@ const communityMem: Record<string, Community & { at: number }> = {};
 export function communityCached(title: string): Community | null {
   return communityMem[communityKey(title)] || null;
 }
+
+// 省伺服器請求：所有片的評分統計每 30 分鐘由 GitHub Actions 存成靜態檔（data 分支），App 平常只讀這個檔；
+// 自己投的票記在手機上。只有投票、以及每部片第一次（之後每 30 天一次）確認自己的票時才會打到伺服器。
+export const COMMUNITY_SUMMARY_URL = "https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/data/community.json";
+type Summary = Record<string, number[]>;
+let summaryMem: { at: number; job: Promise<Summary | null> } | null = null;
+/** 靜態總表（記 5 分鐘）；還沒有這個檔或讀不到回傳 null，改用伺服器 */
+function loadSummary(): Promise<Summary | null> {
+  if (summaryMem && Date.now() - summaryMem.at < 300e3) return summaryMem.job;
+  const job = (async () => {
+    try {
+      const r = await platform().fetchText(COMMUNITY_SUMMARY_URL + "?t=" + Math.floor(Date.now() / 300e3), { accept: "application/json" });
+      if (r.status !== 200) return null;
+      const m = JSON.parse(r.body)?.movies;
+      return m && typeof m === "object" ? (m as Summary) : null;
+    } catch (_) {
+      return null;
+    }
+  })();
+  summaryMem = { at: Date.now(), job };
+  return job;
+}
+/** 這支手機的投票紀錄：s = 我給的分數，at = 上次跟伺服器確認的時間；dist／dat = 伺服器最近回的統計（剛投完票時比靜態檔新） */
+interface MyVote { s: number; at: number; dist?: number[]; dat?: number }
+const readMyVotes = (): Record<string, MyVote> => {
+  try {
+    return JSON.parse(cacheGet("my-votes.json") || "{}") || {};
+  } catch (_) {
+    return {};
+  }
+};
+function saveMyVote(k: string, c: Community, fresh: boolean) {
+  const all = readMyVotes();
+  for (const [key, v] of Object.entries(all)) if (!v.s && Date.now() - v.at > 60 * 86400e3) delete all[key]; // 沒投票的舊紀錄清掉
+  all[k] = fresh ? { s: c.mine, at: Date.now(), dist: c.dist, dat: Date.now() } : { s: c.mine, at: Date.now() };
+  cacheSet("my-votes.json", JSON.stringify(all));
+}
+const fromDist = (dist: number[], mine: number): Community => {
+  const d = [0, 1, 2, 3, 4].map((i) => Number(dist[i]) || 0);
+  const n = d.reduce((a, b) => a + b, 0);
+  const sum = d.reduce((a, c, i) => a + c * (i + 1), 0);
+  return { n, avg: n ? Math.round((sum / n) * 10) / 10 : 0, dist: d, mine };
+};
 /** 讀觀眾評分（5 秒內讀過或剛投過票就直接用） */
 export async function communityStats(title: string): Promise<Community> {
   const k = communityKey(title);
   const hit = communityMem[k];
   if (hit && Date.now() - hit.at < 5000) return { n: hit.n, avg: hit.avg, dist: hit.dist, mine: hit.mine };
+  const mine = readMyVotes()[k];
+  if (mine && Date.now() - mine.at < 30 * 86400e3) {
+    const summary = await loadSummary();
+    if (summary) {
+      // 剛投完票的 45 分鐘內用伺服器當時回的統計（靜態檔還沒更新）
+      const c = fromDist(mine.dist && mine.dat && Date.now() - mine.dat < 45 * 60e3 ? mine.dist : summary[k] || [], mine.s);
+      communityMem[k] = { ...c, at: Date.now() };
+      return c;
+    }
+  }
   const r = await platform().fetchText(`${COMMUNITY_API}/v1/stats?m=${encodeURIComponent(k)}&d=${encodeURIComponent(deviceId())}`, { accept: "application/json" });
   if (r.status !== 200) throw new Error("觀眾評分暫時讀不到");
   const c = JSON.parse(r.body) as Community;
   communityMem[k] = { ...c, at: Date.now() };
+  saveMyVote(k, c, false);
   return c;
 }
 /** 投票：score 1～5；0 = 取消。回傳更新後的統計 */
@@ -1303,6 +1357,7 @@ export async function communityVote(title: string, score: number): Promise<Commu
   if (r.status !== 200) throw new Error("評分沒有送出，請稍後再試");
   const c = JSON.parse(r.body) as Community;
   communityMem[k] = { ...c, at: Date.now() };
+  saveMyVote(k, c, true);
   return c;
 }
 

@@ -12,6 +12,14 @@ class_name = "Movie"
 name = "LIMIT"
 class_name = "Limit"
 
+[[durable_objects.bindings]]
+name = "INDEX"
+class_name = "Index"
+
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["Movie", "Limit"]
+
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["Index"]
