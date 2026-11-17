@@ -29,6 +29,8 @@ targets:
         INFOPLIST_KEY_NSCalendarsWriteOnlyAccessUsageDescription: 把你選的電影場次加入行事曆。
         INFOPLIST_KEY_NSLocationWhenInUseUsageDescription: 用目前位置找出離你最近的影城。
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.entertainment
+        INFOPLIST_KEY_ITSAppUsesNonExemptEncryption: NO # 只用系統的 HTTPS，不需要出口合規文件
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
   MovieScheduleTests:
     type: bundle.unit-test
     platform: iOS

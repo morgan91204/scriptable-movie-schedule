@@ -1,0 +1,87 @@
+# 上傳到 TestFlight：在 macOS 上簽署、封存、上傳。手動執行（Actions → 上傳到 TestFlight → Run workflow）。
+# 需要先在 repo 的 Settings → Secrets and variables → Actions 存四筆：
+#   ASC_KEY_ID（金鑰 ID）、ASC_ISSUER_ID（Issuer ID）、ASC_KEY_P8（.p8 檔全文）、APPLE_TEAM_ID（Team ID）
+name: 上傳到 TestFlight
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 版本號（例如 0.1.0）；留空用專案裡的版本
+        required: false
+        default: ""
+concurrency:
+  group: testflight
+  cancel-in-progress: false
+jobs:
+  upload:
+    runs-on: macos-15
+    timeout-minutes: 40
+    env:
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: 檢查金鑰都設定了
+        run: |
+          MISSING=""
+          for n in ASC_KEY_ID ASC_ISSUER_ID ASC_KEY_P8 APPLE_TEAM_ID; do
+            eval "v=\${$n}"
+            [ -z "$v" ] && MISSING="$MISSING $n"
+          done
+          if [ -n "$MISSING" ]; then
+            echo "::error::還沒設定這些 Secrets：$MISSING（Settings → Secrets and variables → Actions）"
+            exit 1
+          fi
+          mkdir -p "$RUNNER_TEMP/keys"
+          printf '%s\n' "$ASC_KEY_P8" > "$RUNNER_TEMP/keys/AuthKey_$ASC_KEY_ID.p8"
+          grep -q "BEGIN PRIVATE KEY" "$RUNNER_TEMP/keys/AuthKey_$ASC_KEY_ID.p8" || { echo "::error::ASC_KEY_P8 的內容不像 .p8 金鑰（要包含 BEGIN PRIVATE KEY 那幾行）"; exit 1; }
+      - name: 選用最新的 Xcode
+        run: |
+          LATEST=$(ls -d /Applications/Xcode_*.app 2>/dev/null | grep -v -i beta | sort -V | tail -1)
+          [ -n "$LATEST" ] && sudo xcode-select -s "$LATEST"
+          xcodebuild -version
+      - name: 產生 Xcode 專案
+        run: |
+          brew install xcodegen >/dev/null
+          cd ios && xcodegen
+      - name: 簽署並封存
+        run: |
+          cd ios
+          BUILD=$((GITHUB_RUN_NUMBER + 100)) # 每次上傳的建置編號都要比上一次大
+          VERSION="${{ inputs.version }}"
+          AUTH="-allowProvisioningUpdates -authenticationKeyPath $RUNNER_TEMP/keys/AuthKey_$ASC_KEY_ID.p8 -authenticationKeyID $ASC_KEY_ID -authenticationKeyIssuerID $ASC_ISSUER_ID"
+          echo "$AUTH" > "$RUNNER_TEMP/auth.txt"
+          echo "建置編號：$BUILD"
+          set -o pipefail
+          xcodebuild archive -project MovieSchedule.xcodeproj -scheme MovieSchedule -destination "generic/platform=iOS" \
+            -archivePath "$RUNNER_TEMP/App.xcarchive" $AUTH \
+            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" CODE_SIGN_STYLE=Automatic CURRENT_PROJECT_VERSION="$BUILD" ${VERSION:+MARKETING_VERSION="$VERSION"} \
+            2>&1 | tee archive.log | grep -E "error:|\*\* ARCHIVE" || true
+          grep -q "\*\* ARCHIVE SUCCEEDED \*\*" archive.log
+      - name: 上傳到 App Store Connect
+        run: |
+          cd ios
+          cat > "$RUNNER_TEMP/export.plist" <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>destination</key><string>upload</string>
+            <key>signingStyle</key><string>automatic</string>
+            <key>teamID</key><string>$APPLE_TEAM_ID</string>
+            <key>manageAppVersionAndBuildNumber</key><false/>
+          </dict></plist>
+          PLIST
+          set -o pipefail
+          xcodebuild -exportArchive -archivePath "$RUNNER_TEMP/App.xcarchive" -exportOptionsPlist "$RUNNER_TEMP/export.plist" \
+            -exportPath "$RUNNER_TEMP/export" $(cat "$RUNNER_TEMP/auth.txt") 2>&1 | tee upload.log | grep -E "error:|Upload|\*\* EXPORT|uploaded|ITMS" || true
+          grep -q "\*\* EXPORT SUCCEEDED \*\*" upload.log
+          echo "已上傳。Apple 處理完（約 10～30 分鐘）會出現在 App Store Connect 的 TestFlight 分頁。"
+      - name: 失敗時顯示紀錄結尾
+        if: failure()
+        run: tail -40 ios/archive.log ios/upload.log 2>/dev/null || true
+      - name: 清掉金鑰檔
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/keys" "$RUNNER_TEMP/auth.txt"

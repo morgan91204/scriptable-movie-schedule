@@ -13,3 +13,5 @@ worker/.wrangler/
 ios/MovieSchedule.xcodeproj/
 ios/build.log
 ios/DerivedData/
+ios/archive.log
+ios/upload.log
