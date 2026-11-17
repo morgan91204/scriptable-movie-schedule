@@ -506,6 +506,60 @@ const readExtras = (): Record<string, MovieExtras & { at: number }> => {
 };
 
 /** 海報：場次通電影頁（不需 Token）→ TMDB；預告：TMDB 的 YouTube 影片 → YouTube 搜尋 */
+// ───────────────────────── 伺服器整理好的電影資料 ─────────────────────────
+// GitHub Actions 每小時把上映中與票房榜電影的海報、預告、三大評分、片長查好，存成一個靜態檔（data 分支的 meta.json）。
+// App 先讀這個檔：有的話一個請求就拿到全部，不用每部片各打十幾個請求；沒有、太舊或讀不到，就照原本的方式自己查。
+export const META_URL = "https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/data/meta.json";
+export interface MetaEntry {
+  p?: string; // 海報網址
+  t?: string; // 預告網址
+  tn?: string; // 預告標題（有才算找到預告）
+  xa?: number; // 海報／預告查詢時間
+  r?: Ratings; // 三大評分（查過但沒有評分是空物件）
+  ra?: number;
+  rt?: number; // 片長（分鐘）
+  rf?: string; // 片長來源
+  rta?: number;
+  seen?: number; // 最後一次出現在片單上的時間
+}
+export interface MetaFile { updated: number; movies: Record<string, MetaEntry> }
+let metaOn = true;
+/** 伺服器端產生資料時要關掉，不然會讀到自己上一次的結果 */
+export function setMetaEnabled(on: boolean): void {
+  metaOn = on;
+}
+let metaMem: { at: number; job: Promise<MetaFile | null> } | null = null;
+/** 讀伺服器資料（記憶體 30 分鐘、手機 1 小時；超過 3 天沒更新就不用）。最多等 4 秒，讀不到回傳 null */
+function loadMeta(): Promise<MetaFile | null> {
+  if (!metaOn) return Promise.resolve(null);
+  if (metaMem && Date.now() - metaMem.at < 1800e3) return metaMem.job;
+  const fresh = (m: MetaFile | null) => (m && m.movies && Date.now() - m.updated < 3 * 86400e3 ? m : null);
+  const job = (async (): Promise<MetaFile | null> => {
+    let disk: { at: number; data: MetaFile } | null = null;
+    try {
+      disk = JSON.parse(cacheGet("meta.json") || "null");
+    } catch (_) {}
+    if (disk && Date.now() - disk.at < 3600e3) return fresh(disk.data);
+    const net = (async () => {
+      const r = await platform().fetchText(META_URL + "?t=" + Math.floor(Date.now() / 1800e3), { accept: "application/json" });
+      if (r.status !== 200) return null;
+      const data = JSON.parse(r.body) as MetaFile;
+      if (!data || typeof data.movies !== "object") return null;
+      cacheSet("meta.json", JSON.stringify({ at: Date.now(), data }));
+      return data;
+    })().catch(() => null);
+    const got = await Promise.race([net, delay(4000).then(() => null)]);
+    return fresh(got || (disk ? disk.data : null));
+  })();
+  metaMem = { at: Date.now(), job };
+  return job;
+}
+/** 這部片在伺服器資料裡的紀錄（沒有回傳 null） */
+async function metaOf(title: string): Promise<MetaEntry | null> {
+  const m = await loadMeta();
+  return (m && (m.movies[normTitle(title)] || m.movies[normTitle(baseTitle(title))])) || null;
+}
+
 export async function movieExtras(title: string, slug?: string): Promise<MovieExtras> {
   // 找過的海報／預告網址記在手機上（找到的 7 天、沒找到的 1 天），之後不用再查；填了金鑰要重新查
   const hasToken = !!((await loadSettings()).tmdbToken || "").trim();
@@ -520,6 +574,9 @@ export async function movieExtras(title: string, slug?: string): Promise<MovieEx
     const stale = hit && hit.v !== EXTRAS_V && (!hit.trailerName || !hit.poster);
     const ttl = stale ? 0 : !hit?.trailerName ? 3600e3 : hit?.poster ? 7 * 86400e3 : 86400e3;
     if (hit && Date.now() - hit.at < ttl) return { poster: hit.poster, trailer: hit.trailer, trailerName: hit.trailerName };
+    // 伺服器已經查好海報和預告：直接用
+    const me = await metaOf(title);
+    if (me && me.tn && me.t) return { poster: normImageUrl(me.p || ""), trailer: me.t, trailerName: me.tn };
     const out = await findExtras(title, slug);
     // 查不到預告也保留這次執行的結果（不寫進手機快取的 err 會讓下次啟動重查）；
     // 不能刪掉 memo，否則 Scriptable 讀好後重畫會再查一次，畫面上的海報會先消失
@@ -630,6 +687,8 @@ export function movieRuntime(title: string, slug?: string, en?: string): Promise
     };
     const hit = read()["at|" + k];
     if (hit && Date.now() - hit.at < (hit.r ? 30 : 1) * 86400e3) return hit.r ? { runtime: hit.r, from: hit.from } : null;
+    const me = await metaOf(title);
+    if (me && me.rt) return { runtime: me.rt, from: me.rf || "開眼電影網" };
     let out: { runtime: number; from: string } | null = null;
     const token = ((await loadSettings()).tmdbToken || "").trim();
     if (token) {
@@ -691,6 +750,8 @@ export function moviePoster(title: string, slug?: string, en?: string): Promise<
     const own = all["p|" + nk] as (MovieExtras & { at: number; v?: number }) | undefined; // 只查過海報的紀錄
     // 找到的記 7 天；沒找到的記 1 天，但舊版（比對規則改了）記下的「沒找到」一律重查
     if (own && Date.now() - own.at < (own.poster ? 7 : own.v === EXTRAS_V ? 1 : 0) * 86400e3) return own.poster;
+    const me = await metaOf(title);
+    if (me && me.p) return normImageUrl(me.p); // 伺服器已經查好海報
     const poster = normImageUrl(await findPoster(title, slug, en).catch(() => ""));
     const latest = readExtras();
     latest["p|" + nk] = { poster, trailer: "", trailerName: "", at: Date.now(), v: EXTRAS_V } as MovieExtras & { at: number };
@@ -1231,6 +1292,8 @@ export function movieRatings(title: string, en?: string, slug?: string): Promise
     // 有分數記 7 天；查過但沒有任何評分（新片、演唱會）記 1 天，不用每次進電影頁都重查。
     // 舊版（比對規則改了，例如加了年份檢查）記下的一律重查，避免手機上留著對錯片的分數
     if (hit && hit.v === RATINGS_V && Date.now() - hit.at < (has(hit) ? 7 : 1) * 86400e3) return hit;
+    const me = await metaOf(title);
+    if (me && me.r && me.ra) return me.r; // 伺服器已經查好評分（空物件 = 查過、沒有評分）
     const r = await findRatings(title, en, slug);
     // 有錯（連線失敗）：不寫進手機快取（下次啟動再試），但這次執行內記住結果，重畫時不用再查
     if (!r.err || has(r)) {

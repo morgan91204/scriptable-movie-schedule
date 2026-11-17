@@ -7,7 +7,7 @@ on:
 permissions:
   contents: write
 concurrency:
-  group: community
+  group: data-branch
   cancel-in-progress: false
 jobs:
   export:
@@ -20,25 +20,5 @@ jobs:
           node-version: 22
       - name: 讀評分總表
         run: node tools/community.mjs "$RUNNER_TEMP/community.json"
-      - name: 有變化才提交到 data 分支
-        run: |
-          if [ ! -f "$RUNNER_TEMP/community.json" ]; then
-            echo "沒有新的總表"
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          if git fetch origin data 2>/dev/null; then
-            git checkout -q -B data FETCH_HEAD
-          else
-            git checkout -q --orphan data
-            git rm -rfq .
-          fi
-          cp "$RUNNER_TEMP/community.json" community.json
-          git add community.json
-          if git diff --cached --quiet; then
-            echo "評分沒有變化"
-            exit 0
-          fi
-          git commit -q -m "更新觀眾評分總表"
-          git push origin data
+      - name: 有變化才發佈到 data 分支
+        run: tools/publish-data.sh "$RUNNER_TEMP/community.json" community.json "更新資料"

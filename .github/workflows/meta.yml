@@ -1,0 +1,28 @@
+# 電影資料總表：每小時把上映中與票房榜電影的海報、預告、三大評分、片長查好，存成 data 分支的 meta.json
+name: 更新電影資料
+on:
+  schedule:
+    - cron: "23 * * * *"
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: data-branch
+  cancel-in-progress: false
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: 取上一次的總表
+        run: curl -fsSL "https://raw.githubusercontent.com/${{ github.repository }}/data/meta.json?t=$(date +%s)" -o "$RUNNER_TEMP/prev.json" || echo "還沒有總表，從頭查"
+      - name: 查資料
+        run: node tools/meta.mjs "$RUNNER_TEMP/prev.json" "$RUNNER_TEMP/meta.json"
+      - name: 發佈到 data 分支
+        run: tools/publish-data.sh "$RUNNER_TEMP/meta.json" meta.json "更新資料"

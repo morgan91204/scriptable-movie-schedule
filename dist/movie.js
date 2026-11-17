@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.17-1324
+// @movie-schedule-app 電影行程 v2026.11.17-2253
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/jsx.tsx
@@ -1381,6 +1381,38 @@ var readExtras = () => {
     return {};
   }
 };
+var META_URL = "https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/data/meta.json";
+var metaOn = true;
+var metaMem = null;
+function loadMeta() {
+  if (!metaOn) return Promise.resolve(null);
+  if (metaMem && Date.now() - metaMem.at < 18e5) return metaMem.job;
+  const fresh = (m) => m && m.movies && Date.now() - m.updated < 3 * 864e5 ? m : null;
+  const job = (async () => {
+    let disk = null;
+    try {
+      disk = JSON.parse(cacheGet("meta.json") || "null");
+    } catch (_) {
+    }
+    if (disk && Date.now() - disk.at < 36e5) return fresh(disk.data);
+    const net = (async () => {
+      const r = await platform().fetchText(META_URL + "?t=" + Math.floor(Date.now() / 18e5), { accept: "application/json" });
+      if (r.status !== 200) return null;
+      const data = JSON.parse(r.body);
+      if (!data || typeof data.movies !== "object") return null;
+      cacheSet("meta.json", JSON.stringify({ at: Date.now(), data }));
+      return data;
+    })().catch(() => null);
+    const got = await Promise.race([net, delay(4e3).then(() => null)]);
+    return fresh(got || (disk ? disk.data : null));
+  })();
+  metaMem = { at: Date.now(), job };
+  return job;
+}
+async function metaOf(title) {
+  const m = await loadMeta();
+  return m && (m.movies[normTitle(title)] || m.movies[normTitle(baseTitle(title))]) || null;
+}
 async function movieExtras(title, slug) {
   const hasToken = !!((await loadSettings()).tmdbToken || "").trim();
   const k = (hasToken ? "t|" : "n|") + (slug || "") + "|" + title;
@@ -1391,6 +1423,8 @@ async function movieExtras(title, slug) {
     const stale = hit && hit.v !== EXTRAS_V && (!hit.trailerName || !hit.poster);
     const ttl = stale ? 0 : !hit?.trailerName ? 36e5 : hit?.poster ? 7 * 864e5 : 864e5;
     if (hit && Date.now() - hit.at < ttl) return { poster: hit.poster, trailer: hit.trailer, trailerName: hit.trailerName };
+    const me = await metaOf(title);
+    if (me && me.tn && me.t) return { poster: normImageUrl(me.p || ""), trailer: me.t, trailerName: me.tn };
     const out = await findExtras(title, slug);
     const all = read();
     for (const [key, v] of Object.entries(all)) if (Date.now() - v.at > 7 * 864e5) delete all[key];
@@ -1485,6 +1519,8 @@ function movieRuntime(title, slug, en) {
     };
     const hit = read()["at|" + k];
     if (hit && Date.now() - hit.at < (hit.r ? 30 : 1) * 864e5) return hit.r ? { runtime: hit.r, from: hit.from } : null;
+    const me = await metaOf(title);
+    if (me && me.rt) return { runtime: me.rt, from: me.rf || "開眼電影網" };
     let out = null;
     const token = ((await loadSettings()).tmdbToken || "").trim();
     if (token) {
@@ -1538,6 +1574,8 @@ function moviePoster(title, slug, en) {
     if (hit?.poster) return normImageUrl(hit.poster);
     const own = all["p|" + nk];
     if (own && Date.now() - own.at < (own.poster ? 7 : own.v === EXTRAS_V ? 1 : 0) * 864e5) return own.poster;
+    const me = await metaOf(title);
+    if (me && me.p) return normImageUrl(me.p);
     const poster = normImageUrl(await findPoster(title, slug, en).catch(() => ""));
     const latest = readExtras();
     latest["p|" + nk] = { poster, trailer: "", trailerName: "", at: Date.now(), v: EXTRAS_V };
@@ -1948,6 +1986,8 @@ function movieRatings(title, en, slug) {
     const hit = read()[k];
     const has = (x) => !!(x.imdb || x.tomato || x.popcorn);
     if (hit && hit.v === RATINGS_V && Date.now() - hit.at < (has(hit) ? 7 : 1) * 864e5) return hit;
+    const me = await metaOf(title);
+    if (me && me.r && me.ra) return me.r;
     const r = await findRatings(title, en, slug);
     if (!r.err || has(r)) {
       const all = read();
@@ -2163,7 +2203,7 @@ var App = class {
     ];
     // ── 事件迴圈 ──
     // 背景查 GitHub 上的最新版本（首頁顯示是否為最新版）
-    this.latest = checkLatest("2026.11.17-1324");
+    this.latest = checkLatest("2026.11.17-2253");
     // ── 搜尋 ──
     this.query = "";
     this.tmdbStatus = "";
@@ -2298,11 +2338,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.17-1324"}`);
+          Pasteboard.copy(`版本 ${"2026.11.17-2253"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.17-1324"}`,
+      `版本 ${"2026.11.17-2253"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
