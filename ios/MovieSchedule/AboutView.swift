@@ -78,8 +78,8 @@ struct AboutView: View {
     private func row(_ s: Source) -> some View {
         Link(destination: URL(string: s.url) ?? privacyURL) {
             VStack(alignment: .leading, spacing: 2) {
-                Text(s.name).foregroundStyle(.primary)
-                Text(s.detail).font(.footnote).foregroundStyle(.secondary)
+                Text(s.name)
+                Text(s.detail).font(.footnote).foregroundStyle(Color(.secondaryLabel)) // 連結裡的 .secondary 會被染成藍色，改用固定的灰色
             }
         }
     }
