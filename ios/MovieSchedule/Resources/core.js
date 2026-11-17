@@ -54,6 +54,8 @@
     isLocalSrc: () => isLocalSrc,
     isReissue: () => isReissue,
     kmLabel: () => kmLabel,
+    lateIsTonight: () => lateIsTonight,
+    lateOnOwnDate: () => lateOnOwnDate,
     loadBoxOffice: () => loadBoxOffice,
     loadCinemas: () => loadCinemas,
     loadMovies: () => loadMovies,
@@ -78,6 +80,7 @@
     saveSettings: () => saveSettings,
     setMetaEnabled: () => setMetaEnabled,
     shareText: () => shareText,
+    showDay: () => showDay,
     showMinute: () => showMinute,
     tmdbRuntime: () => tmdbRuntime,
     tmdbTest: () => tmdbTest,
@@ -702,6 +705,9 @@ function parseTwMovieDay(doc) {
   var addDays = (d, n) => new Date(Date.parse(d + "T00:00:00Z") + n * 864e5).toISOString().slice(0, 10);
   var weekday = (d) => WEEK[(/* @__PURE__ */ new Date(d + "T00:00:00Z")).getUTCDay()];
   var isLate = (t) => t < "05:00";
+  var lateOnOwnDate = (source) => source === "tw";
+  var showDay = (source, date, time) => isLate(time) && !lateOnOwnDate(source) ? addDays(date, 1) : date;
+  var lateIsTonight = (source, time) => isLate(time) && !lateOnOwnDate(source);
   function dateLabel(d) {
     const [, m, dd] = d.split("-").map(Number);
     const t = todayTPE();
@@ -1449,36 +1455,58 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     return (isLate(t) ? h + 24 : h) * 60 + m;
   }
   async function findShowtimes(scope, date, win, format = "", onProgress) {
-    let from = win.from, to = win.to;
+    let plans = [{ date, from: win.from, to: win.to }];
     if (win.id === "soon") {
-      const now = showMinute(nowHM());
-      from = now;
-      to = now + 180;
+      const hm = nowHM();
+      const now = showMinute(hm);
+      if (isLate(hm) && date === todayTPE()) {
+        const dayEnd = 29 * 60;
+        plans = [{ date: addDays(date, -1), from: now, to: Math.min(now + 180, dayEnd) }];
+        if (now + 180 > dayEnd) plans.push({ date, from: 5 * 60, to: now + 180 - 24 * 60 });
+      } else {
+        plans = [{ date, from: now, to: now + 180 }];
+      }
     }
     const hits = [];
-    const failed = [];
+    const failed = /* @__PURE__ */ new Set();
+    const noData = /* @__PURE__ */ new Set();
     let done = 0;
     const queue = scope.slice();
     async function worker() {
       for (let item = queue.shift(); item; item = queue.shift()) {
-        try {
-          const r = await moviesOf(item.cinema, date);
-          for (const m of r.movies)
-            for (const v of filterVersions(m.versions, format))
-              for (const t of v.times) {
-                const min = showMinute(t);
-                if (min >= from && min < to)
-                  hits.push({ cinema: item.cinema, movie: m, version: v, time: t, date, km: item.km, ctx: { booking: r.booking, sourceUrl: r.sourceUrl, address: r.address } });
+        const own = lateOnOwnDate(item.cinema.source);
+        for (const plan of plans) {
+          const pages = own ? [{ page: plan.date, late: false }, ...plan.to > 24 * 60 ? [{ page: addDays(plan.date, 1), late: true }] : []] : [{ page: plan.date, late: null }];
+          for (const pg of pages) {
+            if (own && !pg.late && plan.from >= 24 * 60) continue;
+            try {
+              const r = await moviesOf(item.cinema, pg.page);
+              for (const m of r.movies)
+                for (const v of filterVersions(m.versions, format))
+                  for (const t of v.times) {
+                    if (pg.late !== null && isLate(t) !== pg.late) continue;
+                    const min = showMinute(t);
+                    if (min >= plan.from && min < plan.to)
+                      hits.push({ cinema: item.cinema, movie: m, version: v, time: t, date: pg.page, km: item.km, ctx: { booking: r.booking, sourceUrl: r.sourceUrl, address: r.address } });
+                  }
+            } catch (_) {
+              let known = null;
+              try {
+                known = (await datesOf(item.cinema)).dates;
+              } catch (_2) {
               }
-        } catch (_) {
-          failed.push(item.cinema.name);
+              if (known && known.indexOf(pg.page) < 0) {
+                if (pg.page === date) noData.add(item.cinema.name);
+              } else failed.add(item.cinema.name);
+            }
+          }
         }
         onProgress && onProgress(++done, scope.length);
       }
     }
     await Promise.all([0, 1, 2, 3, 4, 5].map(worker));
     hits.sort((a, b) => showMinute(a.time) - showMinute(b.time) || (a.km ?? 1e9) - (b.km ?? 1e9));
-    return { hits, failed };
+    return { hits, failed: Array.from(failed), noData: Array.from(noData).filter((n) => !failed.has(n)) };
   }
   function groupByMovie(hits) {
     const map = {};
@@ -1830,8 +1858,8 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   }
   async function nowShowing(scope, date, winId, format) {
     const win = WINDOWS.find((w) => w.id === winId) || WINDOWS[WINDOWS.length - 1];
-    const { hits, failed } = await findShowtimes(scope, date, win, format || "");
-    return { groups: groupByMovie(hits), failed };
+    const { hits, failed, noData } = await findShowtimes(scope, date, win, format || "");
+    return { groups: groupByMovie(hits), failed, noData };
   }
   async function nearby(lat, lng, limit) {
     return nearest(await loadCinemas(), { lat, lng }, limit || 20);

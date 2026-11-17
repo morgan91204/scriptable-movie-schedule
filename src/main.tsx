@@ -11,7 +11,7 @@ import {
   Cinema, Settings, Movie, Version, EXTRA, CITY_ORDER, AD_STEPS,
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
   loadSettings, saveSettings, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, TW,
-  FORMATS, formatsOf, filterVersions, nearest, kmLabel, WINDOWS, findShowtimes, groupByMovie, shareText,
+  FORMATS, formatsOf, filterVersions, nearest, kmLabel, WINDOWS, findShowtimes, groupByMovie, showDay, lateIsTonight, shareText,
   hallOf, tmdbTest, movieExtras, moviePoster, movieRuntime, posterSrc, cachePoster, prefetchPosters, foregroundTask, communityStats, communityCached, communityVote, loadBoxOffice, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, movieRatings, ratingTier,
 } from "./core";
 import type { MovieExtras, Ratings, Community, BoxOfficeItem } from "./core";
@@ -405,7 +405,7 @@ class App {
           {r.movies.length ? null : <Empty icon="🎞" text="這天沒有可讀取的場次" />}
           {r.movies.map((m) => {
             const all = ([] as string[]).concat(...m.versions.map((v) => v.times));
-            const left = isToday ? all.filter((t) => t > now || isLate(t)).length : all.length;
+            const left = isToday ? all.filter((t) => t > now || lateIsTonight(c.source, t)).length : all.length;
             const ended = isToday && left === 0;
             const sub = [m.runtime ? `${m.runtime} 分` : "片長未提供", m.rating, m.versions.map((v) => `${v.label} ${v.times.length} 場`).join("、")]
               .filter(Boolean)
@@ -580,7 +580,7 @@ class App {
           <Section title={v.label}>
             <Chips>
               {[...v.times].sort(byShowtime).map((t) => {
-                const past = isToday && t <= now && !isLate(t);
+                const past = isToday && t <= now && !lateIsTonight(c.source, t);
                 const end = m.runtime ? fmt(new Date(tpeDate(date, t).getTime() + (m.runtime + this.settings.ads) * 6e4)).slice(-5) : "";
                 return (
                   <Chip
@@ -607,8 +607,8 @@ class App {
 
   // ── 確認 ──
   start(p: Pick): Date {
-    // 凌晨場（00:00–04:59）在影城片單上屬於前一個營業日，實際日期要 +1 天
-    return tpeDate(isLate(p.time) ? addDays(p.date, 1) : p.date, p.time);
+    // 凌晨場：場次通放在實際日期那天；其他來源放在前一個營業日，實際日期要 +1 天
+    return tpeDate(showDay(p.cinema.source, p.date, p.time), p.time);
   }
   end(p: Pick): Date {
     return new Date(this.start(p).getTime() + ((this.runtime || 120) + this.settings.ads) * 6e4);
@@ -628,7 +628,7 @@ class App {
           {p.address ? this.addressItem(p.cinema.name, p.address, p.cinema.name) : <Item icon="📍" title={p.cinema.name} />}
           <Item icon="🕒" title={fmt(this.start(p))} subtitle={`預計 ${fmt(this.end(p)).slice(-5)} 散場`} />
         </Section>
-        {isLate(p.time) ? <Note kind="warn" text="凌晨場：已自動算到隔天日期，請再核對電影票。" /> : null}
+        {isLate(p.time) ? <Note kind="warn" text={showDay(p.cinema.source, p.date, p.time) !== p.date ? "凌晨場：已自動算到隔天日期，請再核對電影票。" : "凌晨場：請核對日期，這場是在這一天的凌晨開演。"} /> : null}
         <Section title="可調整">
           <Item
             icon="⏱"
@@ -1030,7 +1030,7 @@ class App {
     else if (this.nowScope === "fav") scope = this.settings.favorites.map((id) => this.cinemas.find((c) => c.id === id)).filter(Boolean).map((c) => ({ cinema: c as Cinema, km: null }));
     else scope = this.cinemas.filter((c) => c.city === this.nowScope).map((c) => ({ cinema: c, km: null }));
     if (!scope.length) throw new Error("沒有可以查的影城。先在影城頁加入常去影城，或改選附近／縣市。");
-    const { hits, failed } = await findShowtimes(scope, date, win, this.nowFormat as Format | "");
+    const { hits, failed, noData } = await findShowtimes(scope, date, win, this.nowFormat as Format | "");
     const groups = groupByMovie(hits);
     prefetchPosters(groups); // 背景先抓海報，進電影頁就不用等
     const scopeLabel = this.nowScope === "fav" ? "常去影城" : this.nowScope === "near" ? "附近 10 間" : this.nowScope;
@@ -1054,6 +1054,7 @@ class App {
           </Section>
         ))}
         {failed.length ? <Note kind="warn" text={`有 ${failed.length} 間讀取失敗：${failed.join("、")}`} /> : null}
+        {noData.length ? <Note text={`這幾間目前沒有這天的場次資料（來源還沒更新），請到影城官網查詢：${noData.join("、")}`} /> : null}
       </Page>
     );
   }

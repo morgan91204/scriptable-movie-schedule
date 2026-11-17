@@ -47,7 +47,7 @@ struct ConfirmView: View {
     }
 
     private var runtime: Int { Int(runtimeText.trimmingCharacters(in: .whitespaces)) ?? 0 }
-    private var start: Date? { Fmt.showDate(date: pick.date, time: pick.time) }
+    private var start: Date? { Fmt.showDate(date: pick.date, time: pick.time, source: pick.cinema?.source) }
     private var end: Date? { start?.addingTimeInterval(Double((runtime > 0 ? runtime : 120) + ads) * 60) }
 
     var body: some View {
@@ -68,7 +68,9 @@ struct ConfirmView: View {
                     LabeledContent("預計散場", value: Fmt.hm(end))
                 }
             } footer: {
-                if Fmt.isLate(pick.time) { Text("凌晨場：已自動算到隔天日期，請再核對電影票。") }
+                if Fmt.isLate(pick.time) {
+                    Text(Fmt.lateShiftsDay(source: pick.cinema?.source, time: pick.time) ? "凌晨場：已自動算到隔天日期，請再核對電影票。" : "凌晨場：請核對日期，這場是在這一天的凌晨開演。")
+                }
             }
 
             Section {

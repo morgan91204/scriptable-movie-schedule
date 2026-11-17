@@ -16,8 +16,8 @@ async function boxOffice() {
 /** 現在有什麼可以看：在指定的影城裡找某天某時段的場次，依電影分組 */
 async function nowShowing(scope: { cinema: core.Cinema; km: number | null }[], date: string, winId: string, format: string) {
   const win = core.WINDOWS.find((w) => w.id === winId) || core.WINDOWS[core.WINDOWS.length - 1];
-  const { hits, failed } = await core.findShowtimes(scope, date, win, (format || "") as any);
-  return { groups: core.groupByMovie(hits), failed };
+  const { hits, failed, noData } = await core.findShowtimes(scope, date, win, (format || "") as any);
+  return { groups: core.groupByMovie(hits), failed, noData };
 }
 /** 離我最近的影城 */
 async function nearby(lat: number, lng: number, limit: number) {

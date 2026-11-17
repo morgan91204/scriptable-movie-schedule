@@ -109,7 +109,14 @@ export const todayTPE = () => new Date(Date.now() + 8 * 3600e3).toISOString().sl
 export const nowHM = () => new Date(Date.now() + 8 * 3600e3).toISOString().slice(11, 16);
 export const addDays = (d: string, n: number) => new Date(Date.parse(d + "T00:00:00Z") + n * 864e5).toISOString().slice(0, 10);
 export const weekday = (d: string) => WEEK[new Date(d + "T00:00:00Z").getUTCDay()];
-export const isLate = (t: string) => t < "05:00"; // 凌晨場：影城營業日的隔天
+export const isLate = (t: string) => t < "05:00"; // 凌晨場（00:00–04:59）
+/** 凌晨場放在哪一天的片單：場次通放在「實際日期」那天（跟開眼比對過：同一場開眼列在前一天片單的最後、場次通列在當天片單的最前面）；
+ *  其他來源（開眼、各影城官網）放在前一個營業日，實際日期要加一天 */
+export const lateOnOwnDate = (source: string) => source === "tw";
+/** 這一場實際開演的日期（YYYY-MM-DD） */
+export const showDay = (source: string, date: string, time: string) => (isLate(time) && !lateOnOwnDate(source) ? addDays(date, 1) : date);
+/** 片單上的凌晨場算不算「這個營業日晚上的場次」（還沒演）：場次通當天片單上的凌晨場是今天清晨的，已經過了 */
+export const lateIsTonight = (source: string, time: string) => isLate(time) && !lateOnOwnDate(source);
 
 export function dateLabel(d: string): string {
   const [, m, dd] = d.split("-").map(Number);
@@ -1066,37 +1073,64 @@ export async function findShowtimes(
   win: TimeWindow,
   format: Format | "" = "",
   onProgress?: (done: number, total: number) => void
-): Promise<{ hits: Hit[]; failed: string[] }> {
-  let from = win.from, to = win.to;
+): Promise<{ hits: Hit[]; failed: string[]; noData: string[] }> {
+  // 要查哪幾個營業日、各自的時段。一般只有一段；
+  // 過了午夜查「接下來 3 小時」時，正在演的凌晨場屬於「前一個營業日」的片單，所以要查前一天（跨過清晨 5 點的部分才查今天）
+  let plans: { date: string; from: number; to: number }[] = [{ date, from: win.from, to: win.to }];
   if (win.id === "soon") {
-    const now = showMinute(nowHM());
-    from = now;
-    to = now + 180;
+    const hm = nowHM();
+    const now = showMinute(hm); // 凌晨是 24:00 之後
+    if (isLate(hm) && date === todayTPE()) {
+      const dayEnd = 29 * 60; // 營業日到清晨 5 點
+      plans = [{ date: addDays(date, -1), from: now, to: Math.min(now + 180, dayEnd) }];
+      if (now + 180 > dayEnd) plans.push({ date, from: 5 * 60, to: now + 180 - 24 * 60 });
+    } else {
+      plans = [{ date, from: now, to: now + 180 }];
+    }
   }
   const hits: Hit[] = [];
-  const failed: string[] = [];
+  const failed = new Set<string>();
+  const noData = new Set<string>();
   let done = 0;
   const queue = scope.slice();
   async function worker() {
     for (let item = queue.shift(); item; item = queue.shift()) {
-      try {
-        const r = await moviesOf(item.cinema, date);
-        for (const m of r.movies)
-          for (const v of filterVersions(m.versions, format))
-            for (const t of v.times) {
-              const min = showMinute(t);
-              if (min >= from && min < to)
-                hits.push({ cinema: item.cinema, movie: m, version: v, time: t, date, km: item.km, ctx: { booking: r.booking, sourceUrl: r.sourceUrl, address: r.address } });
-            }
-      } catch (_) {
-        failed.push(item.cinema.name);
+      const own = lateOnOwnDate(item.cinema.source);
+      for (const plan of plans) {
+        // 要讀哪幾天的片單：一般就是營業日那天；場次通的凌晨場在隔天的片單上，時段跨過午夜時要多讀一天
+        const pages: { page: string; late: boolean | null }[] = own
+          ? [{ page: plan.date, late: false }, ...(plan.to > 24 * 60 ? [{ page: addDays(plan.date, 1), late: true }] : [])]
+          : [{ page: plan.date, late: null }];
+        for (const pg of pages) {
+          if (own && !pg.late && plan.from >= 24 * 60) continue; // 只要凌晨的部分，不用讀當天
+          try {
+            const r = await moviesOf(item.cinema, pg.page);
+            for (const m of r.movies)
+              for (const v of filterVersions(m.versions, format))
+                for (const t of v.times) {
+                  if (pg.late !== null && isLate(t) !== pg.late) continue;
+                  const min = showMinute(t);
+                  if (min >= plan.from && min < plan.to)
+                    hits.push({ cinema: item.cinema, movie: m, version: v, time: t, date: pg.page, km: item.km, ctx: { booking: r.booking, sourceUrl: r.sourceUrl, address: r.address } });
+                }
+          } catch (_) {
+            // 分清楚「來源沒有這天的資料」和「真的讀不到」：影城頁讀得到、只是沒列這一天，就不算失敗
+            let known: string[] | null = null;
+            try {
+              known = (await datesOf(item.cinema)).dates;
+            } catch (_) {}
+            if (known && known.indexOf(pg.page) < 0) {
+              if (pg.page === date) noData.add(item.cinema.name); // 前後一天的片單還沒有或已撤掉是常態，不用提示
+            } else failed.add(item.cinema.name);
+          }
+        }
       }
       onProgress && onProgress(++done, scope.length);
     }
   }
   await Promise.all([0, 1, 2, 3, 4, 5].map(worker)); // 同時最多 6 間，避免一次打太多網站
   hits.sort((a, b) => showMinute(a.time) - showMinute(b.time) || (a.km ?? 1e9) - (b.km ?? 1e9));
-  return { hits, failed };
+  return { hits, failed: Array.from(failed), noData: Array.from(noData).filter((n) => !failed.has(n)) };
 }
 
 /** 把結果依電影分組，場次多的排前面 */

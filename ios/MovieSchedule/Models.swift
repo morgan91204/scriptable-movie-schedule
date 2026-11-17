@@ -164,6 +164,7 @@ struct NowGroup: Codable, Identifiable {
 struct NowResult: Codable {
     var groups: [NowGroup]
     var failed: [String]?
+    var noData: [String]? // 來源沒有這天資料的影城（不是讀取失敗）
 }
 
 /// 觀眾評分

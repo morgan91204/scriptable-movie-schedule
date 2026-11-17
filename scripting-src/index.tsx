@@ -14,7 +14,7 @@ import {
   Cinema, Movie, Settings, Version, TwMovie, TwMovieCinema, CITY_ORDER, TW,
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
   loadSettings, saveSettings, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, cinemaAddress,
-  FORMATS, formatsOf, filterVersions, nearest, kmLabel, WINDOWS, findShowtimes, groupByMovie, shareText, hallOf, tmdbTest, movieExtras, moviePoster, posterReady, normImageUrl, movieRuntime, posterSrc, isLocalSrc, cachePoster, prefetchPosters, foregroundTask, communityStats, communityVote, loadBoxOffice, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, SCRIPTING_IMPORT_URL, movieRatings, ratingTier,
+  FORMATS, formatsOf, filterVersions, nearest, kmLabel, WINDOWS, findShowtimes, groupByMovie, showDay, lateIsTonight, shareText, hallOf, tmdbTest, movieExtras, moviePoster, posterReady, normImageUrl, movieRuntime, posterSrc, isLocalSrc, cachePoster, prefetchPosters, foregroundTask, communityStats, communityVote, loadBoxOffice, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, SCRIPTING_IMPORT_URL, movieRatings, ratingTier,
 } from "./core"
 import type { Format, LatLng, Hit, Community, BoxOfficeItem } from "./core"
 
@@ -632,7 +632,7 @@ function DayPage({ cinema, date }: { cinema: Cinema; date: string }) {
       {day.data && !day.data.movies.length ? <Text foregroundStyle={"secondaryLabel"}>這天沒有可讀取的場次</Text> : null}
       {(day.data?.movies || []).map((m) => {
         const all = ([] as string[]).concat(...m.versions.map((v) => v.times))
-        const left = isToday ? all.filter((t) => t > now || isLate(t)).length : all.length
+        const left = isToday ? all.filter((t) => t > now || lateIsTonight(cinema.source, t)).length : all.length
         const sub = [m.runtime ? `${m.runtime} 分` : "片長未提供", m.rating, m.versions.map((v) => v.label).join("、")].filter(Boolean).join("｜")
         return <NavigationLink key={m.title} destination={
           <ShowtimesPage cinema={cinema} date={date} movie={m}
@@ -666,7 +666,7 @@ function ShowtimesPage({ cinema, date, movie, ctx }: { cinema: Cinema; date: str
     {movie.versions.map((v) =>
       <Section key={v.label} header={<Text>{v.label}</Text>}>
         {[...v.times].sort(byShowtime).map((t) => {
-          const past = isToday && t <= now && !isLate(t)
+          const past = isToday && t <= now && !lateIsTonight(cinema.source, t)
           const end = movie.runtime ? fmt(new Date(tpeDate(date, t).getTime() + (movie.runtime + settings.ads) * 6e4)).slice(-5) : ""
           return <NavigationLink key={t} destination={
             <ConfirmPage pick={{ cinema, date, movie, version: v, time: t, ...ctx }} />
@@ -712,7 +712,7 @@ function ConfirmPage({ pick }: { pick: Pick }) {
 
   const runtime = Math.round(Number(runtimeText)) || 0
   // 凌晨場（00:00–04:59）在影城片單上屬於前一個營業日，實際日期要 +1 天
-  const start = tpeDate(isLate(pick.time) ? addDays(pick.date, 1) : pick.date, pick.time)
+  const start = tpeDate(showDay(pick.cinema.source, pick.date, pick.time), pick.time)
   const end = new Date(start.getTime() + ((runtime || 120) + settings.ads) * 6e4)
 
   async function save() {
@@ -766,7 +766,7 @@ function ConfirmPage({ pick }: { pick: Pick }) {
       <LabeledContent title={"開演"} value={fmt(start)} />
       <LabeledContent title={"預計散場"} value={fmt(end).slice(-5)} />
     </Section>
-    {isLate(pick.time) ? <Section footer={<Text>這是凌晨場：已自動算到隔天日期，請再核對電影票。</Text>}><Label title={"凌晨場"} systemImage={"moon.stars"} /></Section> : null}
+    {isLate(pick.time) ? <Section footer={<Text>{showDay(pick.cinema.source, pick.date, pick.time) !== pick.date ? "這是凌晨場：已自動算到隔天日期，請再核對電影票。" : "這是凌晨場：請核對日期，這場是在這一天的凌晨開演。"}</Text>}><Label title={"凌晨場"} systemImage={"moon.stars"} /></Section> : null}
 
     <Section header={<Text>可調整</Text>} footer={!pick.movie.runtime ? <Text>資料來源沒有提供片長，正在查 TMDB／開眼電影網，查不到請手動輸入。</Text> : runtimeFrom || pick.movie.runtimeFrom ? <Text>{`片長取自 ${runtimeFrom || pick.movie.runtimeFrom}（重映片為原版片長），請再核對。`}</Text> : undefined}>
       <HStack>
@@ -1083,6 +1083,7 @@ function NowResultsPage({ date, winId, scope, format }: { date: string; winId: s
         )}
       </Section>
     )}
+    {res.data?.noData?.length ? <Section footer={<Text>{`這幾間目前沒有這天的場次資料（來源還沒更新），請到影城官網查詢：${res.data.noData.join("、")}`}</Text>}><Label title={`${res.data.noData.length} 間影城今天沒有場次資料`} systemImage={"calendar.badge.exclamationmark"} foregroundStyle={"secondaryLabel"} /></Section> : null}
     {res.data?.failed.length ? <Section footer={<Text>{`讀取失敗：${res.data.failed.join("、")}`}</Text>}><Label title={`${res.data.failed.length} 間影城讀取失敗`} systemImage={"exclamationmark.triangle"} /></Section> : null}
   </List>
 }

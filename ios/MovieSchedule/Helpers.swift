@@ -50,9 +50,12 @@ enum Fmt {
     /// 凌晨場（00:00–04:59）在影城片單上屬於前一個營業日
     static func isLate(_ time: String) -> Bool { time < "05:00" }
 
-    /// 片單日期＋時間 → 實際開演時間（凌晨場算隔天）
-    static func showDate(date: String, time: String) -> Date? {
-        let day = isLate(time) ? addDays(date, 1) : date
+    /// 凌晨場要不要算到隔天：場次通把凌晨場放在實際日期那天的片單，其他來源放在前一個營業日
+    static func lateShiftsDay(source: String?, time: String) -> Bool { isLate(time) && source != "tw" }
+
+    /// 片單日期＋時間 → 實際開演時間
+    static func showDate(date: String, time: String, source: String? = nil) -> Date? {
+        let day = lateShiftsDay(source: source, time: time) ? addDays(date, 1) : date
         let f = DateFormatter()
         f.calendar = calendar
         f.timeZone = tpe

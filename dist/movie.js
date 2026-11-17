@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.17-2358
+// @movie-schedule-app 電影行程 v2026.11.18-0034
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/jsx.tsx
@@ -1068,6 +1068,9 @@ var nowHM = () => new Date(Date.now() + 8 * 36e5).toISOString().slice(11, 16);
 var addDays = (d, n) => new Date(Date.parse(d + "T00:00:00Z") + n * 864e5).toISOString().slice(0, 10);
 var weekday = (d) => WEEK[(/* @__PURE__ */ new Date(d + "T00:00:00Z")).getUTCDay()];
 var isLate = (t) => t < "05:00";
+var lateOnOwnDate = (source) => source === "tw";
+var showDay = (source, date, time) => isLate(time) && !lateOnOwnDate(source) ? addDays(date, 1) : date;
+var lateIsTonight = (source, time) => isLate(time) && !lateOnOwnDate(source);
 function dateLabel(d) {
   const [, m, dd] = d.split("-").map(Number);
   const t = todayTPE();
@@ -1800,36 +1803,58 @@ function showMinute(t) {
   return (isLate(t) ? h2 + 24 : h2) * 60 + m;
 }
 async function findShowtimes(scope, date, win, format = "", onProgress) {
-  let from = win.from, to = win.to;
+  let plans = [{ date, from: win.from, to: win.to }];
   if (win.id === "soon") {
-    const now = showMinute(nowHM());
-    from = now;
-    to = now + 180;
+    const hm = nowHM();
+    const now = showMinute(hm);
+    if (isLate(hm) && date === todayTPE()) {
+      const dayEnd = 29 * 60;
+      plans = [{ date: addDays(date, -1), from: now, to: Math.min(now + 180, dayEnd) }];
+      if (now + 180 > dayEnd) plans.push({ date, from: 5 * 60, to: now + 180 - 24 * 60 });
+    } else {
+      plans = [{ date, from: now, to: now + 180 }];
+    }
   }
   const hits = [];
-  const failed = [];
+  const failed = /* @__PURE__ */ new Set();
+  const noData = /* @__PURE__ */ new Set();
   let done = 0;
   const queue = scope.slice();
   async function worker() {
     for (let item = queue.shift(); item; item = queue.shift()) {
-      try {
-        const r = await moviesOf(item.cinema, date);
-        for (const m of r.movies)
-          for (const v of filterVersions(m.versions, format))
-            for (const t of v.times) {
-              const min = showMinute(t);
-              if (min >= from && min < to)
-                hits.push({ cinema: item.cinema, movie: m, version: v, time: t, date, km: item.km, ctx: { booking: r.booking, sourceUrl: r.sourceUrl, address: r.address } });
+      const own = lateOnOwnDate(item.cinema.source);
+      for (const plan of plans) {
+        const pages = own ? [{ page: plan.date, late: false }, ...plan.to > 24 * 60 ? [{ page: addDays(plan.date, 1), late: true }] : []] : [{ page: plan.date, late: null }];
+        for (const pg of pages) {
+          if (own && !pg.late && plan.from >= 24 * 60) continue;
+          try {
+            const r = await moviesOf(item.cinema, pg.page);
+            for (const m of r.movies)
+              for (const v of filterVersions(m.versions, format))
+                for (const t of v.times) {
+                  if (pg.late !== null && isLate(t) !== pg.late) continue;
+                  const min = showMinute(t);
+                  if (min >= plan.from && min < plan.to)
+                    hits.push({ cinema: item.cinema, movie: m, version: v, time: t, date: pg.page, km: item.km, ctx: { booking: r.booking, sourceUrl: r.sourceUrl, address: r.address } });
+                }
+          } catch (_) {
+            let known = null;
+            try {
+              known = (await datesOf(item.cinema)).dates;
+            } catch (_2) {
             }
-      } catch (_) {
-        failed.push(item.cinema.name);
+            if (known && known.indexOf(pg.page) < 0) {
+              if (pg.page === date) noData.add(item.cinema.name);
+            } else failed.add(item.cinema.name);
+          }
+        }
       }
       onProgress && onProgress(++done, scope.length);
     }
   }
   await Promise.all([0, 1, 2, 3, 4, 5].map(worker));
   hits.sort((a, b) => showMinute(a.time) - showMinute(b.time) || (a.km ?? 1e9) - (b.km ?? 1e9));
-  return { hits, failed };
+  return { hits, failed: Array.from(failed), noData: Array.from(noData).filter((n) => !failed.has(n)) };
 }
 function groupByMovie(hits) {
   const map = {};
@@ -2203,7 +2228,7 @@ var App = class {
     ];
     // ── 事件迴圈 ──
     // 背景查 GitHub 上的最新版本（首頁顯示是否為最新版）
-    this.latest = checkLatest("2026.11.17-2358");
+    this.latest = checkLatest("2026.11.18-0034");
     // ── 搜尋 ──
     this.query = "";
     this.tmdbStatus = "";
@@ -2338,11 +2363,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.17-2358"}`);
+          Pasteboard.copy(`版本 ${"2026.11.18-0034"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.17-2358"}`,
+      `版本 ${"2026.11.18-0034"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -2445,7 +2470,7 @@ var App = class {
     const now = nowHM();
     return /* @__PURE__ */ h(Page, { title: dateLabel(date), subtitle: `${c.name}｜${r.movies.length} 部電影`, onBack: () => this.back() }, /* @__PURE__ */ h(Section, null, r.movies.length ? null : /* @__PURE__ */ h(Empty, { icon: "🎞", text: "這天沒有可讀取的場次" }), r.movies.map((m) => {
       const all = [].concat(...m.versions.map((v) => v.times));
-      const left = isToday ? all.filter((t) => t > now || isLate(t)).length : all.length;
+      const left = isToday ? all.filter((t) => t > now || lateIsTonight(c.source, t)).length : all.length;
       const ended = isToday && left === 0;
       const sub = [m.runtime ? `${m.runtime} 分` : "片長未提供", m.rating, m.versions.map((v) => `${v.label} ${v.times.length} 場`).join("、")].filter(Boolean).join("｜");
       return /* @__PURE__ */ h(
@@ -2562,7 +2587,7 @@ var App = class {
       m.runtime ? `片長 ${m.runtime} 分鐘` + (m.runtimeFrom ? `（${m.runtimeFrom}）` : "") : "片長未提供，下一步可手動輸入",
       m.rating || ""
     ]), m.versions.map((v) => /* @__PURE__ */ h(Section, { title: v.label }, /* @__PURE__ */ h(Chips, null, [...v.times].sort(byShowtime).map((t) => {
-      const past = isToday && t <= now && !isLate(t);
+      const past = isToday && t <= now && !lateIsTonight(c.source, t);
       const end = m.runtime ? fmt(new Date(tpeDate(date, t).getTime() + (m.runtime + this.settings.ads) * 6e4)).slice(-5) : "";
       return /* @__PURE__ */ h(
         Chip,
@@ -2584,7 +2609,7 @@ var App = class {
   }
   // ── 確認 ──
   start(p) {
-    return tpeDate(isLate(p.time) ? addDays(p.date, 1) : p.date, p.time);
+    return tpeDate(showDay(p.cinema.source, p.date, p.time), p.time);
   }
   end(p) {
     return new Date(this.start(p).getTime() + ((this.runtime || 120) + this.settings.ads) * 6e4);
@@ -2595,7 +2620,7 @@ var App = class {
       await this.fillRuntime(p.movie);
       if (p.movie.runtime) this.runtime = p.movie.runtime;
     }
-    return /* @__PURE__ */ h(Page, { title: "確認行程", subtitle: "點選項目可以修改", onBack: () => this.back() }, /* @__PURE__ */ h(Section, null, /* @__PURE__ */ h(Item, { icon: "🎬", title: p.movie.title, subtitle: p.version.label }), p.address ? this.addressItem(p.cinema.name, p.address, p.cinema.name) : /* @__PURE__ */ h(Item, { icon: "📍", title: p.cinema.name }), /* @__PURE__ */ h(Item, { icon: "🕒", title: fmt(this.start(p)), subtitle: `預計 ${fmt(this.end(p)).slice(-5)} 散場` })), isLate(p.time) ? /* @__PURE__ */ h(Note, { kind: "warn", text: "凌晨場：已自動算到隔天日期，請再核對電影票。" }) : null, /* @__PURE__ */ h(Section, { title: "可調整" }, /* @__PURE__ */ h(
+    return /* @__PURE__ */ h(Page, { title: "確認行程", subtitle: "點選項目可以修改", onBack: () => this.back() }, /* @__PURE__ */ h(Section, null, /* @__PURE__ */ h(Item, { icon: "🎬", title: p.movie.title, subtitle: p.version.label }), p.address ? this.addressItem(p.cinema.name, p.address, p.cinema.name) : /* @__PURE__ */ h(Item, { icon: "📍", title: p.cinema.name }), /* @__PURE__ */ h(Item, { icon: "🕒", title: fmt(this.start(p)), subtitle: `預計 ${fmt(this.end(p)).slice(-5)} 散場` })), isLate(p.time) ? /* @__PURE__ */ h(Note, { kind: "warn", text: showDay(p.cinema.source, p.date, p.time) !== p.date ? "凌晨場：已自動算到隔天日期，請再核對電影票。" : "凌晨場：請核對日期，這場是在這一天的凌晨開演。" }) : null, /* @__PURE__ */ h(Section, { title: "可調整" }, /* @__PURE__ */ h(
       Item,
       {
         icon: "⏱",
@@ -2844,7 +2869,7 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
     else if (this.nowScope === "fav") scope = this.settings.favorites.map((id) => this.cinemas.find((c) => c.id === id)).filter(Boolean).map((c) => ({ cinema: c, km: null }));
     else scope = this.cinemas.filter((c) => c.city === this.nowScope).map((c) => ({ cinema: c, km: null }));
     if (!scope.length) throw new Error("沒有可以查的影城。先在影城頁加入常去影城，或改選附近／縣市。");
-    const { hits, failed } = await findShowtimes(scope, date, win, this.nowFormat);
+    const { hits, failed, noData } = await findShowtimes(scope, date, win, this.nowFormat);
     const groups = groupByMovie(hits);
     prefetchPosters(groups);
     const scopeLabel = this.nowScope === "fav" ? "常去影城" : this.nowScope === "near" ? "附近 10 間" : this.nowScope;
@@ -2860,7 +2885,7 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
         subtitle: [hit.version.label, kmLabel(hit.km)].filter(Boolean).join("｜"),
         onTap: () => open(hit)
       }
-    )))), failed.length ? /* @__PURE__ */ h(Note, { kind: "warn", text: `有 ${failed.length} 間讀取失敗：${failed.join("、")}` }) : null);
+    )))), failed.length ? /* @__PURE__ */ h(Note, { kind: "warn", text: `有 ${failed.length} 間讀取失敗：${failed.join("、")}` }) : null, noData.length ? /* @__PURE__ */ h(Note, { text: `這幾間目前沒有這天的場次資料（來源還沒更新），請到影城官網查詢：${noData.join("、")}` }) : null);
   }
   // 從捷徑或 Safari 分享場次通／誠品／光點網址時，直接跳到那間影城
   startFrom(url) {

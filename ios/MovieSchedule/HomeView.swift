@@ -117,7 +117,7 @@ struct NowView: View {
                                 ConfirmView(pick: ShowPick(title: h.movie.title, versionLabel: h.version.label, cinemaName: h.cinema.name, address: h.ctx?.address ?? h.cinema.address ?? "", date: h.date, time: h.time, runtime: h.movie.runtime ?? g.runtime ?? 0, bookingUrl: h.ctx?.booking ?? "", cinema: h.cinema))
                             } label: {
                                 HStack(spacing: 10) {
-                                    Text(h.time).font(.body.monospacedDigit().weight(.semibold))
+                                    Text(h.time + (Fmt.isLate(h.time) ? "（凌晨）" : "")).font(.body.monospacedDigit().weight(.semibold))
                                     VStack(alignment: .leading, spacing: 2) {
                                         Text(h.cinema.name).lineLimit(1)
                                         Text([h.version.label, kmLabel(h.km)].filter { !$0.isEmpty }.joined(separator: "｜")).font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
@@ -131,6 +131,9 @@ struct NowView: View {
                         let info = [(g.runtime ?? 0) > 0 ? "\(g.runtime ?? 0) 分鐘" : "", g.rating ?? ""].filter { !$0.isEmpty }.joined(separator: "｜")
                         if !info.isEmpty { Text(info) }
                     }
+                }
+                if let none = r.noData, !none.isEmpty {
+                    Section { Text("這幾間目前沒有這天的場次資料（來源還沒更新），請到影城官網查詢：\(none.joined(separator: "、"))").font(.footnote).foregroundStyle(.secondary) }
                 }
                 if let failed = r.failed, !failed.isEmpty {
                     Section { Text("讀不到：\(failed.joined(separator: "、"))").font(.footnote).foregroundStyle(.secondary) }
