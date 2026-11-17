@@ -1,17 +1,18 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#7B5CFF"/>
-      <stop offset="1" stop-color="#3B1FA8"/>
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#E9EAEE"/>
     </linearGradient>
     <clipPath id="page"><rect x="212" y="250" width="600" height="560" rx="84"/></clipPath>
   </defs>
   <rect width="1024" height="1024" fill="url(#bg)"/>
   <!-- 行事曆頁 -->
-  <rect x="212" y="250" width="600" height="560" rx="84" fill="#FFFFFF"/>
+  <rect x="212" y="262" width="600" height="560" rx="84" fill="#000000" opacity="0.10"/>
+  <rect x="212" y="250" width="600" height="560" rx="84" fill="#3A3D42"/>
   <!-- 頁首：場記板的斜紋 -->
   <g clip-path="url(#page)">
-    <rect x="212" y="250" width="600" height="150" fill="#1E1440"/>
+    <rect x="212" y="250" width="600" height="150" fill="#24262A"/>
     <g fill="#FFFFFF">
       <polygon points="250,250 330,250 270,400 190,400"/>
       <polygon points="410,250 490,250 430,400 350,400"/>
@@ -20,8 +21,8 @@
     </g>
   </g>
   <!-- 行事曆的兩個扣環 -->
-  <rect x="352" y="196" width="44" height="120" rx="22" fill="#FFFFFF" stroke="#3B1FA8" stroke-width="14"/>
-  <rect x="628" y="196" width="44" height="120" rx="22" fill="#FFFFFF" stroke="#3B1FA8" stroke-width="14"/>
+  <rect x="352" y="196" width="44" height="120" rx="22" fill="#FFFFFF" stroke="#24262A" stroke-width="14"/>
+  <rect x="628" y="196" width="44" height="120" rx="22" fill="#FFFFFF" stroke="#24262A" stroke-width="14"/>
   <!-- 播放鍵 -->
-  <path d="M452 506 L452 714 Q452 734 470 724 L640 624 Q656 610 640 596 L470 496 Q452 486 452 506 Z" fill="#FF3B5C"/>
+  <path d="M452 506 L452 714 Q452 734 470 724 L640 624 Q656 610 640 596 L470 496 Q452 486 452 506 Z" fill="#F5B82E"/>
 </svg>
