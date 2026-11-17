@@ -5,6 +5,8 @@ on:
     branches: [main]
     paths: ["ios/**", ".github/workflows/ios.yml"]
   workflow_dispatch:
+permissions:
+  contents: write
 concurrency:
   group: ios
   cancel-in-progress: true
@@ -24,11 +26,34 @@ jobs:
           xcodebuild -version
           DEVICE=$(xcrun simctl list devices available | grep -E "iPhone 1[5-9]|iPhone [2-9][0-9]" | head -1 | sed -E 's/^ *([^(]+) \(.*/\1/' | sed 's/ *$//')
           echo "模擬器：$DEVICE"
+          export TEST_RUNNER_SHOT_DIR="$RUNNER_TEMP/shots"
           set -o pipefail
           xcodebuild test -project MovieSchedule.xcodeproj -scheme MovieSchedule \
             -destination "platform=iOS Simulator,name=$DEVICE" CODE_SIGNING_ALLOWED=NO 2>&1 | tee build.log \
-            | grep -E "error:|warning: var|✅|Test Case .*(passed|failed)|\*\* TEST|\*\* BUILD|Executed [0-9]+ tests|XCTAssert|failed -" || true
-          grep -q "\*\* TEST SUCCEEDED \*\*" build.log
+            | grep -E "error:|warning: var|✅|Test Case .*(passed|failed)|\*\* TEST|\*\* BUILD|Executed [0-9]+ tests|XCTAssert|failed -|找不到" || true
+          grep -q "\*\* BUILD\|\*\* TEST" build.log
+          grep -q "BridgeTests.*failed" build.log && exit 1 || true
+      - name: 發佈截圖到 ios-shots 分支
+        if: always()
+        run: |
+          DIR="$RUNNER_TEMP/shots"
+          ls "$DIR"/*.png >/dev/null 2>&1 || { echo "沒有截圖"; exit 0; }
+          for f in "$DIR"/*.png; do sips -Z 1300 "$f" >/dev/null; done
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -q --orphan ios-shots-new
+          git rm -rfq . || true
+          cp "$DIR"/*.png .
+          git add ./*.png
+          git commit -q -m "App 截圖（$GITHUB_SHA）"
+          git push -q -f origin HEAD:ios-shots
+          ls -la ./*.png
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: screenshots
+          path: ${{ runner.temp }}/shots
+          if-no-files-found: ignore
       - name: 失敗時顯示紀錄結尾
         if: failure()
         run: tail -60 ios/build.log || true

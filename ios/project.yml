@@ -35,12 +35,21 @@ targets:
       - MovieScheduleTests
     dependencies:
       - target: MovieSchedule
+  MovieScheduleUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - MovieScheduleUITests
+    dependencies:
+      - target: MovieSchedule
 schemes:
   MovieSchedule:
     build:
       targets:
         MovieSchedule: all
         MovieScheduleTests: [test]
+        MovieScheduleUITests: [test]
     test:
       targets:
         - MovieScheduleTests
+        - MovieScheduleUITests
