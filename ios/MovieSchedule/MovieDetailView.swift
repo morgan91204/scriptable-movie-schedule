@@ -34,6 +34,7 @@ struct MovieHero: View {
                 } label: {
                     Label(opening ? "預告讀取中…" : "觀看預告", systemImage: "play.fill")
                         .font(.subheadline.weight(.semibold)).lineLimit(1)
+                        .foregroundStyle(.white) // 列表裡的圖示預設會染成藍色
                 }
                 .buttonStyle(.borderedProminent).buttonBorderShape(.capsule).tint(.red)
                 .disabled(opening)
