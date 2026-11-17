@@ -51,7 +51,11 @@ final class ScreenshotTests: XCTestCase {
         _ = row("now-link").waitForExistence(timeout: 40)
         shot("home", wait: 5)
         if tap(row("now-link"), "現在有什麼可以看") {
-            shot("now", wait: 15)
+            // 改成「整天」，半夜跑也有結果可以看版面
+            if tap(app.buttons.matching(NSPredicate(format: "label BEGINSWITH '時段'")).firstMatch, "時段選單", timeout: 10) {
+                tap(app.buttons["整天"], "整天", timeout: 5)
+            }
+            shot("now", wait: 20)
             back()
         }
 
@@ -65,6 +69,8 @@ final class ScreenshotTests: XCTestCase {
             shot("movie", wait: 10)
             app.swipeUp()
             shot("movie-cinemas", wait: 2)
+            app.swipeDown() // 捲回去，第一間影城才點得到
+            Thread.sleep(forTimeInterval: 1)
             if tap(row("movie-cinema-row"), "放映影城", timeout: 10) {
                 shot("times", wait: 3)
                 if tap(row("time-button"), "場次時間", timeout: 10) {
