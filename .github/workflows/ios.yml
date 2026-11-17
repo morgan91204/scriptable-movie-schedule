@@ -38,12 +38,12 @@ jobs:
             | grep -E "error:|warning: var|✅|Test Case .*(passed|failed)|\*\* TEST|\*\* BUILD|Executed [0-9]+ tests|XCTAssert|failed -|找不到" || true
           grep -q "\*\* BUILD\|\*\* TEST" build.log
           grep -q "BridgeTests.*failed" build.log && exit 1 || true
-      - name: 檢查上架用的建置（不簽署）
+      - name: 檢查上架用的建置（不簽署，上架版設定）
         run: |
           cd ios
           set -o pipefail
           xcodebuild archive -project MovieSchedule.xcodeproj -scheme MovieSchedule -destination "generic/platform=iOS" \
-            -archivePath "$RUNNER_TEMP/Check.xcarchive" CODE_SIGNING_ALLOWED=NO 2>&1 | tee archive.log | grep -E "error:|warning: .*(icon|privacy|Privacy)|\*\* ARCHIVE" || true
+            -archivePath "$RUNNER_TEMP/Check.xcarchive" CODE_SIGNING_ALLOWED=NO SWIFT_ACTIVE_COMPILATION_CONDITIONS="STORE_BUILD" 2>&1 | tee archive.log | grep -E "error:|warning: .*(icon|privacy|Privacy)|\*\* ARCHIVE" || true
           grep -q "\*\* ARCHIVE SUCCEEDED \*\*" archive.log
           APP="$RUNNER_TEMP/Check.xcarchive/Products/Applications/MovieSchedule.app"
           ls "$APP" | grep -E "AppIcon|PrivacyInfo|core.js|Assets.car"

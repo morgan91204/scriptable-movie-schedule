@@ -100,6 +100,8 @@ final class ScreenshotTests: XCTestCase {
         // 5. 設定
         tap(app.tabBars.buttons["設定"], "設定分頁")
         shot("settings", wait: 2)
+        app.swipeUp()
+        if tap(row("about-link"), "資料來源與授權", timeout: 8) { shot("about", wait: 2) }
 
     }
 }

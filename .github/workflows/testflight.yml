@@ -9,6 +9,10 @@ on:
         description: 版本號（例如 0.1.0）；留空用專案裡的版本
         required: false
         default: ""
+      store:
+        description: 上架版：不顯示 IMDb／爛番茄分數，只放連結（正式送審用）
+        type: boolean
+        default: false
 concurrency:
   group: testflight
   cancel-in-progress: false
@@ -51,13 +55,14 @@ jobs:
           cd ios
           BUILD=$((GITHUB_RUN_NUMBER + 100)) # 每次上傳的建置編號都要比上一次大
           VERSION="${{ inputs.version }}"
+          STORE=""; [ "${{ inputs.store }}" = "true" ] && STORE=1
           AUTH="-allowProvisioningUpdates -authenticationKeyPath $RUNNER_TEMP/keys/AuthKey_$ASC_KEY_ID.p8 -authenticationKeyID $ASC_KEY_ID -authenticationKeyIssuerID $ASC_ISSUER_ID"
           echo "$AUTH" > "$RUNNER_TEMP/auth.txt"
           echo "建置編號：$BUILD"
           set -o pipefail
           xcodebuild archive -project MovieSchedule.xcodeproj -scheme MovieSchedule -destination "generic/platform=iOS" \
             -archivePath "$RUNNER_TEMP/App.xcarchive" $AUTH \
-            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" CODE_SIGN_STYLE=Automatic CURRENT_PROJECT_VERSION="$BUILD" ${VERSION:+MARKETING_VERSION="$VERSION"} \
+            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" CODE_SIGN_STYLE=Automatic CURRENT_PROJECT_VERSION="$BUILD" ${VERSION:+MARKETING_VERSION="$VERSION"} ${STORE:+SWIFT_ACTIVE_COMPILATION_CONDITIONS="STORE_BUILD"} \
             2>&1 | tee archive.log | grep -E "error:|\*\* ARCHIVE" || true
           grep -q "\*\* ARCHIVE SUCCEEDED \*\*" archive.log
       - name: 上傳到 App Store Connect

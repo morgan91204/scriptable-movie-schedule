@@ -12,6 +12,25 @@ struct MovieHero: View {
     @State private var ratings: Ratings?
     @State private var ratingsDone = false
     @State private var opening = false
+    private let showScores = ExternalScores.enabled
+
+    /// 到外部網站查這部片的評分（用英文片名搜尋，沒有就用中文）
+    private func linkChip(_ name: String, _ base: String) -> some View {
+        let q = ((en ?? "").isEmpty ? title : (en ?? "")).addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? ""
+        return Button {
+            if let u = URL(string: base + q) { openURL(u) }
+        } label: {
+            HStack(spacing: 3) {
+                Text(name).font(.caption.weight(.semibold))
+                Image(systemName: "arrow.up.right").font(.system(size: 9, weight: .bold))
+            }
+            .fixedSize()
+            .padding(.horizontal, 7).padding(.vertical, 4)
+            .background(Color(.tertiarySystemFill), in: RoundedRectangle(cornerRadius: 6))
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(.secondary)
+    }
 
     var body: some View {
         HStack(alignment: .bottom, spacing: 12) {
@@ -20,7 +39,13 @@ struct MovieHero: View {
                 ForEach(lines.filter { !$0.isEmpty }, id: \.self) { line in
                     Text(line).font(.subheadline).foregroundStyle(.secondary)
                 }
-                if ratingsDone {
+                if !showScores {
+                    // 不顯示外部分數：只放前往查看的連結（用片名搜尋，不讀對方網站）
+                    HStack(spacing: 6) {
+                        linkChip("IMDb", "https://www.imdb.com/find/?q=")
+                        linkChip("爛番茄", "https://www.rottentomatoes.com/search?search=")
+                    }
+                } else if ratingsDone {
                     HStack(spacing: 4) {
                         badge(tag: "IMDb", text: ratings?.imdb.map { String(format: "%.1f", $0.score) }, percent: ratings?.imdb.map { $0.score * 10 }, url: ratings?.imdb?.url)
                         badge(tag: "🍅", text: ratings?.tomato.map { "\(Int($0.score))%" }, percent: ratings?.tomato?.score, url: ratings?.tomato?.url)
@@ -72,9 +97,11 @@ struct MovieHero: View {
 
     private func load() async {
         async let x = try? Bridge.shared.call("movieExtras", [title, js(slug)], as: MovieExtras.self)
-        async let r = try? Bridge.shared.call("movieRatings", [title, js(en), js(slug)], as: Ratings.self)
-        ratings = await r
-        ratingsDone = true
+        if showScores {
+            async let r = try? Bridge.shared.call("movieRatings", [title, js(en), js(slug)], as: Ratings.self)
+            ratings = await r
+            ratingsDone = true
+        }
         extras = await x
     }
 

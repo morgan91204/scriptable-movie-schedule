@@ -3,6 +3,7 @@ import SwiftUI
 struct SettingsView: View {
     @AppStorage("ads") private var ads = 15
     @AppStorage("alarm") private var alarm = 60
+    @AppStorage(ExternalScores.key) private var showScores = true
     @ObservedObject private var settings = SettingsStore.shared
     @State private var tokenDraft = ""
     @State private var tmdbStatus = ""
@@ -41,12 +42,26 @@ struct SettingsView: View {
                 } footer: {
                     Text("到「影城」分頁打開一間影城，點右上角的星星加入或移除。")
                 }
+                if !ExternalScores.storeBuild {
+                    Section {
+                        Toggle("顯示 IMDb／爛番茄分數", isOn: $showScores)
+                    } header: {
+                        Text("評分")
+                    } footer: {
+                        Text("關閉後，電影頁只放「到 IMDb／爛番茄查看」的連結，App 不會去讀這兩個網站。")
+                    }
+                }
+                Section {
+                    NavigationLink { AboutView() } label: { Label("資料來源與授權", systemImage: "doc.text") }
+                        .accessibilityIdentifier("about-link")
+                    Link(destination: privacyURL) { Label("隱私權政策", systemImage: "hand.raised") }
+                }
                 Section {
                     LabeledContent("版本", value: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "")
                 } header: {
                     Text("關於")
                 } footer: {
-                    Text("場次來自場次通、開眼電影網與各影城官網；票房來自國家電影及視聽文化中心「全國電影票房統計」。實際場次以影城公告為準。")
+                    Text("實際場次以影城公告為準。")
                 }
             }
             .navigationTitle("設定")
