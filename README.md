@@ -26,6 +26,16 @@
 <img src="docs/preview-light.png" width="100%" alt="畫面預覽（淺色）">
 </p>
 
+## 網頁版（不用裝 App）
+
+用任何瀏覽器打開就能用，Android、電腦也可以；iPhone 用 Safari 打開後按「分享 → 加入主畫面」，就會像 App 一樣全螢幕開啟。
+
+- 功能和 Scriptable 版相同（同一份程式），網頁由 `web/` 產生
+- 「加入行事曆」會下載 `.ics` 檔，打開就能加進 iPhone、Google 或電腦的行事曆（附開演前 30 分鐘提醒）
+- 時刻表由網頁版自己的 Cloudflare Worker 代抓（瀏覽器不能直接讀其他網站），只允許電影相關網站
+
+部署：repo 根目錄跑 `./build.sh`，再到 `web/` 執行 `npx wrangler deploy`。
+
 ## 安裝
 
 ### Scripting 版（原生介面，推薦）

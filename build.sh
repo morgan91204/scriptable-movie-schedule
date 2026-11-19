@@ -7,7 +7,7 @@ node gen-parsers.mjs
 npx tsc -p tsconfig.json
 npx tsc -p tsconfig.parsers.json
 npx esbuild src/main.tsx --bundle --format=esm --target=es2022 --jsx-factory=h --jsx-fragment=Fragment --charset=utf8 --legal-comments=none --log-level=warning \
-  --define:APP_VERSION="\"$VERSION\"" \
+  --define:APP_VERSION="\"$VERSION\"" --define:IS_WEB=false \
   --banner:js="// Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
@@ -36,3 +36,8 @@ echo "scripting/ ready"
 npx esbuild ios/bridge.ts --bundle --format=iife --target=safari16 --charset=utf8 --legal-comments=none --log-level=warning \
   --define:APP_VERSION="\"$VERSION\"" --outfile=ios/MovieSchedule/Resources/core.js
 echo "ios core.js ready"
+
+# ── 網頁版：同一份 App（src/main.tsx）加上瀏覽器版的 Scriptable 全域物件（web/shim.ts）→ web/public/app.js
+npx esbuild web/entry.ts --bundle --format=esm --target=safari16 --jsx-factory=h --jsx-fragment=Fragment --charset=utf8 --legal-comments=none --log-level=warning \
+  --define:APP_VERSION="\"$VERSION\"" --define:IS_WEB=true --minify --outfile=web/public/app.js
+echo "web/public/app.js ready"

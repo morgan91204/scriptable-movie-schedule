@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.18-0034
+// @movie-schedule-app 電影行程 v2026.11.19-1608
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/jsx.tsx
@@ -2228,7 +2228,7 @@ var App = class {
     ];
     // ── 事件迴圈 ──
     // 背景查 GitHub 上的最新版本（首頁顯示是否為最新版）
-    this.latest = checkLatest("2026.11.18-0034");
+    this.latest = checkLatest("2026.11.19-1608");
     // ── 搜尋 ──
     this.query = "";
     this.tmdbStatus = "";
@@ -2363,11 +2363,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.18-0034"}`);
+          Pasteboard.copy(`版本 ${"2026.11.19-1608"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.18-0034"}`,
+      `版本 ${"2026.11.19-1608"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -2709,9 +2709,9 @@ ${fmt(this.start(p))}
     this.go(() => this.doneView(p, ev, cal));
   }
   doneView(p, ev, cal) {
-    return /* @__PURE__ */ h(Page, { title: "已加入行事曆", subtitle: cal.title }, /* @__PURE__ */ h(Empty, { icon: "✅", text: `${p.movie.title}
+    return /* @__PURE__ */ h(Page, { title: false ? "已產生行事曆檔" : "已加入行事曆", subtitle: cal.title }, /* @__PURE__ */ h(Empty, { icon: "✅", text: `${p.movie.title}
 ${fmt(ev.startDate)} → ${fmt(ev.endDate).slice(-5)}
-${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Section, { hint: "Scriptable 無法直接設定提醒，打開行程後可在「提示」加上開演前 30 分鐘。" }, /* @__PURE__ */ h(Item, { icon: "🔔", title: "打開行程，加提醒", accent: true, onTap: async () => {
+${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Section, { hint: false ? "打開剛下載的 .ics 檔就能加入手機或電腦的行事曆；行程已附開演前 30 分鐘提醒。" : "Scriptable 無法直接設定提醒，打開行程後可在「提示」加上開演前 30 分鐘。" }, /* @__PURE__ */ h(Item, { icon: false ? "📥" : "🔔", title: false ? "再下載一次行事曆檔" : "打開行程，加提醒", accent: true, onTap: async () => {
       await ev.presentEdit();
     } }), /* @__PURE__ */ h(Item, { icon: "📤", title: "分享這場給朋友", accent: true, onTap: () => this.share(p) })), this.bookingButtons(p), /* @__PURE__ */ h(Button, { label: "再新增一部", onTap: () => this.home() }));
   }
@@ -2825,7 +2825,7 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
       this.me = { lat: l.latitude, lng: l.longitude };
       return this.me;
     } catch (_) {
-      throw new Error("拿不到目前位置。請到「設定 → 隱私權與安全性 → 定位服務 → Scriptable」允許使用位置。");
+      throw new Error(false ? "拿不到目前位置。請允許瀏覽器使用位置（iPhone：設定 → 隱私權與安全性 → 定位服務 → Safari 網站）。" : "拿不到目前位置。請到「設定 → 隱私權與安全性 → 定位服務 → Scriptable」允許使用位置。");
     }
   }
   async nearbyView() {
@@ -2907,6 +2907,6 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
     return true;
   }
 };
-setPlatform(scriptablePlatform);
+setPlatform(globalThis.__webPlatform || scriptablePlatform);
 await new App().run();
 Script.complete();

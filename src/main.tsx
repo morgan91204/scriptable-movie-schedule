@@ -30,6 +30,8 @@ interface Pick {
 }
 
 declare const APP_VERSION: string;
+/** 網頁版（web/）編譯時為 true：行事曆改成下載 .ics 檔 */
+declare const IS_WEB: boolean;
 
 type View = () => string | Promise<string>;
 
@@ -762,10 +764,10 @@ class App {
 
   doneView(p: Pick, ev: CalendarEvent, cal: Calendar): string {
     return (
-      <Page title="已加入行事曆" subtitle={cal.title}>
+      <Page title={IS_WEB ? "已產生行事曆檔" : "已加入行事曆"} subtitle={cal.title}>
         <Empty icon="✅" text={`${p.movie.title}\n${fmt(ev.startDate)} → ${fmt(ev.endDate).slice(-5)}\n${p.cinema.name}${this.seat ? "｜" + this.seat : ""}`} />
-        <Section hint="Scriptable 無法直接設定提醒，打開行程後可在「提示」加上開演前 30 分鐘。">
-          <Item icon="🔔" title="打開行程，加提醒" accent onTap={async () => { await ev.presentEdit(); }} />
+        <Section hint={IS_WEB ? "打開剛下載的 .ics 檔就能加入手機或電腦的行事曆；行程已附開演前 30 分鐘提醒。" : "Scriptable 無法直接設定提醒，打開行程後可在「提示」加上開演前 30 分鐘。"}>
+          <Item icon={IS_WEB ? "📥" : "🔔"} title={IS_WEB ? "再下載一次行事曆檔" : "打開行程，加提醒"} accent onTap={async () => { await ev.presentEdit(); }} />
           <Item icon="📤" title="分享這場給朋友" accent onTap={() => this.share(p)} />
         </Section>
         {this.bookingButtons(p)}
@@ -955,7 +957,7 @@ class App {
       this.me = { lat: l.latitude, lng: l.longitude };
       return this.me;
     } catch (_) {
-      throw new Error("拿不到目前位置。請到「設定 → 隱私權與安全性 → 定位服務 → Scriptable」允許使用位置。");
+      throw new Error(IS_WEB ? "拿不到目前位置。請允許瀏覽器使用位置（iPhone：設定 → 隱私權與安全性 → 定位服務 → Safari 網站）。" : "拿不到目前位置。請到「設定 → 隱私權與安全性 → 定位服務 → Scriptable」允許使用位置。");
     }
   }
 
@@ -1080,6 +1082,7 @@ class App {
   }
 }
 
-setPlatform(scriptablePlatform);
+// 網頁版由 web/entry.ts 先放好 __webPlatform
+setPlatform((globalThis as any).__webPlatform || scriptablePlatform);
 await new App().run();
 Script.complete();

@@ -1,0 +1,197 @@
+// 網頁版：用瀏覽器 API 模擬 Scriptable 的全域物件，讓 src/main.tsx 不用改就能在瀏覽器跑。
+// 行事曆改成下載 .ics 檔；網路經過同網域的 /api/fetch（web/worker.js）轉發，避開跨網域限制。
+import type { Platform } from "../src/platform";
+
+const g = globalThis as any;
+const LS = "movie-schedule:";
+
+function store(key: string): string | null {
+  try {
+    return localStorage.getItem(LS + key);
+  } catch (_) {
+    return null;
+  }
+}
+function storeSet(key: string, value: string) {
+  try {
+    localStorage.setItem(LS + key, value);
+  } catch (_) {
+    // 空間滿了：清掉快取（設定保留）再試一次
+    try {
+      for (const k of Object.keys(localStorage)) if (k.startsWith(LS + "cache:")) localStorage.removeItem(k);
+      localStorage.setItem(LS + key, value);
+    } catch (_) {}
+  }
+}
+
+/** 這些網址本身允許跨網域，直接抓；其他經過自己的 Worker 轉發 */
+const DIRECT = /^https:\/\/(raw\.githubusercontent\.com|movie-ratings\.morgan91204\.workers\.dev)\//;
+
+export const webPlatform: Platform = {
+  async fetchText(url, headers, opts) {
+    const method = opts?.method || "GET";
+    if (DIRECT.test(url) || method !== "GET") {
+      const r = await fetch(url, { method, body: opts?.body, headers: method === "GET" ? undefined : { "content-type": "application/json" } });
+      return { status: r.status, body: await r.text() };
+    }
+    const r = await fetch("/api/fetch", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ url, headers }),
+    });
+    if (!r.ok) return { status: r.status, body: "" };
+    return await r.json();
+  },
+  // 本來就在瀏覽器裡，有 DOMParser
+  runInWebView: async (body) => new Function(body)(),
+  loadSettingsJSON: async () => store("settings"),
+  saveSettingsJSON: (json) => storeSet("settings", json),
+  cacheGet: (name) => store("cache:" + name),
+  cacheSet: (name, value) => storeSet("cache:" + name, value),
+  // 圖片交給瀏覽器自己快取
+  cachedImage: (url) => url,
+  cacheImage: async (url) => url,
+};
+g.__webPlatform = webPlatform;
+
+// ── Scriptable 全域物件 ──
+
+g.args = { urls: [], plainTexts: [], shortcutParameter: new URLSearchParams(location.search).get("u") || null };
+g.Script = { complete() {} };
+g.Timer = {
+  schedule(ms: number, repeat: boolean, fn: () => void) {
+    const id = repeat ? setInterval(fn, ms) : setTimeout(fn, ms);
+    return { invalidate: () => (repeat ? clearInterval(id) : clearTimeout(id)) };
+  },
+};
+
+function openUrl(url: string) {
+  // 從非同步流程開新分頁常被擋，被擋就直接換頁
+  const w = window.open(url, "_blank", "noopener");
+  if (!w) location.href = url;
+}
+g.Safari = { open: async (url: string) => openUrl(url), openInApp: async (url: string) => openUrl(url) };
+
+g.Pasteboard = {
+  copy(text: string) {
+    navigator.clipboard?.writeText(text).catch(() => {});
+  },
+  // 瀏覽器不能同步讀剪貼簿，改請使用者貼上
+  paste: () => window.prompt("請貼上內容") || "",
+};
+
+g.ShareSheet = {
+  async present(items: string[]) {
+    const text = items.join("\n");
+    if (navigator.share) {
+      try {
+        await navigator.share({ text });
+        return;
+      } catch (_) {}
+    }
+    await navigator.clipboard?.writeText(text).catch(() => {});
+    (window as any).__toast?.("已複製，可以貼給朋友");
+  },
+};
+
+g.Location = {
+  setAccuracyToHundredMeters() {},
+  current: () =>
+    new Promise((resolve, reject) =>
+      navigator.geolocation.getCurrentPosition(
+        (p) => resolve({ latitude: p.coords.latitude, longitude: p.coords.longitude }),
+        reject,
+        { enableHighAccuracy: false, timeout: 15000, maximumAge: 300000 },
+      ),
+    ),
+};
+
+// ── 行事曆：下載 .ics ──
+const ICS_CAL = { title: "行事曆檔（.ics）", allowsContentModifications: true, identifier: "ics" };
+g.Calendar = {
+  forEvents: async () => [ICS_CAL],
+  forEventsByTitle: async () => ICS_CAL,
+  defaultForEvents: async () => ICS_CAL,
+};
+
+const icsDate = (d: Date) => d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+const icsText = (s: string) => String(s || "").replace(/\\/g, "\\\\").replace(/\n/g, "\\n").replace(/[,;]/g, (m) => "\\" + m);
+/** 每行最多 75 bytes，超過要折行（RFC 5545） */
+function fold(line: string): string {
+  const out: string[] = [];
+  let cur = "";
+  let bytes = 0;
+  for (const ch of line) {
+    const b = new TextEncoder().encode(ch).length;
+    if (bytes + b > 73) {
+      out.push(cur);
+      cur = " ";
+      bytes = 1;
+    }
+    cur += ch;
+    bytes += b;
+  }
+  out.push(cur);
+  return out.join("\r\n");
+}
+
+class CalendarEvent {
+  title = "";
+  startDate = new Date();
+  endDate = new Date();
+  location = "";
+  notes = "";
+  calendar: unknown = ICS_CAL;
+  static async between() {
+    return [];
+  }
+  save() {
+    this.download();
+  }
+  async presentEdit() {
+    this.download();
+  }
+  private download() {
+    const uid = `${icsDate(this.startDate)}-${Math.random().toString(36).slice(2)}@movie-schedule`;
+    const lines = [
+      "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//movie-schedule//web//ZH", "CALSCALE:GREGORIAN", "BEGIN:VEVENT",
+      `UID:${uid}`, `DTSTAMP:${icsDate(new Date())}`, `DTSTART:${icsDate(this.startDate)}`, `DTEND:${icsDate(this.endDate)}`,
+      `SUMMARY:${icsText(this.title)}`, `LOCATION:${icsText(this.location)}`, `DESCRIPTION:${icsText(this.notes)}`,
+      "BEGIN:VALARM", "TRIGGER:-PT30M", "ACTION:DISPLAY", `DESCRIPTION:${icsText(this.title)}`, "END:VALARM",
+      "END:VEVENT", "END:VCALENDAR",
+    ];
+    const blob = new Blob([lines.map(fold).join("\r\n") + "\r\n"], { type: "text/calendar;charset=utf-8" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `${this.title || "電影"}.ics`;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => {
+      URL.revokeObjectURL(a.href);
+      a.remove();
+    }, 60000);
+  }
+}
+g.CalendarEvent = CalendarEvent;
+
+// ── WebView：畫面直接畫在這一頁 ──
+class WebView {
+  async loadHTML(html: string) {
+    const doc = new DOMParser().parseFromString(html, "text/html");
+    for (const st of Array.from(doc.querySelectorAll("style"))) document.head.appendChild(st.cloneNode(true));
+    document.body.innerHTML = '<div id="root"></div>';
+    for (const sc of Array.from(doc.querySelectorAll("script"))) (0, eval)(sc.textContent || "");
+  }
+  evaluateJavaScript(code: string, useCallback = false): Promise<unknown> {
+    if (!useCallback) return Promise.resolve((0, eval)(code));
+    return new Promise((resolve) => {
+      g.completion = (v: unknown) => resolve(v);
+      (0, eval)(code);
+    });
+  }
+  // 網頁不會被「關掉」，永遠不 resolve
+  present() {
+    return new Promise<void>(() => {});
+  }
+}
+g.WebView = WebView;
