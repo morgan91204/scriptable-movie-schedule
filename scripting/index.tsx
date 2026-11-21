@@ -891,20 +891,22 @@ function BoxOfficeMoviePage({ item: x }: { item: BoxOfficeItem }) {
 }
 
 /** 票房排行（官方開放資料，每週更新）；每一部都可以點：有場次的進電影頁，沒有的進精簡頁 */
-function BoxOfficeSections({ movies }: { movies: TwMovie[] }) {
+function BoxOfficeSections({ movies, query }: { movies: TwMovie[]; query: string }) {
   const box = useLoad(() => loadBoxOffice(), [])
   const b = box.data
-  const films = (b?.list || []).map((x) => { const m = matchBoxOffice(x.name, movies); return { title: m ? m.title : x.name, slug: m?.slug, en: m?.en } })
-  const thumbOf = useThumbs(films, `${b ? b.list.length : 0}|${movies.length}`)
+  // 搜尋片名：中文片名或對得到的英文片名
+  const shown = (b?.list || []).filter((x) => !query || `${x.name} ${matchBoxOffice(x.name, movies)?.en || ""}`.toLowerCase().includes(query))
+  const films = shown.map((x) => { const m = matchBoxOffice(x.name, movies); return { title: m ? m.title : x.name, slug: m?.slug, en: m?.en } })
+  const thumbOf = useThumbs(films, `${b ? b.list.length : 0}|${movies.length}|${query}`)
   if (box.error) return <ErrorRow error={box.error} retry={box.reload} />
   if (!b) return <Section><Loading text={"讀取票房排行…"} /></Section>
   const thumbs = films.map(thumbOf)
-  const bad = b.list.filter((_, i) => thumbs[i].why)
+  const bad = shown.filter((_, i) => thumbs[i].why)
   const failNote = bad.length
     ? `\n第 ${bad.map((x) => x.rank).join("、")} 名的海報讀不到（${Array.from(new Set(thumbs.map((t) => t.why).filter(Boolean))).join("；")}），下次進來會再試。`
     : ""
-  return <Section header={<Text>{boxOfficeLabel(b)}</Text>} footer={<Text>{`資料來源：${b.source}。官方每週更新一次。${failNote}`}</Text>}>
-    {b.list.map((x, i) => {
+  return <Section header={<Text>{boxOfficeLabel(b)}</Text>} footer={<Text>{`${shown.length ? "" : "排行上找不到相符的電影。\n"}這週有賣出票的電影共 ${b.list.length} 部。資料來源：${b.source}。官方每週更新一次。${failNote}`}</Text>}>
+    {shown.map((x, i) => {
       const m = matchBoxOffice(x.name, movies)
       const body = <HStack spacing={10}>
         <Text font={"title3"} fontWeight={"bold"} monospacedDigit foregroundStyle={x.rank <= 3 ? "systemOrange" : "secondaryLabel"} frame={{ width: 26 }}>{String(x.rank)}</Text>
@@ -957,7 +959,7 @@ function MoviesPage() {
         <Text tag={"soon"}>即將上映</Text>
       </Picker>
     </Section>
-    {mode === "box" ? <BoxOfficeSections movies={movies.data || []} /> : <>
+    {mode === "box" ? <BoxOfficeSections movies={movies.data || []} query={k} /> : <>
       {movies.error ? <ErrorRow error={movies.error} retry={movies.reload} /> : null}
       {!movies.data && !movies.error ? <Section><Loading text={"讀取電影清單…"} /></Section> : null}
       {now.length ? <Section header={<Text>{`上映中（${now.length}）`}</Text>} footer={<Text>依今天放映的影城數排序；今天沒有場次、過幾天才有的排在最後。資料來自場次通。</Text>}>{now.map(row)}</Section> : null}

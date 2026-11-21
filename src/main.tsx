@@ -793,7 +793,8 @@ class App {
 
   async boxOfficeView(): Promise<string> {
     const [b, all] = await Promise.all([loadBoxOffice(), loadMovies().catch(() => [] as TwMovie[])]);
-    const rows = b.list.map((x) => ({ x, m: matchBoxOffice(x.name, all) }));
+    const k = this.movieQuery.trim().toLowerCase();
+    const rows = b.list.map((x) => ({ x, m: matchBoxOffice(x.name, all) })).filter(({ x, m }) => !k || `${x.name} ${m?.en || ""}`.toLowerCase().includes(k));
     // 海報：手機上記過的立刻有；沒記過的最多等 0.6 秒，其餘讀好後自動補畫
     const jobs = rows.map(({ x, m }) => moviePoster(m ? m.title : x.name, m?.slug, m?.en).catch(() => ""));
     const wait = this.rerendering ? 0 : 600;
@@ -813,7 +814,10 @@ class App {
     return (
       <Page title="依電影找場次" subtitle={boxOfficeLabel(b)} onBack={() => this.back()}>
         {this.movieModeChips()}
-        <Section title={boxOfficeLabel(b)} hint={`資料來源：${b.source}。官方每週更新一次。`}>
+        <input class="field" name="q" value={this.movieQuery} placeholder="搜尋片名" />
+        <Button label="搜尋" kind="secondary" enter onTap={(v) => { this.movieQuery = v.q || ""; }} />
+        {rows.length ? null : <Empty icon="🎞" text="排行上找不到相符的電影" />}
+        <Section title={boxOfficeLabel(b)} hint={`這週有賣出票的電影共 ${b.list.length} 部。資料來源：${b.source}。官方每週更新一次。`}>
           {rows.map(({ x, m }, i) => {
             const t = thumb(posters[i] as string | undefined);
             return (

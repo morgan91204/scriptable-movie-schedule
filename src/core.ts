@@ -1712,18 +1712,18 @@ export interface BoxOffice {
   list: BoxOfficeItem[];
 }
 let boxMem: Promise<BoxOffice> | null = null;
-/** 讀票房排行（手機上記 6 小時；官方一週才更新一次） */
+/** 讀票房排行（手機上記 6 小時；官方一週才更新一次）。排行改成排到底後換了快取檔名，舊的前 20 名不再用 */
 export function loadBoxOffice(): Promise<BoxOffice> {
   return (boxMem ||= (async () => {
     try {
-      const c = JSON.parse(cacheGet("boxoffice.json") || "null");
+      const c = JSON.parse(cacheGet("boxoffice2.json") || "null");
       if (c && c.data && Date.now() - c.at < 6 * 3600e3) return c.data as BoxOffice;
     } catch (_) {}
     const r = await platform().fetchText(BOXOFFICE_URL + "?t=" + Math.floor(Date.now() / 3600e3), { accept: "application/json" });
     if (r.status !== 200) throw new Error("票房排行暫時讀不到");
     const data = JSON.parse(r.body) as BoxOffice;
     if (!data || !Array.isArray(data.list)) throw new Error("票房排行格式不對");
-    cacheSet("boxoffice.json", JSON.stringify({ at: Date.now(), data }));
+    cacheSet("boxoffice2.json", JSON.stringify({ at: Date.now(), data }));
     return data;
   })().catch((e) => {
     boxMem = null;

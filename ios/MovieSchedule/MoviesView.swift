@@ -18,7 +18,7 @@ struct MoviesView: View {
                     .pickerStyle(.segmented)
                 }
                 if mode == "box" {
-                    BoxOfficeSection()
+                    BoxOfficeSection(query: query)
                 } else {
                     nowSections
                 }
@@ -101,6 +101,7 @@ struct MoviesView: View {
 
 /// 票房排行（官方開放資料，每週更新）
 struct BoxOfficeSection: View {
+    var query: String = ""
     @State private var board: Loadable<BoxOfficeBoard> = .loading
 
     var body: some View {
@@ -111,8 +112,10 @@ struct BoxOfficeSection: View {
             case .failed(let message):
                 Section { ErrorRow(message: message) { Task { await load() } } }
             case .loaded(let b):
+                let k = query.trimmingCharacters(in: .whitespaces).lowercased()
+                let rows = b.rows.filter { k.isEmpty || "\($0.x.name) \($0.m?.en ?? "")".lowercased().contains(k) }
                 Section {
-                    ForEach(b.rows) { r in
+                    ForEach(rows) { r in
                         if let m = r.m {
                             NavigationLink { MovieDetailView(movie: m) } label: { rowLabel(r) }.accessibilityIdentifier("box-row")
                         } else {
@@ -122,7 +125,7 @@ struct BoxOfficeSection: View {
                 } header: {
                     Text(b.label)
                 } footer: {
-                    Text("資料來源：\(b.source)。官方每週更新一次。")
+                    Text("\(rows.isEmpty ? "排行上找不到相符的電影。\n" : "")這週有賣出票的電影共 \(b.rows.count) 部。資料來源：\(b.source)。官方每週更新一次。")
                 }
             }
         }

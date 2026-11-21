@@ -1969,7 +1969,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   function loadBoxOffice() {
     return boxMem ||= (async () => {
       try {
-        const c = JSON.parse(cacheGet("boxoffice.json") || "null");
+        const c = JSON.parse(cacheGet("boxoffice2.json") || "null");
         if (c && c.data && Date.now() - c.at < 6 * 36e5) return c.data;
       } catch (_) {
       }
@@ -1977,7 +1977,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
       if (r.status !== 200) throw new Error("票房排行暫時讀不到");
       const data = JSON.parse(r.body);
       if (!data || !Array.isArray(data.list)) throw new Error("票房排行格式不對");
-      cacheSet("boxoffice.json", JSON.stringify({ at: Date.now(), data }));
+      cacheSet("boxoffice2.json", JSON.stringify({ at: Date.now(), data }));
       return data;
     })().catch((e) => {
       boxMem = null;

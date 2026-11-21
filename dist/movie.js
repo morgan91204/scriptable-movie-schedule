@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.22-0347
+// @movie-schedule-app 電影行程 v2026.11.22-0359
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/parsers.gen.ts
@@ -1845,7 +1845,7 @@ var boxMem = null;
 function loadBoxOffice() {
   return boxMem ||= (async () => {
     try {
-      const c = JSON.parse(cacheGet("boxoffice.json") || "null");
+      const c = JSON.parse(cacheGet("boxoffice2.json") || "null");
       if (c && c.data && Date.now() - c.at < 6 * 36e5) return c.data;
     } catch (_) {
     }
@@ -1853,7 +1853,7 @@ function loadBoxOffice() {
     if (r.status !== 200) throw new Error("票房排行暫時讀不到");
     const data = JSON.parse(r.body);
     if (!data || !Array.isArray(data.list)) throw new Error("票房排行格式不對");
-    cacheSet("boxoffice.json", JSON.stringify({ at: Date.now(), data }));
+    cacheSet("boxoffice2.json", JSON.stringify({ at: Date.now(), data }));
     return data;
   })().catch((e) => {
     boxMem = null;
@@ -2416,7 +2416,7 @@ var App = class {
     ];
     // ── 事件迴圈 ──
     // 背景查 GitHub 上的最新版本（首頁顯示是否為最新版）
-    this.latest = checkLatest("2026.11.22-0347");
+    this.latest = checkLatest("2026.11.22-0359");
     // ── 搜尋 ──
     this.query = "";
     this.tmdbStatus = "";
@@ -2551,11 +2551,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.22-0347"}`);
+          Pasteboard.copy(`版本 ${"2026.11.22-0359"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.22-0347"}`,
+      `版本 ${"2026.11.22-0359"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -2915,7 +2915,8 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
   }
   async boxOfficeView() {
     const [b, all] = await Promise.all([loadBoxOffice(), loadMovies().catch(() => [])]);
-    const rows = b.list.map((x) => ({ x, m: matchBoxOffice(x.name, all) }));
+    const k = this.movieQuery.trim().toLowerCase();
+    const rows = b.list.map((x) => ({ x, m: matchBoxOffice(x.name, all) })).filter(({ x, m }) => !k || `${x.name} ${m?.en || ""}`.toLowerCase().includes(k));
     const jobs = rows.map(({ x, m }) => moviePoster(m ? m.title : x.name, m?.slug, m?.en).catch(() => ""));
     const wait = this.rerendering ? 0 : 600;
     const posters = await Promise.all(jobs.map((p) => Promise.race([p, sleep(wait).then(() => void 0)])));
@@ -2930,7 +2931,9 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
       if (src && src === u) cachePoster(u);
       return { src, url: u };
     };
-    return /* @__PURE__ */ h(Page, { title: "依電影找場次", subtitle: boxOfficeLabel(b), onBack: () => this.back() }, this.movieModeChips(), /* @__PURE__ */ h(Section, { title: boxOfficeLabel(b), hint: `資料來源：${b.source}。官方每週更新一次。` }, rows.map(({ x, m }, i) => {
+    return /* @__PURE__ */ h(Page, { title: "依電影找場次", subtitle: boxOfficeLabel(b), onBack: () => this.back() }, this.movieModeChips(), /* @__PURE__ */ h("input", { class: "field", name: "q", value: this.movieQuery, placeholder: "搜尋片名" }), /* @__PURE__ */ h(Button, { label: "搜尋", kind: "secondary", enter: true, onTap: (v) => {
+      this.movieQuery = v.q || "";
+    } }), rows.length ? null : /* @__PURE__ */ h(Empty, { icon: "🎞", text: "排行上找不到相符的電影" }), /* @__PURE__ */ h(Section, { title: boxOfficeLabel(b), hint: `這週有賣出票的電影共 ${b.list.length} 部。資料來源：${b.source}。官方每週更新一次。` }, rows.map(({ x, m }, i) => {
       const t = thumb(posters[i]);
       return /* @__PURE__ */ h(
         Item,
