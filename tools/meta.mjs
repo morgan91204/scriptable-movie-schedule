@@ -20,8 +20,14 @@ const viaCurl = (url, headers, opts) =>
         res({ status: Number(out.slice(i + 9)), body: out.slice(0, i) });
       }));
 const viaFetch = async (url, headers, opts) => {
-  const r = await fetch(url, { headers, method: opts?.method || "GET", body: opts?.body, signal: AbortSignal.timeout(25000) });
-  return { status: r.status, body: await r.text() };
+  try {
+    const r = await fetch(url, { headers, method: opts?.method || "GET", body: opts?.body, signal: AbortSignal.timeout(25000) });
+    return { status: r.status, body: await r.text() };
+  } catch (e) {
+    // Node 內建的 fetch 遇到回應標頭太大的網站（YouTube）會直接失敗：這類改用 curl 再試一次
+    if (/youtube\.com/.test(url)) return viaCurl(url, headers, opts);
+    throw e;
+  }
 };
 const mem = {};
 const platform = {
