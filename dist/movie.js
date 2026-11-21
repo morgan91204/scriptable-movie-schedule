@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.22-0507
+// @movie-schedule-app 電影行程 v2026.11.22-0509
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/parsers.gen.ts
@@ -1058,7 +1058,7 @@ async function movieExtras(title, slug) {
     const ck = (hasToken ? "t|" : "n|") + normTitle(title);
     const read = readExtras;
     const hit = read()[ck];
-    const stale = hit && hit.v !== EXTRAS_V && (!hit.trailerName || !hit.poster || hit.trailerName !== "開眼電影網預告");
+    const stale = hit && hit.v !== EXTRAS_V && true;
     const ttl = stale ? 0 : !hit?.trailerName ? 36e5 : hit?.poster ? 7 * 864e5 : 864e5;
     if (hit && Date.now() - hit.at < ttl) return { poster: hit.poster, trailer: hit.trailer, trailerName: hit.trailerName };
     const me = await metaOf(title);
@@ -1072,7 +1072,7 @@ async function movieExtras(title, slug) {
     return out;
   })();
 }
-var EXTRAS_V = 7;
+var EXTRAS_V = 8;
 function normImageUrl(u) {
   let s = String(u || "").trim().replace(/&amp;/g, "&").replace(/\\\//g, "/");
   if (s.startsWith("//")) s = "https:" + s;
@@ -1346,8 +1346,16 @@ async function findExtras(title, slug) {
     }
     const html = await atPage(id);
     const key = (html.match(/youtube\.com\/embed\/([A-Za-z0-9_-]{11})/) || [])[1];
-    if (!key) atErr.push("開眼電影網沒有這部片的預告");
-    return key ? { key, name: "開眼電影網預告" } : null;
+    if (!key) {
+      atErr.push("開眼電影網沒有這部片的預告");
+      return null;
+    }
+    const name = await ytTitle(key);
+    if (name && YT_NOT_TRAILER.test(name) && !YT_TRAILER.test(name)) {
+      atErr.push("開眼電影網放的是花絮不是預告");
+      return null;
+    }
+    return { key, name: "開眼電影網預告" };
   }).catch((e) => {
     atErr.push("開眼 " + errText(e));
     return null;
@@ -1422,6 +1430,14 @@ function ytScore(name, title, en) {
   if (!zh && /[一-鿿]/.test(name)) sc += 5;
   if (/正式|官方|official/i.test(name)) sc += 3;
   return sc;
+}
+async function ytTitle(key) {
+  try {
+    const r = await platform().fetchText(`https://www.youtube.com/oembed?url=${encodeURIComponent("https://www.youtube.com/watch?v=" + key)}&format=json`, { accept: "application/json" });
+    return r.status === 200 ? String(JSON.parse(r.body).title || "") : "";
+  } catch (_) {
+    return "";
+  }
 }
 var strictTrailers = false;
 async function ytTrailer(title, en) {
@@ -2498,7 +2514,7 @@ var App = class {
     ];
     // ── 事件迴圈 ──
     // 背景查 GitHub 上的最新版本（首頁顯示是否為最新版）
-    this.latest = checkLatest("2026.11.22-0507");
+    this.latest = checkLatest("2026.11.22-0509");
     // ── 搜尋 ──
     this.query = "";
     this.tmdbStatus = "";
@@ -2633,11 +2649,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.22-0507"}`);
+          Pasteboard.copy(`版本 ${"2026.11.22-0509"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.22-0507"}`,
+      `版本 ${"2026.11.22-0509"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }

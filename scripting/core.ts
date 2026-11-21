@@ -684,7 +684,7 @@ export async function movieExtras(title: string, slug?: string): Promise<MovieEx
     // 舊版（v 不是 2）記下的「沒預告」一律重查，因為舊版還不會取 YouTube 搜尋的第一支影片
     // 舊版記下的「沒海報」也重查（海報比對規則改了）
     // 預告挑選規則也改過（要對得上片名、台灣版優先）：舊版從 YouTube 搜尋挑的也重查
-    const stale = hit && hit.v !== EXTRAS_V && (!hit.trailerName || !hit.poster || hit.trailerName !== "開眼電影網預告");
+    const stale = hit && hit.v !== EXTRAS_V && true; // 預告的挑選與檢查規則改過：舊版記下的一律重查一次
     const ttl = stale ? 0 : !hit?.trailerName ? 3600e3 : hit?.poster ? 7 * 86400e3 : 86400e3;
     if (hit && Date.now() - hit.at < ttl) return { poster: hit.poster, trailer: hit.trailer, trailerName: hit.trailerName };
     // 伺服器已經查好海報和預告：直接用
@@ -702,7 +702,7 @@ export async function movieExtras(title: string, slug?: string): Promise<MovieEx
   })());
 }
 /** extras.json 紀錄的版本：預告查法改了就加 1，讓舊的「沒預告」紀錄重查 */
-const EXTRAS_V = 7;
+const EXTRAS_V = 8;
 
 /** 圖片網址正規化：解掉 HTML 跳脫、\\/、//host 與 http:// 都改成 https://（iOS 的 WebView／Image 不載入 http 圖片） */
 export function normImageUrl(u: string): string {
@@ -1025,8 +1025,17 @@ async function findExtras(title: string, slug?: string): Promise<MovieExtras> {
       }
       const html = await atPage(id);
       const key = (html.match(/youtube\.com\/embed\/([A-Za-z0-9_-]{11})/) || [])[1];
-      if (!key) atErr.push("開眼電影網沒有這部片的預告");
-      return key ? { key, name: "開眼電影網預告" } : null;
+      if (!key) {
+        atErr.push("開眼電影網沒有這部片的預告");
+        return null;
+      }
+      // 開眼頁上放的不一定是預告（有時是幕後花絮、訪談）：問一下影片標題（很小的請求），不是預告就不用，改去搜尋
+      const name = await ytTitle(key);
+      if (name && YT_NOT_TRAILER.test(name) && !YT_TRAILER.test(name)) {
+        atErr.push("開眼電影網放的是花絮不是預告");
+        return null;
+      }
+      return { key, name: "開眼電影網預告" };
     })
     .catch((e) => {
       atErr.push("開眼 " + errText(e));
@@ -1111,6 +1120,15 @@ export function ytScore(name: string, title: string, en?: string): number {
   if (!zh && /[一-鿿]/.test(name)) sc += 5; // 沒有台灣版時，中文字幕的版本（多半是香港）比純外語好懂
   if (/正式|官方|official/i.test(name)) sc += 3;
   return sc;
+}
+/** YouTube 影片的標題（讀不到回傳空字串） */
+async function ytTitle(key: string): Promise<string> {
+  try {
+    const r = await platform().fetchText(`https://www.youtube.com/oembed?url=${encodeURIComponent("https://www.youtube.com/watch?v=" + key)}&format=json`, { accept: "application/json" });
+    return r.status === 200 ? String(JSON.parse(r.body).title || "") : "";
+  } catch (_) {
+    return "";
+  }
 }
 let strictTrailers = false;
 /** 伺服器排程用：只採用標題有台灣片名的影片。伺服器在國外，YouTube 給它的搜尋結果跟台灣的手機不同
