@@ -484,15 +484,22 @@ export async function moviesOf(c: Cinema, date: string): Promise<{ movies: Movie
 // 場次通的重映、修復版、演唱會等有時沒有片長：用 TMDB（themoviedb.org）查片名補上。
 // 需要使用者自己的 API Read Access Token（設定裡填），沒填就不補。
 
+// 異體字：兩個來源同一部片用字不同（神祕／神秘、臺／台）
+const VARIANTS: Record<string, string> = { 祕: "秘", 臺: "台", 裏: "裡", 艶: "艷", 羣: "群", 峯: "峰", 砲: "炮" };
 export const normTitle = (t: string) =>
-  String(t || "").toLowerCase().replace(/[\s:：·・\-–—!！?？,，.。'"’「」『』《》()（）\[\]【】]/g, "");
+  String(t || "")
+    .toLowerCase()
+    .replace(/[\s:：·・\-–—_＿!！?？,，.。'"’‘“”「」『』《》〈〉＜＞<>()（）\[\]【】／/]/g, "")
+    .replace(/[祕臺裏艶羣峯砲]/g, (c) => VARIANTS[c] || c);
+/** 更寬鬆的比對用：再去掉開頭的「劇場版」「電影版」（場次通寫「劇場版《XXX》」、開眼只寫「XXX」） */
+export const looseTitle = (t: string) => normTitle(baseTitle(t)).replace(/^(?:劇場版|電影版|動畫電影)/, "") || normTitle(t);
 /** 去掉「4K重映」「全新4K修復版」「(4K修復)」「加碼重映」等字，查原片 */
-const REISSUE_WORDS = "全新|加碼|數位|[248]K|修復|重映|重製|再映|經典|紀念|\\d*週年";
+const REISSUE_WORDS = "全新|加碼|數位|[248]K|修復|重映|重製|再映|經典|紀念|[\\d一二三四五六七八九十百]*週年";
 /** 片名是重映、修復版（查原片時用；比對年份時不能拿重映日來比） */
 export const isReissue = (t: string) => new RegExp(REISSUE_WORDS, "i").test(String(t || ""));
 // 片名前後的裝飾字：(全台聯合首映)哥吉拉-0.0、驀然回首 (真人版)、高年級實習生(2026)、A-Stray Kids…、法文版-XXX、XXX-海報特別場
-const DECOR_LEAD = /^\s*(?:[（(\[【][^）)\]】]{1,12}[）)\]】]|[A-Z]-|(?:法文|中文|英文|日文|韓文|台語|國語|粵語)版[-－:：]?)\s*/;
-const DECOR_TAIL = /\s*(?:[（(\[【]\s*(?:真人版|\d{4}|[^）)\]】]{0,8}版)\s*[）)\]】]|[-－:：]?\s*(?:海報)?特別場|特別版|口白場|中文配音版?|(?:日|英|韓|法|國|台)語版)\s*$/;
+const DECOR_LEAD = /^\s*(?:[（(\[【][^）)\]】]{1,12}[）)\]】]|[A-Z]\d?-|(?:法文|中文|英文|日文|韓文|台語|國語|粵語)版[-－:：]?)\s*/;
+const DECOR_TAIL = /\s*(?:[（(\[【]\s*(?:真人版|\d{4}|[^）)\]】]{0,8}版)\s*[）)\]】]|[-－:：]?\s*(?:海報)?特別場|[-－:：]?\s*(?:粉絲)?特典場|[-－:：]?\s*LIVE VIEWING|應援場|現場直播|安可重播|黑白版|特別版|口白場|中文配音版?|(?:日|英|韓|法|國|台)語版)\s*$/;
 export function baseTitle(t: string): string {
   let s = String(t || "").replace(/[《》]/g, "").trim();
   for (let i = 0; i < 4; i++) {
@@ -501,7 +508,7 @@ export function baseTitle(t: string): string {
     // 結尾括號裡是重映字樣：讓子彈飛(4K修復)、XXX【數位修復版】
     s = s.replace(new RegExp(`\\s*[（(\\[【][^）)\\]】]*(?:${REISSUE_WORDS})[^）)\\]】]*[）)\\]】]\\s*$`, "i"), "");
     // 結尾直接接重映字樣：讓子彈飛 全新4K修復版、進擊的鼓手 4K重映
-    s = s.replace(new RegExp(`[\\s:：\\-–—]*(?:${REISSUE_WORDS})+(?:版本?)?\\s*$`, "i"), "");
+    s = s.replace(new RegExp(`[\\s:：\\-–—_＿]*(?:${REISSUE_WORDS})+(?:版本?)?\\s*$`, "i"), "");
     if (s === before) break;
   }
   return s.trim() || String(t || "").trim();
@@ -692,7 +699,7 @@ export async function movieExtras(title: string, slug?: string): Promise<MovieEx
   })());
 }
 /** extras.json 紀錄的版本：預告查法改了就加 1，讓舊的「沒預告」紀錄重查 */
-const EXTRAS_V = 3;
+const EXTRAS_V = 4;
 
 /** 圖片網址正規化：解掉 HTML 跳脫、\\/、//host 與 http:// 都改成 https://（iOS 的 WebView／Image 不載入 http 圖片） */
 export function normImageUrl(u: string): string {
@@ -732,9 +739,10 @@ function atMovieIndex(): Promise<Record<string, string>> {
       ["now", "new", "next", "next2", "now2"].map(async (p) => {
         const html = await getText(`${AT}/movie/${p}/`).catch(() => "");
         for (const [, id, t] of html.matchAll(/<a[^>]*href="\/movie\/(f[a-z0-9]+)\/"[^>]*>\s*([^<]{1,60}?)\s*<\/a>/g)) {
-          const n = normTitle(t), b = normTitle(baseTitle(t));
+          const n = normTitle(t), b = normTitle(baseTitle(t)), l = looseTitle(t);
           if (n) idx[n] ||= id;
           if (b) idx[b] ||= id;
+          if (l) idx[l] ||= id;
         }
       })
     );
@@ -750,7 +758,18 @@ async function atMovieId(title: string, posterUrl: string): Promise<string> {
   const fromPoster = (posterUrl.match(/\/photo\d*\/(f\w+)\//) || [])[1];
   if (fromPoster) return fromPoster;
   const idx = await atMovieIndex();
-  return idx[normTitle(title)] || idx[normTitle(baseTitle(title))] || "";
+  return matchIndex(idx, title);
+}
+/** 用片名查索引：完全相同 → 去掉重映／裝飾字 → 去掉「劇場版」→ 片名被截斷時用開頭比對（至少 8 個字） */
+function matchIndex(idx: Record<string, string>, title: string): string {
+  const n = normTitle(title), b = normTitle(baseTitle(title)), l = looseTitle(title);
+  if (idx[n] || idx[b] || idx[l]) return idx[n] || idx[b] || idx[l];
+  for (const k of [b, l]) {
+    if (k.length < 8) continue;
+    const hit = Object.keys(idx).find((x) => x.length >= 8 && (x.startsWith(k) || k.startsWith(x)));
+    if (hit) return idx[hit];
+  }
+  return "";
 }
 /** 開眼電影頁的海報（場次通沒有海報時的第二來源；重映、修復版常只有開眼有） */
 async function atPoster(title: string): Promise<string> {
@@ -823,7 +842,8 @@ async function findPoster(title: string, slug?: string, en?: string): Promise<st
   if (p) return p;
   const list = await loadMovies();
   const key = normTitle(title), bkey = normTitle(baseTitle(title));
-  const cands = list.filter((m) => m.slug !== (slug || title) && (normTitle(m.title) === key || normTitle(baseTitle(m.title)) === bkey));
+  const lkey = looseTitle(title);
+  const cands = list.filter((m) => m.slug !== (slug || title) && (normTitle(m.title) === key || normTitle(baseTitle(m.title)) === bkey || looseTitle(m.title) === lkey || (bkey.length >= 8 && normTitle(baseTitle(m.title)).startsWith(bkey))));
   for (const c of cands) {
     p = await twPoster(c.slug).catch(() => "");
     if (p) return p;

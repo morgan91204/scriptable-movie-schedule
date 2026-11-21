@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.22-0318
+// @movie-schedule-app 電影行程 v2026.11.22-0328
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/jsx.tsx
@@ -1371,18 +1371,20 @@ async function moviesOf(c, date) {
   const m = await multiDay(c);
   return { movies: await fillRuntimes(m.schedules[date] || []), booking: c.url, sourceUrl: c.url, address: c.address || "" };
 }
-var normTitle = (t) => String(t || "").toLowerCase().replace(/[\s:：·・\-–—!！?？,，.。'"’「」『』《》()（）\[\]【】]/g, "");
-var REISSUE_WORDS = "全新|加碼|數位|[248]K|修復|重映|重製|再映|經典|紀念|\\d*週年";
+var VARIANTS = { 祕: "秘", 臺: "台", 裏: "裡", 艶: "艷", 羣: "群", 峯: "峰", 砲: "炮" };
+var normTitle = (t) => String(t || "").toLowerCase().replace(/[\s:：·・\-–—_＿!！?？,，.。'"’‘“”「」『』《》〈〉＜＞<>()（）\[\]【】／/]/g, "").replace(/[祕臺裏艶羣峯砲]/g, (c) => VARIANTS[c] || c);
+var looseTitle = (t) => normTitle(baseTitle(t)).replace(/^(?:劇場版|電影版|動畫電影)/, "") || normTitle(t);
+var REISSUE_WORDS = "全新|加碼|數位|[248]K|修復|重映|重製|再映|經典|紀念|[\\d一二三四五六七八九十百]*週年";
 var isReissue = (t) => new RegExp(REISSUE_WORDS, "i").test(String(t || ""));
-var DECOR_LEAD = /^\s*(?:[（(\[【][^）)\]】]{1,12}[）)\]】]|[A-Z]-|(?:法文|中文|英文|日文|韓文|台語|國語|粵語)版[-－:：]?)\s*/;
-var DECOR_TAIL = /\s*(?:[（(\[【]\s*(?:真人版|\d{4}|[^）)\]】]{0,8}版)\s*[）)\]】]|[-－:：]?\s*(?:海報)?特別場|特別版|口白場|中文配音版?|(?:日|英|韓|法|國|台)語版)\s*$/;
+var DECOR_LEAD = /^\s*(?:[（(\[【][^）)\]】]{1,12}[）)\]】]|[A-Z]\d?-|(?:法文|中文|英文|日文|韓文|台語|國語|粵語)版[-－:：]?)\s*/;
+var DECOR_TAIL = /\s*(?:[（(\[【]\s*(?:真人版|\d{4}|[^）)\]】]{0,8}版)\s*[）)\]】]|[-－:：]?\s*(?:海報)?特別場|[-－:：]?\s*(?:粉絲)?特典場|[-－:：]?\s*LIVE VIEWING|應援場|現場直播|安可重播|黑白版|特別版|口白場|中文配音版?|(?:日|英|韓|法|國|台)語版)\s*$/;
 function baseTitle(t) {
   let s = String(t || "").replace(/[《》]/g, "").trim();
   for (let i = 0; i < 4; i++) {
     const before = s;
     s = s.replace(DECOR_LEAD, "").replace(DECOR_TAIL, "");
     s = s.replace(new RegExp(`\\s*[（(\\[【][^）)\\]】]*(?:${REISSUE_WORDS})[^）)\\]】]*[）)\\]】]\\s*$`, "i"), "");
-    s = s.replace(new RegExp(`[\\s:：\\-–—]*(?:${REISSUE_WORDS})+(?:版本?)?\\s*$`, "i"), "");
+    s = s.replace(new RegExp(`[\\s:：\\-–—_＿]*(?:${REISSUE_WORDS})+(?:版本?)?\\s*$`, "i"), "");
     if (s === before) break;
   }
   return s.trim() || String(t || "").trim();
@@ -1517,7 +1519,7 @@ async function movieExtras(title, slug) {
     return out;
   })();
 }
-var EXTRAS_V = 3;
+var EXTRAS_V = 4;
 function normImageUrl(u) {
   let s = String(u || "").trim().replace(/&amp;/g, "&").replace(/\\\//g, "/");
   if (s.startsWith("//")) s = "https:" + s;
@@ -1551,9 +1553,10 @@ function atMovieIndex() {
       ["now", "new", "next", "next2", "now2"].map(async (p) => {
         const html = await getText(`${AT}/movie/${p}/`).catch(() => "");
         for (const [, id, t] of html.matchAll(/<a[^>]*href="\/movie\/(f[a-z0-9]+)\/"[^>]*>\s*([^<]{1,60}?)\s*<\/a>/g)) {
-          const n = normTitle(t), b = normTitle(baseTitle(t));
+          const n = normTitle(t), b = normTitle(baseTitle(t)), l = looseTitle(t);
           if (n) idx[n] ||= id;
           if (b) idx[b] ||= id;
+          if (l) idx[l] ||= id;
         }
       })
     );
@@ -1567,7 +1570,17 @@ async function atMovieId(title, posterUrl) {
   const fromPoster = (posterUrl.match(/\/photo\d*\/(f\w+)\//) || [])[1];
   if (fromPoster) return fromPoster;
   const idx = await atMovieIndex();
-  return idx[normTitle(title)] || idx[normTitle(baseTitle(title))] || "";
+  return matchIndex(idx, title);
+}
+function matchIndex(idx, title) {
+  const n = normTitle(title), b = normTitle(baseTitle(title)), l = looseTitle(title);
+  if (idx[n] || idx[b] || idx[l]) return idx[n] || idx[b] || idx[l];
+  for (const k of [b, l]) {
+    if (k.length < 8) continue;
+    const hit = Object.keys(idx).find((x) => x.length >= 8 && (x.startsWith(k) || k.startsWith(x)));
+    if (hit) return idx[hit];
+  }
+  return "";
 }
 async function atPoster(title) {
   const id = await atMovieId(title, "");
@@ -1634,7 +1647,8 @@ async function findPoster(title, slug, en) {
   if (p) return p;
   const list = await loadMovies();
   const key = normTitle(title), bkey = normTitle(baseTitle(title));
-  const cands = list.filter((m) => m.slug !== (slug || title) && (normTitle(m.title) === key || normTitle(baseTitle(m.title)) === bkey));
+  const lkey = looseTitle(title);
+  const cands = list.filter((m) => m.slug !== (slug || title) && (normTitle(m.title) === key || normTitle(baseTitle(m.title)) === bkey || looseTitle(m.title) === lkey || bkey.length >= 8 && normTitle(baseTitle(m.title)).startsWith(bkey)));
   for (const c of cands) {
     p = await twPoster(c.slug).catch(() => "");
     if (p) return p;
@@ -2334,7 +2348,7 @@ var App = class {
     ];
     // ── 事件迴圈 ──
     // 背景查 GitHub 上的最新版本（首頁顯示是否為最新版）
-    this.latest = checkLatest("2026.11.22-0318");
+    this.latest = checkLatest("2026.11.22-0328");
     // ── 搜尋 ──
     this.query = "";
     this.tmdbStatus = "";
@@ -2469,11 +2483,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.22-0318"}`);
+          Pasteboard.copy(`版本 ${"2026.11.22-0328"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.22-0318"}`,
+      `版本 ${"2026.11.22-0328"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
