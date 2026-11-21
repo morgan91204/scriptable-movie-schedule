@@ -1,5 +1,5 @@
 {
- "updated": "2026-11-21T19:39:26.810Z",
+ "updated": "2026-11-21T20:17:02.638Z",
  "mode": "week",
  "start": "2026-11-09",
  "end": "2026-11-15",
@@ -13,6 +13,7 @@
    "release": "2026-11-02",
    "theaters": 82,
    "week": 74818512,
+   "since": true,
    "weekTickets": 230401,
    "total": 74818512,
    "tickets": 230401
@@ -24,6 +25,7 @@
    "release": "2026-11-06",
    "theaters": 88,
    "week": 30036247,
+   "since": true,
    "weekTickets": 109341,
    "total": 30036247,
    "tickets": 109341
@@ -46,6 +48,7 @@
    "release": "2026-11-06",
    "theaters": 16,
    "week": 5512458,
+   "since": true,
    "weekTickets": 19285,
    "total": 5512458,
    "tickets": 19285
@@ -112,6 +115,7 @@
    "release": "2026-11-06",
    "theaters": 25,
    "week": 1219554,
+   "since": true,
    "weekTickets": 4544,
    "total": 1219554,
    "tickets": 4544
@@ -156,6 +160,7 @@
    "release": "2026-11-07",
    "theaters": 47,
    "week": 871840,
+   "since": true,
    "weekTickets": 3385,
    "total": 871840,
    "tickets": 3385
@@ -222,6 +227,7 @@
    "release": "2026-11-08",
    "theaters": 29,
    "week": 644035,
+   "since": true,
    "weekTickets": 2399,
    "total": 644035,
    "tickets": 2399
@@ -255,6 +261,7 @@
    "release": "2026-11-06",
    "theaters": 51,
    "week": 505644,
+   "since": true,
    "weekTickets": 1944,
    "total": 505644,
    "tickets": 1944
@@ -266,6 +273,7 @@
    "release": "2026-11-06",
    "theaters": 27,
    "week": 493279,
+   "since": true,
    "weekTickets": 1936,
    "total": 493279,
    "tickets": 1936
@@ -354,6 +362,7 @@
    "release": "2026-11-02",
    "theaters": 12,
    "week": 280852,
+   "since": true,
    "weekTickets": 644,
    "total": 280852,
    "tickets": 644
@@ -409,6 +418,7 @@
    "release": "2026-11-06",
    "theaters": 16,
    "week": 214075,
+   "since": true,
    "weekTickets": 862,
    "total": 214075,
    "tickets": 862
@@ -431,6 +441,7 @@
    "release": "2026-11-04",
    "theaters": 22,
    "week": 179533,
+   "since": true,
    "weekTickets": 721,
    "total": 179533,
    "tickets": 721
@@ -453,6 +464,7 @@
    "release": "2026-11-08",
    "theaters": 4,
    "week": 166650,
+   "since": true,
    "weekTickets": 658,
    "total": 166650,
    "tickets": 658
@@ -464,6 +476,7 @@
    "release": "2026-11-05",
    "theaters": 32,
    "week": 153662,
+   "since": true,
    "weekTickets": 615,
    "total": 153662,
    "tickets": 615
@@ -585,6 +598,7 @@
    "release": "2026-11-05",
    "theaters": 1,
    "week": 95750,
+   "since": true,
    "weekTickets": 383,
    "total": 95750,
    "tickets": 383
@@ -618,6 +632,7 @@
    "release": "2026-11-06",
    "theaters": 23,
    "week": 82065,
+   "since": true,
    "weekTickets": 328,
    "total": 82065,
    "tickets": 328
@@ -706,6 +721,7 @@
    "release": "2026-11-06",
    "theaters": 3,
    "week": 53195,
+   "since": true,
    "weekTickets": 268,
    "total": 53195,
    "tickets": 268
@@ -915,6 +931,7 @@
    "release": "2026-11-07",
    "theaters": 1,
    "week": 22955,
+   "since": true,
    "weekTickets": 109,
    "total": 22955,
    "tickets": 109
