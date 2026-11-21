@@ -10,10 +10,16 @@ const PASS_HEADERS = ["accept", "accept-language", "authorization", "content-typ
 const UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1";
 const json = (o, status = 200) => new Response(JSON.stringify(o), { status, headers: { "content-type": "application/json; charset=utf-8" } });
 
+// App 本體（public/app.js）打包在 Worker 裡，不走靜態檔上傳：每次發佈只要上傳這支 Worker 就會更新
+import APP_JS from "./public/app.js.txt";
+
 export default {
   async fetch(req, env, ctx) {
     const url = new URL(req.url);
     if (url.pathname === "/api/fetch" && req.method === "POST") return proxy(req, ctx);
+    if (url.pathname === "/app.js") {
+      return new Response(APP_JS, { headers: { "content-type": "text/javascript; charset=utf-8", "cache-control": "no-cache" } });
+    }
     return env.ASSETS.fetch(req);
   },
 };

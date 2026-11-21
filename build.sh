@@ -40,4 +40,5 @@ echo "ios core.js ready"
 # ── 網頁版：同一份 App（src/main.tsx）加上瀏覽器版的 Scriptable 全域物件（web/shim.ts）→ web/public/app.js
 npx esbuild web/entry.ts --bundle --format=esm --target=safari16 --jsx-factory=h --jsx-fragment=Fragment --charset=utf8 --legal-comments=none --log-level=warning \
   --define:APP_VERSION="\"$VERSION\"" --define:IS_WEB=true --minify --outfile=web/public/app.js
+cp web/public/app.js web/public/app.js.txt  # Worker 把這份當文字打包進去（見 web/worker.js）
 echo "web/public/app.js ready"
