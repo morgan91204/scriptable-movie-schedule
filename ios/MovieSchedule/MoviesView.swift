@@ -135,7 +135,7 @@ struct BoxOfficeSection: View {
     private func rowLabel(_ r: BoxOfficeRow) -> some View {
         HStack(spacing: 10) {
             Text("\(r.x.rank)")
-                .font(.title3.bold()).monospacedDigit()
+                .font(r.x.rank >= 100 ? .subheadline.bold() : .title3.bold()).monospacedDigit()
                 .foregroundStyle(r.x.rank <= 3 ? Color.orange : Color.secondary)
                 .lineLimit(1).minimumScaleFactor(0.6)
                 .frame(width: 36)
