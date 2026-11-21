@@ -4,6 +4,11 @@ on:
   schedule:
     - cron: "17 1 * * *" # 每天台灣時間 09:17
   workflow_dispatch:
+    inputs:
+      force:
+        description: 官方資料沒更新也重新產生（改了排行規則時用）
+        type: boolean
+        default: false
 permissions:
   contents: write
 concurrency:
@@ -20,6 +25,8 @@ jobs:
           node-version: 22
       - name: 讀官方資料、算排行
         run: node tools/boxoffice.mjs
+        env:
+          FORCE: ${{ inputs.force && '1' || '' }}
       - name: 有變化才提交
         run: |
           if git diff --quiet -- dist/boxoffice.json data/boxoffice-snapshot.json; then

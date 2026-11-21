@@ -856,6 +856,20 @@ async function findPoster(title: string, slug?: string, en?: string): Promise<st
   return hit?.p ? "https://image.tmdb.org/t/p/w500" + hit.p : "";
 }
 
+let posterBusy = 0;
+const posterQueue: (() => void)[] = [];
+async function posterLane<T>(job: () => Promise<T>): Promise<T> {
+  if (posterBusy >= 4) await new Promise<void>((go) => posterQueue.push(go));
+  else posterBusy++;
+  try {
+    return await job();
+  } finally {
+    const next = posterQueue.shift();
+    if (next) next(); // 位置直接交給下一個
+    else posterBusy--;
+  }
+}
+
 /** 只查海報網址（約 0.3 秒），不等預告：電影頁先把海報畫出來。手機上記過的直接用（找到的 7 天、沒找到的 1 天） */
 const posterOnly: Record<string, Promise<string>> = {};
 const posterDone: Record<string, string> = {};
@@ -875,13 +889,35 @@ export function moviePoster(title: string, slug?: string, en?: string): Promise<
     if (own && Date.now() - own.at < (own.poster ? 7 : own.v === EXTRAS_V ? 1 : 0) * 86400e3) return own.poster;
     const me = await metaOf(title);
     if (me && me.p) return normImageUrl(me.p); // 伺服器已經查好海報
-    const poster = normImageUrl(await findPoster(title, slug, en).catch(() => ""));
+    // 要上網找的同時最多 4 部：整份清單一起要海報時不會一次打出上百個請求
+    const poster = await posterLane(async () => {
+      const found = normImageUrl(await findPoster(title, slug, en).catch(() => ""));
+      if (found) return found;
+      // 哪個來源都沒有海報（演唱會轉播、特別場、還沒建檔的新片）：走完整查詢，會用 YouTube 預告的縮圖代替，預告網址也一併記下
+      return normImageUrl((await movieExtras(title, slug).catch(() => null))?.poster || "");
+    });
     const latest = readExtras();
     latest["p|" + nk] = { poster, trailer: "", trailerName: "", at: Date.now(), v: EXTRAS_V } as MovieExtras & { at: number };
     cacheSet("extras.json", JSON.stringify(latest));
     return poster;
   })().then((u) => (posterDone[k] = u)));
 }
+
+/** 沒有任何圖可用時畫的預設海報：依片名固定挑一種底色（0–5），同一部片每次、每個版本都一樣 */
+export function posterTint(title: string): number {
+  let h = 0;
+  for (const ch of normTitle(title)) h = (h * 31 + (ch.codePointAt(0) || 0)) % 9973;
+  return h % 6;
+}
+/** 預設海報的六種底色（漸層的上、下兩色） */
+export const POSTER_TINTS: [string, string][] = [
+  ["#3b4a6b", "#1f2a44"],
+  ["#6b3b4a", "#3d1f2a"],
+  ["#2f5d50", "#16352d"],
+  ["#5a4a2f", "#33290f"],
+  ["#4a3b6b", "#281f44"],
+  ["#3a3d42", "#1f2125"],
+];
 
 /** 顯示用的海報來源：手機上有圖片快取就用本機（Scriptable 是 data: 網址、Scripting 是檔案路徑），否則用網址 */
 export function posterSrc(url: string): string {

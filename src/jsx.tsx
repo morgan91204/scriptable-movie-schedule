@@ -1,6 +1,8 @@
 // 迷你 JSX runtime：把 TSX 轉成 HTML 字串，交給 Scriptable 的 WebView 顯示。
 // 點擊事件用 data-act 標記，由 ui.tsx 的事件迴圈接收後呼叫對應的 handler。
 
+import { posterTint } from "./core";
+
 export type Handler = (vals: Record<string, string>) => void | Promise<void>;
 
 declare global {
@@ -171,15 +173,17 @@ export function Item(props: {
   rank?: number; // 排行名次（前三名橘色）
 }): string {
   const cls = ["item", props.onTap ? "tap" : "", props.muted ? "muted" : "", props.accent ? "accent" : "", props.onLongPress ? "long" : ""].join(" ");
-  const fallback = "if(this.dataset.url&&this.src!==this.dataset.url){this.src=this.dataset.url}else{this.replaceWith(Object.assign(document.createElement('span'),{className:'thumb none',textContent:'🎬'}))}";
+  const fallback = "if(this.dataset.url&&this.src!==this.dataset.url){this.src=this.dataset.url}else{this.remove()}";
   return (
     <div class={cls} onTap={props.onTap} onLongPress={props.onLongPress}>
       {props.rank ? <span class={"rank" + (props.rank <= 3 ? " top" : "")}>{props.rank}</span> : null}
       {props.thumb ? (
-        props.thumb.src ? (
-          <img class="thumb" src={props.thumb.src} data-url={props.thumb.url && props.thumb.url !== props.thumb.src ? props.thumb.url : undefined} alt="" loading="lazy" onerror={fallback} />
+        props.thumb.pending && !props.thumb.src ? (
+          <span class="thumb none" />
         ) : (
-          <span class="thumb none">{props.thumb.pending ? "" : "🎬"}</span>
+          <GenPoster cls="thumb" title={props.title}>
+            {props.thumb.src ? <img src={props.thumb.src} data-url={props.thumb.url && props.thumb.url !== props.thumb.src ? props.thumb.url : undefined} alt="" loading="lazy" onerror={fallback} /> : null}
+          </GenPoster>
         )
       ) : null}
       {props.icon ? <span class="ico">{props.icon}</span> : null}
@@ -241,15 +245,32 @@ export function Badges(props: { items: RatingBadge[] }): string {
 }
 
 /** 電影頁頂端：海報在左（沒海報時是灰色預設圖，還在查時先留空的灰框），資訊、評分、預告按鈕在右 */
-export function Hero(props: { poster?: string; posterUrl?: string; posterPending?: boolean; lines: string[]; trailerLabel?: string; onTrailer?: Handler; badges?: RatingBadge[] }): string {
-  // 海報：本機快取（file://）讀不到就改用網址，網址也讀不到才換成灰色預設圖
-  const fallback = "if(this.dataset.url&&this.src!==this.dataset.url){this.src=this.dataset.url}else{this.replaceWith(Object.assign(document.createElement('div'),{className:'poster none',textContent:'🎬'}))}";
+/** 預設海報：場記板斜紋＋片名＋膠卷孔，底色依片名固定。真的海報圖疊在上面，圖讀不到（或根本沒有）就看到它 */
+export function GenPoster(props: { cls: string; title: string; children?: Children }): string {
+  const n = Array.from(props.title).length;
+  return (
+    <span class={`${props.cls} gen g${posterTint(props.title)}`}>
+      <i class="clap" />
+      <span class={"gt" + (n > 16 ? " l" : n > 7 ? " m" : "")}>
+        <span>{esc(props.title)}</span>
+      </span>
+      <i class="perf" />
+      {props.children}
+    </span>
+  );
+}
+
+export function Hero(props: { title?: string; poster?: string; posterUrl?: string; posterPending?: boolean; lines: string[]; trailerLabel?: string; onTrailer?: Handler; badges?: RatingBadge[] }): string {
+  // 海報：本機快取（file://）讀不到就改用網址，網址也讀不到就拿掉，露出底下的預設海報
+  const fallback = "if(this.dataset.url&&this.src!==this.dataset.url){this.src=this.dataset.url}else{this.remove()}";
   return (
     <div class="hero">
-      {props.poster ? (
-        <img class="poster" src={props.poster} data-url={props.posterUrl && props.posterUrl !== props.poster ? props.posterUrl : undefined} alt="" onerror={fallback} />
+      {props.posterPending && !props.poster ? (
+        <div class="poster none pending" />
       ) : (
-        <div class={"poster none" + (props.posterPending ? " pending" : "")}>{props.posterPending ? "" : "🎬"}</div>
+        <GenPoster cls="poster" title={props.title || ""}>
+          {props.poster ? <img src={props.poster} data-url={props.posterUrl && props.posterUrl !== props.poster ? props.posterUrl : undefined} alt="" onerror={fallback} /> : null}
+        </GenPoster>
       )}
       <div class="hero-info">
         {props.lines.filter(Boolean).map((l) => <div class="hero-line">{esc(l)}</div>)}

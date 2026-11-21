@@ -21,6 +21,7 @@
     FORMATS: () => FORMATS,
     MAPS_LABEL: () => MAPS_LABEL,
     META_URL: () => META_URL,
+    POSTER_TINTS: () => POSTER_TINTS,
     SCRIPTING_IMPORT_URL: () => SCRIPTING_IMPORT_URL,
     TMDB_LINKS: () => TMDB_LINKS,
     TW: () => TW,
@@ -82,6 +83,7 @@
     nowHM: () => nowHM,
     posterReady: () => posterReady,
     posterSrc: () => posterSrc,
+    posterTint: () => posterTint,
     prefetchPosters: () => prefetchPosters,
     ratingTier: () => ratingTier,
     saveSettings: () => saveSettings,
@@ -1307,6 +1309,19 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     const hit = await tmdbFind(title, token).catch(() => null) || (en ? await tmdbFind(en, token).catch(() => null) : null);
     return hit?.p ? "https://image.tmdb.org/t/p/w500" + hit.p : "";
   }
+  var posterBusy = 0;
+  var posterQueue = [];
+  async function posterLane(job) {
+    if (posterBusy >= 4) await new Promise((go) => posterQueue.push(go));
+    else posterBusy++;
+    try {
+      return await job();
+    } finally {
+      const next = posterQueue.shift();
+      if (next) next();
+      else posterBusy--;
+    }
+  }
   var posterOnly = {};
   var posterDone = {};
   function posterReady(title, slug) {
@@ -1323,13 +1338,30 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
       if (own && Date.now() - own.at < (own.poster ? 7 : own.v === EXTRAS_V ? 1 : 0) * 864e5) return own.poster;
       const me = await metaOf(title);
       if (me && me.p) return normImageUrl(me.p);
-      const poster = normImageUrl(await findPoster(title, slug, en).catch(() => ""));
+      const poster = await posterLane(async () => {
+        const found = normImageUrl(await findPoster(title, slug, en).catch(() => ""));
+        if (found) return found;
+        return normImageUrl((await movieExtras(title, slug).catch(() => null))?.poster || "");
+      });
       const latest = readExtras();
       latest["p|" + nk] = { poster, trailer: "", trailerName: "", at: Date.now(), v: EXTRAS_V };
       cacheSet("extras.json", JSON.stringify(latest));
       return poster;
     })().then((u) => posterDone[k] = u);
   }
+  function posterTint(title) {
+    let h = 0;
+    for (const ch of normTitle(title)) h = (h * 31 + (ch.codePointAt(0) || 0)) % 9973;
+    return h % 6;
+  }
+  var POSTER_TINTS = [
+    ["#3b4a6b", "#1f2a44"],
+    ["#6b3b4a", "#3d1f2a"],
+    ["#2f5d50", "#16352d"],
+    ["#5a4a2f", "#33290f"],
+    ["#4a3b6b", "#281f44"],
+    ["#3a3d42", "#1f2125"]
+  ];
   function posterSrc(url) {
     url = normImageUrl(url);
     if (!url) return "";

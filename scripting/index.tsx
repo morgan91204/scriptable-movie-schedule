@@ -14,7 +14,7 @@ import {
   Cinema, Movie, Settings, Version, TwMovie, TwMovieCinema, CITY_ORDER, TW,
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
   loadSettings, saveSettings, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, cinemaAddress,
-  FORMATS, formatsOf, filterVersions, nearest, kmLabel, WINDOWS, findShowtimes, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText, hallOf, tmdbTest, movieExtras, moviePoster, posterReady, normImageUrl, movieRuntime, posterSrc, isLocalSrc, cachePoster, prefetchPosters, foregroundTask, communityStats, communityVote, loadBoxOffice, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, SCRIPTING_IMPORT_URL, movieRatings, ratingTier,
+  FORMATS, formatsOf, filterVersions, nearest, kmLabel, WINDOWS, findShowtimes, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText, hallOf, tmdbTest, movieExtras, moviePoster, posterReady, posterTint, POSTER_TINTS, normImageUrl, movieRuntime, posterSrc, isLocalSrc, cachePoster, prefetchPosters, foregroundTask, communityStats, communityVote, loadBoxOffice, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, SCRIPTING_IMPORT_URL, movieRatings, ratingTier,
 } from "./core"
 import type { Format, LatLng, Hit, Community, BoxOfficeItem } from "./core"
 
@@ -382,13 +382,66 @@ function usePosterImage(url: string): { img: any; ver: number; failed: boolean; 
   return { img: mine ? st.img : null, ver: st.ver, failed, err: failed ? posterError(url) : "" }
 }
 
-/** 海報框：固定大小的灰底框，圖放在裡面。圖萬一沒畫出來，也只是看到灰框，不會整格消失、文字跳位 */
-function PosterBox({ w, h, r, img, ver, pending, iconFont }: { w: number; h: number; r: number; img: any; ver: number; pending: boolean; iconFont?: string }) {
+/** 預設海報：哪裡都找不到圖時，用片名畫一張（場記板條紋＋片名，底色依片名固定）。
+ *  只用最基本的元件（固定大小的方塊和文字），列表裡才畫得穩 */
+function GenPoster({ w, h, r, title }: { w: number; h: number; r: number; title: string }) {
+  const big = w > 60
+  const n = Array.from(title).length
+  const size = big ? (n > 16 ? 12 : n > 7 ? 15 : 19) : (n > 16 ? 7 : n > 7 ? 8 : 9)
+  const bar = Math.round(h * 0.15)
+  return <VStack spacing={0} frame={{ width: w, height: h }} background={POSTER_TINTS[posterTint(title)][0]} clipShape={{ type: "rect", cornerRadius: r }}>
+    <HStack spacing={0} frame={{ width: w, height: bar }}>
+      {[0, 1, 2, 3, 4, 5, 6, 7].map((i) => <Text key={i} font={4} frame={{ width: w / 8, height: bar }} background={i % 2 ? "#17181C" : "#FFFFFF"}>{" "}</Text>)}
+    </HStack>
+    <Spacer />
+    <Text font={size} fontWeight={"heavy"} foregroundStyle={"#FFFFFF"} multilineTextAlignment={"center"} lineLimit={big ? 4 : 3} minScaleFactor={0.7} padding={{ horizontal: big ? 8 : 3 }}>{title}</Text>
+    <Spacer />
+  </VStack>
+}
+
+/** 海報框：固定大小的灰底框，圖放在裡面。還在讀是轉圈；確定沒有圖就畫預設海報，不會整格消失、文字跳位 */
+function PosterBox({ w, h, r, img, ver, pending, title }: { w: number; h: number; r: number; img: any; ver: number; pending: boolean; title: string }) {
+  if (!img && !pending) return GenPoster({ w, h, r, title })
   return <VStack frame={{ width: w, height: h }} background={"rgba(120, 120, 128, 0.18)"} clipShape={{ type: "rect", cornerRadius: r }}>
     {img
       ? <Image image={img} resizable scaleToFill frame={{ width: w, height: h }} clipShape={{ type: "rect", cornerRadius: r }} />
-      : pending ? <ProgressView progressViewStyle={"circular"} /> : <Image systemName={"film"} font={iconFont || "body"} foregroundStyle={"tertiaryLabel"} />}
+      : <ProgressView progressViewStyle={"circular"} />}
   </VStack>
+}
+
+/** 列表的小海報統一在這裡查網址、下載（一次 4 張），好了整批重畫一次。
+ *  每一格都不帶自己的狀態：列表裡一掛上就更新狀態的元件，Scripting 偶爾會整格漏畫 */
+function useThumbs(items: { title: string; slug?: string; en?: string }[], key: string): (m: { title: string; slug?: string }) => { img: any; why: string; pending: boolean } {
+  const [, setTick] = useState(0)
+  const imgs = useMemo(() => ({} as Record<string, any>), []) // 這次進畫面解碼好的圖
+  useEffect(() => {
+    if (!items.length) return
+    let alive = true
+    let timer: any = null
+    const bump = () => {
+      if (!alive || timer) return
+      timer = setTimeout(() => { timer = null; if (alive) setTick((n) => n + 1) }, 250) // 幾張一起好就只重畫一次
+    }
+    const queue = items.slice()
+    const run = async () => {
+      for (let m = queue.shift(); m && alive; m = queue.shift()) {
+        try {
+          const u = normImageUrl((await moviePoster(m.title, m.slug, m.en)) || "")
+          if (u && !posterImageNow(u)) await loadPosterImage(u)
+        } catch (_) {}
+        bump()
+      }
+    }
+    for (let i = 0; i < 4; i++) run()
+    return () => { alive = false; if (timer) clearTimeout(timer) }
+  }, [key])
+  return (m) => {
+    const ready = posterReady(m.title, m.slug)
+    const url = normImageUrl(ready || "")
+    const img = url ? (imgs[url] ||= posterImageNow(url)) : null
+    const why = url && !img ? posterError(url) : ""
+    return { img, why, pending: !img && (ready === undefined || (!!url && !why)) }
+  }
 }
 
 /** 電影頁頂端：海報在左，資訊、評分與紅色預告按鈕在右（跟 Scriptable 版一樣） */
@@ -417,7 +470,7 @@ function MovieHero({ title, slug, lines, en }: { title: string; slug?: string; l
   return <>
   <Section>
     <HStack alignment={"bottom"} spacing={12} listRowBackground={"clear"}>
-      <PosterBox w={104} h={156} r={12} img={pi.img} ver={pi.ver} pending={posterPending} iconFont={"largeTitle"} />
+      <PosterBox w={104} h={156} r={12} img={pi.img} ver={pi.ver} pending={posterPending} title={title} />
       <VStack alignment={"leading"} spacing={4}>
         {lines.filter(Boolean).map((l) => <Text key={l} font={"subheadline"} foregroundStyle={"secondaryLabel"}>{l}</Text>)}
         {/* 評分讀好後三個徽章都顯示：沒有那項評分就是「-」（跟「還沒抓到」分得開） */}
@@ -840,35 +893,12 @@ function BoxOfficeMoviePage({ item: x }: { item: BoxOfficeItem }) {
 /** 票房排行（官方開放資料，每週更新）；每一部都可以點：有場次的進電影頁，沒有的進精簡頁 */
 function BoxOfficeSections({ movies }: { movies: TwMovie[] }) {
   const box = useLoad(() => loadBoxOffice(), [])
-  // 每一格的小海報都不帶自己的狀態（列表裡一掛上就更新狀態的元件，Scripting 偶爾會整格漏畫）：
-  // 這裡統一查網址、下載，好了再整批重畫一次
-  const [, setTick] = useState(0)
-  const imgs = useMemo(() => ({} as Record<string, any>), []) // 這次進畫面解碼好的圖
   const b = box.data
-  useEffect(() => {
-    if (!b) return
-    let alive = true
-    let timer: any = null
-    const bump = () => {
-      if (!alive || timer) return
-      timer = setTimeout(() => { timer = null; if (alive) setTick((n) => n + 1) }, 250) // 幾張一起好就只重畫一次
-    }
-    for (const x of b.list) {
-      const m = matchBoxOffice(x.name, movies)
-      moviePoster(m ? m.title : x.name, m?.slug, m?.en).then((u) => loadPosterImage(normImageUrl(u || ""))).then(bump, bump)
-    }
-    return () => { alive = false; if (timer) clearTimeout(timer) }
-  }, [b, movies.length])
+  const films = (b?.list || []).map((x) => { const m = matchBoxOffice(x.name, movies); return { title: m ? m.title : x.name, slug: m?.slug, en: m?.en } })
+  const thumbOf = useThumbs(films, `${b ? b.list.length : 0}|${movies.length}`)
   if (box.error) return <ErrorRow error={box.error} retry={box.reload} />
   if (!b) return <Section><Loading text={"讀取票房排行…"} /></Section>
-  const thumbs = b.list.map((x) => {
-    const m = matchBoxOffice(x.name, movies)
-    const ready = posterReady(m ? m.title : x.name, m?.slug)
-    const url = normImageUrl(ready || "")
-    const img = url ? (imgs[url] ||= posterImageNow(url)) : null
-    const why = url && !img ? posterError(url) : ""
-    return { img, why, pending: !img && (ready === undefined || (!!url && !why)) }
-  })
+  const thumbs = films.map(thumbOf)
   const bad = b.list.filter((_, i) => thumbs[i].why)
   const failNote = bad.length
     ? `\n第 ${bad.map((x) => x.rank).join("、")} 名的海報讀不到（${Array.from(new Set(thumbs.map((t) => t.why).filter(Boolean))).join("；")}），下次進來會再試。`
@@ -878,7 +908,7 @@ function BoxOfficeSections({ movies }: { movies: TwMovie[] }) {
       const m = matchBoxOffice(x.name, movies)
       const body = <HStack spacing={10}>
         <Text font={"title3"} fontWeight={"bold"} monospacedDigit foregroundStyle={x.rank <= 3 ? "systemOrange" : "secondaryLabel"} frame={{ width: 26 }}>{String(x.rank)}</Text>
-        {PosterBox({ w: 44, h: 66, r: 6, img: thumbs[i].img, ver: 0, pending: thumbs[i].pending })}
+        {PosterBox({ w: 44, h: 66, r: 6, img: thumbs[i].img, ver: 0, pending: thumbs[i].pending, title: x.name })}
         <VStack alignment={"leading"} spacing={2}>
           <Text foregroundStyle={"label"} lineLimit={2}>{x.name}</Text>
           <Text font={"subheadline"} foregroundStyle={"secondaryLabel"}>{[x.week !== null ? `本週 ${money(x.week)}` : "", `累計 ${money(x.total)}`].filter(Boolean).join("｜")}</Text>
@@ -900,12 +930,21 @@ function MoviesPage() {
   useEffect(() => { if (movies.data) prefetchPosters(list) }, [movies.data, k]) // 背景先抓海報，進電影頁就不用等
   const now = list.filter((m) => !m.comingSoon)
   const soon = list.filter((m) => m.comingSoon)
-  const row = (m: TwMovie) =>
-    <NavigationLink key={m.slug} destination={<MoviePage movie={m} />}>
-      <Row title={m.title}
-        subtitle={[m.rating, m.runtime ? `${m.runtime} 分` : "", m.en].filter(Boolean).join("｜")}
-        trailing={m.cinemaCount ? `${m.cinemaCount} 間` : ""} />
+  const thumbOf = useThumbs(list, `${(movies.data || []).length}|${k}`) // 每一列的小海報
+  const row = (m: TwMovie) => {
+    const t = thumbOf(m)
+    return <NavigationLink key={m.slug} destination={<MoviePage movie={m} />}>
+      <HStack spacing={10}>
+        {PosterBox({ w: 44, h: 66, r: 6, img: t.img, ver: 0, pending: t.pending, title: m.title })}
+        <VStack alignment={"leading"} spacing={2}>
+          <Text foregroundStyle={"label"} lineLimit={2}>{m.title}</Text>
+          <Text font={"subheadline"} foregroundStyle={"secondaryLabel"} lineLimit={2}>{[m.rating, m.runtime ? `${m.runtime} 分` : "", m.en].filter(Boolean).join("｜")}</Text>
+        </VStack>
+        <Spacer />
+        {m.cinemaCount ? <Text font={"caption"} foregroundStyle={"tertiaryLabel"}>{`${m.cinemaCount} 間`}</Text> : null}
+      </HStack>
     </NavigationLink>
+  }
   return <List
     navigationTitle={"依電影找場次"}
     searchable={{ value: query, onChanged: setQuery, prompt: "搜尋片名" } as any}

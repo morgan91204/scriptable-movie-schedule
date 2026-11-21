@@ -555,6 +555,7 @@ class App {
     if (x?.err) lines = [...lines, `預告：${x.err}`];
     return (
       <Hero
+        title={title}
         poster={poster}
         posterUrl={posterUrl}
         posterPending={!poster && e.loading}
@@ -793,12 +794,15 @@ class App {
     const [b, all] = await Promise.all([loadBoxOffice(), loadMovies().catch(() => [] as TwMovie[])]);
     const rows = b.list.map((x) => ({ x, m: matchBoxOffice(x.name, all) }));
     // 海報：手機上記過的立刻有；沒記過的最多等 0.6 秒，其餘讀好後自動補畫
-    const jobs = rows.map(({ x, m }) => foregroundTask(moviePoster(m ? m.title : x.name, m?.slug, m?.en).catch(() => "")));
+    const jobs = rows.map(({ x, m }) => moviePoster(m ? m.title : x.name, m?.slug, m?.en).catch(() => ""));
     const wait = this.rerendering ? 0 : 600;
     const posters = await Promise.all(jobs.map((p) => Promise.race([p, sleep(wait).then(() => undefined)])));
     const late = jobs.filter((_, i) => posters[i] === undefined);
-    if (late.length) this.late = [Promise.all(late)];
-    prefetchPosters(rows.map(({ x, m }) => ({ title: m ? m.title : x.name, slug: m?.slug, en: m?.en })), 20, 0, 0);
+    // 排行現在排到底（一百多部）：還沒好的每 8 張補畫一次
+    const batches: Promise<unknown>[] = [];
+    for (let i = 0; i < late.length; i += 8) batches.push(Promise.all(late.slice(i, i + 8)));
+    if (batches.length) this.late = batches;
+    prefetchPosters(rows.map(({ x, m }) => ({ title: m ? m.title : x.name, slug: m?.slug, en: m?.en })), 300, 0, 0);
     const thumb = (u: string | undefined) => {
       if (u === undefined) return { src: "" , pending: true };
       const src = posterSrc(u);
@@ -850,8 +854,24 @@ class App {
     const k = this.movieQuery.trim().toLowerCase();
     const list = all.filter((m) => !k || `${m.title} ${m.en}`.toLowerCase().includes(k));
     prefetchPosters(list); // 背景先抓海報，進電影頁就不用等
+    // 每一列的小海報：手機上記過、伺服器查好的立刻有；要上網找的最多等 0.6 秒，其餘每好一批就在原位補畫
+    const jobs = list.map((m) => moviePoster(m.title, m.slug, m.en).catch(() => ""));
+    const got = await Promise.all(jobs.map((p) => Promise.race([p, sleep(this.rerendering ? 0 : 600).then(() => undefined)])));
+    const pending = jobs.filter((_, i) => got[i] === undefined);
+    const late: Promise<unknown>[] = [];
+    for (let i = 0; i < pending.length; i += 8) late.push(Promise.all(pending.slice(i, i + 8)));
+    if (late.length) this.late = late;
+    const thumbOf = new Map<TwMovie, { src: string; url?: string; pending?: boolean }>();
+    list.forEach((m, i) => {
+      const u = got[i];
+      if (u === undefined) return void thumbOf.set(m, { src: "", pending: true });
+      const src = posterSrc(u);
+      if (src && src === u) cachePoster(u);
+      thumbOf.set(m, { src, url: u });
+    });
     const item = (m: TwMovie) => (
       <Item
+        thumb={thumbOf.get(m)}
         title={m.title}
         subtitle={[m.rating, m.runtime ? `${m.runtime} 分` : "", m.en].filter(Boolean).join("｜")}
         badge={m.cinemaCount ? `${m.cinemaCount} 間` : undefined}

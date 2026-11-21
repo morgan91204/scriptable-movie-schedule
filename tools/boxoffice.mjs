@@ -7,7 +7,7 @@ import fs from "node:fs";
 const SRC = "https://boxofficetw.tfai.org.tw/OpenData/statistic/since2016";
 const SNAP = "data/boxoffice-snapshot.json";
 const OUT = "dist/boxoffice.json";
-const TOP = 20;
+const TOP = 300; // 排到底：這週有賣出票的片全部列出（通常 100 多部）
 
 const day = (s) => String(s || "").slice(0, 10);
 const addDays = (d, n) => new Date(Date.parse(d + "T00:00:00Z") + n * 86400e3).toISOString().slice(0, 10);
