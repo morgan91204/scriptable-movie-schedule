@@ -12,7 +12,7 @@ import {
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
   loadSettings, saveSettings, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, TW,
   FORMATS, formatsOf, filterVersions, nearest, kmLabel, WINDOWS, findShowtimes, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText,
-  hallOf, tmdbTest, movieExtras, moviePoster, movieRuntime, posterSrc, cachePoster, prefetchPosters, movieSubtitle, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, foregroundTask, communityStats, communityCached, communityVote, loadBoxOffice, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, movieRatings, ratingTier,
+  hallOf, tmdbTest, movieExtras, moviePoster, movieRuntime, posterSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, foregroundTask, communityStats, communityCached, communityVote, loadBoxOffice, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, movieRatings, ratingTier,
 } from "./core";
 import type { MovieExtras, Ratings, Community, BoxOfficeItem } from "./core";
 import { setTabBar, setBackGuard, esc } from "./jsx";
@@ -879,8 +879,7 @@ class App {
       <Item
         thumb={thumbOf.get(m)}
         title={m.title}
-        subtitle={movieSubtitle(m)}
-        badge={m.cinemaCount ? `${m.cinemaCount} 間` : undefined}
+        subtitle={movieLines(m).filter(Boolean).join("\n")}
         onTap={() => this.go(() => this.movieView(m, ""), `讀取《${m.title}》的放映影城…`)}
       />
     );

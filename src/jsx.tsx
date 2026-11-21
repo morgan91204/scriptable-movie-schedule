@@ -189,7 +189,8 @@ export function Item(props: {
       {props.icon ? <span class="ico">{props.icon}</span> : null}
       <div class="body">
         <div class="title">{esc(props.title)}</div>
-        {props.subtitle ? <div class="sub">{esc(props.subtitle)}</div> : null}
+        {/* 多行說明（用換行分開）：每行各自一行、太長就截斷，第二行起淡一階 */}
+        {props.subtitle ? (props.subtitle.includes("\n") ? props.subtitle.split("\n").map((l, i) => <div class={"sub one" + (i ? " dim" : "")}>{esc(l)}</div>) : <div class="sub">{esc(props.subtitle)}</div>) : null}
       </div>
       {props.badge ? <span class="badge">{esc(props.badge)}</span> : null}
       {props.right ? <span class="right">{esc(props.right)}</span> : null}

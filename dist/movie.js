@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.22-0416
+// @movie-schedule-app 電影行程 v2026.11.22-0430
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/parsers.gen.ts
@@ -1456,10 +1456,10 @@ function boxOfficeLines(x) {
     [releaseLabel(x.release), x.theaters ? `${x.theaters} 間戲院` : ""].filter(Boolean).join("｜")
   ];
 }
-function movieSubtitle(m) {
+function movieLines(m) {
   const md = (d) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`;
-  const head = m.noShowToday ? "今天沒有場次" : m.comingSoon ? m.release ? `${md(m.release)} 上映` : "" : "";
-  return [head, m.rating, m.runtime ? `${m.runtime} 分` : "", m.en].filter(Boolean).join("｜");
+  const head = m.noShowToday ? "今天無場次" : m.comingSoon ? m.release ? `${md(m.release)} 上映` : "" : "";
+  return [[head, m.rating, m.runtime ? `${m.runtime} 分` : "", m.cinemaCount ? `${m.cinemaCount} 間影城` : ""].filter(Boolean).join("｜"), m.en || ""];
 }
 var movieDayCache = {};
 async function movieDay(slug, date) {
@@ -2021,7 +2021,7 @@ function Section(props) {
 function Item(props) {
   const cls = ["item", props.onTap ? "tap" : "", props.muted ? "muted" : "", props.accent ? "accent" : "", props.onLongPress ? "long" : ""].join(" ");
   const fallback = "if(this.dataset.url&&this.src!==this.dataset.url){this.src=this.dataset.url}else{this.remove()}";
-  return /* @__PURE__ */ h("div", { class: cls, onTap: props.onTap, onLongPress: props.onLongPress }, props.rank ? /* @__PURE__ */ h("span", { class: "rank" + (props.rank <= 3 ? " top" : "") }, props.rank) : null, props.thumb ? props.thumb.pending && !props.thumb.src ? /* @__PURE__ */ h("span", { class: "thumb none" }) : /* @__PURE__ */ h(GenPoster, { cls: "thumb", title: props.title }, props.thumb.src ? /* @__PURE__ */ h("img", { src: props.thumb.src, "data-url": props.thumb.url && props.thumb.url !== props.thumb.src ? props.thumb.url : void 0, alt: "", loading: "lazy", onerror: fallback }) : null) : null, props.icon ? /* @__PURE__ */ h("span", { class: "ico" }, props.icon) : null, /* @__PURE__ */ h("div", { class: "body" }, /* @__PURE__ */ h("div", { class: "title" }, esc(props.title)), props.subtitle ? /* @__PURE__ */ h("div", { class: "sub" }, esc(props.subtitle)) : null), props.badge ? /* @__PURE__ */ h("span", { class: "badge" }, esc(props.badge)) : null, props.right ? /* @__PURE__ */ h("span", { class: "right" }, esc(props.right)) : null, props.onTap && props.chevron !== false ? /* @__PURE__ */ h("span", { class: "chev" }, "›") : null);
+  return /* @__PURE__ */ h("div", { class: cls, onTap: props.onTap, onLongPress: props.onLongPress }, props.rank ? /* @__PURE__ */ h("span", { class: "rank" + (props.rank <= 3 ? " top" : "") }, props.rank) : null, props.thumb ? props.thumb.pending && !props.thumb.src ? /* @__PURE__ */ h("span", { class: "thumb none" }) : /* @__PURE__ */ h(GenPoster, { cls: "thumb", title: props.title }, props.thumb.src ? /* @__PURE__ */ h("img", { src: props.thumb.src, "data-url": props.thumb.url && props.thumb.url !== props.thumb.src ? props.thumb.url : void 0, alt: "", loading: "lazy", onerror: fallback }) : null) : null, props.icon ? /* @__PURE__ */ h("span", { class: "ico" }, props.icon) : null, /* @__PURE__ */ h("div", { class: "body" }, /* @__PURE__ */ h("div", { class: "title" }, esc(props.title)), props.subtitle ? props.subtitle.includes("\n") ? props.subtitle.split("\n").map((l, i) => /* @__PURE__ */ h("div", { class: "sub one" + (i ? " dim" : "") }, esc(l))) : /* @__PURE__ */ h("div", { class: "sub" }, esc(props.subtitle)) : null), props.badge ? /* @__PURE__ */ h("span", { class: "badge" }, esc(props.badge)) : null, props.right ? /* @__PURE__ */ h("span", { class: "right" }, esc(props.right)) : null, props.onTap && props.chevron !== false ? /* @__PURE__ */ h("span", { class: "chev" }, "›") : null);
 }
 function Chips(props) {
   return /* @__PURE__ */ h("div", { class: "chips" }, props.children);
@@ -2099,7 +2099,7 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .gen{position:relative;overflow:hidden;display:flex!important;flex-direction:column;color:#fff;text-align:center}
 .gen>img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
 .gen .clap{flex:none;height:17%;background:repeating-linear-gradient(115deg,#fff 0 14%,#17181c 14% 28%);border-bottom:1px solid rgba(0,0,0,.35)}
-.gen .gt{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;padding:0 7%;font-weight:800;line-height:1.2;font-size:9px;text-shadow:0 1px 2px rgba(0,0,0,.25)}
+.gen .gt{flex:1;min-height:0;overflow:hidden;display:flex;align-items:center;justify-content:center;padding:0 7%;font-weight:800;line-height:1.2;font-size:9px;text-shadow:0 1px 2px rgba(0,0,0,.25)}
 .gen .gt>span{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden;word-break:break-word}
 .gen .gt.m{font-size:8px}.gen .gt.l{font-size:7px}
 .gen .perf{flex:none;height:9%;opacity:.5;background:repeating-linear-gradient(90deg,transparent 0 6%,#fff 6% 15%,transparent 15% 20%);background-size:70% 50%;background-position:center;background-repeat:no-repeat}
@@ -2110,6 +2110,8 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .item .body{flex:1;min-width:0}
 .item .title{font-size:16px;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
 .item .sub{font-size:13px;color:var(--fg2);margin-top:2px;white-space:pre-line;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.item .sub.one{display:block;white-space:nowrap}
+.item .sub.dim{font-size:12px;opacity:.75;margin-top:1px}
 .item .right{font-size:14px;color:var(--fg2);flex:none;max-width:40%;text-align:right}
 .item .badge{flex:none;font-size:12px;padding:2px 8px;border-radius:999px;background:var(--chip);color:var(--chip-fg)}
 .item .chev{color:var(--fg2);opacity:.55;font-size:22px;line-height:1;flex:none}
@@ -2437,7 +2439,7 @@ var App = class {
     ];
     // ── 事件迴圈 ──
     // 背景查 GitHub 上的最新版本（首頁顯示是否為最新版）
-    this.latest = checkLatest("2026.11.22-0416");
+    this.latest = checkLatest("2026.11.22-0430");
     // ── 搜尋 ──
     this.query = "";
     this.tmdbStatus = "";
@@ -2572,11 +2574,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.22-0416"}`);
+          Pasteboard.copy(`版本 ${"2026.11.22-0430"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.22-0416"}`,
+      `版本 ${"2026.11.22-0430"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -3000,8 +3002,7 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
       {
         thumb: thumbOf.get(m),
         title: m.title,
-        subtitle: movieSubtitle(m),
-        badge: m.cinemaCount ? `${m.cinemaCount} 間` : void 0,
+        subtitle: movieLines(m).filter(Boolean).join("\n"),
         onTap: () => this.go(() => this.movieView(m, ""), `讀取《${m.title}》的放映影城…`)
       }
     );

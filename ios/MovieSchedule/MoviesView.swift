@@ -64,7 +64,7 @@ struct MoviesView: View {
 
     /// 說明文字開頭：已上映但今天沒排片的標「今天沒有場次」，還沒上映的標上映日期
     private func head(_ m: TwMovie) -> String {
-        if m.noShowToday ?? false { return "今天沒有場次" }
+        if m.noShowToday ?? false { return "今天無場次" }
         guard m.comingSoon ?? false, let d = m.release, d.count >= 10 else { return "" }
         let p = d.split(separator: "-").compactMap { Int($0) }
         return p.count == 3 ? "\(p[1])/\(p[2]) 上映" : ""
@@ -78,13 +78,16 @@ struct MoviesView: View {
                 PosterView(title: m.title, slug: m.slug, en: m.en)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(m.title).lineLimit(2)
-                    Text([head(m), m.rating ?? "", (m.runtime ?? 0) > 0 ? "\(m.runtime ?? 0) 分" : "", m.en ?? ""].filter { !$0.isEmpty }.joined(separator: "｜"))
-                        .font(.subheadline).foregroundStyle(.secondary).lineLimit(2)
+                    // 兩行說明各自一行不換行，跟票房排行同一種排版
+                    let first = [head(m), m.rating ?? "", (m.runtime ?? 0) > 0 ? "\(m.runtime ?? 0) 分" : "", (m.cinemaCount ?? 0) > 0 ? "\(m.cinemaCount ?? 0) 間影城" : ""].filter { !$0.isEmpty }.joined(separator: "｜")
+                    if !first.isEmpty {
+                        Text(first).font(.subheadline).foregroundStyle(.secondary).lineLimit(1).minimumScaleFactor(0.8)
+                    }
+                    if let en = m.en, !en.isEmpty {
+                        Text(en).font(.caption).foregroundStyle(.tertiary).lineLimit(1)
+                    }
                 }
                 Spacer(minLength: 4)
-                if let n = m.cinemaCount, n > 0 {
-                    Text("\(n) 間").font(.caption).foregroundStyle(.tertiary)
-                }
             }
         }
         .accessibilityIdentifier("movie-row")

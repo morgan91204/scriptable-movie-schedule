@@ -46,7 +46,7 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .gen{position:relative;overflow:hidden;display:flex!important;flex-direction:column;color:#fff;text-align:center}
 .gen>img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
 .gen .clap{flex:none;height:17%;background:repeating-linear-gradient(115deg,#fff 0 14%,#17181c 14% 28%);border-bottom:1px solid rgba(0,0,0,.35)}
-.gen .gt{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;padding:0 7%;font-weight:800;line-height:1.2;font-size:9px;text-shadow:0 1px 2px rgba(0,0,0,.25)}
+.gen .gt{flex:1;min-height:0;overflow:hidden;display:flex;align-items:center;justify-content:center;padding:0 7%;font-weight:800;line-height:1.2;font-size:9px;text-shadow:0 1px 2px rgba(0,0,0,.25)}
 .gen .gt>span{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden;word-break:break-word}
 .gen .gt.m{font-size:8px}.gen .gt.l{font-size:7px}
 .gen .perf{flex:none;height:9%;opacity:.5;background:repeating-linear-gradient(90deg,transparent 0 6%,#fff 6% 15%,transparent 15% 20%);background-size:70% 50%;background-position:center;background-repeat:no-repeat}
@@ -57,6 +57,8 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .item .body{flex:1;min-width:0}
 .item .title{font-size:16px;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
 .item .sub{font-size:13px;color:var(--fg2);margin-top:2px;white-space:pre-line;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.item .sub.one{display:block;white-space:nowrap}
+.item .sub.dim{font-size:12px;opacity:.75;margin-top:1px}
 .item .right{font-size:14px;color:var(--fg2);flex:none;max-width:40%;text-align:right}
 .item .badge{flex:none;font-size:12px;padding:2px 8px;border-radius:999px;background:var(--chip);color:var(--chip-fg)}
 .item .chev{color:var(--fg2);opacity:.55;font-size:22px;line-height:1;flex:none}

@@ -75,10 +75,10 @@
     movieDay: () => movieDay,
     movieDayFilled: () => movieDayFilled,
     movieExtras: () => movieExtras,
+    movieLines: () => movieLines,
     moviePoster: () => moviePoster,
     movieRatings: () => movieRatings,
     movieRuntime: () => movieRuntime,
-    movieSubtitle: () => movieSubtitle,
     moviesOf: () => moviesOf,
     nearest: () => nearest,
     normImageUrl: () => normImageUrl,
@@ -1576,10 +1576,10 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
       [releaseLabel(x.release), x.theaters ? `${x.theaters} 間戲院` : ""].filter(Boolean).join("｜")
     ];
   }
-  function movieSubtitle(m) {
+  function movieLines(m) {
     const md = (d) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`;
-    const head = m.noShowToday ? "今天沒有場次" : m.comingSoon ? m.release ? `${md(m.release)} 上映` : "" : "";
-    return [head, m.rating, m.runtime ? `${m.runtime} 分` : "", m.en].filter(Boolean).join("｜");
+    const head = m.noShowToday ? "今天無場次" : m.comingSoon ? m.release ? `${md(m.release)} 上映` : "" : "";
+    return [[head, m.rating, m.runtime ? `${m.runtime} 分` : "", m.cinemaCount ? `${m.cinemaCount} 間影城` : ""].filter(Boolean).join("｜"), m.en || ""];
   }
   var movieDayCache = {};
   async function movieDay(slug, date) {

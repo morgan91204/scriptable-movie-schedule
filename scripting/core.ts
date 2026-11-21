@@ -1159,11 +1159,12 @@ export function boxOfficeLines(x: BoxOfficeItem): [string, string] {
     [releaseLabel(x.release), x.theaters ? `${x.theaters} 間戲院` : ""].filter(Boolean).join("｜"),
   ];
 }
-/** 電影清單上每一列的說明文字：分級｜片長｜英文片名，前面加上「今天沒有場次」或上映日期 */
-export function movieSubtitle(m: TwMovie): string {
+/** 電影清單（上映中、即將上映）每一列的兩行說明，各自一行不換行：
+ *  第一行：「今天無場次」或上映日期｜分級｜片長｜放映影城數；第二行：英文片名 */
+export function movieLines(m: TwMovie): [string, string] {
   const md = (d: string) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`;
-  const head = m.noShowToday ? "今天沒有場次" : m.comingSoon ? (m.release ? `${md(m.release)} 上映` : "") : "";
-  return [head, m.rating, m.runtime ? `${m.runtime} 分` : "", m.en].filter(Boolean).join("｜");
+  const head = m.noShowToday ? "今天無場次" : m.comingSoon ? (m.release ? `${md(m.release)} 上映` : "") : "";
+  return [[head, m.rating, m.runtime ? `${m.runtime} 分` : "", m.cinemaCount ? `${m.cinemaCount} 間影城` : ""].filter(Boolean).join("｜"), m.en || ""];
 }
 
 const movieDayCache: Record<string, TwMovieDay> = {};

@@ -14,7 +14,7 @@ import {
   Cinema, Movie, Settings, Version, TwMovie, TwMovieCinema, CITY_ORDER, TW,
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
   loadSettings, saveSettings, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, cinemaAddress,
-  FORMATS, formatsOf, filterVersions, nearest, kmLabel, WINDOWS, findShowtimes, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText, hallOf, tmdbTest, movieExtras, moviePoster, posterReady, posterTint, POSTER_TINTS, normImageUrl, movieRuntime, posterSrc, isLocalSrc, cachePoster, prefetchPosters, movieSubtitle, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, foregroundTask, communityStats, communityVote, loadBoxOffice, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, SCRIPTING_IMPORT_URL, movieRatings, ratingTier,
+  FORMATS, formatsOf, filterVersions, nearest, kmLabel, WINDOWS, findShowtimes, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText, hallOf, tmdbTest, movieExtras, moviePoster, posterReady, posterTint, POSTER_TINTS, normImageUrl, movieRuntime, posterSrc, isLocalSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, foregroundTask, communityStats, communityVote, loadBoxOffice, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, SCRIPTING_IMPORT_URL, movieRatings, ratingTier,
 } from "./core"
 import type { Format, LatLng, Hit, Community, BoxOfficeItem } from "./core"
 
@@ -938,15 +938,17 @@ function MoviesPage() {
   const thumbOf = useThumbs(mode === "box" ? [] : list, `${(movies.data || []).length}|${k}|${mode}`) // 每一列的小海報
   const row = (m: TwMovie) => {
     const t = thumbOf(m)
+    const lines = movieLines(m)
     return <NavigationLink key={m.slug} destination={<MoviePage movie={m} />}>
       <HStack spacing={10}>
         {PosterBox({ w: 44, h: 66, r: 6, img: t.img, ver: 0, pending: t.pending, title: m.title })}
         <VStack alignment={"leading"} spacing={2}>
           <Text foregroundStyle={"label"} lineLimit={2}>{m.title}</Text>
-          <Text font={"subheadline"} foregroundStyle={"secondaryLabel"} lineLimit={2}>{movieSubtitle(m)}</Text>
+          {/* 兩行說明各自一行不換行，跟票房排行同一種排版 */}
+          {lines[0] ? <Text font={"subheadline"} foregroundStyle={"secondaryLabel"} lineLimit={1} minScaleFactor={0.8}>{lines[0]}</Text> : null}
+          {lines[1] ? <Text font={"caption"} foregroundStyle={"tertiaryLabel"} lineLimit={1}>{lines[1]}</Text> : null}
         </VStack>
         <Spacer />
-        {m.cinemaCount ? <Text font={"caption"} foregroundStyle={"tertiaryLabel"}>{`${m.cinemaCount} 間`}</Text> : null}
       </HStack>
     </NavigationLink>
   }
