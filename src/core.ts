@@ -690,6 +690,9 @@ export async function movieExtras(title: string, slug?: string): Promise<MovieEx
     // 不會因為各自搜尋的結果不同而不一樣
     const me = await metaOf(title);
     if (me && me.tn && me.t) return { poster: normImageUrl(me.p || hit?.poster || ""), trailer: me.t, trailerName: me.tn };
+    // 伺服器查過、沒有把握是正確預告的：所有版本都開搜尋頁，不各自去搜（各自搜的結果會不一樣，也可能是錯的）
+    if (me && me.xa)
+      return { poster: normImageUrl(me.p || hit?.poster || ""), trailer: `https://www.youtube.com/results?search_query=${encodeURIComponent(baseTitle(title) + " 預告")}`, trailerName: "" };
     if (hit && Date.now() - hit.at < ttl) return { poster: hit.poster, trailer: hit.trailer, trailerName: hit.trailerName };
     const out = await findExtras(title, slug);
     // 查不到預告也保留這次執行的結果（不寫進手機快取的 err 會讓下次啟動重查）；
@@ -703,7 +706,7 @@ export async function movieExtras(title: string, slug?: string): Promise<MovieEx
   })());
 }
 /** extras.json 紀錄的版本：預告查法改了就加 1，讓舊的「沒預告」紀錄重查 */
-const EXTRAS_V = 8;
+const EXTRAS_V = 9;
 
 /** 圖片網址正規化：解掉 HTML 跳脫、\\/、//host 與 http:// 都改成 https://（iOS 的 WebView／Image 不載入 http 圖片） */
 export function normImageUrl(u: string): string {
@@ -1131,44 +1134,25 @@ async function ytTitle(key: string): Promise<string> {
     return "";
   }
 }
-let strictTrailers = false;
-/** 伺服器排程用：只採用標題有台灣片名的影片。伺服器在國外，YouTube 給它的搜尋結果跟台灣的手機不同
- *  （常是香港版排前面），拿不準的就不寫進總表，留給手機自己搜 */
-export function setStrictTrailers(on: boolean): void {
-  strictTrailers = on;
-}
-/** 從 YouTube 找這部片的預告：要標題對得上片名才採用（搜尋的第一筆常常是不相干的影片），台灣版優先。
- *  先用片名搜；沒有台灣版就換個問法再搜一次；還是沒有、又有英文片名，再用英文片名搜 */
+/** 從 YouTube 找這部片的預告：只採用標題有台灣片名、而且看得出是預告或上映宣傳的影片。
+ *  寧可找不到（畫面上改開搜尋頁），也不放可能是錯的：搜尋的第一筆常是影評、花絮、別的地區的版本 */
 async function ytTrailer(title: string, en?: string): Promise<{ key: string; name: string } | { err: string }> {
   const base = baseTitle(title);
   const plain = base.replace(/[:：·・\-–—_＿／/!！?？「」『』《》〈〉()（）\[\]【】]+/g, " ").replace(/\s+/g, " ").trim(); // 冒號等符號會被當成搜尋語法
-  const queries = [`${plain} 預告`, `${plain} 電影 中文預告`, en ? `${en} trailer` : ""].filter(Boolean);
   let best: { key: string; name: string; sc: number } | null = null;
-  let first: { key: string; name: string } | null = null; // 第一次搜尋的第一筆（優先挑標題有「預告」的）
   let err = "";
-  for (const q of queries) {
+  for (const q of [`${plain} 預告`, `${plain} 電影 中文預告`]) {
     let r = await ytSearch(q);
     if (!r.list.length && r.err === "搜尋沒有結果") r = await ytSearch(q); // 偶爾會回空白頁，再試一次
     if (r.err) err = r.err;
-    if (!first && q === queries[0]) {
-      const ok = r.list.filter((v) => !YT_NOT_TRAILER.test(v.name));
-      first = ok.find((v) => YT_TRAILER.test(v.name)) || ok[0] || null;
-    }
     r.list.forEach((v, i) => {
       const sc = ytScore(v.name, title, en) * 100 - i; // 同分的照搜尋結果的順序
-      if (sc > 0 && (!best || sc > best.sc)) best = { ...v, sc };
+      if (sc >= 70 * 100 - 50 && (!best || sc > best.sc)) best = { ...v, sc }; // 70 分以上 = 標題有台灣片名
     });
-    if (best && (best as { sc: number }).sc >= 100 * 100 - 50) break; // 已經有台灣片名的預告，不用再搜
-    if (!strictTrailers && first) break; // 手機上：沒有台灣片名的預告就用第一筆，不多搜（每次約 1MB）
+    if (best) break;
   }
   const b = best as { key: string; name: string; sc: number } | null;
-  const zhHit = !!b && b.sc >= 70 * 100 - 50; // 標題有台灣片名
-  if (b && (zhHit || strictTrailers === false)) {
-    // 手機上：有台灣片名的用它；否則在台灣搜到的第一筆通常就是台灣版預告，比只對上英文片名的（常是香港、國際版）可靠
-    if (zhHit || !first) return { key: b.key, name: b.name };
-  }
-  if (!strictTrailers && first) return first;
-  return { err: err || "搜尋結果裡沒有對得上片名的影片" };
+  return b ? { key: b.key, name: b.name } : { err: err || "搜尋結果裡沒有確定是這部片預告的影片" };
 }
 
 /** 沒有片長的電影，從 TMDB 補上（會標記 runtimeFrom）；沒設定 Token 或查詢失敗就原樣回傳 */

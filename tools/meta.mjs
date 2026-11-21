@@ -45,7 +45,6 @@ const built = buildSync({ stdin: { contents: 'export * from "./core"; export { s
 const core = await import("data:text/javascript;base64," + Buffer.from(built.outputFiles[0].text).toString("base64"));
 core.setPlatform(platform);
 core.setMetaEnabled(false);
-core.setStrictTrailers(true); // 伺服器在國外，YouTube 搜尋結果跟台灣不同：只留標題有台灣片名的預告，其餘讓手機自己搜 // 不讀自己上一次的結果，每筆都重新查
 
 let prev = { movies: {} };
 try {

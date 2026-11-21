@@ -93,7 +93,6 @@
     releaseOf: () => releaseOf,
     saveSettings: () => saveSettings,
     setMetaEnabled: () => setMetaEnabled,
-    setStrictTrailers: () => setStrictTrailers,
     shareText: () => shareText,
     showDay: () => showDay,
     showMinute: () => showMinute,
@@ -1167,6 +1166,8 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
       const ttl = stale ? 0 : !hit?.trailerName ? 36e5 : hit?.poster ? 7 * 864e5 : 864e5;
       const me = await metaOf(title);
       if (me && me.tn && me.t) return { poster: normImageUrl(me.p || hit?.poster || ""), trailer: me.t, trailerName: me.tn };
+      if (me && me.xa)
+        return { poster: normImageUrl(me.p || hit?.poster || ""), trailer: `https://www.youtube.com/results?search_query=${encodeURIComponent(baseTitle(title) + " 預告")}`, trailerName: "" };
       if (hit && Date.now() - hit.at < ttl) return { poster: hit.poster, trailer: hit.trailer, trailerName: hit.trailerName };
       const out = await findExtras(title, slug);
       const all = read();
@@ -1177,7 +1178,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
       return out;
     })();
   }
-  var EXTRAS_V = 8;
+  var EXTRAS_V = 9;
   function normImageUrl(u) {
     let s = String(u || "").trim().replace(/&amp;/g, "&").replace(/\\\//g, "/");
     if (s.startsWith("//")) s = "https:" + s;
@@ -1556,39 +1557,23 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
       return "";
     }
   }
-  var strictTrailers = false;
-  function setStrictTrailers(on) {
-    strictTrailers = on;
-  }
   async function ytTrailer(title, en) {
     const base = baseTitle(title);
     const plain = base.replace(/[:：·・\-–—_＿／/!！?？「」『』《》〈〉()（）\[\]【】]+/g, " ").replace(/\s+/g, " ").trim();
-    const queries = [`${plain} 預告`, `${plain} 電影 中文預告`, en ? `${en} trailer` : ""].filter(Boolean);
     let best = null;
-    let first = null;
     let err = "";
-    for (const q of queries) {
+    for (const q of [`${plain} 預告`, `${plain} 電影 中文預告`]) {
       let r = await ytSearch(q);
       if (!r.list.length && r.err === "搜尋沒有結果") r = await ytSearch(q);
       if (r.err) err = r.err;
-      if (!first && q === queries[0]) {
-        const ok = r.list.filter((v) => !YT_NOT_TRAILER.test(v.name));
-        first = ok.find((v) => YT_TRAILER.test(v.name)) || ok[0] || null;
-      }
       r.list.forEach((v, i) => {
         const sc = ytScore(v.name, title, en) * 100 - i;
-        if (sc > 0 && (!best || sc > best.sc)) best = { ...v, sc };
+        if (sc >= 70 * 100 - 50 && (!best || sc > best.sc)) best = { ...v, sc };
       });
-      if (best && best.sc >= 100 * 100 - 50) break;
-      if (!strictTrailers && first) break;
+      if (best) break;
     }
     const b = best;
-    const zhHit = !!b && b.sc >= 70 * 100 - 50;
-    if (b && (zhHit || strictTrailers === false)) {
-      if (zhHit || !first) return { key: b.key, name: b.name };
-    }
-    if (!strictTrailers && first) return first;
-    return { err: err || "搜尋結果裡沒有對得上片名的影片" };
+    return b ? { key: b.key, name: b.name } : { err: err || "搜尋結果裡沒有確定是這部片預告的影片" };
   }
   async function fillRuntimes(movies) {
     const todo = movies.filter((m) => !m.runtime);
