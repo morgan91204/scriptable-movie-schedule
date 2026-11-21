@@ -911,7 +911,7 @@ function BoxOfficeSections({ movies, query }: { movies: TwMovie[]; query: string
       const m = matchBoxOffice(x.name, movies)
       const lines = boxOfficeLines(x)
       const body = <HStack spacing={10}>
-        <Text font={"title3"} fontWeight={"bold"} monospacedDigit foregroundStyle={x.rank <= 3 ? "systemOrange" : "secondaryLabel"} frame={{ width: 26 }}>{String(x.rank)}</Text>
+        <Text font={"title3"} fontWeight={"bold"} monospacedDigit foregroundStyle={x.rank <= 3 ? "systemOrange" : "secondaryLabel"} lineLimit={1} minScaleFactor={0.6} frame={{ width: 34 }}>{String(x.rank)}</Text>
         {PosterBox({ w: 44, h: 66, r: 6, img: thumbs[i].img, ver: 0, pending: thumbs[i].pending, title: x.name })}
         <VStack alignment={"leading"} spacing={2}>
           <Text foregroundStyle={"label"} lineLimit={2}>{x.name}</Text>

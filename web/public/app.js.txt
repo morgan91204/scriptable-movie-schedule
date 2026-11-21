@@ -390,7 +390,7 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .group .item:last-child{border-bottom:0}
 .item.tap:active{background:var(--line)}
 .item .ico{font-size:20px;width:26px;text-align:center;flex:none}
-.item .rank{flex:none;width:22px;text-align:center;font-size:17px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--fg2)}
+.item .rank{flex:none;width:32px;text-align:center;font-size:17px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--fg2)}
 .item .rank.top{color:#ff9f0a}
 .item .thumb{flex:none;width:44px;height:66px;border-radius:6px;object-fit:cover;background:var(--chip)}
 .item .thumb.none{display:block}

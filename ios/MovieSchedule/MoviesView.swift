@@ -137,7 +137,8 @@ struct BoxOfficeSection: View {
             Text("\(r.x.rank)")
                 .font(.title3.bold()).monospacedDigit()
                 .foregroundStyle(r.x.rank <= 3 ? Color.orange : Color.secondary)
-                .frame(width: 28)
+                .lineLimit(1).minimumScaleFactor(0.6)
+                .frame(width: 36)
             PosterView(title: r.m?.title ?? r.x.name, slug: r.m?.slug, en: r.m?.en)
             VStack(alignment: .leading, spacing: 2) {
                 Text(r.x.name).lineLimit(2)
