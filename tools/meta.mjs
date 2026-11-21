@@ -121,5 +121,5 @@ fs.writeFileSync(outPath, JSON.stringify({ updated: now, movies: sorted }) + "\n
 const all = Object.values(sorted);
 console.log(`片單 ${todo.length} 部；這次查了 海報／預告 ${stat.extras}、評分 ${stat.ratings}、片長 ${stat.runtime}、上映日期 ${stat.release}，失敗 ${stat.fail}`);
 console.log(`總表 ${all.length} 部：有海報 ${all.filter((e) => e.p).length}、有預告 ${all.filter((e) => e.tn).length}、有評分 ${all.filter((e) => has(e.r)).length}；檔案 ${Math.round(fs.statSync(outPath).size / 1024)}KB`);
-process.exit(0);
 if (noTrailer.length) console.log("找不到預告的例子：\n" + noTrailer.join("\n"));
+process.exit(0);
