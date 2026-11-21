@@ -690,9 +690,8 @@ export async function movieExtras(title: string, slug?: string): Promise<MovieEx
     // 不會因為各自搜尋的結果不同而不一樣
     const me = await metaOf(title);
     if (me && me.tn && me.t) return { poster: normImageUrl(me.p || hit?.poster || ""), trailer: me.t, trailerName: me.tn };
-    // 伺服器查過、沒有把握是正確預告的：所有版本都開搜尋頁，不各自去搜（各自搜的結果會不一樣，也可能是錯的）
-    if (me && me.xa)
-      return { poster: normImageUrl(me.p || hit?.poster || ""), trailer: `https://www.youtube.com/results?search_query=${encodeURIComponent(baseTitle(title) + " 預告")}`, trailerName: "" };
+    // 伺服器沒有的：手機自己搜，用同一套嚴格規則（標題要有台灣片名、看得出是預告）。
+    // 伺服器在國外，只在台灣看得到的影片（片商鎖地區的官方預告）它搜不到，手機才搜得到；找不到就開搜尋頁
     if (hit && Date.now() - hit.at < ttl) return { poster: hit.poster, trailer: hit.trailer, trailerName: hit.trailerName };
     const out = await findExtras(title, slug);
     // 查不到預告也保留這次執行的結果（不寫進手機快取的 err 會讓下次啟動重查）；
