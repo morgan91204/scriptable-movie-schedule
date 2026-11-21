@@ -65,7 +65,8 @@ async function refresh(m) {
   const e = (movies[k] ||= {});
   e.seen = now;
   // 海報／預告：都有的 3 天查一次，缺的 6 小時再試
-  if (!e.xa || now - e.xa > (e.p && e.tn ? 3 * DAY : 6 * HOUR)) {
+  // RECHECK=1：缺海報或預告的立刻重查（改了比對規則、加了新來源時手動跑一次）
+  if (!e.xa || now - e.xa > (e.p && e.tn ? 3 * DAY : process.env.RECHECK === "1" ? 0 : 6 * HOUR)) {
     try {
       const x = await core.movieExtras(m.title, m.slug);
       if (x.poster) e.p = x.poster;

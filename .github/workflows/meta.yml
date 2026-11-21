@@ -4,6 +4,11 @@ on:
   schedule:
     - cron: "23 * * * *"
   workflow_dispatch:
+    inputs:
+      recheck:
+        description: 缺海報或預告的片立刻重查（改了比對規則時用）
+        type: boolean
+        default: false
 permissions:
   contents: write
 concurrency:
@@ -24,6 +29,8 @@ jobs:
         run: curl -fsSL "https://raw.githubusercontent.com/${{ github.repository }}/data/meta.json?t=$(date +%s)" -o "$RUNNER_TEMP/prev.json" || echo "還沒有總表，從頭查"
       - name: 查資料
         run: node tools/meta.mjs "$RUNNER_TEMP/prev.json" "$RUNNER_TEMP/meta.json"
+        env:
+          RECHECK: ${{ inputs.recheck && '1' || '' }}
       - name: 取上一次的開眼場次
         run: curl -fsSL "https://raw.githubusercontent.com/${{ github.repository }}/data/at.json?t=$(date +%s)" -o "$RUNNER_TEMP/prev-at.json" || echo "還沒有，從頭抓"
       - name: 抓開眼場次（只有開眼有的戲院、要補頂級影廳的威秀）
