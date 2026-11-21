@@ -13,6 +13,7 @@ struct MoviesView: View {
                     Picker("顯示", selection: $mode) {
                         Text("上映中").tag("now")
                         Text("票房排行").tag("box")
+                        Text("即將上映").tag("soon")
                     }
                     .pickerStyle(.segmented)
                 }
@@ -38,23 +39,35 @@ struct MoviesView: View {
         case .loaded(let all):
             let k = query.trimmingCharacters(in: .whitespaces).lowercased()
             let list = all.filter { k.isEmpty || "\($0.title) \($0.en ?? "")".lowercased().contains(k) }
-            let now = list.filter { !($0.comingSoon ?? false) }
-            let soon = list.filter { $0.comingSoon ?? false }
+            let now = mode == "soon" ? [] : list.filter { !($0.comingSoon ?? false) }
+            let soon = mode == "soon" ? list.filter { $0.comingSoon ?? false } : []
             if !now.isEmpty {
                 Section {
                     ForEach(now) { row($0) }
                 } header: {
                     Text("上映中（\(now.count)）")
                 } footer: {
-                    Text("依今天放映的影城數排序，資料來自場次通。")
+                    Text("依今天放映的影城數排序；今天沒有場次、過幾天才有的排在最後。資料來自場次通。")
                 }
             }
             if !soon.isEmpty {
-                Section("即將上映（\(soon.count)）") {
+                Section {
                     ForEach(soon) { row($0) }
+                } header: {
+                    Text("即將上映（\(soon.count)）")
+                } footer: {
+                    Text("還沒上映、但已經可以查到場次的片，依上映日期排序。")
                 }
             }
         }
+    }
+
+    /// 說明文字開頭：已上映但今天沒排片的標「今天沒有場次」，還沒上映的標上映日期
+    private func head(_ m: TwMovie) -> String {
+        if m.noShowToday ?? false { return "今天沒有場次" }
+        guard m.comingSoon ?? false, let d = m.release, d.count >= 10 else { return "" }
+        let p = d.split(separator: "-").compactMap { Int($0) }
+        return p.count == 3 ? "\(p[1])/\(p[2]) 上映" : ""
     }
 
     private func row(_ m: TwMovie) -> some View {
@@ -65,7 +78,7 @@ struct MoviesView: View {
                 PosterView(title: m.title, slug: m.slug, en: m.en)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(m.title).lineLimit(2)
-                    Text([m.rating ?? "", (m.runtime ?? 0) > 0 ? "\(m.runtime ?? 0) 分" : "", m.en ?? ""].filter { !$0.isEmpty }.joined(separator: "｜"))
+                    Text([head(m), m.rating ?? "", (m.runtime ?? 0) > 0 ? "\(m.runtime ?? 0) 分" : "", m.en ?? ""].filter { !$0.isEmpty }.joined(separator: "｜"))
                         .font(.subheadline).foregroundStyle(.secondary).lineLimit(2)
                 }
                 Spacer(minLength: 4)

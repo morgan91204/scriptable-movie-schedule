@@ -336,7 +336,9 @@ export interface TwMovie {
   runtime: number;
   runtimeFrom?: string;
   cinemaCount: number;
-  comingSoon: boolean;
+  comingSoon: boolean; // 還沒上映（場次通的「即將上映」裡，已經上映過、只是今天沒場次的不算，見 noShowToday）
+  release?: string; // 上映日期 YYYY-MM-DD（伺服器查好的，沒有就是不知道）
+  noShowToday?: boolean; // 已經上映，今天沒有場次、之後幾天才有
 }
 export interface TwMovieCinema {
   id: string; // 場次通影城代碼

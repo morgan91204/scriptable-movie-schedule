@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.22-0340
+// @movie-schedule-app 電影行程 v2026.11.22-0347
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/parsers.gen.ts
@@ -1422,8 +1422,27 @@ async function tmdbTest(token) {
 }
 var moviesCache = null;
 async function loadMovies() {
-  if (!moviesCache) moviesCache = await fillRuntimes(await parse("parseTwMovies", await getText(TW + "/movies/")));
+  if (!moviesCache) {
+    const list = await fillRuntimes(await parse("parseTwMovies", await getText(TW + "/movies/")));
+    const meta = await loadMeta().catch(() => null);
+    const today = todayTPE();
+    for (const m of list) {
+      const e = meta && (meta.movies[normTitle(m.title)] || meta.movies[normTitle(baseTitle(m.title))]);
+      if (e?.rd) m.release = e.rd;
+      if (m.comingSoon && m.release && m.release <= today) {
+        m.comingSoon = false;
+        m.noShowToday = true;
+      }
+    }
+    const soon = list.filter((m) => m.comingSoon).sort((a, b) => (a.release || "9999").localeCompare(b.release || "9999"));
+    moviesCache = [...list.filter((m) => !m.comingSoon && !m.noShowToday), ...list.filter((m) => m.noShowToday), ...soon];
+  }
   return moviesCache;
+}
+function movieSubtitle(m) {
+  const md = (d) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`;
+  const head = m.noShowToday ? "今天沒有場次" : m.comingSoon ? m.release ? `${md(m.release)} 上映` : "" : "";
+  return [head, m.rating, m.runtime ? `${m.runtime} 分` : "", m.en].filter(Boolean).join("｜");
 }
 var movieDayCache = {};
 async function movieDay(slug, date) {
@@ -2397,7 +2416,7 @@ var App = class {
     ];
     // ── 事件迴圈 ──
     // 背景查 GitHub 上的最新版本（首頁顯示是否為最新版）
-    this.latest = checkLatest("2026.11.22-0340");
+    this.latest = checkLatest("2026.11.22-0347");
     // ── 搜尋 ──
     this.query = "";
     this.tmdbStatus = "";
@@ -2532,11 +2551,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.22-0340"}`);
+          Pasteboard.copy(`版本 ${"2026.11.22-0347"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.22-0340"}`,
+      `版本 ${"2026.11.22-0347"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -2890,6 +2909,8 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
       this.movieMode = "now";
     } }), /* @__PURE__ */ h(Chip, { label: "票房排行", muted: this.movieMode !== "box", onTap: () => {
       this.movieMode = "box";
+    } }), /* @__PURE__ */ h(Chip, { label: "即將上映", muted: this.movieMode !== "soon", onTap: () => {
+      this.movieMode = "soon";
     } }));
   }
   async boxOfficeView() {
@@ -2933,7 +2954,8 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
     if (this.movieMode === "box") return this.boxOfficeView();
     const all = await loadMovies();
     const k = this.movieQuery.trim().toLowerCase();
-    const list = all.filter((m) => !k || `${m.title} ${m.en}`.toLowerCase().includes(k));
+    const soonMode = this.movieMode === "soon";
+    const list = all.filter((m) => !!m.comingSoon === soonMode && (!k || `${m.title} ${m.en}`.toLowerCase().includes(k)));
     prefetchPosters(list);
     const jobs = list.map((m) => moviePoster(m.title, m.slug, m.en).catch(() => ""));
     const got = await Promise.all(jobs.map((p) => Promise.race([p, sleep(this.rerendering ? 0 : 600).then(() => void 0)])));
@@ -2954,7 +2976,7 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
       {
         thumb: thumbOf.get(m),
         title: m.title,
-        subtitle: [m.rating, m.runtime ? `${m.runtime} 分` : "", m.en].filter(Boolean).join("｜"),
+        subtitle: movieSubtitle(m),
         badge: m.cinemaCount ? `${m.cinemaCount} 間` : void 0,
         onTap: () => this.go(() => this.movieView(m, ""), `讀取《${m.title}》的放映影城…`)
       }
@@ -2963,7 +2985,7 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
     const soon = list.filter((m) => m.comingSoon);
     return /* @__PURE__ */ h(Page, { title: "依電影找場次", subtitle: `${all.length} 部電影`, onBack: () => this.back() }, this.movieModeChips(), /* @__PURE__ */ h("input", { class: "field", name: "q", value: this.movieQuery, placeholder: "搜尋片名" }), /* @__PURE__ */ h(Button, { label: "搜尋", kind: "secondary", enter: true, onTap: (v) => {
       this.movieQuery = v.q || "";
-    } }), now.length ? /* @__PURE__ */ h(Section, { title: `上映中（${now.length}）`, hint: "依今天放映的影城數排序，資料來自場次通。" }, now.map(item)) : null, soon.length ? /* @__PURE__ */ h(Section, { title: `即將上映（${soon.length}）` }, soon.map(item)) : null, list.length ? null : /* @__PURE__ */ h(Empty, { icon: "🎞", text: "找不到相符的電影" }));
+    } }), now.length ? /* @__PURE__ */ h(Section, { title: `上映中（${now.length}）`, hint: "依今天放映的影城數排序；今天沒有場次、過幾天才有的排在最後。資料來自場次通。" }, now.map(item)) : null, soon.length ? /* @__PURE__ */ h(Section, { title: `即將上映（${soon.length}）`, hint: "還沒上映、但已經可以查到場次的片，依上映日期排序。" }, soon.map(item)) : null, list.length ? null : /* @__PURE__ */ h(Empty, { icon: "🎞", text: "找不到相符的電影" }));
   }
   async movieView(m, date) {
     const d = await movieDay(m.slug, date || void 0);

@@ -76,6 +76,7 @@
     moviePoster: () => moviePoster,
     movieRatings: () => movieRatings,
     movieRuntime: () => movieRuntime,
+    movieSubtitle: () => movieSubtitle,
     moviesOf: () => moviesOf,
     nearest: () => nearest,
     normImageUrl: () => normImageUrl,
@@ -95,6 +96,7 @@
     tmdbTest: () => tmdbTest,
     todayTPE: () => todayTPE,
     tpeDate: () => tpeDate,
+    twReleaseDate: () => twReleaseDate,
     weekday: () => weekday
   });
 
@@ -1531,8 +1533,32 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   }
   var moviesCache = null;
   async function loadMovies() {
-    if (!moviesCache) moviesCache = await fillRuntimes(await parse("parseTwMovies", await getText(TW + "/movies/")));
+    if (!moviesCache) {
+      const list = await fillRuntimes(await parse("parseTwMovies", await getText(TW + "/movies/")));
+      const meta = await loadMeta().catch(() => null);
+      const today = todayTPE();
+      for (const m of list) {
+        const e = meta && (meta.movies[normTitle(m.title)] || meta.movies[normTitle(baseTitle(m.title))]);
+        if (e?.rd) m.release = e.rd;
+        if (m.comingSoon && m.release && m.release <= today) {
+          m.comingSoon = false;
+          m.noShowToday = true;
+        }
+      }
+      const soon = list.filter((m) => m.comingSoon).sort((a, b) => (a.release || "9999").localeCompare(b.release || "9999"));
+      moviesCache = [...list.filter((m) => !m.comingSoon && !m.noShowToday), ...list.filter((m) => m.noShowToday), ...soon];
+    }
     return moviesCache;
+  }
+  async function twReleaseDate(slug) {
+    const r = await get(`${TW}/movies/${encodeURIComponent(slug).replace(/%3A/gi, ":")}/`);
+    if (!r.ok) throw new Error("no page");
+    return (r.body.match(/"datePublished":"(\d{4}-\d{2}-\d{2})/) || [])[1] || "";
+  }
+  function movieSubtitle(m) {
+    const md = (d) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`;
+    const head = m.noShowToday ? "今天沒有場次" : m.comingSoon ? m.release ? `${md(m.release)} 上映` : "" : "";
+    return [head, m.rating, m.runtime ? `${m.runtime} 分` : "", m.en].filter(Boolean).join("｜");
   }
   var movieDayCache = {};
   async function movieDay(slug, date) {

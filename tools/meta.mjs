@@ -49,7 +49,7 @@ const now = Date.now();
 
 // 片單：場次通上映中＋即將上映，加上票房榜上場次通沒有的片
 const list = await core.loadMovies();
-const todo = list.map((m) => ({ title: m.title, slug: m.slug, en: m.en, runtime: m.runtime }));
+const todo = list.map((m) => ({ title: m.title, slug: m.slug, en: m.en, runtime: m.runtime, soon: m.comingSoon }));
 try {
   for (const x of (await core.loadBoxOffice()).list) if (!core.matchBoxOffice(x.name, list)) todo.push({ title: x.name, runtime: 0 });
 } catch (e) {
@@ -57,7 +57,7 @@ try {
 }
 if (todo.length < 20) throw new Error("片單太短（" + todo.length + "），可能是來源暫時有問題，這次不更新");
 
-const stat = { extras: 0, ratings: 0, runtime: 0, fail: 0 };
+const stat = { extras: 0, ratings: 0, runtime: 0, release: 0, fail: 0 };
 const has = (r) => !!(r && (r.imdb || r.tomato || r.popcorn));
 async function refresh(m) {
   const k = core.normTitle(m.title);
@@ -87,6 +87,15 @@ async function refresh(m) {
       } else stat.fail++;
     } catch (_) { stat.fail++; }
   }
+  // 上映日期：只查場次通列在「即將上映」的片（那一區混著已經上映、只是今天沒場次的片，App 靠這個分開）
+  if (m.soon && m.slug && (!e.rda || now - e.rda > (e.rd ? 7 * DAY : DAY))) {
+    try {
+      const d = await core.twReleaseDate(m.slug);
+      if (d) e.rd = d;
+      e.rda = now;
+      stat.release++;
+    } catch (_) { stat.fail++; }
+  }
   // 片長：只查來源沒給的
   if (!m.runtime && (!e.rta || now - e.rta > (e.rt ? 7 * DAY : DAY))) {
     try {
@@ -107,6 +116,6 @@ for (const [k, e] of Object.entries(movies)) if (!e.seen || now - e.seen > 14 * 
 const sorted = Object.fromEntries(Object.keys(movies).sort().map((k) => [k, movies[k]]));
 fs.writeFileSync(outPath, JSON.stringify({ updated: now, movies: sorted }) + "\n");
 const all = Object.values(sorted);
-console.log(`片單 ${todo.length} 部；這次查了 海報／預告 ${stat.extras}、評分 ${stat.ratings}、片長 ${stat.runtime}，失敗 ${stat.fail}`);
+console.log(`片單 ${todo.length} 部；這次查了 海報／預告 ${stat.extras}、評分 ${stat.ratings}、片長 ${stat.runtime}、上映日期 ${stat.release}，失敗 ${stat.fail}`);
 console.log(`總表 ${all.length} 部：有海報 ${all.filter((e) => e.p).length}、有預告 ${all.filter((e) => e.tn).length}、有評分 ${all.filter((e) => has(e.r)).length}；檔案 ${Math.round(fs.statSync(outPath).size / 1024)}KB`);
 process.exit(0);

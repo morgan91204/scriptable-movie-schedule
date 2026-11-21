@@ -630,6 +630,8 @@ export interface MetaEntry {
   rt?: number; // 片長（分鐘）
   rf?: string; // 片長來源
   rta?: number;
+  rd?: string; // 上映日期 YYYY-MM-DD（場次通電影頁）
+  rda?: number;
   seen?: number; // 最後一次出現在片單上的時間
 }
 export interface MetaFile { updated: number; movies: Record<string, MetaEntry> }
@@ -1113,8 +1115,36 @@ export async function tmdbTest(token: string): Promise<string> {
 let moviesCache: TwMovie[] | null = null;
 /** 場次通的電影清單（上映中＋即將上映） */
 export async function loadMovies(): Promise<TwMovie[]> {
-  if (!moviesCache) moviesCache = await fillRuntimes(await parse<TwMovie[]>("parseTwMovies", await getText(TW + "/movies/")));
+  if (!moviesCache) {
+    const list = await fillRuntimes(await parse<TwMovie[]>("parseTwMovies", await getText(TW + "/movies/")));
+    // 場次通的「即將上映」其實是「今天沒有場次、之後幾天才有」：已經上映過的片（只是今天剛好沒排）也在裡面。
+    // 用伺服器查好的上映日期分開：上映日已過的歸回上映中（標「今天沒有場次」），其餘才是真的即將上映
+    const meta = await loadMeta().catch(() => null);
+    const today = todayTPE();
+    for (const m of list) {
+      const e = meta && (meta.movies[normTitle(m.title)] || meta.movies[normTitle(baseTitle(m.title))]);
+      if (e?.rd) m.release = e.rd;
+      if (m.comingSoon && m.release && m.release <= today) {
+        m.comingSoon = false;
+        m.noShowToday = true;
+      }
+    }
+    const soon = list.filter((m) => m.comingSoon).sort((a, b) => (a.release || "9999").localeCompare(b.release || "9999")); // 快上映的排前面
+    moviesCache = [...list.filter((m) => !m.comingSoon && !m.noShowToday), ...list.filter((m) => m.noShowToday), ...soon];
+  }
   return moviesCache;
+}
+/** 場次通電影頁上的上映日期（YYYY-MM-DD，沒有回傳空字串）。一部片一個請求，只給伺服器排程用 */
+export async function twReleaseDate(slug: string): Promise<string> {
+  const r = await get(`${TW}/movies/${encodeURIComponent(slug).replace(/%3A/gi, ":")}/`);
+  if (!r.ok) throw new Error("no page");
+  return (r.body.match(/"datePublished":"(\d{4}-\d{2}-\d{2})/) || [])[1] || "";
+}
+/** 電影清單上每一列的說明文字：分級｜片長｜英文片名，前面加上「今天沒有場次」或上映日期 */
+export function movieSubtitle(m: TwMovie): string {
+  const md = (d: string) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`;
+  const head = m.noShowToday ? "今天沒有場次" : m.comingSoon ? (m.release ? `${md(m.release)} 上映` : "") : "";
+  return [head, m.rating, m.runtime ? `${m.runtime} 分` : "", m.en].filter(Boolean).join("｜");
 }
 
 const movieDayCache: Record<string, TwMovieDay> = {};

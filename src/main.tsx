@@ -12,7 +12,7 @@ import {
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
   loadSettings, saveSettings, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, TW,
   FORMATS, formatsOf, filterVersions, nearest, kmLabel, WINDOWS, findShowtimes, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText,
-  hallOf, tmdbTest, movieExtras, moviePoster, movieRuntime, posterSrc, cachePoster, prefetchPosters, foregroundTask, communityStats, communityCached, communityVote, loadBoxOffice, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, movieRatings, ratingTier,
+  hallOf, tmdbTest, movieExtras, moviePoster, movieRuntime, posterSrc, cachePoster, prefetchPosters, movieSubtitle, foregroundTask, communityStats, communityCached, communityVote, loadBoxOffice, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, movieRatings, ratingTier,
 } from "./core";
 import type { MovieExtras, Ratings, Community, BoxOfficeItem } from "./core";
 import { setTabBar, setBackGuard, esc } from "./jsx";
@@ -780,12 +780,13 @@ class App {
   // ── 依電影找 ──
   movieQuery = "";
   /** 電影分頁上方的切換：上映中／票房排行 */
-  movieMode: "now" | "box" = "now";
+  movieMode: "now" | "box" | "soon" = "now";
   movieModeChips(): string {
     return (
       <Chips>
         <Chip label="上映中" muted={this.movieMode !== "now"} onTap={() => { this.movieMode = "now"; }} />
         <Chip label="票房排行" muted={this.movieMode !== "box"} onTap={() => { this.movieMode = "box"; }} />
+        <Chip label="即將上映" muted={this.movieMode !== "soon"} onTap={() => { this.movieMode = "soon"; }} />
       </Chips>
     );
   }
@@ -852,7 +853,8 @@ class App {
     if (this.movieMode === "box") return this.boxOfficeView();
     const all = await loadMovies();
     const k = this.movieQuery.trim().toLowerCase();
-    const list = all.filter((m) => !k || `${m.title} ${m.en}`.toLowerCase().includes(k));
+    const soonMode = this.movieMode === "soon";
+    const list = all.filter((m) => !!m.comingSoon === soonMode && (!k || `${m.title} ${m.en}`.toLowerCase().includes(k)));
     prefetchPosters(list); // 背景先抓海報，進電影頁就不用等
     // 每一列的小海報：手機上記過、伺服器查好的立刻有；要上網找的最多等 0.6 秒，其餘每好一批就在原位補畫
     const jobs = list.map((m) => moviePoster(m.title, m.slug, m.en).catch(() => ""));
@@ -873,7 +875,7 @@ class App {
       <Item
         thumb={thumbOf.get(m)}
         title={m.title}
-        subtitle={[m.rating, m.runtime ? `${m.runtime} 分` : "", m.en].filter(Boolean).join("｜")}
+        subtitle={movieSubtitle(m)}
         badge={m.cinemaCount ? `${m.cinemaCount} 間` : undefined}
         onTap={() => this.go(() => this.movieView(m, ""), `讀取《${m.title}》的放映影城…`)}
       />
@@ -885,8 +887,8 @@ class App {
         {this.movieModeChips()}
         <input class="field" name="q" value={this.movieQuery} placeholder="搜尋片名" />
         <Button label="搜尋" kind="secondary" enter onTap={(v) => { this.movieQuery = v.q || ""; }} />
-        {now.length ? <Section title={`上映中（${now.length}）`} hint="依今天放映的影城數排序，資料來自場次通。">{now.map(item)}</Section> : null}
-        {soon.length ? <Section title={`即將上映（${soon.length}）`}>{soon.map(item)}</Section> : null}
+        {now.length ? <Section title={`上映中（${now.length}）`} hint="依今天放映的影城數排序；今天沒有場次、過幾天才有的排在最後。資料來自場次通。">{now.map(item)}</Section> : null}
+        {soon.length ? <Section title={`即將上映（${soon.length}）`} hint="還沒上映、但已經可以查到場次的片，依上映日期排序。">{soon.map(item)}</Section> : null}
         {list.length ? null : <Empty icon="🎞" text="找不到相符的電影" />}
       </Page>
     );

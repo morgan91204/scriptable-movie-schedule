@@ -14,7 +14,7 @@ import {
   Cinema, Movie, Settings, Version, TwMovie, TwMovieCinema, CITY_ORDER, TW,
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
   loadSettings, saveSettings, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, cinemaAddress,
-  FORMATS, formatsOf, filterVersions, nearest, kmLabel, WINDOWS, findShowtimes, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText, hallOf, tmdbTest, movieExtras, moviePoster, posterReady, posterTint, POSTER_TINTS, normImageUrl, movieRuntime, posterSrc, isLocalSrc, cachePoster, prefetchPosters, foregroundTask, communityStats, communityVote, loadBoxOffice, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, SCRIPTING_IMPORT_URL, movieRatings, ratingTier,
+  FORMATS, formatsOf, filterVersions, nearest, kmLabel, WINDOWS, findShowtimes, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText, hallOf, tmdbTest, movieExtras, moviePoster, posterReady, posterTint, POSTER_TINTS, normImageUrl, movieRuntime, posterSrc, isLocalSrc, cachePoster, prefetchPosters, movieSubtitle, foregroundTask, communityStats, communityVote, loadBoxOffice, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, SCRIPTING_IMPORT_URL, movieRatings, ratingTier,
 } from "./core"
 import type { Format, LatLng, Hit, Community, BoxOfficeItem } from "./core"
 
@@ -926,11 +926,11 @@ function MoviesPage() {
   const [mode, setMode] = useState<string>("now")
   const [query, setQuery] = useState("")
   const k = query.trim().toLowerCase()
-  const list = (movies.data || []).filter((m) => !k || `${m.title} ${m.en}`.toLowerCase().includes(k))
-  useEffect(() => { if (movies.data) prefetchPosters(list) }, [movies.data, k]) // 背景先抓海報，進電影頁就不用等
+  const list = (movies.data || []).filter((m) => (mode === "box" || !!m.comingSoon === (mode === "soon")) && (!k || `${m.title} ${m.en}`.toLowerCase().includes(k)))
+  useEffect(() => { if (movies.data) prefetchPosters(list) }, [movies.data, k, mode]) // 背景先抓海報，進電影頁就不用等
   const now = list.filter((m) => !m.comingSoon)
   const soon = list.filter((m) => m.comingSoon)
-  const thumbOf = useThumbs(list, `${(movies.data || []).length}|${k}`) // 每一列的小海報
+  const thumbOf = useThumbs(mode === "box" ? [] : list, `${(movies.data || []).length}|${k}|${mode}`) // 每一列的小海報
   const row = (m: TwMovie) => {
     const t = thumbOf(m)
     return <NavigationLink key={m.slug} destination={<MoviePage movie={m} />}>
@@ -938,7 +938,7 @@ function MoviesPage() {
         {PosterBox({ w: 44, h: 66, r: 6, img: t.img, ver: 0, pending: t.pending, title: m.title })}
         <VStack alignment={"leading"} spacing={2}>
           <Text foregroundStyle={"label"} lineLimit={2}>{m.title}</Text>
-          <Text font={"subheadline"} foregroundStyle={"secondaryLabel"} lineLimit={2}>{[m.rating, m.runtime ? `${m.runtime} 分` : "", m.en].filter(Boolean).join("｜")}</Text>
+          <Text font={"subheadline"} foregroundStyle={"secondaryLabel"} lineLimit={2}>{movieSubtitle(m)}</Text>
         </VStack>
         <Spacer />
         {m.cinemaCount ? <Text font={"caption"} foregroundStyle={"tertiaryLabel"}>{`${m.cinemaCount} 間`}</Text> : null}
@@ -954,13 +954,14 @@ function MoviesPage() {
       <Picker title={"顯示"} value={mode} onChanged={(v: string) => setMode(v)} pickerStyle={"segmented"}>
         <Text tag={"now"}>上映中</Text>
         <Text tag={"box"}>票房排行</Text>
+        <Text tag={"soon"}>即將上映</Text>
       </Picker>
     </Section>
     {mode === "box" ? <BoxOfficeSections movies={movies.data || []} /> : <>
       {movies.error ? <ErrorRow error={movies.error} retry={movies.reload} /> : null}
       {!movies.data && !movies.error ? <Section><Loading text={"讀取電影清單…"} /></Section> : null}
-      {now.length ? <Section header={<Text>{`上映中（${now.length}）`}</Text>} footer={<Text>依今天放映的影城數排序，資料來自場次通。</Text>}>{now.map(row)}</Section> : null}
-      {soon.length ? <Section header={<Text>{`即將上映（${soon.length}）`}</Text>}>{soon.map(row)}</Section> : null}
+      {now.length ? <Section header={<Text>{`上映中（${now.length}）`}</Text>} footer={<Text>依今天放映的影城數排序；今天沒有場次、過幾天才有的排在最後。資料來自場次通。</Text>}>{now.map(row)}</Section> : null}
+      {soon.length ? <Section header={<Text>{`即將上映（${soon.length}）`}</Text>} footer={<Text>還沒上映、但已經可以查到場次的片，依上映日期排序。</Text>}>{soon.map(row)}</Section> : null}
     </>}
   </List>
 }

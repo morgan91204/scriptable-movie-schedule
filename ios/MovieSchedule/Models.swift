@@ -37,6 +37,8 @@ struct TwMovie: Codable, Hashable, Identifiable {
     var runtimeFrom: String?
     var cinemaCount: Int?
     var comingSoon: Bool?
+    var release: String?
+    var noShowToday: Bool?
     var id: String { slug }
 }
 
