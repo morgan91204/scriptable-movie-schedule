@@ -1165,9 +1165,9 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
       const hit = read()[ck];
       const stale = hit && hit.v !== EXTRAS_V && true;
       const ttl = stale ? 0 : !hit?.trailerName ? 36e5 : hit?.poster ? 7 * 864e5 : 864e5;
-      if (hit && Date.now() - hit.at < ttl) return { poster: hit.poster, trailer: hit.trailer, trailerName: hit.trailerName };
       const me = await metaOf(title);
-      if (me && me.tn && me.t) return { poster: normImageUrl(me.p || ""), trailer: me.t, trailerName: me.tn };
+      if (me && me.tn && me.t) return { poster: normImageUrl(me.p || hit?.poster || ""), trailer: me.t, trailerName: me.tn };
+      if (hit && Date.now() - hit.at < ttl) return { poster: hit.poster, trailer: hit.trailer, trailerName: hit.trailerName };
       const out = await findExtras(title, slug);
       const all = read();
       for (const [key, v] of Object.entries(all)) if (Date.now() - v.at > 7 * 864e5) delete all[key];

@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.22-0509
+// @movie-schedule-app 電影行程 v2026.11.22-0520
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/parsers.gen.ts
@@ -1060,9 +1060,9 @@ async function movieExtras(title, slug) {
     const hit = read()[ck];
     const stale = hit && hit.v !== EXTRAS_V && true;
     const ttl = stale ? 0 : !hit?.trailerName ? 36e5 : hit?.poster ? 7 * 864e5 : 864e5;
-    if (hit && Date.now() - hit.at < ttl) return { poster: hit.poster, trailer: hit.trailer, trailerName: hit.trailerName };
     const me = await metaOf(title);
-    if (me && me.tn && me.t) return { poster: normImageUrl(me.p || ""), trailer: me.t, trailerName: me.tn };
+    if (me && me.tn && me.t) return { poster: normImageUrl(me.p || hit?.poster || ""), trailer: me.t, trailerName: me.tn };
+    if (hit && Date.now() - hit.at < ttl) return { poster: hit.poster, trailer: hit.trailer, trailerName: hit.trailerName };
     const out = await findExtras(title, slug);
     const all = read();
     for (const [key, v] of Object.entries(all)) if (Date.now() - v.at > 7 * 864e5) delete all[key];
@@ -2514,7 +2514,7 @@ var App = class {
     ];
     // ── 事件迴圈 ──
     // 背景查 GitHub 上的最新版本（首頁顯示是否為最新版）
-    this.latest = checkLatest("2026.11.22-0509");
+    this.latest = checkLatest("2026.11.22-0520");
     // ── 搜尋 ──
     this.query = "";
     this.tmdbStatus = "";
@@ -2649,11 +2649,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.22-0509"}`);
+          Pasteboard.copy(`版本 ${"2026.11.22-0520"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.22-0509"}`,
+      `版本 ${"2026.11.22-0520"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }

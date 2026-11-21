@@ -686,10 +686,11 @@ export async function movieExtras(title: string, slug?: string): Promise<MovieEx
     // 預告挑選規則也改過（要對得上片名、台灣版優先）：舊版從 YouTube 搜尋挑的也重查
     const stale = hit && hit.v !== EXTRAS_V && true; // 預告的挑選與檢查規則改過：舊版記下的一律重查一次
     const ttl = stale ? 0 : !hit?.trailerName ? 3600e3 : hit?.poster ? 7 * 86400e3 : 86400e3;
-    if (hit && Date.now() - hit.at < ttl) return { poster: hit.poster, trailer: hit.trailer, trailerName: hit.trailerName };
-    // 伺服器已經查好海報和預告：直接用
+    // 伺服器查好的預告優先，手機自己以前搜到的排後面：這樣每個版本、每支手機看到的都是同一支，
+    // 不會因為各自搜尋的結果不同而不一樣
     const me = await metaOf(title);
-    if (me && me.tn && me.t) return { poster: normImageUrl(me.p || ""), trailer: me.t, trailerName: me.tn };
+    if (me && me.tn && me.t) return { poster: normImageUrl(me.p || hit?.poster || ""), trailer: me.t, trailerName: me.tn };
+    if (hit && Date.now() - hit.at < ttl) return { poster: hit.poster, trailer: hit.trailer, trailerName: hit.trailerName };
     const out = await findExtras(title, slug);
     // 查不到預告也保留這次執行的結果（不寫進手機快取的 err 會讓下次啟動重查）；
     // 不能刪掉 memo，否則 Scriptable 讀好後重畫會再查一次，畫面上的海報會先消失

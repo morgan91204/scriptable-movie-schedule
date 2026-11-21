@@ -124,12 +124,27 @@ await Promise.all(Array.from({ length: 3 }, async () => {
   for (let m = queue.shift(); m; m = queue.shift()) await refresh(m).catch(() => { stat.fail++; });
 }));
 
+// 手動指定的預告（data/trailers.json：片名 → YouTube 網址）：自動挑錯或挑不到時用，優先於其他來源
+try {
+  const pins = JSON.parse(fs.readFileSync(new URL("../data/trailers.json", import.meta.url), "utf8"));
+  for (const [title, url] of Object.entries(pins)) {
+    const id = (String(url).match(/(?:v=|youtu\.be\/|embed\/|shorts\/)([A-Za-z0-9_-]{11})/) || [])[1];
+    const e = movies[core.normTitle(title)];
+    if (!id || !e) continue; // 網址不對，或這部片不在片單上
+    e.t = `https://www.youtube.com/watch?v=${id}`;
+    e.tn = "預告片";
+    stat.pins = (stat.pins || 0) + 1;
+  }
+} catch (e) {
+  console.log("手動指定的預告讀不到，略過：", String(e.message || e));
+}
+
 // 下檔超過 14 天的清掉
 for (const [k, e] of Object.entries(movies)) if (!e.seen || now - e.seen > 14 * DAY) delete movies[k];
 const sorted = Object.fromEntries(Object.keys(movies).sort().map((k) => [k, movies[k]]));
 fs.writeFileSync(outPath, JSON.stringify({ updated: now, movies: sorted }) + "\n");
 const all = Object.values(sorted);
-console.log(`片單 ${todo.length} 部；這次查了 海報／預告 ${stat.extras}、評分 ${stat.ratings}、片長 ${stat.runtime}、上映日期 ${stat.release}，失敗 ${stat.fail}`);
+console.log(`片單 ${todo.length} 部；這次查了 海報／預告 ${stat.extras}、評分 ${stat.ratings}、片長 ${stat.runtime}、上映日期 ${stat.release}、手動指定預告 ${stat.pins || 0}，失敗 ${stat.fail}`);
 console.log(`總表 ${all.length} 部：有海報 ${all.filter((e) => e.p).length}、有預告 ${all.filter((e) => e.tn).length}、有評分 ${all.filter((e) => has(e.r)).length}；檔案 ${Math.round(fs.statSync(outPath).size / 1024)}KB`);
 if (noTrailer.length) console.log("找不到預告的例子：\n" + noTrailer.join("\n"));
 process.exit(0);
