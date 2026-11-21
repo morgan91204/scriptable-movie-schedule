@@ -125,7 +125,7 @@ struct BoxOfficeSection: View {
                 } header: {
                     Text(b.label)
                 } footer: {
-                    Text("\(rows.isEmpty ? "排行上找不到相符的電影。\n" : "")這週有賣出票的電影共 \(b.rows.count) 部。資料來源：\(b.source)。官方每週更新一次。")
+                    Text("\(rows.isEmpty ? "排行上找不到相符的電影。\n" : "")這週有賣出票的電影共 \(b.rows.count) 部。\(b.rows.contains { $0.x.since ?? false } ? "標「上映至今」的是官方這週才第一次列入的新片：沒有上週的數字可以相減，排名用的是上映以來的累計，會比單週多。" : "")資料來源：\(b.source)。官方每週更新一次。")
                 }
             }
         }
@@ -143,7 +143,8 @@ struct BoxOfficeSection: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(r.x.name).lineLimit(2)
                 // 第一行金額、第二行上映日期與戲院數：各自一行不換行
-                Text([r.x.week.map { "本週 \(Fmt.money($0))" } ?? "", "累計 \(Fmt.money(r.x.total))"].filter { !$0.isEmpty }.joined(separator: "｜"))
+                // since：官方這週才第一次列入的新片，沒有單週數字，只顯示上映至今
+                Text((r.x.since ?? false) ? "上映至今 \(Fmt.money(r.x.total))" : [r.x.week.map { "本週 \(Fmt.money($0))" } ?? "", "累計 \(Fmt.money(r.x.total))"].filter { !$0.isEmpty }.joined(separator: "｜"))
                     .font(.subheadline).foregroundStyle(.secondary).lineLimit(1).minimumScaleFactor(0.8)
                 let second = [Fmt.release(r.x.release), (r.x.theaters ?? 0) > 0 ? "\(r.x.theaters ?? 0) 間戲院" : ""].filter { !$0.isEmpty }.joined(separator: "｜")
                 if !second.isEmpty {

@@ -1155,7 +1155,7 @@ export function releaseOf(title: string): string {
 /** 票房排行每一列的兩行說明：第一行金額，第二行上映日期與戲院數 */
 export function boxOfficeLines(x: BoxOfficeItem): [string, string] {
   return [
-    [x.week !== null ? `本週 ${money(x.week)}` : "", `累計 ${money(x.total)}`].filter(Boolean).join("｜"),
+    x.since ? `上映至今 ${money(x.total)}` : [x.week !== null ? `本週 ${money(x.week)}` : "", `累計 ${money(x.total)}`].filter(Boolean).join("｜"),
     [releaseLabel(x.release), x.theaters ? `${x.theaters} 間戲院` : ""].filter(Boolean).join("｜"),
   ];
 }
@@ -1720,6 +1720,7 @@ export interface BoxOfficeItem {
   release: string; // 上映日 YYYY-MM-DD
   theaters: number; // 上映戲院數
   week: number | null; // 這週票房（元）；mode 是 total 時沒有
+  since?: boolean; // week 不是單週：官方上週還沒列入這部片，數字是上映至今的累計
   total: number; // 累計票房（元）
 }
 export interface BoxOffice {
@@ -1760,6 +1761,12 @@ export function money(n: number): string {
 export function matchBoxOffice<T extends { title: string }>(name: string, movies: T[]): T | undefined {
   const k = communityKey(name);
   return movies.find((m) => communityKey(m.title) === k);
+}
+/** 排行下方的說明：有「上映至今」的片時多解釋一句 */
+export function boxOfficeNote(b: BoxOffice): string {
+  return b.list.some((x) => x.since)
+    ? "標「上映至今」的是官方這週才第一次列入的新片：沒有上週的數字可以相減，排名用的是上映以來的累計，會比單週多。"
+    : "";
 }
 /** 排行的期間說明：「10/26–11/1 週票房」或「截至 11/1 累計」 */
 export function boxOfficeLabel(b: BoxOffice): string {

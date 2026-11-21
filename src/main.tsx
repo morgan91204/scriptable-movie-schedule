@@ -12,7 +12,7 @@ import {
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
   loadSettings, saveSettings, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, TW,
   FORMATS, formatsOf, filterVersions, nearest, kmLabel, WINDOWS, findShowtimes, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText,
-  hallOf, tmdbTest, movieExtras, moviePoster, movieRuntime, posterSrc, cachePoster, prefetchPosters, movieSubtitle, releaseLabel, releaseOf, boxOfficeLines, foregroundTask, communityStats, communityCached, communityVote, loadBoxOffice, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, movieRatings, ratingTier,
+  hallOf, tmdbTest, movieExtras, moviePoster, movieRuntime, posterSrc, cachePoster, prefetchPosters, movieSubtitle, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, foregroundTask, communityStats, communityCached, communityVote, loadBoxOffice, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, movieRatings, ratingTier,
 } from "./core";
 import type { MovieExtras, Ratings, Community, BoxOfficeItem } from "./core";
 import { setTabBar, setBackGuard, esc } from "./jsx";
@@ -817,7 +817,7 @@ class App {
         <input class="field" name="q" value={this.movieQuery} placeholder="搜尋片名" />
         <Button label="搜尋" kind="secondary" enter onTap={(v) => { this.movieQuery = v.q || ""; }} />
         {rows.length ? null : <Empty icon="🎞" text="排行上找不到相符的電影" />}
-        <Section title={boxOfficeLabel(b)} hint={`這週有賣出票的電影共 ${b.list.length} 部。資料來源：${b.source}。官方每週更新一次。`}>
+        <Section title={boxOfficeLabel(b)} hint={`這週有賣出票的電影共 ${b.list.length} 部。${boxOfficeNote(b)}資料來源：${b.source}。官方每週更新一次。`}>
           {rows.map(({ x, m }, i) => {
             const t = thumb(posters[i] as string | undefined);
             return (
@@ -843,7 +843,7 @@ class App {
       <Page title={x.name} subtitle={`票房第 ${x.rank} 名`} onBack={() => this.back()}>
         {this.hero(e, x.name, [x.country, `${date} 上映`])}
         <Section title="票房" hint="資料來源：國家電影及視聽文化中心「全國電影票房統計」。">
-          {x.week !== null ? <Item title="本週票房" right={money(x.week)} /> : null}
+          {x.week !== null && !x.since ? <Item title="本週票房" right={money(x.week)} /> : null}
           <Item title="累計票房" right={money(x.total)} />
           {x.theaters ? <Item title="上映戲院" right={`${x.theaters} 間`} /> : null}
           <Item title="上映日期" right={date} />

@@ -107,6 +107,7 @@ struct BoxOfficeItem: Codable, Hashable {
     var release: String?
     var theaters: Int?
     var week: Double?
+    var since: Bool?
     var total: Double
 }
 

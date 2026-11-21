@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.22-0404
+// @movie-schedule-app 電影行程 v2026.11.22-0416
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/parsers.gen.ts
@@ -1452,7 +1452,7 @@ function releaseOf(title) {
 }
 function boxOfficeLines(x) {
   return [
-    [x.week !== null ? `本週 ${money(x.week)}` : "", `累計 ${money(x.total)}`].filter(Boolean).join("｜"),
+    x.since ? `上映至今 ${money(x.total)}` : [x.week !== null ? `本週 ${money(x.week)}` : "", `累計 ${money(x.total)}`].filter(Boolean).join("｜"),
     [releaseLabel(x.release), x.theaters ? `${x.theaters} 間戲院` : ""].filter(Boolean).join("｜")
   ];
 }
@@ -1886,6 +1886,9 @@ function money(n) {
 function matchBoxOffice(name, movies) {
   const k = communityKey(name);
   return movies.find((m) => communityKey(m.title) === k);
+}
+function boxOfficeNote(b) {
+  return b.list.some((x) => x.since) ? "標「上映至今」的是官方這週才第一次列入的新片：沒有上週的數字可以相減，排名用的是上映以來的累計，會比單週多。" : "";
 }
 function boxOfficeLabel(b) {
   const md = (d) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`;
@@ -2434,7 +2437,7 @@ var App = class {
     ];
     // ── 事件迴圈 ──
     // 背景查 GitHub 上的最新版本（首頁顯示是否為最新版）
-    this.latest = checkLatest("2026.11.22-0404");
+    this.latest = checkLatest("2026.11.22-0416");
     // ── 搜尋 ──
     this.query = "";
     this.tmdbStatus = "";
@@ -2569,11 +2572,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.22-0404"}`);
+          Pasteboard.copy(`版本 ${"2026.11.22-0416"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.22-0404"}`,
+      `版本 ${"2026.11.22-0416"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -2951,7 +2954,7 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
     };
     return /* @__PURE__ */ h(Page, { title: "依電影找場次", subtitle: boxOfficeLabel(b), onBack: () => this.back() }, this.movieModeChips(), /* @__PURE__ */ h("input", { class: "field", name: "q", value: this.movieQuery, placeholder: "搜尋片名" }), /* @__PURE__ */ h(Button, { label: "搜尋", kind: "secondary", enter: true, onTap: (v) => {
       this.movieQuery = v.q || "";
-    } }), rows.length ? null : /* @__PURE__ */ h(Empty, { icon: "🎞", text: "排行上找不到相符的電影" }), /* @__PURE__ */ h(Section, { title: boxOfficeLabel(b), hint: `這週有賣出票的電影共 ${b.list.length} 部。資料來源：${b.source}。官方每週更新一次。` }, rows.map(({ x, m }, i) => {
+    } }), rows.length ? null : /* @__PURE__ */ h(Empty, { icon: "🎞", text: "排行上找不到相符的電影" }), /* @__PURE__ */ h(Section, { title: boxOfficeLabel(b), hint: `這週有賣出票的電影共 ${b.list.length} 部。${boxOfficeNote(b)}資料來源：${b.source}。官方每週更新一次。` }, rows.map(({ x, m }, i) => {
       const t = thumb(posters[i]);
       return /* @__PURE__ */ h(
         Item,
@@ -2969,7 +2972,7 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
   async boxMovieView(x) {
     const e = await this.extras(x.name);
     const date = x.release.replace(/-/g, "/");
-    return /* @__PURE__ */ h(Page, { title: x.name, subtitle: `票房第 ${x.rank} 名`, onBack: () => this.back() }, this.hero(e, x.name, [x.country, `${date} 上映`]), /* @__PURE__ */ h(Section, { title: "票房", hint: "資料來源：國家電影及視聽文化中心「全國電影票房統計」。" }, x.week !== null ? /* @__PURE__ */ h(Item, { title: "本週票房", right: money(x.week) }) : null, /* @__PURE__ */ h(Item, { title: "累計票房", right: money(x.total) }), x.theaters ? /* @__PURE__ */ h(Item, { title: "上映戲院", right: `${x.theaters} 間` }) : null, /* @__PURE__ */ h(Item, { title: "上映日期", right: date })), /* @__PURE__ */ h(Note, { text: "場次通目前沒有這部片的場次，可能已經下檔，或只在少數戲院放映。" }));
+    return /* @__PURE__ */ h(Page, { title: x.name, subtitle: `票房第 ${x.rank} 名`, onBack: () => this.back() }, this.hero(e, x.name, [x.country, `${date} 上映`]), /* @__PURE__ */ h(Section, { title: "票房", hint: "資料來源：國家電影及視聽文化中心「全國電影票房統計」。" }, x.week !== null && !x.since ? /* @__PURE__ */ h(Item, { title: "本週票房", right: money(x.week) }) : null, /* @__PURE__ */ h(Item, { title: "累計票房", right: money(x.total) }), x.theaters ? /* @__PURE__ */ h(Item, { title: "上映戲院", right: `${x.theaters} 間` }) : null, /* @__PURE__ */ h(Item, { title: "上映日期", right: date })), /* @__PURE__ */ h(Note, { text: "場次通目前沒有這部片的場次，可能已經下檔，或只在少數戲院放映。" }));
   }
   async movieListView() {
     if (this.movieMode === "box") return this.boxOfficeView();

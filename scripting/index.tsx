@@ -14,7 +14,7 @@ import {
   Cinema, Movie, Settings, Version, TwMovie, TwMovieCinema, CITY_ORDER, TW,
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
   loadSettings, saveSettings, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, cinemaAddress,
-  FORMATS, formatsOf, filterVersions, nearest, kmLabel, WINDOWS, findShowtimes, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText, hallOf, tmdbTest, movieExtras, moviePoster, posterReady, posterTint, POSTER_TINTS, normImageUrl, movieRuntime, posterSrc, isLocalSrc, cachePoster, prefetchPosters, movieSubtitle, releaseLabel, releaseOf, boxOfficeLines, foregroundTask, communityStats, communityVote, loadBoxOffice, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, SCRIPTING_IMPORT_URL, movieRatings, ratingTier,
+  FORMATS, formatsOf, filterVersions, nearest, kmLabel, WINDOWS, findShowtimes, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText, hallOf, tmdbTest, movieExtras, moviePoster, posterReady, posterTint, POSTER_TINTS, normImageUrl, movieRuntime, posterSrc, isLocalSrc, cachePoster, prefetchPosters, movieSubtitle, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, foregroundTask, communityStats, communityVote, loadBoxOffice, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, SCRIPTING_IMPORT_URL, movieRatings, ratingTier,
 } from "./core"
 import type { Format, LatLng, Hit, Community, BoxOfficeItem } from "./core"
 
@@ -883,7 +883,7 @@ function BoxOfficeMoviePage({ item: x }: { item: BoxOfficeItem }) {
   return <List navigationTitle={x.name} navigationBarTitleDisplayMode={"inline"}>
     <MovieHero title={x.name} lines={[x.country, `${date} 上映`]} />
     <Section header={<Text>{`票房第 ${x.rank} 名`}</Text>} footer={<Text>資料來源：國家電影及視聽文化中心「全國電影票房統計」。場次通目前沒有這部片的場次，可能已經下檔，或只在少數戲院放映。</Text>}>
-      {x.week !== null ? <LabeledContent title={"本週票房"} value={money(x.week)} /> : null}
+      {x.week !== null && !x.since ? <LabeledContent title={"本週票房"} value={money(x.week)} /> : null}
       <LabeledContent title={"累計票房"} value={money(x.total)} />
       {x.theaters ? <LabeledContent title={"上映戲院"} value={`${x.theaters} 間`} /> : null}
       <LabeledContent title={"上映日期"} value={date} />
@@ -906,7 +906,7 @@ function BoxOfficeSections({ movies, query }: { movies: TwMovie[]; query: string
   const failNote = bad.length
     ? `\n第 ${bad.map((x) => x.rank).join("、")} 名的海報讀不到（${Array.from(new Set(thumbs.map((t) => t.why).filter(Boolean))).join("；")}），下次進來會再試。`
     : ""
-  return <Section header={<Text>{boxOfficeLabel(b)}</Text>} footer={<Text>{`${shown.length ? "" : "排行上找不到相符的電影。\n"}這週有賣出票的電影共 ${b.list.length} 部。資料來源：${b.source}。官方每週更新一次。${failNote}`}</Text>}>
+  return <Section header={<Text>{boxOfficeLabel(b)}</Text>} footer={<Text>{`${shown.length ? "" : "排行上找不到相符的電影。\n"}這週有賣出票的電影共 ${b.list.length} 部。${boxOfficeNote(b)}資料來源：${b.source}。官方每週更新一次。${failNote}`}</Text>}>
     {shown.map((x, i) => {
       const m = matchBoxOffice(x.name, movies)
       const lines = boxOfficeLines(x)

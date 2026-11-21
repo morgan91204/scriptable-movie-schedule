@@ -33,6 +33,7 @@
     bookingUrl: () => bookingUrl,
     boxOfficeLabel: () => boxOfficeLabel,
     boxOfficeLines: () => boxOfficeLines,
+    boxOfficeNote: () => boxOfficeNote,
     byShowtime: () => byShowtime,
     cachePoster: () => cachePoster,
     checkLatest: () => checkLatest,
@@ -1571,7 +1572,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   }
   function boxOfficeLines(x) {
     return [
-      [x.week !== null ? `本週 ${money(x.week)}` : "", `累計 ${money(x.total)}`].filter(Boolean).join("｜"),
+      x.since ? `上映至今 ${money(x.total)}` : [x.week !== null ? `本週 ${money(x.week)}` : "", `累計 ${money(x.total)}`].filter(Boolean).join("｜"),
       [releaseLabel(x.release), x.theaters ? `${x.theaters} 間戲院` : ""].filter(Boolean).join("｜")
     ];
   }
@@ -2013,6 +2014,9 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   function matchBoxOffice(name, movies) {
     const k = communityKey(name);
     return movies.find((m) => communityKey(m.title) === k);
+  }
+  function boxOfficeNote(b) {
+    return b.list.some((x) => x.since) ? "標「上映至今」的是官方這週才第一次列入的新片：沒有上週的數字可以相減，排名用的是上映以來的累計，會比單週多。" : "";
   }
   function boxOfficeLabel(b) {
     const md = (d) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`;

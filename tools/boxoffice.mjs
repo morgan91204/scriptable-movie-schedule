@@ -53,7 +53,9 @@ if (base) {
   list = films
     .map((f) => {
       const b = before.get(key(f));
-      return { ...f, week: f.total - (b ? b.total : 0), weekTickets: f.tickets - (b ? b.tickets : 0) };
+      // 上週的資料裡還沒有這部片，卻在這週開始前就上映了（官方常晚一週才列入新片）：
+      // 相減出來的是「上映至今」，不是單週，標記起來讓 App 照實顯示
+      return { ...f, week: f.total - (b ? b.total : 0), weekTickets: f.tickets - (b ? b.tickets : 0), since: !b && f.release < start };
     })
     .filter((f) => f.week > 0)
     .sort((a, b) => b.week - a.week);
@@ -80,6 +82,7 @@ const result = {
     release: f.release,
     theaters: f.theaters,
     week: mode === "week" ? f.week : null,
+    ...(f.since ? { since: true } : {}), // week 其實是上映至今的累計（見上）
     weekTickets: mode === "week" ? f.weekTickets : null,
     total: f.total,
     tickets: f.tickets,
