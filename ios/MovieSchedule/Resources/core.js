@@ -908,6 +908,8 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
       };
     }
     if (c.source === "tw") {
+      const sup = AT_SUPPLEMENT.find((x) => x[0].test(c.name));
+      if (sup) atDay(atCinema(sup[1], sup[2], c.name, "")).catch(() => null);
       const d = await twDay(c);
       const future = d.dates.filter((x) => x >= today);
       return { dates: future.length ? future : d.dates, address: d.address, notice: "", site: d.booking || "" };
@@ -930,7 +932,15 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     if (!s) return movies;
     let d = null;
     try {
-      d = await Promise.race([atDay(atCinema(s[1], s[2], c.name, ""), date), delay(3e3).then(() => null)]);
+      const at = atCinema(s[1], s[2], c.name, "");
+      d = await Promise.race([
+        (async () => {
+          let x = await atDay(at);
+          if (x.date !== date) x = await atDay(at, date);
+          return x;
+        })(),
+        delay(8e3).then(() => null)
+      ]);
     } catch (_) {
       return movies;
     }

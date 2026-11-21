@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.22-0144
+// @movie-schedule-app 電影行程 v2026.11.22-0256
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/jsx.tsx
@@ -1268,6 +1268,8 @@ async function datesOf(c) {
     };
   }
   if (c.source === "tw") {
+    const sup = AT_SUPPLEMENT.find((x) => x[0].test(c.name));
+    if (sup) atDay(atCinema(sup[1], sup[2], c.name, "")).catch(() => null);
     const d = await twDay(c);
     const future = d.dates.filter((x) => x >= today);
     return { dates: future.length ? future : d.dates, address: d.address, notice: "", site: d.booking || "" };
@@ -1290,7 +1292,15 @@ async function supplementHalls(c, date, movies) {
   if (!s) return movies;
   let d = null;
   try {
-    d = await Promise.race([atDay(atCinema(s[1], s[2], c.name, ""), date), delay(3e3).then(() => null)]);
+    const at = atCinema(s[1], s[2], c.name, "");
+    d = await Promise.race([
+      (async () => {
+        let x = await atDay(at);
+        if (x.date !== date) x = await atDay(at, date);
+        return x;
+      })(),
+      delay(8e3).then(() => null)
+    ]);
   } catch (_) {
     return movies;
   }
@@ -2288,7 +2298,7 @@ var App = class {
     ];
     // ── 事件迴圈 ──
     // 背景查 GitHub 上的最新版本（首頁顯示是否為最新版）
-    this.latest = checkLatest("2026.11.22-0144");
+    this.latest = checkLatest("2026.11.22-0256");
     // ── 搜尋 ──
     this.query = "";
     this.tmdbStatus = "";
@@ -2423,11 +2433,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.22-0144"}`);
+          Pasteboard.copy(`版本 ${"2026.11.22-0256"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.22-0144"}`,
+      `版本 ${"2026.11.22-0256"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }

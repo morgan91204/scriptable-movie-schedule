@@ -359,6 +359,8 @@ export async function datesOf(c: Cinema): Promise<{ dates: string[]; address: st
     };
   }
   if (c.source === "tw") {
+    const sup = AT_SUPPLEMENT.find((x) => x[0].test(c.name));
+    if (sup) atDay(atCinema(sup[1], sup[2], c.name, "")).catch(() => null); // 先在背景讀開眼（補頂級影廳用）
     const d = await twDay(c);
     const future = d.dates.filter((x) => x >= today);
     return { dates: future.length ? future : d.dates, address: d.address, notice: "", site: d.booking || "" };
@@ -385,7 +387,17 @@ async function supplementHalls(c: Cinema, date: string, movies: Movie[]): Promis
   if (!s) return movies;
   let d: AtDay | null = null;
   try {
-    d = await Promise.race([atDay(atCinema(s[1], s[2], c.name, ""), date), delay(3000).then(() => null)]);
+    // 開眼回應約要 3 秒，最多等 8 秒（讀過會記住，同一次使用不用再等）。
+    // 跟讀開眼戲院一樣：先讀不帶日期的頁（今天），日期不對再讀帶日期的頁。今天的場次只有不帶日期的頁才完整
+    const at = atCinema(s[1], s[2], c.name, "");
+    d = await Promise.race([
+      (async () => {
+        let x = await atDay(at);
+        if (x.date !== date) x = await atDay(at, date);
+        return x;
+      })(),
+      delay(8000).then(() => null),
+    ]);
   } catch (_) {
     return movies;
   }
