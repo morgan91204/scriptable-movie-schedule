@@ -1168,7 +1168,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
       return out;
     })();
   }
-  var EXTRAS_V = 4;
+  var EXTRAS_V = 5;
   function normImageUrl(u) {
     let s = String(u || "").trim().replace(/&amp;/g, "&").replace(/\\\//g, "/");
     if (s.startsWith("//")) s = "https:" + s;
@@ -1304,10 +1304,21 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     }
     p = await atPoster(title).catch(() => "");
     if (p) return p;
+    p = await imdbPoster(title, slug, en).catch(() => "");
+    if (p) return p;
     const token = ((await loadSettings()).tmdbToken || "").trim();
     if (!token) return "";
     const hit = await tmdbFind(title, token).catch(() => null) || (en ? await tmdbFind(en, token).catch(() => null) : null);
     return hit?.p ? "https://image.tmdb.org/t/p/w500" + hit.p : "";
+  }
+  async function imdbPoster(title, slug, en) {
+    const r = await movieRatings(title, en, slug);
+    const id = (r.imdb?.url.match(/tt\d+/) || [])[0];
+    if (!id) return "";
+    const res = await platform().fetchText(`https://v3.sg.media-imdb.com/suggestion/x/${id}.json`, { "User-Agent": UA });
+    const hit = (JSON.parse(res.body).d || []).find((x) => x.id === id);
+    const u = String(hit?.i?.imageUrl || "");
+    return /^https:\/\/m\.media-amazon\.com\//.test(u) ? u.replace(/\._V1_.*?(\.\w+)$/, "._V1_UX500_$1") : "";
   }
   var posterBusy = 0;
   var posterQueue = [];
@@ -1333,9 +1344,10 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
       const nk = normTitle(title);
       const all = readExtras();
       const hit = all["t|" + nk] || all["n|" + nk];
-      if (hit?.poster) return normImageUrl(hit.poster);
+      const isThumb = (u) => /ytimg\.com/.test(u);
+      if (hit?.poster && !isThumb(hit.poster)) return normImageUrl(hit.poster);
       const own = all["p|" + nk];
-      if (own && Date.now() - own.at < (own.poster ? 7 : own.v === EXTRAS_V ? 1 : 0) * 864e5) return own.poster;
+      if (own && Date.now() - own.at < (own.poster && !isThumb(own.poster) ? 7 : own.v === EXTRAS_V ? 1 : 0) * 864e5) return own.poster;
       const me = await metaOf(title);
       if (me && me.p) return normImageUrl(me.p);
       const poster = await posterLane(async () => {

@@ -699,7 +699,7 @@ export async function movieExtras(title: string, slug?: string): Promise<MovieEx
   })());
 }
 /** extras.json 紀錄的版本：預告查法改了就加 1，讓舊的「沒預告」紀錄重查 */
-const EXTRAS_V = 4;
+const EXTRAS_V = 5;
 
 /** 圖片網址正規化：解掉 HTML 跳脫、\\/、//host 與 http:// 都改成 https://（iOS 的 WebView／Image 不載入 http 圖片） */
 export function normImageUrl(u: string): string {
@@ -850,10 +850,25 @@ async function findPoster(title: string, slug?: string, en?: string): Promise<st
   }
   p = await atPoster(title).catch(() => "");
   if (p) return p;
+  p = await imdbPoster(title, slug, en).catch(() => "");
+  if (p) return p;
   const token = ((await loadSettings()).tmdbToken || "").trim();
   if (!token) return "";
   const hit = (await tmdbFind(title, token).catch(() => null)) || (en ? await tmdbFind(en, token).catch(() => null) : null);
   return hit?.p ? "https://image.tmdb.org/t/p/w500" + hit.p : "";
+}
+
+/** IMDb 的海報（不需要金鑰）：評分查詢已經對到 IMDb 編號，用編號再問一次搜尋建議就有海報圖。
+ *  場次通、開眼都沒建檔的片（動畫特別場、演唱會電影）常常只有這裡有 */
+async function imdbPoster(title: string, slug?: string, en?: string): Promise<string> {
+  const r = await movieRatings(title, en, slug);
+  const id = (r.imdb?.url.match(/tt\d+/) || [])[0];
+  if (!id) return "";
+  const res = await platform().fetchText(`https://v3.sg.media-imdb.com/suggestion/x/${id}.json`, { "User-Agent": UA });
+  const hit = ((JSON.parse(res.body).d || []) as any[]).find((x) => x.id === id);
+  const u = String(hit?.i?.imageUrl || "");
+  // 原圖動輒幾 MB：亞馬遜圖床可以在網址指定寬度
+  return /^https:\/\/m\.media-amazon\.com\//.test(u) ? u.replace(/\._V1_.*?(\.\w+)$/, "._V1_UX500_$1") : "";
 }
 
 let posterBusy = 0;
@@ -883,10 +898,11 @@ export function moviePoster(title: string, slug?: string, en?: string): Promise<
     const nk = normTitle(title);
     const all = readExtras();
     const hit = all["t|" + nk] || all["n|" + nk];
-    if (hit?.poster) return normImageUrl(hit.poster);
+    const isThumb = (u: string) => /ytimg\.com/.test(u); // 預告縮圖只是暫代：一天後再找一次真的海報
+    if (hit?.poster && !isThumb(hit.poster)) return normImageUrl(hit.poster);
     const own = all["p|" + nk] as (MovieExtras & { at: number; v?: number }) | undefined; // 只查過海報的紀錄
     // 找到的記 7 天；沒找到的記 1 天，但舊版（比對規則改了）記下的「沒找到」一律重查
-    if (own && Date.now() - own.at < (own.poster ? 7 : own.v === EXTRAS_V ? 1 : 0) * 86400e3) return own.poster;
+    if (own && Date.now() - own.at < (own.poster && !isThumb(own.poster) ? 7 : own.v === EXTRAS_V ? 1 : 0) * 86400e3) return own.poster;
     const me = await metaOf(title);
     if (me && me.p) return normImageUrl(me.p); // 伺服器已經查好海報
     // 要上網找的同時最多 4 部：整份清單一起要海報時不會一次打出上百個請求

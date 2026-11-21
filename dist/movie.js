@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.22-0338
+// @movie-schedule-app 電影行程 v2026.11.22-0340
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/parsers.gen.ts
@@ -1071,7 +1071,7 @@ async function movieExtras(title, slug) {
     return out;
   })();
 }
-var EXTRAS_V = 4;
+var EXTRAS_V = 5;
 function normImageUrl(u) {
   let s = String(u || "").trim().replace(/&amp;/g, "&").replace(/\\\//g, "/");
   if (s.startsWith("//")) s = "https:" + s;
@@ -1207,10 +1207,21 @@ async function findPoster(title, slug, en) {
   }
   p = await atPoster(title).catch(() => "");
   if (p) return p;
+  p = await imdbPoster(title, slug, en).catch(() => "");
+  if (p) return p;
   const token = ((await loadSettings()).tmdbToken || "").trim();
   if (!token) return "";
   const hit = await tmdbFind(title, token).catch(() => null) || (en ? await tmdbFind(en, token).catch(() => null) : null);
   return hit?.p ? "https://image.tmdb.org/t/p/w500" + hit.p : "";
+}
+async function imdbPoster(title, slug, en) {
+  const r = await movieRatings(title, en, slug);
+  const id = (r.imdb?.url.match(/tt\d+/) || [])[0];
+  if (!id) return "";
+  const res = await platform().fetchText(`https://v3.sg.media-imdb.com/suggestion/x/${id}.json`, { "User-Agent": UA });
+  const hit = (JSON.parse(res.body).d || []).find((x) => x.id === id);
+  const u = String(hit?.i?.imageUrl || "");
+  return /^https:\/\/m\.media-amazon\.com\//.test(u) ? u.replace(/\._V1_.*?(\.\w+)$/, "._V1_UX500_$1") : "";
 }
 var posterBusy = 0;
 var posterQueue = [];
@@ -1233,9 +1244,10 @@ function moviePoster(title, slug, en) {
     const nk = normTitle(title);
     const all = readExtras();
     const hit = all["t|" + nk] || all["n|" + nk];
-    if (hit?.poster) return normImageUrl(hit.poster);
+    const isThumb = (u) => /ytimg\.com/.test(u);
+    if (hit?.poster && !isThumb(hit.poster)) return normImageUrl(hit.poster);
     const own = all["p|" + nk];
-    if (own && Date.now() - own.at < (own.poster ? 7 : own.v === EXTRAS_V ? 1 : 0) * 864e5) return own.poster;
+    if (own && Date.now() - own.at < (own.poster && !isThumb(own.poster) ? 7 : own.v === EXTRAS_V ? 1 : 0) * 864e5) return own.poster;
     const me = await metaOf(title);
     if (me && me.p) return normImageUrl(me.p);
     const poster = await posterLane(async () => {
@@ -2385,7 +2397,7 @@ var App = class {
     ];
     // ── 事件迴圈 ──
     // 背景查 GitHub 上的最新版本（首頁顯示是否為最新版）
-    this.latest = checkLatest("2026.11.22-0338");
+    this.latest = checkLatest("2026.11.22-0340");
     // ── 搜尋 ──
     this.query = "";
     this.tmdbStatus = "";
@@ -2520,11 +2532,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.22-0338"}`);
+          Pasteboard.copy(`版本 ${"2026.11.22-0340"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.22-0338"}`,
+      `版本 ${"2026.11.22-0340"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
