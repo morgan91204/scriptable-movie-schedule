@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.22-0500
+// @movie-schedule-app 電影行程 v2026.11.22-0507
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/parsers.gen.ts
@@ -1072,7 +1072,7 @@ async function movieExtras(title, slug) {
     return out;
   })();
 }
-var EXTRAS_V = 6;
+var EXTRAS_V = 7;
 function normImageUrl(u) {
   let s = String(u || "").trim().replace(/&amp;/g, "&").replace(/\\\//g, "/");
   if (s.startsWith("//")) s = "https:" + s;
@@ -1423,24 +1423,35 @@ function ytScore(name, title, en) {
   if (/正式|官方|official/i.test(name)) sc += 3;
   return sc;
 }
+var strictTrailers = false;
 async function ytTrailer(title, en) {
   const base = baseTitle(title);
   const plain = base.replace(/[:：·・\-–—_＿／/!！?？「」『』《》〈〉()（）\[\]【】]+/g, " ").replace(/\s+/g, " ").trim();
   const queries = [`${plain} 預告`, `${plain} 電影 中文預告`, en ? `${en} trailer` : ""].filter(Boolean);
   let best = null;
+  let first = null;
   let err = "";
   for (const q of queries) {
     let r = await ytSearch(q);
     if (!r.list.length && r.err === "搜尋沒有結果") r = await ytSearch(q);
     if (r.err) err = r.err;
+    if (!first && q === queries[0]) {
+      const ok = r.list.filter((v) => !YT_NOT_TRAILER.test(v.name));
+      first = ok.find((v) => YT_TRAILER.test(v.name)) || ok[0] || null;
+    }
     r.list.forEach((v, i) => {
       const sc = ytScore(v.name, title, en) * 100 - i;
       if (sc > 0 && (!best || sc > best.sc)) best = { ...v, sc };
     });
     if (best && best.sc >= 100 * 100 - 50) break;
+    if (!strictTrailers && first) break;
   }
   const b = best;
-  if (b) return { key: b.key, name: b.name };
+  const zhHit = !!b && b.sc >= 70 * 100 - 50;
+  if (b && (zhHit || strictTrailers === false)) {
+    if (zhHit || !first) return { key: b.key, name: b.name };
+  }
+  if (!strictTrailers && first) return first;
   return { err: err || "搜尋結果裡沒有對得上片名的影片" };
 }
 async function fillRuntimes(movies) {
@@ -2487,7 +2498,7 @@ var App = class {
     ];
     // ── 事件迴圈 ──
     // 背景查 GitHub 上的最新版本（首頁顯示是否為最新版）
-    this.latest = checkLatest("2026.11.22-0500");
+    this.latest = checkLatest("2026.11.22-0507");
     // ── 搜尋 ──
     this.query = "";
     this.tmdbStatus = "";
@@ -2622,11 +2633,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.22-0500"}`);
+          Pasteboard.copy(`版本 ${"2026.11.22-0507"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.22-0500"}`,
+      `版本 ${"2026.11.22-0507"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
