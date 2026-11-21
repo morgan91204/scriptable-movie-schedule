@@ -57,6 +57,7 @@ try {
 }
 if (todo.length < 20) throw new Error("片單太短（" + todo.length + "），可能是來源暫時有問題，這次不更新");
 
+const noTrailer = [];
 const stat = { extras: 0, ratings: 0, runtime: 0, release: 0, fail: 0 };
 const has = (r) => !!(r && (r.imdb || r.tomato || r.popcorn));
 async function refresh(m) {
@@ -71,6 +72,7 @@ async function refresh(m) {
       const x = await core.movieExtras(m.title, m.slug);
       if (x.poster) e.p = x.poster;
       if (x.trailerName) { e.t = x.trailer; e.tn = x.trailerName; }
+      else if (x.err && noTrailer.length < 8) noTrailer.push(`${m.title}：${x.err}`); // 找不到預告的原因，印幾筆方便查
       e.xa = now;
       stat.extras++;
     } catch (_) { stat.fail++; }
@@ -120,3 +122,4 @@ const all = Object.values(sorted);
 console.log(`片單 ${todo.length} 部；這次查了 海報／預告 ${stat.extras}、評分 ${stat.ratings}、片長 ${stat.runtime}、上映日期 ${stat.release}，失敗 ${stat.fail}`);
 console.log(`總表 ${all.length} 部：有海報 ${all.filter((e) => e.p).length}、有預告 ${all.filter((e) => e.tn).length}、有評分 ${all.filter((e) => has(e.r)).length}；檔案 ${Math.round(fs.statSync(outPath).size / 1024)}KB`);
 process.exit(0);
+if (noTrailer.length) console.log("找不到預告的例子：\n" + noTrailer.join("\n"));
