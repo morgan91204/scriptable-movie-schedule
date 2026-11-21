@@ -9,12 +9,14 @@ git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 if git fetch -q origin data 2>/dev/null; then
   git checkout -q -f --detach FETCH_HEAD
 else
+  git branch -D data-new >/dev/null 2>&1 || true
   git checkout -q --orphan data-new
   git rm -rfq . || true
 fi
 cp "$SRC" "$NAME"
 git add "$NAME"
 if git diff --cached --quiet; then echo "內容沒有變化"; exit 0; fi
+git branch -D data-fresh >/dev/null 2>&1 || true  # 同一輪發佈第二個檔案時，上一次留下的暫用分支要先刪掉
 git checkout -q --orphan data-fresh
 git commit -q -m "$MSG"
 git push -q -f origin HEAD:data
