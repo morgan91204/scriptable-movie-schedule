@@ -683,7 +683,8 @@ export async function movieExtras(title: string, slug?: string): Promise<MovieEx
     // 有找到預告：記 7 天（沒海報 1 天）。沒找到預告：只記 1 小時就重查（可能只是當時連線失敗）；
     // 舊版（v 不是 2）記下的「沒預告」一律重查，因為舊版還不會取 YouTube 搜尋的第一支影片
     // 舊版記下的「沒海報」也重查（海報比對規則改了）
-    const stale = hit && hit.v !== EXTRAS_V && (!hit.trailerName || !hit.poster);
+    // 預告挑選規則也改過（要對得上片名、台灣版優先）：舊版從 YouTube 搜尋挑的也重查
+    const stale = hit && hit.v !== EXTRAS_V && (!hit.trailerName || !hit.poster || hit.trailerName !== "開眼電影網預告");
     const ttl = stale ? 0 : !hit?.trailerName ? 3600e3 : hit?.poster ? 7 * 86400e3 : 86400e3;
     if (hit && Date.now() - hit.at < ttl) return { poster: hit.poster, trailer: hit.trailer, trailerName: hit.trailerName };
     // 伺服器已經查好海報和預告：直接用
@@ -701,7 +702,7 @@ export async function movieExtras(title: string, slug?: string): Promise<MovieEx
   })());
 }
 /** extras.json 紀錄的版本：預告查法改了就加 1，讓舊的「沒預告」紀錄重查 */
-const EXTRAS_V = 5;
+const EXTRAS_V = 6;
 
 /** 圖片網址正規化：解掉 HTML 跳脫、\\/、//host 與 http:// 都改成 https://（iOS 的 WebView／Image 不載入 http 圖片） */
 export function normImageUrl(u: string): string {
@@ -1036,7 +1037,9 @@ async function findExtras(title: string, slug?: string): Promise<MovieExtras> {
   const tv = t && "v" in t ? t.v : null;
   let pick = tv && tv.zh ? tv : at || tv;
   if (!pick) {
-    const yt = await ytFirst(base + " 預告");
+    const k = normTitle(title), bk = normTitle(base);
+    const en = (moviesCache || []).find((m) => normTitle(m.title) === k || normTitle(baseTitle(m.title)) === bk)?.en; // 英文片名（片單讀過才有）
+    const yt = await ytTrailer(title, en);
     if ("key" in yt) pick = yt;
     else atErr.push("YouTube " + yt.err);
   }
@@ -1053,9 +1056,9 @@ async function findExtras(title: string, slug?: string): Promise<MovieExtras> {
   return out;
 }
 
-/** YouTube 搜尋結果裡的第一支影片（優先挑標題有「預告」或 trailer 的），點了直接看、不用再從搜尋頁挑。
+/** 讀一次 YouTube 搜尋頁，回傳前 20 支影片（影片編號與標題）。
  *  用桌面版 UA，手機版 UA 會被轉到 m.youtube.com；結果頁約 1MB，所以只在開眼／TMDB 都沒有預告時才查 */
-async function ytFirst(query: string): Promise<{ key: string; name: string } | { err: string }> {
+async function ytSearch(query: string): Promise<{ list: { key: string; name: string }[]; err?: string }> {
   let r: { status: number; body: string };
   try {
     r = await platform().fetchText(`https://www.youtube.com/results?search_query=${encodeURIComponent(query)}&hl=zh-TW&gl=TW`, {
@@ -1063,9 +1066,9 @@ async function ytFirst(query: string): Promise<{ key: string; name: string } | {
       "Accept-Language": "zh-TW,zh;q=0.9",
     });
   } catch (e) {
-    return { err: "搜尋頁讀不到（" + errText(e) + "）" };
+    return { list: [], err: "搜尋頁讀不到（" + errText(e) + "）" };
   }
-  if (r.status < 200 || r.status >= 300) return { err: "搜尋頁回應 " + r.status };
+  if (r.status < 200 || r.status >= 300) return { list: [], err: "搜尋頁回應 " + r.status };
   const list: { key: string; name: string }[] = [];
   for (const m of r.body.matchAll(/"videoRenderer":\{"videoId":"([A-Za-z0-9_-]{11})"([\s\S]{0,4000}?)"title":\{"runs":\[\{"text":"((?:[^"\\]|\\.)*)"/g)) {
     let name = m[3];
@@ -1073,10 +1076,59 @@ async function ytFirst(query: string): Promise<{ key: string; name: string } | {
       name = JSON.parse('"' + name + '"');
     } catch (_) {}
     list.push({ key: m[1], name });
-    if (list.length >= 5) break;
+    if (list.length >= 20) break;
   }
-  if (!list.length) return { err: /consent\.youtube|consent\.google/.test(r.body) ? "搜尋頁要求同意 Cookie" : "搜尋頁裡找不到影片（" + Math.round(r.body.length / 1024) + "KB）" };
-  return list.find((v) => /預告|trailer|teaser/i.test(v.name)) || list[0];
+  if (!list.length) return { list, err: /consent\.youtube|consent\.google/.test(r.body) ? "搜尋頁要求同意 Cookie" : "搜尋沒有結果" };
+  return { list };
+}
+
+const YT_TRAILER = /預告|trailer|teaser|予告|\bPV\b/i;
+const YT_RELEASE = /上映|大銀幕|戲院|獻映|登場/;
+const YT_NOT_TRAILER = /影評|解析|劇透|不知道的事|reaction|反應|新聞|心得|懶人包|彩蛋|訪談|專訪|幕後|花絮|主題曲|片尾曲|\bOST\b|\bMV\b|\bAMV\b|直播|重溫|回顧/i;
+const YT_NOT_TW = /香港|澳門|港版|粵語|廣東話|\bHK\b|马来西亚|馬來西亞|新加坡/i;
+/** 影片標題對不對得上這部片、像不像預告：分數越高越好，0 = 不是這部片（或不是預告），不採用。
+ *  台灣片名整個出現在標題裡的排最前面——香港、中國的版本片名通常不同（哥斯拉／哥吉拉），自然排到後面 */
+export function ytScore(name: string, title: string, en?: string): number {
+  const base = baseTitle(title);
+  const n = normTitle(name);
+  // 片名拆成幾段（「加速世界 劇場版 INFINITE BURST」），「劇場版」這類通用字不算，其餘每一段都要出現
+  const parts = base.split(/[\s:：·・\-–—_＿／/]+/).map(normTitle).filter((x) => x && !/^(?:劇場版|電影版|動畫電影|themovie|movie)$/.test(x));
+  const zh = parts.length > 0 && parts.every((x) => n.includes(x));
+  const e = en ? normEn(en) : "";
+  const enHit = e.length >= 4 && normEn(name).includes(e);
+  if (!zh && !enHit) return 0;
+  const trailer = YT_TRAILER.test(name);
+  if (YT_NOT_TRAILER.test(name) && !trailer) return 0;
+  if (!trailer && !(zh && YT_RELEASE.test(name))) return zh ? 1 : 0; // 對得上片名但看不出是預告：最後才用
+  let sc = zh ? 100 : 50; // 中文（台灣）片名 > 只有英文片名對上
+  if (YT_NOT_TW.test(name)) sc -= 30;
+  if (/台灣|臺灣|全台|在台|台版/.test(name)) sc += 20;
+  if (!zh && /[一-鿿]/.test(name)) sc += 5; // 沒有台灣版時，中文字幕的版本（多半是香港）比純外語好懂
+  if (/正式|官方|official/i.test(name)) sc += 3;
+  if (YT_NOT_TRAILER.test(name)) sc -= 20;
+  return sc;
+}
+/** 從 YouTube 找這部片的預告：要標題對得上片名才採用（搜尋的第一筆常常是不相干的影片），台灣版優先。
+ *  先用片名搜；沒有台灣版就換個問法再搜一次；還是沒有、又有英文片名，再用英文片名搜 */
+async function ytTrailer(title: string, en?: string): Promise<{ key: string; name: string } | { err: string }> {
+  const base = baseTitle(title);
+  const plain = base.replace(/[:：·・\-–—_＿／/!！?？「」『』《》〈〉()（）\[\]【】]+/g, " ").replace(/\s+/g, " ").trim(); // 冒號等符號會被當成搜尋語法
+  const queries = [`${plain} 預告`, `${plain} 電影 中文預告`, en ? `${en} trailer` : ""].filter(Boolean);
+  let best: { key: string; name: string; sc: number } | null = null;
+  let err = "";
+  for (const q of queries) {
+    let r = await ytSearch(q);
+    if (!r.list.length && r.err === "搜尋沒有結果") r = await ytSearch(q); // 偶爾會回空白頁，再試一次
+    if (r.err) err = r.err;
+    r.list.forEach((v, i) => {
+      const sc = ytScore(v.name, title, en) * 100 - i; // 同分的照搜尋結果的順序
+      if (sc > 0 && (!best || sc > best.sc)) best = { ...v, sc };
+    });
+    if (best && (best as { sc: number }).sc >= 100 * 100 - 50) break; // 已經有台灣片名的預告，不用再搜
+  }
+  const b = best as { key: string; name: string; sc: number } | null;
+  if (b) return { key: b.key, name: b.name };
+  return { err: err || "搜尋結果裡沒有對得上片名的影片" };
 }
 
 /** 沒有片長的電影，從 TMDB 補上（會標記 runtimeFrom）；沒設定 Token 或查詢失敗就原樣回傳 */

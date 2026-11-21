@@ -73,11 +73,14 @@ async function refresh(m) {
   e.seen = now;
   // 海報／預告：都有的 3 天查一次，缺的 6 小時再試
   // RECHECK=1：缺海報或預告的立刻重查（改了比對規則、加了新來源時手動跑一次）
-  if (!e.xa || now - e.xa > (e.p && e.tn ? 3 * DAY : process.env.RECHECK === "1" ? 0 : 6 * HOUR)) {
+  // RECHECK=1 時，從 YouTube 搜尋挑的預告也重查（挑選規則改過）；開眼自己的預告不用
+  const fromSearch = e.tn && e.tn !== "開眼電影網預告";
+  if (!e.xa || now - e.xa > (process.env.RECHECK === "1" && (!e.p || !e.tn || fromSearch) ? 0 : e.p && e.tn ? 3 * DAY : 6 * HOUR)) {
     try {
       const x = await core.movieExtras(m.title, m.slug);
       if (x.poster) e.p = x.poster;
       if (x.trailerName) { e.t = x.trailer; e.tn = x.trailerName; }
+      else if (fromSearch && process.env.RECHECK === "1" && !/讀不到|回應 \d/.test(x.err || "")) { delete e.t; delete e.tn; } // 舊規則挑的對不上片名：拿掉，不留錯的
       else if (x.err && noTrailer.length < 8) noTrailer.push(`${m.title}：${x.err}`); // 找不到預告的原因，印幾筆方便查
       e.xa = now;
       stat.extras++;
