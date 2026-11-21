@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.22-0451
+// @movie-schedule-app 電影行程 v2026.11.22-0456
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/parsers.gen.ts
@@ -1104,7 +1104,8 @@ function atMovieIndex() {
     const idx = {};
     await Promise.all(
       ["now", "new", "next", "next2", "now2"].map(async (p) => {
-        const html = await getText(`${AT}/movie/${p}/`).catch(() => "");
+        const url = `${AT}/movie/${p}/`;
+        const html = await getText(url).catch(() => getText(url).catch(() => ""));
         for (const [, id, t] of html.matchAll(/<a[^>]*href="\/movie\/(f[a-z0-9]+)\/"[^>]*>\s*([^<]{1,60}?)\s*<\/a>/g)) {
           const n = normTitle(t), b = normTitle(baseTitle(t)), l = looseTitle(t);
           if (n) idx[n] ||= id;
@@ -1399,7 +1400,7 @@ async function ytSearch(query) {
 }
 var YT_TRAILER = /預告|trailer|teaser|予告|\bPV\b/i;
 var YT_RELEASE = /上映|大銀幕|戲院|獻映|登場/;
-var YT_NOT_TRAILER = /影評|解析|劇透|不知道的事|reaction|反應|新聞|心得|懶人包|彩蛋|訪談|專訪|幕後|花絮|主題曲|片尾曲|\bOST\b|\bMV\b|\bAMV\b|直播|重溫|回顧/i;
+var YT_NOT_TRAILER = /影評|解析|解說|劇透|不知道的事|冷知識|認識|盤點|看點|必看|reaction|反應|新聞|心得|懶人包|彩蛋|訪談|專訪|幕後|花絮|主題曲|片尾曲|\bOST\b|\bMV\b|\bAMV\b|直播|重溫|回顧/i;
 var YT_NOT_TW = /香港|澳門|港版|粵語|廣東話|\bHK\b|马来西亚|馬來西亞|新加坡/i;
 function ytScore(name, title, en) {
   const base = baseTitle(title);
@@ -1409,10 +1410,13 @@ function ytScore(name, title, en) {
   const e = en ? normEn(en) : "";
   const enHit = e.length >= 4 && normEn(name).includes(e);
   if (!zh && !enHit) return 0;
+  const years = (name.match(/(?:19|20)\d{2}(?!\d)/g) || []).map(Number);
+  const thisYear = Number(todayTPE().slice(0, 4));
+  if (!isReissue(title) && years.length && !years.some((y) => Math.abs(y - thisYear) <= 1)) return 0;
   const trailer = YT_TRAILER.test(name);
   if (YT_NOT_TRAILER.test(name) && !trailer) return 0;
   if (!trailer && !(zh && YT_RELEASE.test(name))) return zh ? 1 : 0;
-  let sc = zh ? 100 : 50;
+  let sc = zh ? trailer ? 100 : 70 : 50;
   if (YT_NOT_TW.test(name)) sc -= 30;
   if (/台灣|臺灣|全台|在台|台版/.test(name)) sc += 20;
   if (!zh && /[一-鿿]/.test(name)) sc += 5;
@@ -2484,7 +2488,7 @@ var App = class {
     ];
     // ── 事件迴圈 ──
     // 背景查 GitHub 上的最新版本（首頁顯示是否為最新版）
-    this.latest = checkLatest("2026.11.22-0451");
+    this.latest = checkLatest("2026.11.22-0456");
     // ── 搜尋 ──
     this.query = "";
     this.tmdbStatus = "";
@@ -2619,11 +2623,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.22-0451"}`);
+          Pasteboard.copy(`版本 ${"2026.11.22-0456"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.22-0451"}`,
+      `版本 ${"2026.11.22-0456"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }

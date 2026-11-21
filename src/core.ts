@@ -740,7 +740,8 @@ function atMovieIndex(): Promise<Record<string, string>> {
     const idx: Record<string, string> = {};
     await Promise.all(
       ["now", "new", "next", "next2", "now2"].map(async (p) => {
-        const html = await getText(`${AT}/movie/${p}/`).catch(() => "");
+        const url = `${AT}/movie/${p}/`;
+        const html = await getText(url).catch(() => getText(url).catch(() => "")); // 開眼偶爾逾時：再試一次，不然這一頁的片整輪都對不到
         for (const [, id, t] of html.matchAll(/<a[^>]*href="\/movie\/(f[a-z0-9]+)\/"[^>]*>\s*([^<]{1,60}?)\s*<\/a>/g)) {
           const n = normTitle(t), b = normTitle(baseTitle(t)), l = looseTitle(t);
           if (n) idx[n] ||= id;
@@ -1084,7 +1085,7 @@ async function ytSearch(query: string): Promise<{ list: { key: string; name: str
 
 const YT_TRAILER = /預告|trailer|teaser|予告|\bPV\b/i;
 const YT_RELEASE = /上映|大銀幕|戲院|獻映|登場/;
-const YT_NOT_TRAILER = /影評|解析|劇透|不知道的事|reaction|反應|新聞|心得|懶人包|彩蛋|訪談|專訪|幕後|花絮|主題曲|片尾曲|\bOST\b|\bMV\b|\bAMV\b|直播|重溫|回顧/i;
+const YT_NOT_TRAILER = /影評|解析|解說|劇透|不知道的事|冷知識|認識|盤點|看點|必看|reaction|反應|新聞|心得|懶人包|彩蛋|訪談|專訪|幕後|花絮|主題曲|片尾曲|\bOST\b|\bMV\b|\bAMV\b|直播|重溫|回顧/i;
 const YT_NOT_TW = /香港|澳門|港版|粵語|廣東話|\bHK\b|马来西亚|馬來西亞|新加坡/i;
 /** 影片標題對不對得上這部片、像不像預告：分數越高越好，0 = 不是這部片（或不是預告），不採用。
  *  台灣片名整個出現在標題裡的排最前面——香港、中國的版本片名通常不同（哥斯拉／哥吉拉），自然排到後面 */
@@ -1097,10 +1098,14 @@ export function ytScore(name: string, title: string, en?: string): number {
   const e = en ? normEn(en) : "";
   const enHit = e.length >= 4 && normEn(name).includes(e);
   if (!zh && !enHit) return 0;
+  // 標題寫了年份、卻不是今年前後：是同名的舊片（真人版對到多年前的動畫版）。重映片本來就是舊片，不檢查
+  const years = (name.match(/(?:19|20)\d{2}(?!\d)/g) || []).map(Number);
+  const thisYear = Number(todayTPE().slice(0, 4));
+  if (!isReissue(title) && years.length && !years.some((y) => Math.abs(y - thisYear) <= 1)) return 0;
   const trailer = YT_TRAILER.test(name);
   if (YT_NOT_TRAILER.test(name) && !trailer) return 0;
   if (!trailer && !(zh && YT_RELEASE.test(name))) return zh ? 1 : 0; // 對得上片名但看不出是預告：最後才用
-  let sc = zh ? 100 : 50; // 中文（台灣）片名 > 只有英文片名對上
+  let sc = zh ? (trailer ? 100 : 70) : 50; // 台灣片名＋寫明預告 > 台灣片名＋上映宣傳 > 只有英文片名對上
   if (YT_NOT_TW.test(name)) sc -= 30;
   if (/台灣|臺灣|全台|在台|台版/.test(name)) sc += 20;
   if (!zh && /[一-鿿]/.test(name)) sc += 5; // 沒有台灣版時，中文字幕的版本（多半是香港）比純外語好懂
