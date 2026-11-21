@@ -141,13 +141,15 @@ struct BoxOfficeSection: View {
             PosterView(title: r.m?.title ?? r.x.name, slug: r.m?.slug, en: r.m?.en)
             VStack(alignment: .leading, spacing: 2) {
                 Text(r.x.name).lineLimit(2)
+                // 第一行金額、第二行上映日期與戲院數：各自一行不換行
                 Text([r.x.week.map { "本週 \(Fmt.money($0))" } ?? "", "累計 \(Fmt.money(r.x.total))"].filter { !$0.isEmpty }.joined(separator: "｜"))
-                    .font(.subheadline).foregroundStyle(.secondary)
+                    .font(.subheadline).foregroundStyle(.secondary).lineLimit(1).minimumScaleFactor(0.8)
+                let second = [Fmt.release(r.x.release), (r.x.theaters ?? 0) > 0 ? "\(r.x.theaters ?? 0) 間戲院" : ""].filter { !$0.isEmpty }.joined(separator: "｜")
+                if !second.isEmpty {
+                    Text(second).font(.caption).foregroundStyle(.tertiary).lineLimit(1).minimumScaleFactor(0.8)
+                }
             }
             Spacer(minLength: 4)
-            if let t = r.x.theaters, t > 0 {
-                Text("\(t) 間").font(.caption).foregroundStyle(.tertiary)
-            }
         }
     }
 

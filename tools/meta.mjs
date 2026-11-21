@@ -88,8 +88,8 @@ async function refresh(m) {
       } else stat.fail++;
     } catch (_) { stat.fail++; }
   }
-  // 上映日期：只查場次通列在「即將上映」的片（那一區混著已經上映、只是今天沒場次的片，App 靠這個分開）
-  if (m.soon && m.slug && (!e.rda || now - e.rda > (e.rd ? 7 * DAY : DAY))) {
+  // 上映日期：電影頁要顯示；場次通的「即將上映」混著已經上映、只是今天沒場次的片，App 也靠這個分開
+  if (m.slug && (!e.rda || now - e.rda > (e.rd ? 7 * DAY : DAY))) {
     try {
       const d = await core.twReleaseDate(m.slug);
       if (d) e.rd = d;

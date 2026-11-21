@@ -1140,6 +1140,25 @@ export async function twReleaseDate(slug: string): Promise<string> {
   if (!r.ok) throw new Error("no page");
   return (r.body.match(/"datePublished":"(\d{4}-\d{2}-\d{2})/) || [])[1] || "";
 }
+/** 上映日期的顯示文字：「2026/08/07 上映」（沒有日期回傳空字串） */
+export function releaseLabel(d?: string | null): string {
+  return d && /^\d{4}-\d{2}-\d{2}/.test(d) ? `${d.slice(0, 10).replace(/-/g, "/")} 上映` : "";
+}
+/** 已經讀過的資料裡這部片的上映日期（電影清單、票房排行；都沒有回傳空字串）。不另外上網查 */
+export function releaseOf(title: string): string {
+  const k = normTitle(title), b = normTitle(baseTitle(title));
+  const m = (moviesCache || []).find((x) => normTitle(x.title) === k) || (moviesCache || []).find((x) => normTitle(baseTitle(x.title)) === b);
+  if (m?.release) return m.release;
+  const ck = communityKey(title);
+  return (boxData?.list.find((x) => communityKey(x.name) === ck)?.release || "").slice(0, 10);
+}
+/** 票房排行每一列的兩行說明：第一行金額，第二行上映日期與戲院數 */
+export function boxOfficeLines(x: BoxOfficeItem): [string, string] {
+  return [
+    [x.week !== null ? `本週 ${money(x.week)}` : "", `累計 ${money(x.total)}`].filter(Boolean).join("｜"),
+    [releaseLabel(x.release), x.theaters ? `${x.theaters} 間戲院` : ""].filter(Boolean).join("｜"),
+  ];
+}
 /** 電影清單上每一列的說明文字：分級｜片長｜英文片名，前面加上「今天沒有場次」或上映日期 */
 export function movieSubtitle(m: TwMovie): string {
   const md = (d: string) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`;
@@ -1712,6 +1731,7 @@ export interface BoxOffice {
   list: BoxOfficeItem[];
 }
 let boxMem: Promise<BoxOffice> | null = null;
+let boxData: BoxOffice | null = null; // 這次執行讀到的排行（releaseOf 同步查用）
 /** 讀票房排行（手機上記 6 小時；官方一週才更新一次）。排行改成排到底後換了快取檔名，舊的前 20 名不再用 */
 export function loadBoxOffice(): Promise<BoxOffice> {
   return (boxMem ||= (async () => {
@@ -1725,7 +1745,7 @@ export function loadBoxOffice(): Promise<BoxOffice> {
     if (!data || !Array.isArray(data.list)) throw new Error("票房排行格式不對");
     cacheSet("boxoffice2.json", JSON.stringify({ at: Date.now(), data }));
     return data;
-  })().catch((e) => {
+  })().then((d) => (boxData = d)).catch((e) => {
     boxMem = null;
     throw e;
   }));

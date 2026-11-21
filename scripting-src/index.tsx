@@ -14,7 +14,7 @@ import {
   Cinema, Movie, Settings, Version, TwMovie, TwMovieCinema, CITY_ORDER, TW,
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
   loadSettings, saveSettings, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, cinemaAddress,
-  FORMATS, formatsOf, filterVersions, nearest, kmLabel, WINDOWS, findShowtimes, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText, hallOf, tmdbTest, movieExtras, moviePoster, posterReady, posterTint, POSTER_TINTS, normImageUrl, movieRuntime, posterSrc, isLocalSrc, cachePoster, prefetchPosters, movieSubtitle, foregroundTask, communityStats, communityVote, loadBoxOffice, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, SCRIPTING_IMPORT_URL, movieRatings, ratingTier,
+  FORMATS, formatsOf, filterVersions, nearest, kmLabel, WINDOWS, findShowtimes, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText, hallOf, tmdbTest, movieExtras, moviePoster, posterReady, posterTint, POSTER_TINTS, normImageUrl, movieRuntime, posterSrc, isLocalSrc, cachePoster, prefetchPosters, movieSubtitle, releaseLabel, releaseOf, boxOfficeLines, foregroundTask, communityStats, communityVote, loadBoxOffice, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, SCRIPTING_IMPORT_URL, movieRatings, ratingTier,
 } from "./core"
 import type { Format, LatLng, Hit, Community, BoxOfficeItem } from "./core"
 
@@ -723,6 +723,7 @@ function ShowtimesPage({ cinema, date, movie: given, ctx, complete }: { cinema: 
     <MovieHero title={movie.title} lines={[
       movie.runtime ? `片長 ${movie.runtime} 分鐘` + (movie.runtimeFrom ? `（${movie.runtimeFrom}）` : "") : "片長未提供，下一步可手動輸入",
       movie.rating || "",
+      releaseLabel(releaseOf(movie.title)),
     ]} />
     <Section>
       <LabeledContent title={"影城"} value={cinema.name} />
@@ -908,15 +909,17 @@ function BoxOfficeSections({ movies, query }: { movies: TwMovie[]; query: string
   return <Section header={<Text>{boxOfficeLabel(b)}</Text>} footer={<Text>{`${shown.length ? "" : "排行上找不到相符的電影。\n"}這週有賣出票的電影共 ${b.list.length} 部。資料來源：${b.source}。官方每週更新一次。${failNote}`}</Text>}>
     {shown.map((x, i) => {
       const m = matchBoxOffice(x.name, movies)
+      const lines = boxOfficeLines(x)
       const body = <HStack spacing={10}>
         <Text font={"title3"} fontWeight={"bold"} monospacedDigit foregroundStyle={x.rank <= 3 ? "systemOrange" : "secondaryLabel"} frame={{ width: 26 }}>{String(x.rank)}</Text>
         {PosterBox({ w: 44, h: 66, r: 6, img: thumbs[i].img, ver: 0, pending: thumbs[i].pending, title: x.name })}
         <VStack alignment={"leading"} spacing={2}>
           <Text foregroundStyle={"label"} lineLimit={2}>{x.name}</Text>
-          <Text font={"subheadline"} foregroundStyle={"secondaryLabel"}>{[x.week !== null ? `本週 ${money(x.week)}` : "", `累計 ${money(x.total)}`].filter(Boolean).join("｜")}</Text>
+          {/* 第一行金額、第二行上映日期與戲院數：各自一行不換行，窄螢幕也對得齊 */}
+          <Text font={"subheadline"} foregroundStyle={"secondaryLabel"} lineLimit={1} minScaleFactor={0.8}>{lines[0]}</Text>
+          {lines[1] ? <Text font={"caption"} foregroundStyle={"tertiaryLabel"} lineLimit={1} minScaleFactor={0.8}>{lines[1]}</Text> : null}
         </VStack>
         <Spacer />
-        {x.theaters ? <Text font={"caption"} foregroundStyle={"tertiaryLabel"}>{`${x.theaters} 間`}</Text> : null}
       </HStack>
       return <NavigationLink key={x.rank} destination={m ? <MoviePage movie={m} /> : <BoxOfficeMoviePage item={x} />}>{body}</NavigationLink>
     })}
@@ -1006,6 +1009,7 @@ function MoviePage({ movie }: { movie: TwMovie }) {
     <MovieHero title={movie.title} slug={movie.slug} en={movie.en} lines={[
       movie.en,
       [movie.rating || data?.rating, runtime ? `${runtime} 分鐘` : ""].filter(Boolean).join("｜"),
+      releaseLabel(data?.release || movie.release || releaseOf(movie.title)),
       data ? `${data.cinemas.length} 間影城有放映` : "",
     ]} />
     <Section>

@@ -32,6 +32,7 @@
     baseTitle: () => baseTitle,
     bookingUrl: () => bookingUrl,
     boxOfficeLabel: () => boxOfficeLabel,
+    boxOfficeLines: () => boxOfficeLines,
     byShowtime: () => byShowtime,
     cachePoster: () => cachePoster,
     checkLatest: () => checkLatest,
@@ -87,6 +88,8 @@
     posterTint: () => posterTint,
     prefetchPosters: () => prefetchPosters,
     ratingTier: () => ratingTier,
+    releaseLabel: () => releaseLabel,
+    releaseOf: () => releaseOf,
     saveSettings: () => saveSettings,
     setMetaEnabled: () => setMetaEnabled,
     shareText: () => shareText,
@@ -374,7 +377,7 @@ function parseTwMovies(doc) {
 }
 function parseTwMovieDay(doc) {
   const clean = (s) => String(s || "").replace(/\\s+/g, " ").trim();
-  let title = "", en = "", rating = "", runtime = 0, image = "";
+  let title = "", en = "", rating = "", runtime = 0, image = "", release = "";
   const address = {};
   for (const el of Array.from(doc.querySelectorAll('script[type="application/ld+json"]'))) {
     try {
@@ -384,6 +387,7 @@ function parseTwMovieDay(doc) {
       en = clean(o.alternateName);
       rating = clean(o.contentRating);
       runtime = Number((String(o.duration || "").match(/(\\d+)M/) || [])[1] || 0);
+      release = (String(o.datePublished || "").match(/^\\d{4}-\\d{2}-\\d{2}/) || [""])[0];
       image = clean(typeof o.image === "string" ? o.image : o.image && (o.image.url || o.image[0]));
       for (const ev of o.subjectOf || []) {
         const loc = ev && ev.location;
@@ -434,7 +438,7 @@ function parseTwMovieDay(doc) {
       });
     }
   }
-  return { title, en, rating, runtime, image, date, dates, cinemas };
+  return { title, en, rating, runtime, image, release, date, dates, cinemas };
 }
 {
   parseAtDay,
@@ -1555,6 +1559,22 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     if (!r.ok) throw new Error("no page");
     return (r.body.match(/"datePublished":"(\d{4}-\d{2}-\d{2})/) || [])[1] || "";
   }
+  function releaseLabel(d) {
+    return d && /^\d{4}-\d{2}-\d{2}/.test(d) ? `${d.slice(0, 10).replace(/-/g, "/")} 上映` : "";
+  }
+  function releaseOf(title) {
+    const k = normTitle(title), b = normTitle(baseTitle(title));
+    const m = (moviesCache || []).find((x) => normTitle(x.title) === k) || (moviesCache || []).find((x) => normTitle(baseTitle(x.title)) === b);
+    if (m?.release) return m.release;
+    const ck = communityKey(title);
+    return (boxData?.list.find((x) => communityKey(x.name) === ck)?.release || "").slice(0, 10);
+  }
+  function boxOfficeLines(x) {
+    return [
+      [x.week !== null ? `本週 ${money(x.week)}` : "", `累計 ${money(x.total)}`].filter(Boolean).join("｜"),
+      [releaseLabel(x.release), x.theaters ? `${x.theaters} 間戲院` : ""].filter(Boolean).join("｜")
+    ];
+  }
   function movieSubtitle(m) {
     const md = (d) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`;
     const head = m.noShowToday ? "今天沒有場次" : m.comingSoon ? m.release ? `${md(m.release)} 上映` : "" : "";
@@ -1966,6 +1986,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   }
   var BOXOFFICE_URL = "https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/main/dist/boxoffice.json";
   var boxMem = null;
+  var boxData = null;
   function loadBoxOffice() {
     return boxMem ||= (async () => {
       try {
@@ -1979,7 +2000,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
       if (!data || !Array.isArray(data.list)) throw new Error("票房排行格式不對");
       cacheSet("boxoffice2.json", JSON.stringify({ at: Date.now(), data }));
       return data;
-    })().catch((e) => {
+    })().then((d) => boxData = d).catch((e) => {
       boxMem = null;
       throw e;
     });

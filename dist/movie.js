@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.22-0359
+// @movie-schedule-app 電影行程 v2026.11.22-0402
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/parsers.gen.ts
@@ -278,7 +278,7 @@ function parseTwMovies(doc) {
 }
 function parseTwMovieDay(doc) {
   const clean = (s) => String(s || "").replace(/\\s+/g, " ").trim();
-  let title = "", en = "", rating = "", runtime = 0, image = "";
+  let title = "", en = "", rating = "", runtime = 0, image = "", release = "";
   const address = {};
   for (const el of Array.from(doc.querySelectorAll('script[type="application/ld+json"]'))) {
     try {
@@ -288,6 +288,7 @@ function parseTwMovieDay(doc) {
       en = clean(o.alternateName);
       rating = clean(o.contentRating);
       runtime = Number((String(o.duration || "").match(/(\\d+)M/) || [])[1] || 0);
+      release = (String(o.datePublished || "").match(/^\\d{4}-\\d{2}-\\d{2}/) || [""])[0];
       image = clean(typeof o.image === "string" ? o.image : o.image && (o.image.url || o.image[0]));
       for (const ev of o.subjectOf || []) {
         const loc = ev && ev.location;
@@ -338,7 +339,7 @@ function parseTwMovieDay(doc) {
       });
     }
   }
-  return { title, en, rating, runtime, image, date, dates, cinemas };
+  return { title, en, rating, runtime, image, release, date, dates, cinemas };
 }
 {
   parseAtDay,
@@ -1439,6 +1440,22 @@ async function loadMovies() {
   }
   return moviesCache;
 }
+function releaseLabel(d) {
+  return d && /^\d{4}-\d{2}-\d{2}/.test(d) ? `${d.slice(0, 10).replace(/-/g, "/")} 上映` : "";
+}
+function releaseOf(title) {
+  const k = normTitle(title), b = normTitle(baseTitle(title));
+  const m = (moviesCache || []).find((x) => normTitle(x.title) === k) || (moviesCache || []).find((x) => normTitle(baseTitle(x.title)) === b);
+  if (m?.release) return m.release;
+  const ck = communityKey(title);
+  return (boxData?.list.find((x) => communityKey(x.name) === ck)?.release || "").slice(0, 10);
+}
+function boxOfficeLines(x) {
+  return [
+    [x.week !== null ? `本週 ${money(x.week)}` : "", `累計 ${money(x.total)}`].filter(Boolean).join("｜"),
+    [releaseLabel(x.release), x.theaters ? `${x.theaters} 間戲院` : ""].filter(Boolean).join("｜")
+  ];
+}
 function movieSubtitle(m) {
   const md = (d) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`;
   const head = m.noShowToday ? "今天沒有場次" : m.comingSoon ? m.release ? `${md(m.release)} 上映` : "" : "";
@@ -1842,6 +1859,7 @@ async function communityVote(title, score) {
 }
 var BOXOFFICE_URL = "https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/main/dist/boxoffice.json";
 var boxMem = null;
+var boxData = null;
 function loadBoxOffice() {
   return boxMem ||= (async () => {
     try {
@@ -1855,7 +1873,7 @@ function loadBoxOffice() {
     if (!data || !Array.isArray(data.list)) throw new Error("票房排行格式不對");
     cacheSet("boxoffice2.json", JSON.stringify({ at: Date.now(), data }));
     return data;
-  })().catch((e) => {
+  })().then((d) => boxData = d).catch((e) => {
     boxMem = null;
     throw e;
   });
@@ -2416,7 +2434,7 @@ var App = class {
     ];
     // ── 事件迴圈 ──
     // 背景查 GitHub 上的最新版本（首頁顯示是否為最新版）
-    this.latest = checkLatest("2026.11.22-0359");
+    this.latest = checkLatest("2026.11.22-0402");
     // ── 搜尋 ──
     this.query = "";
     this.tmdbStatus = "";
@@ -2551,11 +2569,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.22-0359"}`);
+          Pasteboard.copy(`版本 ${"2026.11.22-0402"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.22-0359"}`,
+      `版本 ${"2026.11.22-0402"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -2941,7 +2959,7 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
           rank: x.rank,
           thumb: t,
           title: x.name,
-          subtitle: [x.week !== null ? `本週 ${money(x.week)}` : "", `累計 ${money(x.total)}`, x.theaters ? `${x.theaters} 間戲院` : ""].filter(Boolean).join("｜"),
+          subtitle: boxOfficeLines(x).filter(Boolean).join("\n"),
           onTap: m ? () => this.go(() => this.movieView(m, ""), `讀取《${m.title}》的放映影城…`) : () => this.go(() => this.boxMovieView(x), `讀取《${x.name}》…`)
         }
       );
@@ -3013,7 +3031,7 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
     };
     const x = await this.extras(m.title, m.slug, m.en);
     if (!runtime) runtime = await this.fillRuntime(m, 1500);
-    return /* @__PURE__ */ h(Page, { title: m.title, subtitle: [m.rating || d.rating, runtime ? `${runtime} 分鐘` : "", `${d.cinemas.length} 間影城`].filter(Boolean).join("｜"), onBack: () => this.back() }, this.hero(x, m.title, [m.en, [m.rating || d.rating, runtime ? `${runtime} 分鐘` : ""].filter(Boolean).join("｜"), `${d.cinemas.length} 間影城有放映`]), /* @__PURE__ */ h(Section, { title: "日期" }, /* @__PURE__ */ h(Chips, null, (dates.length ? dates : [d.date]).map((x2) => /* @__PURE__ */ h(Chip, { label: dateLabel(x2).replace(/（.）.*$/, ""), sub: x2 === d.date ? "目前" : dateLabel(x2).match(/（(.)）/)?.[1] || "", muted: x2 !== d.date, onTap: () => replace(x2) })))), /* @__PURE__ */ h(Section, { title: "縣市" }, /* @__PURE__ */ h(Chips, null, ["全部", ...cities].map((c) => /* @__PURE__ */ h(Chip, { label: c, muted: c !== city, onTap: () => {
+    return /* @__PURE__ */ h(Page, { title: m.title, subtitle: [m.rating || d.rating, runtime ? `${runtime} 分鐘` : "", `${d.cinemas.length} 間影城`].filter(Boolean).join("｜"), onBack: () => this.back() }, this.hero(x, m.title, [m.en, [m.rating || d.rating, runtime ? `${runtime} 分鐘` : ""].filter(Boolean).join("｜"), releaseLabel(d.release || m.release || releaseOf(m.title)), `${d.cinemas.length} 間影城有放映`]), /* @__PURE__ */ h(Section, { title: "日期" }, /* @__PURE__ */ h(Chips, null, (dates.length ? dates : [d.date]).map((x2) => /* @__PURE__ */ h(Chip, { label: dateLabel(x2).replace(/（.）.*$/, ""), sub: x2 === d.date ? "目前" : dateLabel(x2).match(/（(.)）/)?.[1] || "", muted: x2 !== d.date, onTap: () => replace(x2) })))), /* @__PURE__ */ h(Section, { title: "縣市" }, /* @__PURE__ */ h(Chips, null, ["全部", ...cities].map((c) => /* @__PURE__ */ h(Chip, { label: c, muted: c !== city, onTap: () => {
       this.movieCity = c;
     } })))), formats.length ? /* @__PURE__ */ h(Section, { title: "特殊廳" }, /* @__PURE__ */ h(Chips, null, ["", ...formats].map((f) => /* @__PURE__ */ h(Chip, { label: f || "全部", muted: f !== fmtSel, onTap: () => {
       this.movieFormat = f;

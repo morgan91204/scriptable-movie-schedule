@@ -58,6 +58,7 @@ struct TwMovieDay: Codable {
     var rating: String?
     var runtime: Int?
     var runtimeFrom: String?
+    var release: String?
     var date: String
     var dates: [String]
     var cinemas: [TwMovieCinema]

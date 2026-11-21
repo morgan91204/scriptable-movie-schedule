@@ -3,6 +3,13 @@ import SwiftUI
 
 /// 日期、金額等小工具（與 src/core.ts 的同名函式行為一致）
 enum Fmt {
+    /// 上映日期的顯示文字：「2026/08/07 上映」（沒有日期回傳空字串）
+    static func release(_ d: String?) -> String {
+        guard let d, d.count >= 10 else { return "" }
+        let day = String(d.prefix(10))
+        guard day.split(separator: "-").count == 3 else { return "" }
+        return day.replacingOccurrences(of: "-", with: "/") + " 上映"
+    }
     static let tpe = TimeZone(identifier: "Asia/Taipei")!
     static let week = ["日", "一", "二", "三", "四", "五", "六"]
     static let cityOrder = [

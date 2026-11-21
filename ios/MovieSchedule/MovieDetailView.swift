@@ -135,6 +135,7 @@ struct MovieDetailView: View {
                 MovieHero(title: movie.title, slug: movie.slug, en: movie.en, lines: [
                     movie.en ?? "",
                     [movie.rating ?? data?.rating ?? "", runtime > 0 ? "\(runtime) 分鐘" : ""].filter { !$0.isEmpty }.joined(separator: "｜"),
+                    Fmt.release(data?.release ?? movie.release),
                     data.map { "\($0.cinemas.count) 間影城有放映" } ?? "",
                 ])
             }
