@@ -24,5 +24,13 @@ jobs:
         run: curl -fsSL "https://raw.githubusercontent.com/${{ github.repository }}/data/meta.json?t=$(date +%s)" -o "$RUNNER_TEMP/prev.json" || echo "還沒有總表，從頭查"
       - name: 查資料
         run: node tools/meta.mjs "$RUNNER_TEMP/prev.json" "$RUNNER_TEMP/meta.json"
+      - name: 取上一次的開眼場次
+        run: curl -fsSL "https://raw.githubusercontent.com/${{ github.repository }}/data/at.json?t=$(date +%s)" -o "$RUNNER_TEMP/prev-at.json" || echo "還沒有，從頭抓"
+      - name: 抓開眼場次（只有開眼有的戲院、要補頂級影廳的威秀）
+        run: node tools/at.mjs "$RUNNER_TEMP/prev-at.json" "$RUNNER_TEMP/at.json"
       - name: 發佈到 data 分支
         run: tools/publish-data.sh "$RUNNER_TEMP/meta.json" meta.json "更新資料"
+      - name: 發佈開眼場次到 data 分支
+        run: |
+          git checkout -q -f "$GITHUB_SHA"
+          tools/publish-data.sh "$RUNNER_TEMP/at.json" at.json "更新資料"

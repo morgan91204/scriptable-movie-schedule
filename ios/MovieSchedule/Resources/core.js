@@ -10,6 +10,8 @@
   var core_exports = {};
   __export(core_exports, {
     AD_STEPS: () => AD_STEPS,
+    AT_DATA_URL: () => AT_DATA_URL,
+    AT_SUPPLEMENT: () => AT_SUPPLEMENT,
     BOXOFFICE_URL: () => BOXOFFICE_URL,
     CINEMA_APPS: () => CINEMA_APPS,
     CITY_ORDER: () => CITY_ORDER,
@@ -25,6 +27,7 @@
     WEEK: () => WEEK,
     WINDOWS: () => WINDOWS,
     addDays: () => addDays,
+    atDayLive: () => atDayLive,
     baseTitle: () => baseTitle,
     bookingUrl: () => bookingUrl,
     boxOfficeLabel: () => boxOfficeLabel,
@@ -785,7 +788,10 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     let found = [];
     const cached = cacheGet("at-theaters.json");
     const parsed = cached ? JSON.parse(cached) : null;
-    if (parsed && Date.now() - parsed.at < 7 * 864e5) {
+    const served = (await loadAtData())?.theaters;
+    if (served && served.length) {
+      found = served;
+    } else if (parsed && Date.now() - parsed.at < 7 * 864e5) {
       found = parsed.list;
     } else {
       try {
@@ -801,11 +807,44 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     const extra2 = found.filter((t) => !known.has(t.id)).map((t) => atCinema(t.id, t.region, t.name, ""));
     return builtin.concat(extra2);
   }
+  var AT_DATA_URL = "https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/data/at.json";
+  var atDataMem = null;
+  function loadAtData() {
+    if (!metaOn) return Promise.resolve(null);
+    if (atDataMem && Date.now() - atDataMem.at < 20 * 6e4) return atDataMem.job;
+    const fresh = (d) => d && d.days && Date.now() - d.updated < 3 * 36e5 ? d : null;
+    const job = (async () => {
+      let disk = null;
+      try {
+        disk = JSON.parse(cacheGet("at-data.json") || "null");
+      } catch (_) {
+      }
+      if (disk && Date.now() - disk.at < 30 * 6e4) return fresh(disk.data);
+      const net = (async () => {
+        const r = await platform().fetchText(AT_DATA_URL + "?t=" + Math.floor(Date.now() / (20 * 6e4)), { accept: "application/json" });
+        if (r.status !== 200) return null;
+        const data = JSON.parse(r.body);
+        if (!data || typeof data.days !== "object") return null;
+        cacheSet("at-data.json", JSON.stringify({ at: Date.now(), data }));
+        return data;
+      })().catch(() => null);
+      const got = await Promise.race([net, delay(4e3).then(() => null)]);
+      return fresh(got || (disk ? disk.data : null));
+    })();
+    atDataMem = { at: Date.now(), job };
+    return job;
+  }
   var atDayCache = {};
+  async function atDayLive(url, date) {
+    const full = date ? `${url}${date.replace(/-/g, "")}/` : url;
+    if (!atDayCache[full]) atDayCache[full] = await parse("parseAtDay", await getText(full));
+    return atDayCache[full];
+  }
   async function atDay(c, date) {
-    const url = date ? `${c.url}${date.replace(/-/g, "")}/` : c.url;
-    if (!atDayCache[url]) atDayCache[url] = await parse("parseAtDay", await getText(url));
-    return atDayCache[url];
+    const data = await loadAtData();
+    const hit = data?.days[c.id.replace(/^at-/, "")]?.[date || todayTPE()];
+    if (hit && hit.date) return hit;
+    return atDayLive(c.url, date);
   }
   var twDayCache = {};
   async function twDay(c, date) {

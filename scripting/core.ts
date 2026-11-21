@@ -218,7 +218,10 @@ async function loadAtTheaters(): Promise<Cinema[]> {
   let found: AtTheater[] = [];
   const cached = cacheGet("at-theaters.json");
   const parsed = cached ? (JSON.parse(cached) as { at: number; list: AtTheater[] }) : null;
-  if (parsed && Date.now() - parsed.at < 7 * 864e5) {
+  const served = (await loadAtData())?.theaters;
+  if (served && served.length) {
+    found = served; // 伺服器每小時掃一次，App 不用自己讀 18 個地區頁
+  } else if (parsed && Date.now() - parsed.at < 7 * 864e5) {
     found = parsed.list;
   } else {
     try {
@@ -235,11 +238,54 @@ async function loadAtTheaters(): Promise<Cinema[]> {
   return builtin.concat(extra);
 }
 
+// ── 伺服器先抓好的開眼場次 ──
+// 開眼每個網頁要 3 秒左右。GitHub Actions 每小時把「只有開眼有的戲院」和「要補頂級影廳的威秀」今明兩天的片單抓好，
+// 存成一個檔（data 分支的 at.json）；App 先讀這個檔，沒有、超過 3 小時沒更新或讀不到，才自己去讀開眼。
+export const AT_DATA_URL = "https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/data/at.json";
+export interface AtData {
+  updated: number;
+  theaters?: AtTheater[]; // 開眼各地區頁掃到的戲院（App 就不用自己掃 18 個地區頁）
+  days: Record<string, Record<string, AtDay>>; // 開眼戲院代碼 → 日期 → 片單
+}
+let atDataMem: { at: number; job: Promise<AtData | null> } | null = null;
+function loadAtData(): Promise<AtData | null> {
+  if (!metaOn) return Promise.resolve(null);
+  if (atDataMem && Date.now() - atDataMem.at < 20 * 60e3) return atDataMem.job;
+  const fresh = (d: AtData | null) => (d && d.days && Date.now() - d.updated < 3 * 3600e3 ? d : null);
+  const job = (async (): Promise<AtData | null> => {
+    let disk: { at: number; data: AtData } | null = null;
+    try {
+      disk = JSON.parse(cacheGet("at-data.json") || "null");
+    } catch (_) {}
+    if (disk && Date.now() - disk.at < 30 * 60e3) return fresh(disk.data);
+    const net = (async () => {
+      const r = await platform().fetchText(AT_DATA_URL + "?t=" + Math.floor(Date.now() / (20 * 60e3)), { accept: "application/json" });
+      if (r.status !== 200) return null;
+      const data = JSON.parse(r.body) as AtData;
+      if (!data || typeof data.days !== "object") return null;
+      cacheSet("at-data.json", JSON.stringify({ at: Date.now(), data }));
+      return data;
+    })().catch(() => null);
+    const got = await Promise.race([net, delay(4000).then(() => null)]);
+    return fresh(got || (disk ? disk.data : null));
+  })();
+  atDataMem = { at: Date.now(), job };
+  return job;
+}
+
 const atDayCache: Record<string, AtDay> = {};
+/** 直接讀開眼的戲院頁（不經過伺服器資料；伺服器產生資料時也用這個） */
+export async function atDayLive(url: string, date?: string): Promise<AtDay> {
+  const full = date ? `${url}${date.replace(/-/g, "")}/` : url;
+  if (!atDayCache[full]) atDayCache[full] = await parse<AtDay>("parseAtDay", await getText(full));
+  return atDayCache[full];
+}
 async function atDay(c: Cinema, date?: string): Promise<AtDay> {
-  const url = date ? `${c.url}${date.replace(/-/g, "")}/` : c.url;
-  if (!atDayCache[url]) atDayCache[url] = await parse<AtDay>("parseAtDay", await getText(url));
-  return atDayCache[url];
+  // 先看伺服器抓好的：不帶日期 = 今天
+  const data = await loadAtData();
+  const hit = data?.days[c.id.replace(/^at-/, "")]?.[date || todayTPE()];
+  if (hit && hit.date) return hit;
+  return atDayLive(c.url, date);
 }
 
 const twDayCache: Record<string, TwDay> = {};
@@ -372,7 +418,7 @@ export async function datesOf(c: Cinema): Promise<{ dates: string[]; address: st
 
 // 場次通沒有收錄部分威秀的頂級影廳（Gold Class、MUCROWN、TITAN），開眼有：這幾間額外讀開眼，把缺的廳別補進來。
 // 2026-11 比對全台 66 間場次通影城與開眼後整理；[影城名稱, 開眼戲院代碼, 開眼地區代碼]
-const AT_SUPPLEMENT: [RegExp, string, string][] = [
+export const AT_SUPPLEMENT: [RegExp, string, string][] = [
   [/MUVIE CINEMAS\s*台北松仁/, "t02a11", "a02"],
   [/新竹大遠百威秀/, "t03505", "a35"],
   [/MUVIE CINEMAS\s*台中TIGER CITY/i, "t04402", "a04"],

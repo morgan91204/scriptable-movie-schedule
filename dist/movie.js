@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.22-0256
+// @movie-schedule-app 電影行程 v2026.11.22-0318
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/jsx.tsx
@@ -1145,7 +1145,10 @@ async function loadAtTheaters() {
   let found = [];
   const cached = cacheGet("at-theaters.json");
   const parsed = cached ? JSON.parse(cached) : null;
-  if (parsed && Date.now() - parsed.at < 7 * 864e5) {
+  const served = (await loadAtData())?.theaters;
+  if (served && served.length) {
+    found = served;
+  } else if (parsed && Date.now() - parsed.at < 7 * 864e5) {
     found = parsed.list;
   } else {
     try {
@@ -1161,11 +1164,44 @@ async function loadAtTheaters() {
   const extra = found.filter((t) => !known.has(t.id)).map((t) => atCinema(t.id, t.region, t.name, ""));
   return builtin.concat(extra);
 }
+var AT_DATA_URL = "https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/data/at.json";
+var atDataMem = null;
+function loadAtData() {
+  if (!metaOn) return Promise.resolve(null);
+  if (atDataMem && Date.now() - atDataMem.at < 20 * 6e4) return atDataMem.job;
+  const fresh = (d) => d && d.days && Date.now() - d.updated < 3 * 36e5 ? d : null;
+  const job = (async () => {
+    let disk = null;
+    try {
+      disk = JSON.parse(cacheGet("at-data.json") || "null");
+    } catch (_) {
+    }
+    if (disk && Date.now() - disk.at < 30 * 6e4) return fresh(disk.data);
+    const net = (async () => {
+      const r = await platform().fetchText(AT_DATA_URL + "?t=" + Math.floor(Date.now() / (20 * 6e4)), { accept: "application/json" });
+      if (r.status !== 200) return null;
+      const data = JSON.parse(r.body);
+      if (!data || typeof data.days !== "object") return null;
+      cacheSet("at-data.json", JSON.stringify({ at: Date.now(), data }));
+      return data;
+    })().catch(() => null);
+    const got = await Promise.race([net, delay(4e3).then(() => null)]);
+    return fresh(got || (disk ? disk.data : null));
+  })();
+  atDataMem = { at: Date.now(), job };
+  return job;
+}
 var atDayCache = {};
+async function atDayLive(url, date) {
+  const full = date ? `${url}${date.replace(/-/g, "")}/` : url;
+  if (!atDayCache[full]) atDayCache[full] = await parse("parseAtDay", await getText(full));
+  return atDayCache[full];
+}
 async function atDay(c, date) {
-  const url = date ? `${c.url}${date.replace(/-/g, "")}/` : c.url;
-  if (!atDayCache[url]) atDayCache[url] = await parse("parseAtDay", await getText(url));
-  return atDayCache[url];
+  const data = await loadAtData();
+  const hit = data?.days[c.id.replace(/^at-/, "")]?.[date || todayTPE()];
+  if (hit && hit.date) return hit;
+  return atDayLive(c.url, date);
 }
 var twDayCache = {};
 async function twDay(c, date) {
@@ -2298,7 +2334,7 @@ var App = class {
     ];
     // ── 事件迴圈 ──
     // 背景查 GitHub 上的最新版本（首頁顯示是否為最新版）
-    this.latest = checkLatest("2026.11.22-0256");
+    this.latest = checkLatest("2026.11.22-0318");
     // ── 搜尋 ──
     this.query = "";
     this.tmdbStatus = "";
@@ -2433,11 +2469,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.22-0256"}`);
+          Pasteboard.copy(`版本 ${"2026.11.22-0318"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.22-0256"}`,
+      `版本 ${"2026.11.22-0318"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
