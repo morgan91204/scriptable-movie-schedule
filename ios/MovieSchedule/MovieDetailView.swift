@@ -167,7 +167,8 @@ struct MovieDetailView: View {
                         ForEach(rows) { cinema in
                             NavigationLink {
                                 TimesView(title: d.title, runtime: runtime, cinemaName: cinema.name, address: cinema.address ?? "", date: d.date, versions: cinema.versions, bookingUrl: "",
-                                          cinema: Cinema(id: cinema.id, name: cinema.name, city: cinema.city, district: cinema.district, source: "tw", url: "https://twshowtimes.com/cinemas/\(cinema.id)/", address: (cinema.address ?? "").isEmpty ? nil : cinema.address, aliases: nil))
+                                          cinema: Cinema(id: cinema.id, name: cinema.name, city: cinema.city, district: cinema.district, source: "tw", url: "https://twshowtimes.com/cinemas/\(cinema.id)/", address: (cinema.address ?? "").isEmpty ? nil : cinema.address, aliases: nil),
+                                          complete: true)
                             } label: {
                                 VStack(alignment: .leading, spacing: 3) {
                                     Text(cinema.name)
@@ -187,6 +188,22 @@ struct MovieDetailView: View {
         .task { if day.value == nil { await load() } }
         .onChange(of: date) { _, new in
             if let d = day.value, new != d.date, !new.isEmpty { Task { await load(new) } }
+        }
+        .task(id: "\(day.value?.date ?? "")|\(city)") { await fill() }
+    }
+
+    /// 電影頁每間影城只列一種版本：把目前顯示的影城從影城頁補齊（一次 12 間，補好一批就更新畫面）
+    private func fill() async {
+        guard let d = day.value else { return }
+        let ids = d.cinemas.filter { (city == "全部" || $0.city == city) && !($0.full ?? false) }.map { $0.id }
+        var start = 0
+        while start < ids.count {
+            if Task.isCancelled { return }
+            let chunk = Array(ids[start..<min(start + 12, ids.count)])
+            start += 12
+            guard let updated: TwMovieDay = try? await Bridge.shared.call("fillMovie", [movie.slug, d.date, chunk]) else { continue }
+            if Task.isCancelled { return }
+            if day.value?.date == updated.date { day = .loaded(updated) }
         }
     }
 
@@ -214,6 +231,9 @@ struct TimesView: View {
     let versions: [ShowVersion]
     let bookingUrl: String
     var cinema: Cinema? = nil
+    /// 從電影頁進來時，傳進來的可能只有一種版本：進來後再讀影城頁補齊
+    var complete = false
+    @State private var fullVersions: [ShowVersion]?
 
     var body: some View {
         // 用 ScrollView 而不是 List：一列裡有很多個時間按鈕，List 會把整列當成一個可點的項目
@@ -223,7 +243,7 @@ struct TimesView: View {
                     Text(title).font(.title3.bold())
                     Text("\(cinemaName)｜\(Fmt.dateLabel(date))").font(.subheadline).foregroundStyle(.secondary)
                 }
-                ForEach(versions, id: \.self) { v in
+                ForEach(fullVersions ?? versions, id: \.self) { v in
                     VStack(alignment: .leading, spacing: 8) {
                         Text(v.label).font(.headline)
                         LazyVGrid(columns: [GridItem(.adaptive(minimum: 76), spacing: 8)], spacing: 8) {
@@ -245,6 +265,13 @@ struct TimesView: View {
             .padding()
         }
         .background(Color(.systemGroupedBackground))
+        .task {
+            guard complete, let cinema, cinema.source == "tw" else { return }
+            let count: ([ShowVersion]) -> Int = { $0.reduce(0) { $0 + $1.times.count } }
+            if let v: [ShowVersion] = try? await Bridge.shared.callOptional("movieCinemaVersions", [Bridge.json(cinema), date, title]), count(v) > count(versions) {
+                fullVersions = v
+            }
+        }
         .navigationTitle("選場次")
         .navigationBarTitleDisplayMode(.inline)
     }

@@ -11,7 +11,7 @@ import {
   Cinema, Settings, Movie, Version, EXTRA, CITY_ORDER, AD_STEPS,
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
   loadSettings, saveSettings, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, TW,
-  FORMATS, formatsOf, filterVersions, nearest, kmLabel, WINDOWS, findShowtimes, groupByMovie, showDay, lateIsTonight, shareText,
+  FORMATS, formatsOf, filterVersions, nearest, kmLabel, WINDOWS, findShowtimes, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText,
   hallOf, tmdbTest, movieExtras, moviePoster, movieRuntime, posterSrc, cachePoster, prefetchPosters, foregroundTask, communityStats, communityCached, communityVote, loadBoxOffice, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, movieRatings, ratingTier,
 } from "./core";
 import type { MovieExtras, Ratings, Community, BoxOfficeItem } from "./core";
@@ -876,6 +876,13 @@ class App {
   movieFormat = "";
   async movieView(m: TwMovie, date: string): Promise<string> {
     const d = await movieDay(m.slug, date || undefined);
+    // 電影頁每間影城只列一種版本：把目前要顯示的影城補齊（最多等 1.5 秒，其餘補好後自動重畫）
+    const fillIds = d.cinemas.filter((c) => this.movieCity === "全部" || c.city === this.movieCity).map((c) => c.id);
+    if (!movieDayFilled(d, fillIds)) {
+      const job = foregroundTask(fillMovieDay(d, fillIds).catch(() => d));
+      await Promise.race([job, sleep(this.rerendering ? 0 : 1500)]);
+      if (!movieDayFilled(d, fillIds)) this.late.push(job);
+    }
     const dates = d.dates.filter((x) => x >= todayTPE());
     let runtime = d.runtime || m.runtime;
     const cities = Array.from(new Set(d.cinemas.map((c) => c.city))).sort(
@@ -931,7 +938,13 @@ class App {
                   icon={this.settings.favorites.indexOf(c.id) >= 0 ? "★" : undefined}
                   title={c.name}
                   subtitle={summary}
-                  onTap={() => this.go(() => this.timesView(toCinema(c), d.date, movie, { booking: "", sourceUrl: `${TW}/cinemas/${c.id}/${d.date}/`, address: c.address }))}
+                  onTap={async () => {
+                    // 還沒補齊的話，進選場次前先補這一間，確保看到所有版本
+                    await fillMovieDay(d, [c.id]).catch(() => d);
+                    const fresh = d.cinemas.find((x) => x.id === c.id);
+                    const mv: Movie = { ...movie, versions: fresh ? filterVersions(fresh.versions, fmtSel) : movie.versions };
+                    this.go(() => this.timesView(toCinema(c), d.date, mv, { booking: "", sourceUrl: `${TW}/cinemas/${c.id}/${d.date}/`, address: c.address }));
+                  }}
                 />
               );
             })}

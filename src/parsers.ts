@@ -345,6 +345,7 @@ export interface TwMovieCinema {
   district: string;
   address: string;
   versions: Version[];
+  full?: boolean; // 已經從影城頁補齊所有版本（電影頁每間影城只列一種版本）
 }
 export interface TwMovieDay {
   title: string;

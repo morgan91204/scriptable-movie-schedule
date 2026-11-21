@@ -47,6 +47,7 @@ struct TwMovieCinema: Codable, Hashable, Identifiable {
     var district: String?
     var address: String?
     var versions: [ShowVersion]
+    var full: Bool? // 已經從影城頁補齊所有版本（電影頁每間影城只列一種）
 }
 
 struct TwMovieDay: Codable {

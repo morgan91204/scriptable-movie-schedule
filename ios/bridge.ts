@@ -28,7 +28,11 @@ async function patchSettings(patch: Record<string, unknown>) {
   core.saveSettings({ ...(await core.loadSettings()), ...patch } as core.Settings);
   return true;
 }
-const extra: Record<string, (...a: any[]) => any> = { boxOffice, nowShowing, nearby, patchSettings };
+/** 補齊電影頁各影城的版本（電影頁每間影城只列一種版本），回傳補好的整份資料 */
+async function fillMovie(slug: string, date: string | null, ids: string[]) {
+  return core.fillMovieDay(await core.movieDay(slug, date || undefined), ids);
+}
+const extra: Record<string, (...a: any[]) => any> = { boxOffice, nowShowing, nearby, patchSettings, fillMovie };
 
 (globalThis as any).MS = {
   init(saved: Record<string, string>) {

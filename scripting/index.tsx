@@ -14,7 +14,7 @@ import {
   Cinema, Movie, Settings, Version, TwMovie, TwMovieCinema, CITY_ORDER, TW,
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
   loadSettings, saveSettings, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, cinemaAddress,
-  FORMATS, formatsOf, filterVersions, nearest, kmLabel, WINDOWS, findShowtimes, groupByMovie, showDay, lateIsTonight, shareText, hallOf, tmdbTest, movieExtras, moviePoster, posterReady, normImageUrl, movieRuntime, posterSrc, isLocalSrc, cachePoster, prefetchPosters, foregroundTask, communityStats, communityVote, loadBoxOffice, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, SCRIPTING_IMPORT_URL, movieRatings, ratingTier,
+  FORMATS, formatsOf, filterVersions, nearest, kmLabel, WINDOWS, findShowtimes, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText, hallOf, tmdbTest, movieExtras, moviePoster, posterReady, normImageUrl, movieRuntime, posterSrc, isLocalSrc, cachePoster, prefetchPosters, foregroundTask, communityStats, communityVote, loadBoxOffice, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, SCRIPTING_IMPORT_URL, movieRatings, ratingTier,
 } from "./core"
 import type { Format, LatLng, Hit, Community, BoxOfficeItem } from "./core"
 
@@ -650,8 +650,20 @@ function DayPage({ cinema, date }: { cinema: Cinema; date: string }) {
 
 type Ctx = { booking: string; sourceUrl: string; address: string }
 
-function ShowtimesPage({ cinema, date, movie, ctx }: { cinema: Cinema; date: string; movie: Movie; ctx: Ctx }) {
+function ShowtimesPage({ cinema, date, movie: given, ctx, complete }: { cinema: Cinema; date: string; movie: Movie; ctx: Ctx; complete?: boolean }) {
   const [settings] = useSettings()
+  // 從電影頁進來時，傳進來的可能只有一種版本：讀影城頁補齊所有版本
+  const [versions, setVersions] = useState<Movie["versions"] | null>(null)
+  useEffect(() => {
+    if (!complete || cinema.source !== "tw") return
+    let alive = true
+    movieCinemaVersions(cinema, date, given.title).then((v) => {
+      const count = (vs: Movie["versions"]) => vs.reduce((a, x) => a + x.times.length, 0)
+      if (alive && v && count(v) > count(given.versions)) setVersions(v)
+    }).catch(() => {})
+    return () => { alive = false }
+  }, [cinema.id, date, given.title])
+  const movie: Movie = versions ? { ...given, versions } : given
   const isToday = date === todayTPE()
   const now = nowHM()
   return <List navigationTitle={movie.title} navigationBarTitleDisplayMode={"inline"}>
@@ -921,8 +933,17 @@ function MoviePage({ movie }: { movie: TwMovie }) {
   const [onlyFav, setOnlyFav] = useState(false)
   const [format, setFormat] = useState<string>("")
   const day = useLoad(() => movieDay(movie.slug, date || undefined), [movie.slug, date])
+  const [, setFilled] = useState(0)
 
   const data = day.data
+  // 電影頁每間影城只列一種版本：把目前顯示的影城從影城頁補齊，補好後重畫
+  useEffect(() => {
+    if (!data) return
+    let alive = true
+    const ids = data.cinemas.filter((c) => city === "全部" || c.city === city).map((c) => c.id)
+    if (!movieDayFilled(data, ids)) fillMovieDay(data, ids).then(() => { if (alive) setFilled((n) => n + 1) }).catch(() => {})
+    return () => { alive = false }
+  }, [data, city])
   const dates = (data?.dates || []).filter((d) => d >= todayTPE())
   const cities = useMemo(() => sortCities(Array.from(new Set((data?.cinemas || []).map((c) => c.city)))), [data])
   const formats = FORMATS.filter((f) => (data?.cinemas || []).some((c) => c.versions.some((v) => formatsOf(v.label).indexOf(f) >= 0)))
@@ -969,7 +990,7 @@ function MoviePage({ movie }: { movie: TwMovie }) {
           const d = data!.date
           const summary = c.versions.map((v) => `${v.label} ${[...v.times].sort(byShowtime).join(" ")}`).join("／")
           return <NavigationLink key={c.id} destination={
-            <ShowtimesPage cinema={toCinema(c)} date={d} movie={m}
+            <ShowtimesPage cinema={toCinema(c)} date={d} movie={m} complete
               ctx={{ booking: "", sourceUrl: `${TW}/cinemas/${c.id}/${d}/`, address: c.address }} />
           }>
             <Row title={(settings.favorites.indexOf(c.id) >= 0 ? "★ " : "") + c.name} subtitle={summary} />

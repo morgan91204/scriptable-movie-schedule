@@ -42,6 +42,7 @@
     datesOf: () => datesOf,
     distanceKm: () => distanceKm,
     extractTmdbKey: () => extractTmdbKey,
+    fillMovieDay: () => fillMovieDay,
     fillRuntimes: () => fillRuntimes,
     filterVersions: () => filterVersions,
     findShowtimes: () => findShowtimes,
@@ -63,7 +64,9 @@
     mapsUrl: () => mapsUrl,
     matchBoxOffice: () => matchBoxOffice,
     money: () => money,
+    movieCinemaVersions: () => movieCinemaVersions,
     movieDay: () => movieDay,
+    movieDayFilled: () => movieDayFilled,
     movieExtras: () => movieExtras,
     moviePoster: () => moviePoster,
     movieRatings: () => movieRatings,
@@ -913,6 +916,40 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     const dates = Object.keys(m.schedules).filter((x) => x >= today).sort();
     return { dates, address: c.address || "", notice: m.notice, site: c.url };
   }
+  var AT_SUPPLEMENT = [
+    [/MUVIE CINEMAS\s*台北松仁/, "t02a11", "a02"],
+    [/新竹大遠百威秀/, "t03505", "a35"],
+    [/MUVIE CINEMAS\s*台中TIGER CITY/i, "t04402", "a04"],
+    [/台南南紡威秀/, "t06610", "a06"],
+    [/高雄大遠百威秀/, "t07703", "a07"]
+  ];
+  var SPECIAL_HALL = /gold\s*class|mucrown|titan/i;
+  var hallKey = (label) => ((label.match(SPECIAL_HALL) || [""])[0] || "").toLowerCase().replace(/\s/g, "");
+  async function supplementHalls(c, date, movies) {
+    const s = AT_SUPPLEMENT.find((x) => x[0].test(c.name));
+    if (!s) return movies;
+    let d = null;
+    try {
+      d = await Promise.race([atDay(atCinema(s[1], s[2], c.name, ""), date), delay(3e3).then(() => null)]);
+    } catch (_) {
+      return movies;
+    }
+    if (!d || d.date !== date) return movies;
+    const tkey = (t) => normTitle(baseTitle(t));
+    const out = movies.map((m) => ({ ...m, versions: m.versions.slice() }));
+    for (const am of d.movies)
+      for (const v of am.versions) {
+        const hall = hallKey(v.label);
+        const times = v.times.filter((t) => !isLate(t));
+        if (!hall || !times.length) continue;
+        const target = out.find((m) => tkey(m.title) === tkey(am.title));
+        if (target && target.versions.some((x) => hallKey(x.label) === hall)) continue;
+        const ver = { label: `${v.label}（取自開眼）`, times };
+        if (target) target.versions.push(ver);
+        else out.push({ title: am.title, runtime: am.runtime, rating: am.rating, versions: [ver] });
+      }
+    return out;
+  }
   async function moviesOf(c, date) {
     if (c.source === "at") {
       let d = await atDay(c);
@@ -923,7 +960,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
       let d = await twDay(c);
       if (d.date !== date) d = await twDay(c, date);
       if (d.date && d.date !== date) throw new Error("網站回傳的日期和選擇的不同，請稍後再試");
-      return { movies: await fillRuntimes(d.movies), booking: d.booking, sourceUrl: `${TW}/cinemas/${c.id}/${date}/`, address: d.address };
+      return { movies: await fillRuntimes(await supplementHalls(c, date, d.movies)), booking: d.booking, sourceUrl: `${TW}/cinemas/${c.id}/${date}/`, address: d.address };
     }
     const m = await multiDay(c);
     return { movies: await fillRuntimes(m.schedules[date] || []), booking: c.url, sourceUrl: c.url, address: c.address || "" };
@@ -1400,6 +1437,32 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     }
     return movieDayCache[url];
   }
+  async function movieCinemaVersions(c, date, title) {
+    const r = await moviesOf(c, date);
+    const k = normTitle(title), bk = normTitle(baseTitle(title));
+    const hit = r.movies.find((m) => normTitle(m.title) === k) || r.movies.find((m) => normTitle(baseTitle(m.title)) === bk);
+    return hit && hit.versions.some((v) => v.times.length) ? hit.versions : null;
+  }
+  async function fillMovieDay(day, ids) {
+    const todo = day.cinemas.filter((c) => !c.full && (!ids || ids.indexOf(c.id) >= 0));
+    const queue = todo.slice();
+    await Promise.all(
+      Array.from({ length: Math.min(6, queue.length) }, async () => {
+        for (let c = queue.shift(); c; c = queue.shift()) {
+          try {
+            const cinema = { id: c.id, name: c.name, city: c.city, district: c.district, source: "tw", url: `${TW}/cinemas/${c.id}/`, address: c.address };
+            const full = await movieCinemaVersions(cinema, day.date, day.title);
+            const count = (vs) => vs.reduce((a, v) => a + v.times.length, 0);
+            if (full && count(full) >= count(c.versions)) c.versions = full;
+            c.full = true;
+          } catch (_) {
+          }
+        }
+      })
+    );
+    return day;
+  }
+  var movieDayFilled = (day, ids) => day.cinemas.every((c) => c.full || ids.indexOf(c.id) < 0);
   async function cinemaAddress(c) {
     if (c.address) return c.address;
     try {
@@ -1868,7 +1931,10 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     saveSettings({ ...await loadSettings(), ...patch });
     return true;
   }
-  var extra = { boxOffice, nowShowing, nearby, patchSettings };
+  async function fillMovie(slug, date, ids) {
+    return fillMovieDay(await movieDay(slug, date || void 0), ids);
+  }
+  var extra = { boxOffice, nowShowing, nearby, patchSettings, fillMovie };
   globalThis.MS = {
     init(saved) {
       cache = saved || {};

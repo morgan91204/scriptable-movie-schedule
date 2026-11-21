@@ -368,6 +368,44 @@ export async function datesOf(c: Cinema): Promise<{ dates: string[]; address: st
   return { dates, address: c.address || "", notice: m.notice, site: c.url };
 }
 
+// 場次通沒有收錄部分威秀的頂級影廳（Gold Class、MUCROWN、TITAN），開眼有：這幾間額外讀開眼，把缺的廳別補進來。
+// 2026-11 比對全台 66 間場次通影城與開眼後整理；[影城名稱, 開眼戲院代碼, 開眼地區代碼]
+const AT_SUPPLEMENT: [RegExp, string, string][] = [
+  [/MUVIE CINEMAS\s*台北松仁/, "t02a11", "a02"],
+  [/新竹大遠百威秀/, "t03505", "a35"],
+  [/MUVIE CINEMAS\s*台中TIGER CITY/i, "t04402", "a04"],
+  [/台南南紡威秀/, "t06610", "a06"],
+  [/高雄大遠百威秀/, "t07703", "a07"],
+];
+const SPECIAL_HALL = /gold\s*class|mucrown|titan/i;
+const hallKey = (label: string) => ((label.match(SPECIAL_HALL) || [""])[0] || "").toLowerCase().replace(/\s/g, "");
+/** 把開眼有、場次通沒有的頂級影廳場次補進片單（最多等 3 秒；只補白天到午夜的場次，凌晨場兩個來源放的日期不同） */
+async function supplementHalls(c: Cinema, date: string, movies: Movie[]): Promise<Movie[]> {
+  const s = AT_SUPPLEMENT.find((x) => x[0].test(c.name));
+  if (!s) return movies;
+  let d: AtDay | null = null;
+  try {
+    d = await Promise.race([atDay(atCinema(s[1], s[2], c.name, ""), date), delay(3000).then(() => null)]);
+  } catch (_) {
+    return movies;
+  }
+  if (!d || d.date !== date) return movies;
+  const tkey = (t: string) => normTitle(baseTitle(t));
+  const out = movies.map((m) => ({ ...m, versions: m.versions.slice() })); // 不改到快取裡的片單
+  for (const am of d.movies)
+    for (const v of am.versions) {
+      const hall = hallKey(v.label);
+      const times = v.times.filter((t) => !isLate(t));
+      if (!hall || !times.length) continue;
+      const target = out.find((m) => tkey(m.title) === tkey(am.title));
+      if (target && target.versions.some((x) => hallKey(x.label) === hall)) continue; // 場次通已經有這個廳
+      const ver: Version = { label: `${v.label}（取自開眼）`, times };
+      if (target) target.versions.push(ver);
+      else out.push({ title: am.title, runtime: am.runtime, rating: am.rating, versions: [ver] });
+    }
+  return out;
+}
+
 export async function moviesOf(c: Cinema, date: string): Promise<{ movies: Movie[]; booking: string; sourceUrl: string; address: string }> {
   if (c.source === "at") {
     let d = await atDay(c);
@@ -378,7 +416,7 @@ export async function moviesOf(c: Cinema, date: string): Promise<{ movies: Movie
     let d = await twDay(c);
     if (d.date !== date) d = await twDay(c, date);
     if (d.date && d.date !== date) throw new Error("網站回傳的日期和選擇的不同，請稍後再試");
-    return { movies: await fillRuntimes(d.movies), booking: d.booking, sourceUrl: `${TW}/cinemas/${c.id}/${date}/`, address: d.address };
+    return { movies: await fillRuntimes(await supplementHalls(c, date, d.movies)), booking: d.booking, sourceUrl: `${TW}/cinemas/${c.id}/${date}/`, address: d.address };
   }
   const m = await multiDay(c);
   return { movies: await fillRuntimes(m.schedules[date] || []), booking: c.url, sourceUrl: c.url, address: c.address || "" };
@@ -961,6 +999,39 @@ export async function movieDay(slug: string, date?: string): Promise<TwMovieDay>
   }
   return movieDayCache[url];
 }
+
+/** 這間影城這一天、這部片的完整版本與場次（讀影城頁）；找不到這部片回傳 null */
+export async function movieCinemaVersions(c: Cinema, date: string, title: string): Promise<Version[] | null> {
+  const r = await moviesOf(c, date);
+  const k = normTitle(title), bk = normTitle(baseTitle(title));
+  const hit = r.movies.find((m) => normTitle(m.title) === k) || r.movies.find((m) => normTitle(baseTitle(m.title)) === bk);
+  return hit && hit.versions.some((v) => v.times.length) ? hit.versions : null;
+}
+
+/** 補齊電影頁各影城的版本：場次通的電影頁每間影城只列一種版本（例如只有 4DX），其他版本要讀影城頁才有。
+ *  ids：要補的影城（不給就全部）；一次 6 間。直接改 day 裡的資料，補過的影城標記 full */
+export async function fillMovieDay(day: TwMovieDay, ids?: string[]): Promise<TwMovieDay> {
+  const todo = day.cinemas.filter((c) => !c.full && (!ids || ids.indexOf(c.id) >= 0));
+  const queue = todo.slice();
+  await Promise.all(
+    Array.from({ length: Math.min(6, queue.length) }, async () => {
+      for (let c = queue.shift(); c; c = queue.shift()) {
+        try {
+          const cinema: Cinema = { id: c.id, name: c.name, city: c.city, district: c.district, source: "tw", url: `${TW}/cinemas/${c.id}/`, address: c.address };
+          const full = await movieCinemaVersions(cinema, day.date, day.title);
+          const count = (vs: Version[]) => vs.reduce((a, v) => a + v.times.length, 0);
+          if (full && count(full) >= count(c.versions)) c.versions = full; // 影城頁讀到的比較少就不換（可能是對錯片）
+          c.full = true;
+        } catch (_) {
+          // 這間讀不到：保留電影頁給的那一種版本，下次再試
+        }
+      }
+    })
+  );
+  return day;
+}
+/** 這些影城都補齊了嗎 */
+export const movieDayFilled = (day: TwMovieDay, ids: string[]) => day.cinemas.every((c) => c.full || ids.indexOf(c.id) < 0);
 
 /** 影城地址：清單或電影頁沒有時，讀一次影城頁補上 */
 export async function cinemaAddress(c: Cinema): Promise<string> {
