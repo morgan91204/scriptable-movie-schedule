@@ -8,8 +8,8 @@ workers_dev = true
 directory = "./public"
 binding = "ASSETS"
 
-# App 本體當成文字打包進 Worker（見 worker.js）；public/.assetsignore 讓它不走靜態檔上傳
+# App 本體與「關於」「隱私權政策」兩頁（pages/）當成文字打包進 Worker（見 worker.js）；public/.assetsignore 讓它不走靜態檔上傳
 [[rules]]
 type = "Text"
-globs = ["**/*.js.txt"]
+globs = ["**/*.js.txt", "**/*.html.txt"]
 fallthrough = true

@@ -12,6 +12,10 @@ const json = (o, status = 200) => new Response(JSON.stringify(o), { status, head
 
 // App 本體（public/app.js）打包在 Worker 裡，不走靜態檔上傳：每次發佈只要上傳這支 Worker 就會更新
 import APP_JS from "./public/app.js.txt";
+// 「關於」與「隱私權政策」兩個靜態頁也一樣打包進來（原始檔在 pages/）
+import ABOUT_HTML from "./pages/about.html.txt";
+import PRIVACY_HTML from "./pages/privacy.html.txt";
+const PAGES = { "/about": ABOUT_HTML, "/privacy": PRIVACY_HTML };
 
 export default {
   async fetch(req, env, ctx) {
@@ -20,6 +24,8 @@ export default {
     if (url.pathname === "/app.js") {
       return new Response(APP_JS, { headers: { "content-type": "text/javascript; charset=utf-8", "cache-control": "no-cache" } });
     }
+    const page = PAGES[url.pathname.replace(/\/+$/, "")];
+    if (page && req.method === "GET") return new Response(page, { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "public, max-age=600" } });
     return env.ASSETS.fetch(req);
   },
 };
