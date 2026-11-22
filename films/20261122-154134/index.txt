@@ -1,0 +1,6 @@
+01.html 200 372135 https://www.taipeiff.taipei/tw/movies/a04d39477b84
+02.html 000ERR 0 https://tyff.taoyuancf.org.tw/film/ocf1-1
+03.html 200 129288 https://festival.south.org.tw/film/the-way-he-sings
+04.html 200 49034 https://www.ticff.org.tw/zh_tw/26/26film/%E9%95%B7%E9%80%94%E5%A4%9C%E8%BB%8A-24767308
+05.html 200 115159 https://twtiaf.com/2026/film.php?id=103
+06.html 200 7514 https://www.tidf.org.tw/zh-hant/shows/schedule
