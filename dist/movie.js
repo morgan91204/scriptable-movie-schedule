@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.22-2103
+// @movie-schedule-app 電影行程 v2026.11.22-2112
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/parsers.gen.ts
@@ -1743,15 +1743,28 @@ async function movieDays(slug, dates) {
 }
 var FESTIVAL_URL = "https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/data/festival.json";
 var festivalsNow = [];
-async function loadFestivals() {
-  const data = await loadServed("festival", FESTIVAL_URL, 72, (d) => Array.isArray(d.festivals)).catch(() => null);
+function festivalState(f) {
   const today = todayTPE();
-  festivalsNow = (data ? data.festivals : []).map((f) => ({ ...f, sessions: (f.sessions || []).filter((x) => x.date >= today) })).filter((f) => f.end >= today && f.sessions.length > 0);
+  return f.end < today ? "past" : f.start > today ? "soon" : "now";
+}
+async function loadFestivals() {
+  const data = await loadServed("festival", FESTIVAL_URL, 24 * 14, (d) => Array.isArray(d.festivals)).catch(() => null);
+  const rank = { now: 0, soon: 1, past: 2 };
+  festivalsNow = (data ? data.festivals : []).filter((f) => f && Array.isArray(f.sessions) && f.sessions.length > 0).sort((a, b) => rank[festivalState(a)] - rank[festivalState(b)] || (festivalState(a) === "soon" ? a.start.localeCompare(b.start) : b.start.localeCompare(a.start)));
   return festivalsNow;
 }
 var festivalsReady = () => festivalsNow;
 function festivalDates(f) {
   return Array.from(new Set(f.sessions.map((x) => x.date))).sort();
+}
+function festivalDefaultDate(f) {
+  const dates = festivalDates(f);
+  const today = todayTPE();
+  return dates.indexOf(today) >= 0 ? today : dates.find((d) => d > today) || dates[0] || "";
+}
+function festivalStateLabel(f) {
+  const st = festivalState(f);
+  return st === "now" ? "進行中" : st === "past" ? "已結束" : `${Number(f.start.slice(5, 7))}/${Number(f.start.slice(8, 10))} 開始`;
 }
 function festivalPlace(x) {
   const v = /^MUVIE$/i.test(x.venue) ? "MUVIE CINEMAS" : x.venue;
@@ -1779,10 +1792,13 @@ function festivalCinema(x, cinemas, f) {
   return hit || { id: "fest-" + x.venue, name: festivalPlace({ venue: x.venue, room: "" }) || f.name, city: "", district: "", source: "tw", url: f.site };
 }
 function festivalNote(list) {
-  const today = todayTPE();
-  if (list.some((f) => f.start <= today)) return "進行中";
-  const next = list.map((f) => f.start).sort()[0] || "";
-  return next ? `${Number(next.slice(5, 7))}/${Number(next.slice(8, 10))} 開始` : "";
+  if (list.some((f) => festivalState(f) === "now")) return "進行中";
+  const next = list.filter((f) => festivalState(f) === "soon").map((f) => f.start).sort()[0] || "";
+  return next ? `${Number(next.slice(5, 7))}/${Number(next.slice(8, 10))} 開始` : list.length ? "回顧" : "";
+}
+function festivalFooter(f) {
+  const past = festivalState(f) === "past" ? "這個影展已經結束，場次留著給你回頭看。" : "";
+  return `${past}場次來自${f.source}${festivalState(f) === "past" ? "" : `，${f.ticketing ? `購票會開啟${f.ticketing}` : "購票請到官網"}，是否售完請以售票頁為準`}。影展的片名在院線上映時可能不同。`;
 }
 function distanceKm(a, b) {
   const R = 6371, rad = Math.PI / 180;
@@ -2945,14 +2961,14 @@ var App = class {
   }
   /** 最新版本是多少。網頁版問的是自己網站現在上線的版本（重新整理就會拿到的那一版），不是 GitHub 上的 */
   checkVersion() {
-    if (true) return checkLatest("2026.11.22-2103");
+    if (true) return checkLatest("2026.11.22-2112");
     return (async () => {
       try {
         const r = await globalThis.fetch("/api/version?t=" + Date.now(), { cache: "no-store" });
         const latest = String((await r.json()).version || "");
         if (!latest) return null;
         const num = (v) => Number(v.replace(/\D/g, "")) || 0;
-        return { latest, isLatest: num("2026.11.22-2103") >= num(latest) };
+        return { latest, isLatest: num("2026.11.22-2112") >= num(latest) };
       } catch (_) {
         return null;
       }
@@ -3049,11 +3065,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.22-2103"}`);
+          Pasteboard.copy(`版本 ${"2026.11.22-2112"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.22-2103"}`,
+      `版本 ${"2026.11.22-2112"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -3395,7 +3411,7 @@ var App = class {
     if (false) {
       if (!r) return /* @__PURE__ */ h(Note, { text: "（無法確認是否為最新版：連不到網站）" });
       if (r.isLatest) return /* @__PURE__ */ h(Note, { text: "✅ 已是最新版" });
-      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.22-2103"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
+      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.22-2112"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
         globalThis.location.reload();
       } }));
     }
@@ -3499,18 +3515,18 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
     }
     const f = list.find((x) => x.id === this.festId) || list[0];
     const dates = festivalDates(f);
-    const date = dates.indexOf(this.festDate) >= 0 ? this.festDate : dates[0];
+    const date = dates.indexOf(this.festDate) >= 0 ? this.festDate : festivalDefaultDate(f);
     const day = festivalDay(f, date);
     const md = (d) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`;
-    return /* @__PURE__ */ h(Page, { title: "依電影找場次", subtitle: `${f.name}｜${md(f.start)}–${md(f.end)}`, onBack: () => this.back() }, this.movieModeChips(), list.length > 1 ? /* @__PURE__ */ h(Section, { title: "影展" }, /* @__PURE__ */ h(Chips, null, list.map((x) => /* @__PURE__ */ h(Chip, { label: x.name, muted: x.id !== f.id, onTap: () => {
+    return /* @__PURE__ */ h(Page, { title: "依電影找場次", subtitle: `${f.name}｜${md(f.start)}–${md(f.end)}`, onBack: () => this.back() }, this.movieModeChips(), list.length > 1 ? /* @__PURE__ */ h(Section, { title: "影展" }, /* @__PURE__ */ h(Chips, null, list.map((x) => /* @__PURE__ */ h(Chip, { label: x.name, sub: festivalStateLabel(x), muted: x.id !== f.id, onTap: () => {
       this.festId = x.id;
       this.festDate = "";
     } })))) : null, /* @__PURE__ */ h(Section, { title: "日期" }, /* @__PURE__ */ h(Chips, null, dates.map((d) => /* @__PURE__ */ h(Chip, { label: dateLabel(d).replace(/（.）.*$/, ""), sub: d === todayTPE() ? "今天" : dateLabel(d).match(/（(.)）/)?.[1] || "", muted: d !== date, onTap: () => {
       this.festDate = d;
-    } })))), /* @__PURE__ */ h(Section, { title: `${f.name}｜${dateLabel(date).replace(/ .*$/, "")}｜${day.length} 部、${day.reduce((n, x) => n + x.sessions.length, 0)} 場`, hint: `場次來自${f.source}，${f.ticketing ? `購票會開啟${f.ticketing}` : "購票請到官網"}。是否售完請以售票頁為準。影展的片名在院線上映時可能不同。` }, day.map(({ film, sessions }) => /* @__PURE__ */ h(
+    } })))), /* @__PURE__ */ h(Section, { title: `${f.name}｜${dateLabel(date).replace(/ .*$/, "")}｜${day.length} 部、${day.reduce((n, x) => n + x.sessions.length, 0)} 場`, hint: festivalFooter(f) }, day.map(({ film, sessions }) => /* @__PURE__ */ h(
       Item,
       {
-        thumb: { src: "" },
+        thumb: { src: film.poster || "" },
         title: film.title,
         subtitle: festivalLines(film, sessions).filter(Boolean).join("\n"),
         onTap: () => this.go(() => this.festivalFilmView(f, film))
@@ -3529,14 +3545,14 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
       this.go(() => this.confirmView({ cinema, address: cinema.address || "", booking: x.ticket || film.url, sourceUrl: film.url, date: x.date, movie, version, time: x.time }));
     };
     const end = (x) => film.mins ? fmt(new Date(tpeDate(x.date, x.time).getTime() + (film.mins + this.settings.ads) * 6e4)).slice(-5) : "";
-    return /* @__PURE__ */ h(Page, { title: film.title, subtitle: f.name, onBack: () => this.back() }, /* @__PURE__ */ h(Hero, { title: film.title, lines: [[film.rating, film.mins ? `${film.mins} 分鐘` : ""].filter(Boolean).join("｜"), f.name, "影展片名，院線上映時可能不同"] }), /* @__PURE__ */ h(Section, { title: "場次", hint: "點一場加入行事曆。散場時間是依片長和你設定的廣告預告時間估的。" }, sessions.map((x) => /* @__PURE__ */ h(
+    return /* @__PURE__ */ h(Page, { title: film.title, subtitle: f.name, onBack: () => this.back() }, /* @__PURE__ */ h(Hero, { title: film.title, poster: film.poster || void 0, lines: [[film.rating, film.mins ? `${film.mins} 分鐘` : ""].filter(Boolean).join("｜"), `${f.name}（${festivalStateLabel(f)}）`, "影展片名，院線上映時可能不同"] }), /* @__PURE__ */ h(Section, { title: "場次", hint: festivalState(f) === "past" ? "這個影展已經結束，場次僅供回顧。" : "點一場加入行事曆。散場時間是依片長和你設定的廣告預告時間估的。" }, sessions.map((x) => /* @__PURE__ */ h(
       Item,
       {
         title: `${dateLabel(x.date).replace(/ .*$/, "")}　${x.time}`,
         subtitle: [festivalPlace(x), end(x) ? `預計 ${end(x)} 散場` : ""].filter(Boolean).join("\n"),
         onTap: () => pick(x)
       }
-    ))), sessions.length ? null : /* @__PURE__ */ h(Empty, { icon: "🎞", text: "這部片的場次都演完了" }), /* @__PURE__ */ h(Button, { label: "🌐 官網的影片介紹", kind: "secondary", onTap: () => Safari.open(film.url) }));
+    ))), sessions.length ? null : /* @__PURE__ */ h(Empty, { icon: "🎞", text: "找不到這部片的場次" }), /* @__PURE__ */ h(Button, { label: "🌐 官網的影片介紹", kind: "secondary", onTap: () => Safari.open(film.url) }));
   }
   async boxOfficeView() {
     const [b, all] = await Promise.all([this.boxSort === "year" ? loadBoxOfficeFull() : this.boxSort === "week" && this.boxWeek ? loadBoxOfficeWeeks() : loadBoxOffice(), loadMovies().catch(() => [])]);

@@ -229,6 +229,7 @@ struct FestivalFilm: Codable, Hashable, Identifiable {
     var mins: Int?
     var rating: String?
     var url: String?
+    var poster: String? // 官網給的劇照（有的才有）
 }
 /// 影展分類的一列：一部片在那一天的場次摘要
 struct FestivalDayRow: Codable, Hashable, Identifiable {
@@ -262,5 +263,6 @@ struct FestivalSessionRow: Codable, Hashable, Identifiable {
 struct FestivalFilmDetail: Codable {
     var name: String
     var film: FestivalFilm
+    var past: Bool? // 影展已經結束（場次僅供回顧）
     var sessions: [FestivalSessionRow]
 }

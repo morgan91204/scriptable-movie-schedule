@@ -85,12 +85,12 @@ async function festivalBoard(festId: string, date: string) {
   const f = list.find((x) => x.id === festId) || list[0];
   if (!f) return { festivals: [], note: "", id: "", name: "", range: "", footer: "", dates: [], date: "", day: [] };
   const dates = core.festivalDates(f);
-  const d = dates.indexOf(date) >= 0 ? date : dates[0];
+  const d = dates.indexOf(date) >= 0 ? date : core.festivalDefaultDate(f);
   const md = (x: string) => `${Number(x.slice(5, 7))}/${Number(x.slice(8, 10))}`;
   return {
-    festivals: list.map((x) => ({ id: x.id, name: x.name })), note: core.festivalNote(list),
-    id: f.id, name: f.name, range: `${md(f.start)}–${md(f.end)}`,
-    footer: `場次來自${f.source}，${f.ticketing ? `購票會開啟${f.ticketing}` : "購票請到官網"}。是否售完請以售票頁為準。影展的片名在院線上映時可能不同。`,
+    festivals: list.map((x) => ({ id: x.id, name: `${x.name}（${core.festivalStateLabel(x)}）` })), note: core.festivalNote(list),
+    id: f.id, name: f.name, range: `${md(f.start)}–${md(f.end)}｜${core.festivalStateLabel(f)}`,
+    footer: core.festivalFooter(f),
     dates, date: d,
     day: core.festivalDay(f, d).map(({ film, sessions }) => ({ film, count: sessions.length, lines: core.festivalLines(film, sessions) })),
   };
@@ -103,7 +103,7 @@ async function festivalFilm(festId: string, filmId: string) {
   const film = f.films.find((x) => x.id === filmId);
   if (!film) return null;
   return {
-    name: f.name, film,
+    name: `${f.name}（${core.festivalStateLabel(f)}）`, film, past: core.festivalState(f) === "past",
     sessions: core.festivalFilmSessions(f, filmId).map((x) => ({ date: x.date, time: x.time, place: core.festivalPlace(x), room: x.room, ticket: x.ticket || film.url, cinema: core.festivalCinema(x, cinemas, f) })),
   };
 }

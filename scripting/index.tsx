@@ -14,7 +14,7 @@ import {
   Cinema, Movie, Settings, Version, TwMovie, TwMovieCinema, CITY_ORDER, TW,
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
   loadSettings, saveSettings, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, cinemaAddress,
-  FORMATS, formatsOf, filterVersions, filterVersionsAny, movieRows, movieDays, nearest, kmLabel, WINDOWS, findShowtimes, findShowtimesMulti, multiLabel, multiDetail, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText, hallOf, tmdbTest, movieExtras, moviePoster, posterReady, posterTint, POSTER_TINTS, normImageUrl, movieRuntime, posterSrc, isLocalSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityVote, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, SCRIPTING_IMPORT_URL, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, movieRatings, ratingTier,
+  FORMATS, formatsOf, filterVersions, filterVersionsAny, movieRows, movieDays, nearest, kmLabel, WINDOWS, findShowtimes, findShowtimesMulti, multiLabel, multiDetail, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText, hallOf, tmdbTest, movieExtras, moviePoster, posterReady, posterTint, POSTER_TINTS, normImageUrl, movieRuntime, posterSrc, isLocalSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityVote, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, SCRIPTING_IMPORT_URL, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, festivalDefaultDate, festivalStateLabel, festivalState, festivalFooter, movieRatings, ratingTier,
 } from "./core"
 import type { Format, LatLng, Hit, Community, BoxOfficeItem, BoxSort, Festival, FestivalFilm, FestivalSession } from "./core"
 
@@ -978,6 +978,27 @@ function BoxOfficeSections({ movies, query }: { movies: TwMovie[]; query: string
   </>
 }
 
+/** 直接給圖片網址的小圖（影展官網給的劇照）：統一下載、好了整批重畫一次；沒有網址或讀不到就回傳 null */
+function useDirectImages(urls: string[], key: string): (url: string) => any {
+  const [, setTick] = useState(0)
+  const imgs = useMemo(() => ({} as Record<string, any>), [])
+  useEffect(() => {
+    let alive = true
+    let timer: any = null
+    const bump = () => { if (!alive || timer) return; timer = setTimeout(() => { timer = null; if (alive) setTick((n) => n + 1) }, 250) }
+    const queue = urls.filter(Boolean)
+    const run = async () => {
+      for (let u = queue.shift(); u && alive; u = queue.shift()) {
+        try { if (!posterImageNow(u)) await loadPosterImage(u) } catch (_) {}
+        bump()
+      }
+    }
+    for (let i = 0; i < 4; i++) run()
+    return () => { alive = false; if (timer) clearTimeout(timer) }
+  }, [key])
+  return (url) => (url ? (imgs[url] ||= posterImageNow(url)) : null)
+}
+
 /** 影展分類：選影展（同時有兩個以上時）、選日期，列出那一天的片 */
 function FestivalSections({ list }: { list: Festival[] }) {
   const [festId, setFestId] = useState("")
@@ -985,25 +1006,26 @@ function FestivalSections({ list }: { list: Festival[] }) {
   const f = list.find((x) => x.id === festId) || list[0]
   if (!f) return <Section><Text foregroundStyle={"secondaryLabel"}>目前沒有進行中的影展</Text></Section>
   const dates = festivalDates(f)
-  const date = dates.indexOf(pickedDate) >= 0 ? pickedDate : dates[0]
+  const date = dates.indexOf(pickedDate) >= 0 ? pickedDate : festivalDefaultDate(f)
   const day = festivalDay(f, date)
+  const imgOf = useDirectImages(day.map((x) => x.film.poster || ""), f.id + date) // 官網有給圖的片，直接用它的圖
   const md = (d: string) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`
   return <>
-    <Section footer={<Text>{`${f.name}｜${md(f.start)}–${md(f.end)}`}</Text>}>
+    <Section footer={<Text>{`${f.name}｜${md(f.start)}–${md(f.end)}｜${festivalStateLabel(f)}`}</Text>}>
       {list.length > 1 ? <Picker title={"影展"} value={f.id} onChanged={(v: string) => { setFestId(v); setPickedDate("") }}>
-        {list.map((x) => <Text key={x.id} tag={x.id}>{x.name}</Text>)}
+        {list.map((x) => <Text key={x.id} tag={x.id}>{`${x.name}（${festivalStateLabel(x)}）`}</Text>)}
       </Picker> : null}
       <Picker title={"日期"} value={date} onChanged={(v: string) => setPickedDate(v)}>
         {dates.map((d) => <Text key={d} tag={d}>{dateLabel(d)}</Text>)}
       </Picker>
     </Section>
     <Section header={<Text>{`${day.length} 部、${day.reduce((n, x) => n + x.sessions.length, 0)} 場`}</Text>}
-      footer={<Text>{`場次來自${f.source}，${f.ticketing ? `購票會開啟${f.ticketing}` : "購票請到官網"}。是否售完請以售票頁為準。影展的片名在院線上映時可能不同。`}</Text>}>
+      footer={<Text>{festivalFooter(f)}</Text>}>
       {day.map(({ film, sessions }) => {
         const lines = festivalLines(film, sessions)
         return <NavigationLink key={film.id} destination={<FestivalFilmPage festival={f} film={film} />}>
           <HStack spacing={10}>
-            {GenPoster({ w: 44, h: 66, r: 6, title: film.title })}
+            {PosterBox({ w: 44, h: 66, r: 6, img: imgOf(film.poster || ""), ver: 0, pending: false, title: film.title })}
             <VStack alignment={"leading"} spacing={2}>
               <Text foregroundStyle={"label"} lineLimit={2}>{film.title}</Text>
               {lines[0] ? <Text font={"subheadline"} foregroundStyle={"secondaryLabel"} lineLimit={1} minScaleFactor={0.8}>{lines[0]}</Text> : null}
@@ -1022,19 +1044,20 @@ function FestivalSections({ list }: { list: Festival[] }) {
 function FestivalFilmPage({ festival: f, film }: { festival: Festival; film: FestivalFilm }) {
   const [settings] = useSettings()
   const sessions = festivalFilmSessions(f, film.id)
+  const imgOf = useDirectImages([film.poster || ""], film.id)
   const end = (x: FestivalSession) => (film.mins ? fmt(new Date(tpeDate(x.date, x.time).getTime() + (film.mins + settings.ads) * 6e4)).slice(-5) : "")
   return <List navigationTitle={film.title} navigationBarTitleDisplayMode={"inline"}>
     <Section>
       <HStack alignment={"bottom"} spacing={12} listRowBackground={"clear"}>
-        {GenPoster({ w: 104, h: 156, r: 12, title: film.title })}
+        {PosterBox({ w: 104, h: 156, r: 12, img: imgOf(film.poster || ""), ver: 0, pending: false, title: film.title })}
         <VStack alignment={"leading"} spacing={4}>
           <Text font={"subheadline"} foregroundStyle={"secondaryLabel"}>{[film.rating, film.mins ? `${film.mins} 分鐘` : ""].filter(Boolean).join("｜")}</Text>
-          <Text font={"subheadline"} foregroundStyle={"secondaryLabel"}>{f.name}</Text>
+          <Text font={"subheadline"} foregroundStyle={"secondaryLabel"}>{`${f.name}（${festivalStateLabel(f)}）`}</Text>
           <Text font={"footnote"} foregroundStyle={"tertiaryLabel"}>影展片名，院線上映時可能不同</Text>
         </VStack>
       </HStack>
     </Section>
-    <Section header={<Text>場次</Text>} footer={<Text>點一場加入行事曆。散場時間是依片長和你設定的廣告預告時間估的。</Text>}>
+    <Section header={<Text>場次</Text>} footer={<Text>{festivalState(f) === "past" ? "這個影展已經結束，場次僅供回顧。" : "點一場加入行事曆。散場時間是依片長和你設定的廣告預告時間估的。"}</Text>}>
       {sessions.map((x) => {
         const cinema = festivalCinema(x, store.cinemas, f)
         const version: Version = { label: festivalPlace(x), times: [x.time] }
@@ -1045,7 +1068,7 @@ function FestivalFilmPage({ festival: f, film }: { festival: Festival; film: Fes
           <Row title={`${dateLabel(x.date).replace(/ .*$/, "")}　${x.time}`} subtitle={[festivalPlace(x), end(x) ? `預計 ${end(x)} 散場` : ""].filter(Boolean).join("｜")} />
         </NavigationLink>
       })}
-      {sessions.length ? null : <Text foregroundStyle={"secondaryLabel"}>這部片的場次都演完了</Text>}
+      {sessions.length ? null : <Text foregroundStyle={"secondaryLabel"}>找不到這部片的場次</Text>}
     </Section>
     <Section>
       <Button title={"官網的影片介紹"} systemImage={"safari"} action={() => Safari.openURL(film.url)} />

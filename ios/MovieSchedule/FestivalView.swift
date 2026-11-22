@@ -35,7 +35,7 @@ struct FestivalSection: View {
                                 FestivalFilmView(festId: b.id, filmId: row.film.id, title: row.film.title)
                             } label: {
                                 HStack(spacing: 10) {
-                                    GeneratedPoster(title: row.film.title, width: 44).clipShape(RoundedRectangle(cornerRadius: 6))
+                                    FestivalPoster(film: row.film, width: 44)
                                     VStack(alignment: .leading, spacing: 2) {
                                         Text(row.film.title).lineLimit(2)
                                         if let first = row.lines.first, !first.isEmpty {
@@ -90,7 +90,7 @@ struct FestivalFilmView: View {
                 let mins = d.film.mins ?? 0
                 Section {
                     HStack(alignment: .bottom, spacing: 12) {
-                        GeneratedPoster(title: d.film.title, width: 104).clipShape(RoundedRectangle(cornerRadius: 12))
+                        FestivalPoster(film: d.film, width: 104)
                         VStack(alignment: .leading, spacing: 4) {
                             Text([d.film.rating ?? "", mins > 0 ? "\(mins) 分鐘" : ""].filter { !$0.isEmpty }.joined(separator: "｜"))
                                 .font(.subheadline).foregroundStyle(.secondary)
@@ -111,11 +111,11 @@ struct FestivalFilmView: View {
                             }
                         }
                     }
-                    if d.sessions.isEmpty { Text("這部片的場次都演完了").foregroundStyle(.secondary) }
+                    if d.sessions.isEmpty { Text("找不到這部片的場次").foregroundStyle(.secondary) }
                 } header: {
                     Text("場次")
                 } footer: {
-                    Text("點一場加入行事曆。")
+                    Text((d.past ?? false) ? "這個影展已經結束，場次僅供回顧。" : "點一場加入行事曆。")
                 }
                 if let u = d.film.url, let url = URL(string: u) {
                     Section {
@@ -138,6 +138,20 @@ struct FestivalFilmView: View {
             }
         } catch {
             detail = .failed(errorText(error))
+        }
+    }
+}
+
+/// 影展的小海報：官網有給劇照就用，沒有就用片名畫的預設海報（不上網查，影展片名多半對不到院線資料）
+struct FestivalPoster: View {
+    let film: FestivalFilm
+    var width: CGFloat = 44
+
+    var body: some View {
+        if let u = film.poster, !u.isEmpty {
+            PosterView(title: film.title, width: width, directURL: u)
+        } else {
+            GeneratedPoster(title: film.title, width: width).clipShape(RoundedRectangle(cornerRadius: width > 60 ? 12 : 6))
         }
     }
 }

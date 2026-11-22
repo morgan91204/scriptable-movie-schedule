@@ -76,6 +76,8 @@ struct PosterView: View {
     var width: CGFloat = 44
     /// 有給上映日期 = 已下檔的舊片：用輕量查法（一部片一個小請求），不走完整查詢
     var lightRelease: String? = nil
+    /// 直接給圖片網址（影展官網的劇照）：不用查，直接載這張
+    var directURL: String? = nil
 
     @State private var image: UIImage?
     @State private var done = false
@@ -98,7 +100,9 @@ struct PosterView: View {
 
     private func load() async {
         var found: String?
-        if let lightRelease {
+        if let directURL, !directURL.isEmpty {
+            found = directURL
+        } else if let lightRelease {
             found = try? await Bridge.shared.call("posterLight", [title, lightRelease], as: String.self)
         } else {
             found = try? await Bridge.shared.call("moviePoster", [title, js(slug), js(en)], as: String.self)

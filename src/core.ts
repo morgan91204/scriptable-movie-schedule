@@ -1542,7 +1542,7 @@ export async function movieDays(slug: string, dates: string[]): Promise<TwMovieD
 // 整理成 data 分支的 festival.json；裡面有還沒演的場次，App 就多出「影展」分類，影展結束就自動消失。
 // 這一類只讀伺服器整理好的檔，手機不會自己去讀影展官網。
 export const FESTIVAL_URL = "https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/data/festival.json";
-export interface FestivalFilm { id: string; title: string; mins: number; rating: string; url: string }
+export interface FestivalFilm { id: string; title: string; mins: number; rating: string; url: string; poster?: string }
 export interface FestivalSession { film: string; date: string; time: string; venue: string; room: string; ticket: string }
 export interface Festival {
   id: string;
@@ -1556,20 +1556,36 @@ export interface Festival {
   sessions: FestivalSession[];
 }
 let festivalsNow: Festival[] = []; // 這次執行讀到的（同步拿，給分頁列判斷要不要顯示「影展」）
-/** 進行中或即將開始、而且還有場次沒演的影展（演過的日期已經去掉）。讀不到就是空的 */
-export async function loadFestivals(): Promise<Festival[]> {
-  const data = await loadServed<{ updated: number; festivals: Festival[] }>("festival", FESTIVAL_URL, 72, (d) => Array.isArray(d.festivals)).catch(() => null);
+/** 影展現在的狀態：now 進行中、soon 還沒開始、past 已經結束 */
+export function festivalState(f: Festival): "now" | "soon" | "past" {
   const today = todayTPE();
+  return f.end < today ? "past" : f.start > today ? "soon" : "now";
+}
+/** 今年的影展：進行中的排最前面，再來是即將開始的，已經結束的（留著回頭看）排最後、新的在前。讀不到就是空的 */
+export async function loadFestivals(): Promise<Festival[]> {
+  const data = await loadServed<{ updated: number; festivals: Festival[] }>("festival", FESTIVAL_URL, 24 * 14, (d) => Array.isArray(d.festivals)).catch(() => null);
+  const rank = { now: 0, soon: 1, past: 2 };
   festivalsNow = (data ? data.festivals : [])
-    .map((f) => ({ ...f, sessions: (f.sessions || []).filter((x) => x.date >= today) }))
-    .filter((f) => f.end >= today && f.sessions.length > 0);
+    .filter((f) => f && Array.isArray(f.sessions) && f.sessions.length > 0)
+    .sort((a, b) => rank[festivalState(a)] - rank[festivalState(b)] || (festivalState(a) === "soon" ? a.start.localeCompare(b.start) : b.start.localeCompare(a.start)));
   return festivalsNow;
 }
 /** 這次執行已經讀到的影展（沒讀過是空的） */
 export const festivalsReady = (): Festival[] => festivalsNow;
-/** 影展還有場次的日期 */
+/** 影展有場次的日期（整個影展期間；已經結束的影展也列，可以回頭看） */
 export function festivalDates(f: Festival): string[] {
   return Array.from(new Set(f.sessions.map((x) => x.date))).sort();
+}
+/** 一進來先看哪一天：影展期間是今天，還沒開始是第一天，已經結束也是第一天 */
+export function festivalDefaultDate(f: Festival): string {
+  const dates = festivalDates(f);
+  const today = todayTPE();
+  return dates.indexOf(today) >= 0 ? today : dates.find((d) => d > today) || dates[0] || "";
+}
+/** 影展名稱後面的狀態說明：「進行中」「6/26 開始」「已結束」 */
+export function festivalStateLabel(f: Festival): string {
+  const st = festivalState(f);
+  return st === "now" ? "進行中" : st === "past" ? "已結束" : `${Number(f.start.slice(5, 7))}/${Number(f.start.slice(8, 10))} 開始`;
 }
 /** 場地的顯示名稱：官網只寫「MUVIE」「台北信義威秀」，補成看得懂的；影廳接在後面 */
 export function festivalPlace(x: { venue: string; room: string }): string {
@@ -1586,7 +1602,7 @@ export function festivalDay(f: Festival, date: string): { film: FestivalFilm; se
     .map((id) => ({ film: film(id), sessions: by[id].sort((a, b) => a.time.localeCompare(b.time)) }))
     .sort((a, b) => a.sessions[0].time.localeCompare(b.sessions[0].time) || a.film.title.localeCompare(b.film.title));
 }
-/** 一部片在影展期間還沒演的所有場次 */
+/** 一部片在影展期間的所有場次 */
 export function festivalFilmSessions(f: Festival, filmId: string): FestivalSession[] {
   return f.sessions.filter((x) => x.film === filmId).sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
 }
@@ -1605,12 +1621,16 @@ export function festivalCinema(x: { venue: string; room: string }, cinemas: Cine
     : cinemas.find((c) => c.name.replace(/影城$/, "") === v) || cinemas.find((c) => v.length >= 4 && c.name.indexOf(v) >= 0);
   return hit || { id: "fest-" + x.venue, name: festivalPlace({ venue: x.venue, room: "" }) || f.name, city: "", district: "", source: "tw", url: f.site };
 }
-/** 分頁列上「影展」那一顆的小字：進行中／幾月幾日開始 */
+/** 分頁列上「影展」那一顆的小字：有進行中的寫「進行中」，否則是最近要開始的日期，都結束了寫「回顧」 */
 export function festivalNote(list: Festival[]): string {
-  const today = todayTPE();
-  if (list.some((f) => f.start <= today)) return "進行中";
-  const next = list.map((f) => f.start).sort()[0] || "";
-  return next ? `${Number(next.slice(5, 7))}/${Number(next.slice(8, 10))} 開始` : "";
+  if (list.some((f) => festivalState(f) === "now")) return "進行中";
+  const next = list.filter((f) => festivalState(f) === "soon").map((f) => f.start).sort()[0] || "";
+  return next ? `${Number(next.slice(5, 7))}/${Number(next.slice(8, 10))} 開始` : list.length ? "回顧" : "";
+}
+/** 影展清單下方的說明 */
+export function festivalFooter(f: Festival): string {
+  const past = festivalState(f) === "past" ? "這個影展已經結束，場次留著給你回頭看。" : "";
+  return `${past}場次來自${f.source}${festivalState(f) === "past" ? "" : `，${f.ticketing ? `購票會開啟${f.ticketing}` : "購票請到官網"}，是否售完請以售票頁為準`}。影展的片名在院線上映時可能不同。`;
 }
 
 // ───────────────────────── 距離 ─────────────────────────

@@ -31,7 +31,7 @@ jobs:
           UA="Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1"
           mkdir -p "$RUNNER_TEMP/out"; : > "$RUNNER_TEMP/out/index.txt"; n=0
           if [ "$URLS" = "tff-raw" ]; then node tools/festival-raw.mjs "$RUNNER_TEMP/out" | tee -a "$RUNNER_TEMP/out/index.txt"; URLS=""; fi
-          if [ "$URLS" = "festival-full" ]; then KEEP_PAST=1 node tools/festival.mjs "$RUNNER_TEMP/out/festival-full.json" | tee -a "$RUNNER_TEMP/out/index.txt"; URLS=""; fi
+          if [ "$URLS" = "festival-full" ]; then node tools/festival.mjs "$RUNNER_TEMP/out/festival-full.json" | tee -a "$RUNNER_TEMP/out/index.txt"; URLS=""; fi
           for U in $URLS; do
             n=$((n+1)); F=$(printf "%02d.html" "$n")
             code=$(curl -sS -m 40 -L -A "$UA" -H "Accept-Language: zh-TW,zh;q=0.9" -o "$RUNNER_TEMP/out/$F" -w "%{http_code}" -- "$U" || echo ERR)

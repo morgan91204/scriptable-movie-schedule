@@ -71,10 +71,14 @@
     festivalCinema: () => festivalCinema,
     festivalDates: () => festivalDates,
     festivalDay: () => festivalDay,
+    festivalDefaultDate: () => festivalDefaultDate,
     festivalFilmSessions: () => festivalFilmSessions,
+    festivalFooter: () => festivalFooter,
     festivalLines: () => festivalLines,
     festivalNote: () => festivalNote,
     festivalPlace: () => festivalPlace,
+    festivalState: () => festivalState,
+    festivalStateLabel: () => festivalStateLabel,
     festivalsReady: () => festivalsReady,
     fillMovieDay: () => fillMovieDay,
     fillRuntimes: () => fillRuntimes,
@@ -1925,15 +1929,28 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   }
   var FESTIVAL_URL = "https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/data/festival.json";
   var festivalsNow = [];
-  async function loadFestivals() {
-    const data = await loadServed("festival", FESTIVAL_URL, 72, (d) => Array.isArray(d.festivals)).catch(() => null);
+  function festivalState(f) {
     const today = todayTPE();
-    festivalsNow = (data ? data.festivals : []).map((f) => ({ ...f, sessions: (f.sessions || []).filter((x) => x.date >= today) })).filter((f) => f.end >= today && f.sessions.length > 0);
+    return f.end < today ? "past" : f.start > today ? "soon" : "now";
+  }
+  async function loadFestivals() {
+    const data = await loadServed("festival", FESTIVAL_URL, 24 * 14, (d) => Array.isArray(d.festivals)).catch(() => null);
+    const rank = { now: 0, soon: 1, past: 2 };
+    festivalsNow = (data ? data.festivals : []).filter((f) => f && Array.isArray(f.sessions) && f.sessions.length > 0).sort((a, b) => rank[festivalState(a)] - rank[festivalState(b)] || (festivalState(a) === "soon" ? a.start.localeCompare(b.start) : b.start.localeCompare(a.start)));
     return festivalsNow;
   }
   var festivalsReady = () => festivalsNow;
   function festivalDates(f) {
     return Array.from(new Set(f.sessions.map((x) => x.date))).sort();
+  }
+  function festivalDefaultDate(f) {
+    const dates = festivalDates(f);
+    const today = todayTPE();
+    return dates.indexOf(today) >= 0 ? today : dates.find((d) => d > today) || dates[0] || "";
+  }
+  function festivalStateLabel(f) {
+    const st = festivalState(f);
+    return st === "now" ? "進行中" : st === "past" ? "已結束" : `${Number(f.start.slice(5, 7))}/${Number(f.start.slice(8, 10))} 開始`;
   }
   function festivalPlace(x) {
     const v = /^MUVIE$/i.test(x.venue) ? "MUVIE CINEMAS" : x.venue;
@@ -1961,10 +1978,13 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     return hit || { id: "fest-" + x.venue, name: festivalPlace({ venue: x.venue, room: "" }) || f.name, city: "", district: "", source: "tw", url: f.site };
   }
   function festivalNote(list) {
-    const today = todayTPE();
-    if (list.some((f) => f.start <= today)) return "進行中";
-    const next = list.map((f) => f.start).sort()[0] || "";
-    return next ? `${Number(next.slice(5, 7))}/${Number(next.slice(8, 10))} 開始` : "";
+    if (list.some((f) => festivalState(f) === "now")) return "進行中";
+    const next = list.filter((f) => festivalState(f) === "soon").map((f) => f.start).sort()[0] || "";
+    return next ? `${Number(next.slice(5, 7))}/${Number(next.slice(8, 10))} 開始` : list.length ? "回顧" : "";
+  }
+  function festivalFooter(f) {
+    const past = festivalState(f) === "past" ? "這個影展已經結束，場次留著給你回頭看。" : "";
+    return `${past}場次來自${f.source}${festivalState(f) === "past" ? "" : `，${f.ticketing ? `購票會開啟${f.ticketing}` : "購票請到官網"}，是否售完請以售票頁為準`}。影展的片名在院線上映時可能不同。`;
   }
   function distanceKm(a, b) {
     const R = 6371, rad = Math.PI / 180;
@@ -2594,15 +2614,15 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     const f = list.find((x) => x.id === festId) || list[0];
     if (!f) return { festivals: [], note: "", id: "", name: "", range: "", footer: "", dates: [], date: "", day: [] };
     const dates = festivalDates(f);
-    const d = dates.indexOf(date) >= 0 ? date : dates[0];
+    const d = dates.indexOf(date) >= 0 ? date : festivalDefaultDate(f);
     const md = (x) => `${Number(x.slice(5, 7))}/${Number(x.slice(8, 10))}`;
     return {
-      festivals: list.map((x) => ({ id: x.id, name: x.name })),
+      festivals: list.map((x) => ({ id: x.id, name: `${x.name}（${festivalStateLabel(x)}）` })),
       note: festivalNote(list),
       id: f.id,
       name: f.name,
-      range: `${md(f.start)}–${md(f.end)}`,
-      footer: `場次來自${f.source}，${f.ticketing ? `購票會開啟${f.ticketing}` : "購票請到官網"}。是否售完請以售票頁為準。影展的片名在院線上映時可能不同。`,
+      range: `${md(f.start)}–${md(f.end)}｜${festivalStateLabel(f)}`,
+      footer: festivalFooter(f),
       dates,
       date: d,
       day: festivalDay(f, d).map(({ film, sessions }) => ({ film, count: sessions.length, lines: festivalLines(film, sessions) }))
@@ -2615,8 +2635,9 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     const film = f.films.find((x) => x.id === filmId);
     if (!film) return null;
     return {
-      name: f.name,
+      name: `${f.name}（${festivalStateLabel(f)}）`,
       film,
+      past: festivalState(f) === "past",
       sessions: festivalFilmSessions(f, filmId).map((x) => ({ date: x.date, time: x.time, place: festivalPlace(x), room: x.room, ticket: x.ticket || film.url, cinema: festivalCinema(x, cinemas, f) }))
     };
   }
