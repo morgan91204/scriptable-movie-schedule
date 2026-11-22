@@ -461,7 +461,8 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     let changed = false;
     for (const f of got.filter((x) => String(x.end).slice(0, 4) === y)) {
       const i = list.findIndex((x) => x.id === f.id);
-      if (i >= 0 && f.sessions.length <= list[i].sessions.length) continue; // 已經有、而且沒有比較完整
+      const pics = (x) => (x.films || []).filter((m) => m.poster).length;
+      if (i >= 0 && f.sessions.length <= list[i].sessions.length && !(f.sessions.length === list[i].sessions.length && pics(f) > pics(list[i]))) continue; // 已經有、而且沒有比較完整（場次沒變多、圖也沒變多）
       if (i >= 0) list[i] = f; else list.push(f);
       changed = true;
       console.log(`${f.name} ${y}：補進 ${y} 年的存檔（${f.sessions.length} 場）`);
