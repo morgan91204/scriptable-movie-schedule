@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <meta name="format-detection" content="telephone=no" />
+        <meta http-equiv="X-UA-Compatible" content="ie=edge" />
+        <meta name="keywords" content="首頁關鍵字" />
+        <meta name="description" content="首頁簡介" />
+        <meta property="og:type" content="website" />
+        <meta property="og:title" content="首頁 | 桃園電影節" />
+        <meta property="og:image" content="https://tyff.taoyuancf.org.tw/project/images/logo.webp" />
+        <!-- At least: 200 x 200, 檔案大小必須小於8mb -->
+        <meta property="og:description" content="首頁簡介" />
+        <meta property="og:url" content="https://tyff.taoyuancf.org.tw" />
+        <meta property="og:site_name" content="桃園電影節" />
+        <title>首頁 | 桃園電影節</title>
+
+        <link rel="icon" href="https://tyff.taoyuancf.org.tw/project/images/favicon.ico" type="image/x-icon" />
+
+        <link rel="preload" as="font" href="https://tyff.taoyuancf.org.tw/project/fonts/fontawesome/fa-solid-900.woff2" type="font/woff2" crossorigin="anonymous" />
+        <link rel="preload" as="font" href="https://tyff.taoyuancf.org.tw/project/fonts/fontawesome/fa-brands-400.woff2" type="font/woff2" crossorigin="anonymous" />
+        <link rel="preload" as="font" href="https://tyff.taoyuancf.org.tw/project/fonts/fontawesome/fa-regular-400.woff2" type="font/woff2" crossorigin="anonymous" />
+
+        <!-- $$$ Basic Structure CSS 1/1 $$$ -->
+        <!-- Included CSS of base,layout,modules,state,icon & theme -->
+        <link rel="stylesheet" href="https://tyff.taoyuancf.org.tw/project/css/core.min.css?v=202412051455" />
+        <!-- Fancybox 3.5.7 -->
+        <link rel="stylesheet" href="https://tyff.taoyuancf.org.tw/project/css/jquery.fancybox.min.css?v=202412051455" />
+        <!-- Grid system is used from bootstrap v3.4.1 customize in layout.sass -->
+        <!-- Fontawesome 5.15.1 in core.sass -->
+        <!-- Slick in core.sass -->
+        <!-- animate.compact.css v4.1.1 in core.sass -->
+        <!-- aos.css 2.3.2 in core.sass -->
+
+            <!-- $$$ Single CSS $$$ -->
+    <link rel="stylesheet" href="https://tyff.taoyuancf.org.tw/project/css/jquery.mCustomScrollbar.css?v=202412051455" />
+    <link rel="stylesheet" href="https://tyff.taoyuancf.org.tw/project/css/index.min.css?v=202412051455" />
+
+
+
+        <!-- $$$ Basic Structure JS 1/2 $$$ -->
+        <!-- Jquery 3.6.0 -->
+        <script defer src="https://tyff.taoyuancf.org.tw/project/js/jquery-3.6.0.min.js?v=202412051455"></script>
+        <!-- Google font -->
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&family=PT+Sans:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+
+        <!-- Swiper 11.1.4 -->
+        <script defer src="https://tyff.taoyuancf.org.tw/project/js/swiper-bundle.min.js?v=202412051455"></script>
+
+        <!-- Fancybox 3.5.7 -->
+        <script defer src="https://tyff.taoyuancf.org.tw/project/js/jquery.fancybox.min.js?v=202412051455"></script>
+
+            <!-- $$$ Single JS $$$ -->
+    <script defer src="https://tyff.taoyuancf.org.tw/project/js/geoCalendar.js?v=202508071736"></script>
+    <script>
+        $currentpage = "INDEX"
+    </script>
+
+        <!--$$$ Basic Structure JS 2/2 $$$-->
+        <script defer src="https://tyff.taoyuancf.org.tw/project/js/custom.js?v=202412051455"></script>
+
+            <script type="application/ld+json">
+    {
+        "@context": "http://schema.org",
+        "@type": "LocalBusiness",
+        "name": "桃園電影節",
+        "image": "project/images/logo.png",
+        "telephone": "02-2361-0873",
+        "email": "press.tyff@gmail.com",
+        "address": {
+            "@type": "PostalAddress",
+            "streetAddress": "",
+            "addressLocality": ""
+        }
+    }
+</script>
+
+                
+            </head>
+
+    <body>
+    
+        <header>
+
+            <div class="header__blank-space"></div>
+
+            <div class="screenmask zindex-30"></div>
+
+            <div class="site-nav zindex-50">
+                <div class="main-menu zindex-40">
+                    <nav class="navbar">
+                        <a href="https://tyff.taoyuancf.org.tw" class="logo">
+                            
+                            <img src="https://tyff.taoyuancf.org.tw/project/images/footerlogo.png" alt="桃園電影節logo">
+                        </a>
+                        <div class="function zindex-30">
+                                                            <!-- Start Search -->
+                                <form action="https://tyff.taoyuancf.org.tw/site-search" method="GET" class="searchbar">
+                                    <input type="search" class="searchbar__input" name="s" value="" placeholder="全站搜尋/請輸入關鍵字" required/>
+                                    <button type="submit" class="searchbar__button">
+                                        <i class="fas fa-search"></i>
+                                    </button>
+                                </form>
+                                <!-- End Search -->
+                                                                                        <a href="/sitemap" class="btn btn-sitemap">
+                                    <i class="fa-solid fa-sitemap"></i>
+                                </a>
+                                                        <div class="menu-toggle zindex-40">
+                                <span></span>
+                                <span></span>
+                                <span></span>
+                            </div>
+                        </div>
+                        <div id="menu-on" class="navitem-group">
+                            <div class="navitem-group__blank-space"></div>
+                            <ul>
+
+                                                                    <li class="navhead" data-page="">
+                                        <a href="javascript:;">桃園電影節</a>
+                                        <div class="opentoggle">
+                                            <div class="sticker-triangle"></div>
+                                        </div>
+                                        <ul class="">
+                                                                                            <li class="navitem">
+                                                    <a href="https://tyff.taoyuancf.org.tw/venue">場地資訊</a>
+                                                </li>
+                                                                                                                                        <li class="navitem">
+                                                    <a href="https://tyff.taoyuancf.org.tw/sponsor">贊助與感謝</a>
+                                                </li>
+                                                                                                                                </ul>
+                                    </li>
+                                
+                                                                    <li class="navhead" data-page="">
+                                        <a href="javascript:;">最新消息</a>
+                                        <div class="opentoggle">
+                                            <div class="sticker-triangle"></div>
+                                        </div>
+                                        <ul class="">
+                                                                                            <li class="navitem">
+                                                    <a href="https://tyff.taoyuancf.org.tw/newscategory/news">影展新聞</a>
+                                                </li>
+                                                                                            <li class="navitem">
+                                                    <a href="https://tyff.taoyuancf.org.tw/newscategory/festivalannouncements">影展公告</a>
+                                                </li>
+                                                                                    </ul>
+                                    </li>
+                                
+                                                                    <li class="navhead" data-page="">
+                                        <a href="javascript:;">系列活動</a>
+                                        <div class="opentoggle">
+                                            <div class="sticker-triangle"></div>
+                                        </div>
+                                        <ul class="">
+                                                                                            <li class="navitem">
+                                                    <a href="https://tyff.taoyuancf.org.tw/activitycategory/12">影展周邊活動</a>
+                                                </li>
+                                                                                            <li class="navitem">
+                                                    <a href="https://tyff.taoyuancf.org.tw/activitycategory/programguide">選片指南</a>
+                                                </li>
+                                                                                            <li class="navitem">
+                                                    <a href="https://tyff.taoyuancf.org.tw/activitycategory/internship">桃園電影科技國際論壇</a>
+                                                </li>
+                                                                                    </ul>
+                                    </li>
+                                
+                                                                    <li class="navhead" data-page="">
+                                        <a href="javascript:;">影展片單</a>
+                                        <div class="opentoggle">
+                                            <div class="sticker-triangle"></div>
+                                        </div>
+                                        <ul class="">
+                                                                                            <li class="navitem">
+                                                    <a href="https://tyff.taoyuancf.org.tw/theme">主題單元</a>
+                                                </li>
+                                                                                                                                        <li class="navitem">
+                                                    <a href="https://tyff.taoyuancf.org.tw/filmsearch">場次日曆</a>
+                                                </li>
+                                                                                                                                                                                            <li class="navitem">
+                                                        <a href="https://tyff.taoyuancf.org.tw/downloadcategory/download">手冊摺頁電子版下載</a>
+                                                    </li>
+                                                                                                                                    </ul>
+                                    </li>
+                                
+                                                                    <li class="navhead" data-page="">
+                                        <a href="javascript:;">桃園電影獎</a>
+                                        <div class="opentoggle">
+                                            <div class="sticker-triangle"></div>
+                                        </div>
+                                        <ul class="">
+                                                                                            <li class="navitem">
+                                                    <a href="https://tyff.taoyuancf.org.tw/taoyuanfilmawards/submissions">2026 桃園電影獎徵件報名</a>
+                                                </li>
+                                                                                            <li class="navitem">
+                                                    <a href="https://tyff.taoyuancf.org.tw/taoyuanfilmawards/2025tyfanom">桃園電影獎入圍片單</a>
+                                                </li>
+                                                                                            <li class="navitem">
+                                                    <a href="https://tyff.taoyuancf.org.tw/taoyuanfilmawards/2025awardceremony">桃園電影獎得獎名單</a>
+                                                </li>
+                                                                                    </ul>
+                                    </li>
+                                
+                                                                    <li class="navhead" data-page="">
+                                        <a href="javascript:;">購票與商品</a>
+                                        <div class="opentoggle">
+                                            <div class="sticker-triangle"></div>
+                                        </div>
+                                        <ul class="">
+                                                                                                                                                <li class="navitem">
+                                                        <a href="https://tyff.taoyuancf.org.tw/purchasing/guide">購票方式</a>
+                                                    </li>
+                                                                                                                                                                                        <li class="navitem">
+                                                    <a href="https://tyff.taoyuancf.org.tw/question">票務Ｑ＆Ａ</a>
+                                                </li>
+                                                                                                                                                                                                                            </ul>
+                                    </li>
+                                
+                                                                    <li class="navhead" data-page="">
+                                        <a href="https://tyff.taoyuancf.org.tw/theme/history">歷屆影展</a>
+                                    </li>
+                                
+                            </ul>
+                        </div>
+                    </nav>
+                </div>
+            </div>
+
+        </header>
+
+                <section>
+
+            <h1 class="is-existhidden">桃園電影節官方網站</h1>
+
+            
+                                    <!-- Start Jumbotron -->
+                    <div class="jumbotron">
+                        <div class="swiper-jumbotron">
+                            <div class="swiper-wrapper">
+                                                                    <div class="swiper-slide">
+                                        <a href="javascript:;" class="jumbotron__link">
+                                            <img src="https://tyff.taoyuancf.org.tw/storage/files/u5b98u7db2u57160610-02.jpg" alt="" class="jumbotron__img">
+                                        </a>
+                                    </div>
+                                                                    <div class="swiper-slide">
+                                        <a href="https://tyff.taoyuancf.org.tw/taoyuanfilmawards/2025awardceremony" class="jumbotron__link">
+                                            <img src="https://tyff.taoyuancf.org.tw/storage/files/2026u6843u5712u96fbu5f71u734eu5f97u734eu540du55ae-1.jpg" alt="𝟮𝟬𝟮𝟲 桃園電影獎得獎名單" class="jumbotron__img">
+                                        </a>
+                                    </div>
+                                                            </div>
+                        </div>
+
+                        <!-- Start menu -->
+<ul id="menu" class="menu menu--abso zindex-10">
+
+            <li>
+            <a href="javascript:;" class="menu__item">
+                桃園電影節
+                <span>About us</span>
+            </a>
+            <ul class="menu__submenu">
+                                    <li>
+                        <a href="https://tyff.taoyuancf.org.tw/venue" class="menu__subitem"><img src="https://tyff.taoyuancf.org.tw/storage/files/66666-0.webp" alt="場地資訊"><span>場地資訊</span></a>
+                    </li>
+                                                    <li>
+                        <a href="https://tyff.taoyuancf.org.tw/sponsor" class="menu__subitem"><img src="https://tyff.taoyuancf.org.tw/storage/files/77777-0.webp" alt="贊助與感謝"><span>贊助與感謝</span></a>
+                    </li>
+                                            </ul>
+        </li>
+    
+            <li>
+            <a href="javascript:;" class="menu__item">
+                最新消息
+                <span>News</span>
+            </a>
+            <ul class="menu__submenu">
+                                    <li>
+                        <a href="https://tyff.taoyuancf.org.tw/newscategory/news" class="menu__subitem"><img src="https://tyff.taoyuancf.org.tw/storage/files/00000000.gif" alt="影展新聞"><span>影展新聞</span></a>
+                    </li>
+                                    <li>
+                        <a href="https://tyff.taoyuancf.org.tw/newscategory/festivalannouncements" class="menu__subitem"><img src="https://tyff.taoyuancf.org.tw/storage/files/2222222.gif" alt="影展公告"><span>影展公告</span></a>
+                    </li>
+                            </ul>
+        </li>
+    
+            <li>
+            <a href="javascript:;" class="menu__item">
+                系列活動
+                <span>Activity</span>
+            </a>
+            <ul class="menu__submenu">
+                                    <li>
+                        <a href="https://tyff.taoyuancf.org.tw/activitycategory/12" class="menu__subitem"><img src="https://tyff.taoyuancf.org.tw/storage/files/3333333.gif" alt="影展周邊活動"><span>影展周邊活動</span></a>
+                    </li>
+                                    <li>
+                        <a href="https://tyff.taoyuancf.org.tw/activitycategory/programguide" class="menu__subitem"><img src="https://tyff.taoyuancf.org.tw/storage/files/44444.gif" alt="選片指南"><span>選片指南</span></a>
+                    </li>
+                                    <li>
+                        <a href="https://tyff.taoyuancf.org.tw/activitycategory/internship" class="menu__subitem"><img src="https://tyff.taoyuancf.org.tw/storage/files/u5b98u7db2u5206u985eu5716-u8ad6u58c7.gif" alt="桃園電影科技國際論壇"><span>桃園電影科技國際論壇</span></a>
+                    </li>
+                            </ul>
+        </li>
+    
+            <li>
+            <a href="javascript:;" class="menu__item">
+                影展片單
+                <span>Film</span>
+            </a>
+            <ul class="menu__submenu">
+                                    <li>
+                        <a href="https://tyff.taoyuancf.org.tw/theme" class="menu__subitem"><img src="/project/images/theme-movie.webp" alt="主題單元"><span>主題單元</span></a>
+                    </li>
+                                                    <li>
+                        <a href="https://tyff.taoyuancf.org.tw/filmsearch" class="menu__subitem"><img src="/project/images/calendar.webp" alt="場次日曆"><span>場次日曆</span></a>
+                    </li>
+                                                                            <li>
+                            <a href="https://tyff.taoyuancf.org.tw/downloadcategory/download" class="menu__subitem"><img src="https://tyff.taoyuancf.org.tw/storage/files/8888888.gif" alt="手冊摺頁電子版下載"><span>手冊摺頁電子版下載</span></a>
+                        </li>
+                                                </ul>
+        </li>
+    
+            <li>
+            <a href="javascript:;" class="menu__item">
+                桃園電影獎
+                <span>Award</span>
+            </a>
+            <ul class="menu__submenu">
+                                    <li>
+                        <a href="https://tyff.taoyuancf.org.tw/taoyuanfilmawards/submissions" class="menu__subitem"><img src="https://tyff.taoyuancf.org.tw/storage/files/competition.gif" alt="2026 桃園電影獎徵件報名"><span>2026 桃園電影獎徵件報名</span></a>
+                    </li>
+                                    <li>
+                        <a href="https://tyff.taoyuancf.org.tw/taoyuanfilmawards/2025tyfanom" class="menu__subitem"><img src="https://tyff.taoyuancf.org.tw/storage/files/nominees.gif" alt="桃園電影獎入圍片單"><span>桃園電影獎入圍片單</span></a>
+                    </li>
+                                    <li>
+                        <a href="https://tyff.taoyuancf.org.tw/taoyuanfilmawards/2025awardceremony" class="menu__subitem"><img src="https://tyff.taoyuancf.org.tw/storage/files/u7372u734eu540du55ae.gif" alt="桃園電影獎得獎名單"><span>桃園電影獎得獎名單</span></a>
+                    </li>
+                            </ul>
+        </li>
+    
+            <li>
+            <a href="javascript:;" class="menu__item">
+                購票與商品
+                <span>Purchasing</span>
+            </a>
+            <ul class="menu__submenu">
+                                                            <li>
+                            <a href="https://tyff.taoyuancf.org.tw/purchasing/guide" class="menu__subitem"><img src="https://tyff.taoyuancf.org.tw/storage/files/99999.gif" alt="購票方式"><span>購票方式</span></a>
+                        </li>
+                                                                                            <li>
+                        <a href="https://tyff.taoyuancf.org.tw/question" class="menu__subitem"><img src="https://tyff.taoyuancf.org.tw/storage/files/sales.gif" alt="票務Ｑ＆Ａ"><span>票務Ｑ＆Ａ</span></a>
+                    </li>
+                                                                                </ul>
+        </li>
+    
+            <li>
+            <a href="https://tyff.taoyuancf.org.tw/theme/history" class="menu__item">
+                歷屆影展
+                <span>History</span>
+            </a>
+        </li>
+        
+</ul>
+<!-- End menu -->                    </div>
+                    <!-- End Jumbotron -->
+                
+                
+                
+            
+                
+                                    <!-- Start Newsarea -->
+                    <div class="newsarea">
+                        <div class="container-1710">
+                            <div class="newsarea__head">
+                                                                                                            <h2 class="bigheading">影展新聞<span>Film News</span></h2>
+                                        <a href="https://tyff.taoyuancf.org.tw/newscategory/news" class="more">More<span></span></a>
+                                                                                                                                                                    </div>
+                            <div class="newsarea__body">
+                                <div class="swiper-newsarea">
+                                    <div class="swiper-wrapper">
+                                                                                    <div class="swiper-slide">
+                                                <a href="https://tyff.taoyuancf.org.tw/news/2026-14" class="newsbox">
+                                                    <div class="newsbox__pic"><img src="https://tyff.taoyuancf.org.tw/storage/files/u622au5716-2026-08-25-u51ccu666812608.png" alt="𝟮𝟬𝟮𝟲 桃園電影獎 正式揭曉！"></div>
+                                                    <h3 class="newsbox__title">𝟮𝟬𝟮𝟲 桃園電影獎 正式揭曉！</h3>
+                                                    <div class="newsbox__date">2026-08-24</div>
+                                                    <p class="newsbox__text">2026桃園電影獎正式揭曉！《一生二命》勇奪最佳影片，《深度安靜》與《96分鐘》各獲三項大獎，林柏宏、林依晨分別以《96分鐘》、《深度安靜》拿下最佳男、女演員，李雪與林意箴則共同獲得最佳女配角；此外，《奴隸島》、《風的前奏》等作品也分別獲得人文關懷獎、最佳動畫獎等肯定。本屆共吸引17個地區、261部作品投件，最終20部作品角逐13座獎項，總獎金超過135萬元。</p>
+                                                </a>
+                                            </div>
+                                                                                    <div class="swiper-slide">
+                                                <a href="https://tyff.taoyuancf.org.tw/news/2025awardceremony" class="newsbox">
+                                                    <div class="newsbox__pic"><img src="https://tyff.taoyuancf.org.tw/storage/files/img-6242.jpg" alt="𝟮𝟬𝟮𝟲 桃園電影科技國際論壇  國內外專家齊聚一堂！"></div>
+                                                    <h3 class="newsbox__title">𝟮𝟬𝟮𝟲 桃園電影科技國際論壇  國內外專家齊聚一堂！</h3>
+                                                    <div class="newsbox__date">2026-08-21</div>
+                                                    <p class="newsbox__text">論壇次日延續首日對全球視效產業、技術研發與世界級電影製作的探討，第二日將視角帶回台灣第一線工作現場，從視覺特效總監的影像決策、AI影像製程、國際管線的在地轉譯，到跨國產業合作，呈現技術進入實際製作後所面對的選擇與挑戰。</p>
+                                                </a>
+                                            </div>
+                                                                                    <div class="swiper-slide">
+                                                <a href="https://tyff.taoyuancf.org.tw/news/2026-2" class="newsbox">
+                                                    <div class="newsbox__pic"><img src="https://tyff.taoyuancf.org.tw/storage/files/u622au5716-2026-08-21-u4e0au5348104836.png" alt="𝟮𝟬𝟮𝟲 桃園電影科技國際論壇 集結全球視效領航者！"></div>
+                                                    <h3 class="newsbox__title">𝟮𝟬𝟮𝟲 桃園電影科技國際論壇 集結全球視效領航者！</h3>
+                                                    <div class="newsbox__date">2026-08-20</div>
+                                                    <p class="newsbox__text">2026桃園電影科技國際論壇首日邀集紐西蘭、韓國頂尖影視科技專家，從產業趨勢、AI技術到《阿凡達：火與燼》的視覺特效製作，帶觀眾一窺電影特效如何讓想像化為現實。論壇將持續至8/21，探索科技與電影創作的更多可能。</p>
+                                                </a>
+                                            </div>
+                                                                                    <div class="swiper-slide">
+                                                <a href="https://tyff.taoyuancf.org.tw/news/2026-12" class="newsbox">
+                                                    <div class="newsbox__pic"><img src="https://tyff.taoyuancf.org.tw/storage/files/u622au5716-2026-08-22-u665au4e0a103626.png" alt="《陽光女子合唱團》演員羅晨恩共同參與映後現場！"></div>
+                                                    <h3 class="newsbox__title">《陽光女子合唱團》演員羅晨恩共同參與映後現場！</h3>
+                                                    <div class="newsbox__date">2026-08-16</div>
+                                                    <p class="newsbox__text">《陽光女子合唱團》演員羅晨恩親臨桃影，與觀眾分享拍攝故事並帶來自彈自唱，現場互動溫暖真摯，讓觀眾感受作品滿滿的母愛與力量。</p>
+                                                </a>
+                                            </div>
+                                                                                    <div class="swiper-slide">
+                                                <a href="https://tyff.taoyuancf.org.tw/news/2026-11" class="newsbox">
+                                                    <div class="newsbox__pic"><img src="https://tyff.taoyuancf.org.tw/storage/files/u622au5716-2026-08-22-u665au4e0a103059.png" alt="奇談島航-劇集系列 主創團隊蒞臨映後現場！"></div>
+                                                    <h3 class="newsbox__title">奇談島航-劇集系列 主創團隊蒞臨映後現場！</h3>
+                                                    <div class="newsbox__date">2026-08-16</div>
+                                                    <p class="newsbox__text">《煙囪的孩子》、《三分之二》、《光到不了的地方》主創齊聚桃影，導演王登鈺、楊子霆與美術指導秦彤分享動畫創作，帶觀眾穿梭記憶、神靈傳說與末日世界的奇幻想像。</p>
+                                                </a>
+                                            </div>
+                                                                                    <div class="swiper-slide">
+                                                <a href="https://tyff.taoyuancf.org.tw/news/2026-10" class="newsbox">
+                                                    <div class="newsbox__pic"><img src="https://tyff.taoyuancf.org.tw/storage/files/u622au5716-2026-08-22-u665au4e0a102238.png" alt="《大仙尪仔》劇組熱鬧蒞臨！"></div>
+                                                    <h3 class="newsbox__title">《大仙尪仔》劇組熱鬧蒞臨！</h3>
+                                                    <div class="newsbox__date">2026-08-16</div>
+                                                    <p class="newsbox__text">《大仙尪仔》導演凌柏瑋攜手范逸臣、洪都拉斯、方馨、鄭仲茵、牧森熱鬧現身桃影，分享艋舺小人物的荒謬冒險與台灣草根生命力，現場笑聲不斷、氣氛熱烈！</p>
+                                                </a>
+                                            </div>
+                                                                                    <div class="swiper-slide">
+                                                <a href="https://tyff.taoyuancf.org.tw/news/2026-9" class="newsbox">
+                                                    <div class="newsbox__pic"><img src="https://tyff.taoyuancf.org.tw/storage/files/u622au5716-2026-08-22-u665au4e0a100946.png" alt="《怎麼可能我的祖先是你家的鬼》映後精彩紀實！"></div>
+                                                    <h3 class="newsbox__title">《怎麼可能我的祖先是你家的鬼》映後精彩紀實！</h3>
+                                                    <div class="newsbox__date">2026-08-16</div>
+                                                    <p class="newsbox__text">《怎麼可能我的祖先是你家的鬼》演員小薰、洪金輝與小薰爸爸親臨桃影，與觀眾分享這場結合恐怖、喜劇與尋根之旅的跨國奇幻冒險及幕後趣事。</p>
+                                                </a>
+                                            </div>
+                                                                                    <div class="swiper-slide">
+                                                <a href="https://tyff.taoyuancf.org.tw/news/2026-8" class="newsbox">
+                                                    <div class="newsbox__pic"><img src="https://tyff.taoyuancf.org.tw/storage/files/u622au5716-2026-08-22-u665au4e0a95404.png" alt="《小包袱》映後故事"></div>
+                                                    <h3 class="newsbox__title">《小包袱》映後故事</h3>
+                                                    <div class="newsbox__date">2026-08-16</div>
+                                                    <p class="newsbox__text">《小包袱》劇組導演徐麗雯、製作人葉天倫及演員吳奕蓉、黃湘婷、今子嫣齊聚桃影，分享從小說改編到角色演繹的幕後故事，一起打開藏在親情與告別裡的心中小包袱。</p>
+                                                </a>
+                                            </div>
+                                                                                    <div class="swiper-slide">
+                                                <a href="https://tyff.taoyuancf.org.tw/news/2026-7" class="newsbox">
+                                                    <div class="newsbox__pic"><img src="https://tyff.taoyuancf.org.tw/storage/files/u622au5716-2026-08-22-u665au4e0a94713.png" alt="《離異之域》映後點滴"></div>
+                                                    <h3 class="newsbox__title">《離異之域》映後點滴</h3>
+                                                    <div class="newsbox__date">2026-08-15</div>
+                                                    <p class="newsbox__text">本次桃影邀請了《離異之域》導演李儒林出席映後座談，與觀眾分享拍攝紀錄片的點點滴滴。</p>
+                                                </a>
+                                            </div>
+                                                                                    <div class="swiper-slide">
+                                                <a href="https://tyff.taoyuancf.org.tw/news/2026-6" class="newsbox">
+                                                    <div class="newsbox__pic"><img src="https://tyff.taoyuancf.org.tw/storage/files/dsc00104-2.jpg" alt="《小丑與天鵝》重出江湖！"></div>
+                                                    <h3 class="newsbox__title">《小丑與天鵝》重出江湖！</h3>
+                                                    <div class="newsbox__date">2026-08-15</div>
+                                                    <p class="newsbox__text">《小丑與天鵝》2K數位修復版——經典重返大銀幕，小丑再次登場！</p>
+                                                </a>
+                                            </div>
+                                                                            </div>
+                                </div>
+                                <div class="flexCC">
+                                    <div class="swiper-pagination"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- End Newsarea -->
+                
+                
+            
+                
+                
+                                    <!-- Start Datearea -->
+                    <div class="datearea">
+                        <div class="container-1710">
+                            <div class="datearea__head">
+                                <h2 class="bigheading">活動日曆<span>Event calendar</span></h2>
+                                <a href="https://tyff.taoyuancf.org.tw/activitycategory" class="more">More<span></span></a>
+                            </div>
+                            <div class="datearea__body">
+                                <div class="datearea__left">
+                                    <div id="geo-calendar">
+                                        <div class="wrap"></div>
+                                        <div class="links">
+                                            <a class="buy" href="https://www.opentix.life/search/%E6%A1%83%E5%9C%92%E9%9B%BB%E5%BD%B1%E7%AF%80/DEFAULT?type=programs" target="_blank">線上購票</a>
+                                                                                                                                                            <a class="how" href="https://tyff.taoyuancf.org.tw/purchasing/guide" target="_blank">購票方式</a>
+                                                                                                                                                <a class="qa" href="https://tyff.taoyuancf.org.tw/question" target="_blank">票務Ｑ＆Ａ</a>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="datearea__right">
+                                    <div class="swiper-movie">
+                                        <div class="swiper-wrapper">
+
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            
+
+                                        </div>
+                                    </div>
+                                    <div class="swiper-button-prev"></div>
+                                    <div class="swiper-button-next"></div>
+                                    <div class="swiper-pagination"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- End Datearea -->
+                
+            
+                        <script>
+                document.addEventListener('DOMContentLoaded', function() {
+                    
+                    $(function() {
+
+                        var $geoCalendar = $('#geo-calendar'),
+                            $gcYear = $geoCalendar.find('.year'),
+                            $gcMonth = $geoCalendar.find('.month');
+
+                        $geoCalendar.on('calendar.changed', function(e) {
+                            
+                            $.get('https://tyff.taoyuancf.org.tw/filmsearch/search', {
+                                year: $gcYear.val(),
+                                month: $gcMonth.val()
+                            }).done(function(result) {
+                                if (result.data) {
+                                    dateList = result.data;
+                                    geoCalendar();
+                                }
+                            });
+
+                            
+                        }).trigger('calendar.changed');
+
+                    });
+                })
+            </script>
+            
+        </section>
+
+
+        <footer>
+
+            <div id="block-policy" class="block-policy--cht"></div>
+
+            <div class="sidebar sidebar--fixed">
+                <div class="share">
+                    <div class="share__inner">
+                        <div class="socialShare">
+                            <div class="socialShare__inner">
+                                <a href="javascript:;" id="socialShare-FB" title="分享到Facebook" aria-label="分享到Facebook" class="socialShare__item"><i class="fa-brands fa-facebook"></i></a>
+                                <a href="javascript:;" id="socialShare-Line" title="分享到Line" aria-label="分享到Line" class="socialShare__item"><i class="fab fa-line"></i></a>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="share__icon">
+                        <i class="fa-solid fa-share-nodes"></i>
+                    </div>
+                </div>
+                <div id="back-to-top" class="backTotop">
+                    <i class="fa-solid fa-caret-up"></i>
+                </div>
+            </div>
+
+            <div class="footer">
+
+                <div class="container-1710">
+
+                    <div class="footer__inner">
+                        <a href="https://tyff.taoyuancf.org.tw" class="footerlogo">
+                            
+                            <img src="https://tyff.taoyuancf.org.tw/project/images/footerlogo.png" alt="桃園電影節logo">
+                        </a>
+
+                        <div class="contactinfo">
+                            <div class="contactinfo__maintitle">
+                                聯絡方式
+                                <span>Contact Us</span>
+                            </div>
+                                                            <div class="contactinfo__item">
+                                    <div class="contactinfo__title">桃園電影節服務專線</div>
+                                    <span>：</span>
+                                    <a href="tel:02-2361-0873" class="contactinfo__value">02-2361-0873 </a>
+                                </div>
+                                                                                        <div class="contactinfo__item">
+                                    <div class="contactinfo__title">服務時間</div>
+                                    <span>：</span>
+                                    <div class="contactinfo__value">週一至週五 09:30-18:00</div>
+                                </div>
+                                                    </div>
+
+                        <div class="other">
+                            <div class="social-group">
+                                                                    <a href="https://www.facebook.com/taoyuanff" target="_blank" rel="noopener noreferrer" class="social"><i class="fa-brands fa-facebook-f"></i></a>
+                                                                                                    <a href="mailto:press.tyff@gmail.com" class="social"><i class="fa-regular fa-envelope"></i></a>
+                                                                                                    <a href="https://www.instagram.com/taoyuanfilmfest/" target="_blank" rel="noopener noreferrer" class="social"><i class="fa-brands fa-instagram"></i></a>
+                                                                                                    <a href="https://www.youtube.com/channel/UCXT-D7GqH0mC2tVsml3ey0g?view_as=subscriber" target="_blank" rel="noopener noreferrer" class="social"><i class="fa-brands fa-youtube"></i></a>
+                                                            </div>
+                            <div class="visit">
+                                <dt class="visit__views">
+                                    瀏覽人數<span>Views</span>
+                                </dt>
+                                <dd class="visit__numbers js-tenpercentile">3884067</dd>
+                            </div>
+                                                            <div class="copyright">
+                                    © 桃園電影節 All Rights Reserved.
+                                </div>
+                                                    </div>
+                    </div>
+
+                </div>
+
+            </div>
+
+        </footer>        
+        
+    </body>
+
+</html>
