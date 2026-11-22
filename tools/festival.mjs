@@ -62,6 +62,7 @@ export function goldenHorseName(html, firstDate) {
   const month = Number((firstDate || "").slice(5, 7));
   if (/FFF|FANT/i.test(code) || (month >= 3 && month <= 5)) return { id: "ghfff", name: "金馬奇幻影展" };
   if (code === "FF" || (month >= 10 && month <= 12)) return { id: "ghff", name: "台北金馬影展" };
+  if (month >= 6 && month <= 9) return { id: "ghcff", name: "金馬經典影展" }; // 經典影展在 7、8 月（分類代碼還沒看過，先靠月份）
   return { id: "gh", name: "金馬影展" };
 }
 
