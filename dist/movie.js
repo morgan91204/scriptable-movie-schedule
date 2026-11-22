@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.22-1150
+// @movie-schedule-app 電影行程 v2026.11.22-1205
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/parsers.gen.ts
@@ -1767,9 +1767,19 @@ async function findShowtimesMulti(scope, dates, winIds, formats = []) {
 }
 function multiLabel(dates, winIds) {
   const md = (d) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`;
+  const ds = dates.slice().sort();
+  const run = ds.every((d, i) => !i || d === addDays(ds[i - 1], 1));
+  const day = ds.length === 1 ? md(ds[0]) : run ? `${md(ds[0])}–${md(ds[ds.length - 1])}` : `${ds.length} 天`;
+  const wins = WINDOWS.filter((w2) => winIds.indexOf(w2.id) >= 0);
+  const w = !wins.length || wins.some((x) => x.id === "all") ? "整天" : wins.length === 1 ? wins[0].label : `${wins.length} 個時段`;
+  return `${day}｜${w}`;
+}
+function multiDetail(dates, winIds) {
+  const md = (d) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`;
   const wins = WINDOWS.filter((w2) => winIds.indexOf(w2.id) >= 0);
   const w = !wins.length || wins.some((x) => x.id === "all") ? "整天" : wins.map((x) => x.label).join("、");
-  return `${dates.slice().sort().map(md).join("、")}｜${w}`;
+  return `日期：${dates.slice().sort().map(md).join("、")}
+時段：${w}`;
 }
 function groupByMovie(hits) {
   const map = {};
@@ -2305,7 +2315,7 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .btn.secondary{background:var(--card);color:var(--accent)}
 .btn.danger{background:var(--card);color:var(--red)}
 .btn:active{opacity:.7}
-.note{margin:10px 12px 0;font-size:13px;color:var(--fg2)}
+.note{margin:10px 12px 0;font-size:13px;color:var(--fg2);white-space:pre-line}
 .note.version{padding:6px 0;-webkit-user-select:none;user-select:none}
 .note.version:active{opacity:.5}
 .note.warn{color:var(--orange)}
@@ -2615,7 +2625,7 @@ var App = class {
     ];
     // ── 事件迴圈 ──
     // 背景查 GitHub 上的最新版本（首頁顯示是否為最新版）
-    this.latest = checkLatest("2026.11.22-1150");
+    this.latest = checkLatest("2026.11.22-1205");
     // ── 搜尋 ──
     this.query = "";
     this.tmdbStatus = "";
@@ -2747,7 +2757,7 @@ var App = class {
     if (!this.cinemas.length) this.cinemas = await loadCinemas();
     this.calendarName = (await currentCalendar(this.settings)).title;
     const favs = this.settings.favorites.map((id) => this.cinemas.find((c) => c.id === id)).filter(Boolean);
-    return /* @__PURE__ */ h(Page, { title: "🎬 電影行程", subtitle: `${this.cinemas.length} 間影城｜選影城 → 日期 → 電影 → 場次` }, /* @__PURE__ */ h(Section, null, /* @__PURE__ */ h(Item, { icon: "🕘", title: "現在有什麼可以看", subtitle: "選時段，一次列出常去、附近或某縣市的所有場次", onTap: () => this.go(() => this.nowView()) }), /* @__PURE__ */ h(Item, { icon: "🎞️", title: "依電影找場次", subtitle: "先選電影，再看哪些影城有放映", onTap: () => this.go(() => this.movieListView(), "讀取電影清單…") }), /* @__PURE__ */ h(Item, { icon: "🧭", title: "附近的影城", subtitle: "依目前位置排序", onTap: () => this.go(() => this.nearbyView(), "取得目前位置…") }), /* @__PURE__ */ h(Item, { icon: "🎦", title: "依縣市找影院", subtitle: `全台 ${this.cinemas.length} 間，也可以搜尋影城`, onTap: () => this.go(() => this.citiesView()) })), favs.length ? /* @__PURE__ */ h(Section, { title: "常去影城", hint: "影城搜尋在「影城」分頁，行事曆與提醒在「設定」分頁。" }, favs.map((c) => /* @__PURE__ */ h(Item, { icon: "★", title: c.name, subtitle: `${c.city} ${c.district}`, onTap: () => this.go(() => this.cinemaView(c), `讀取 ${c.name} 的場次…`) }))) : null, await this.versionNote());
+    return /* @__PURE__ */ h(Page, { title: "🎬 電影行程", subtitle: `${this.cinemas.length} 間影城｜選影城 → 日期 → 電影 → 場次` }, /* @__PURE__ */ h(Section, null, /* @__PURE__ */ h(Item, { icon: "🕘", title: "現在有什麼可以看", subtitle: "依時段找常去、附近或各縣市的場次", onTap: () => this.go(() => this.nowView()) }), /* @__PURE__ */ h(Item, { icon: "🎞️", title: "依電影找場次", subtitle: "先選電影，再看哪些影城有放映", onTap: () => this.go(() => this.movieListView(), "讀取電影清單…") }), /* @__PURE__ */ h(Item, { icon: "🧭", title: "附近的影城", subtitle: "依目前位置排序", onTap: () => this.go(() => this.nearbyView(), "取得目前位置…") }), /* @__PURE__ */ h(Item, { icon: "🎦", title: "依縣市找影院", subtitle: `全台 ${this.cinemas.length} 間，也可以搜尋影城`, onTap: () => this.go(() => this.citiesView()) })), favs.length ? /* @__PURE__ */ h(Section, { title: "常去影城", hint: "影城搜尋在「影城」分頁，行事曆與提醒在「設定」分頁。" }, favs.map((c) => /* @__PURE__ */ h(Item, { icon: "★", title: c.name, subtitle: `${c.city} ${c.district}`, onTap: () => this.go(() => this.cinemaView(c), `讀取 ${c.name} 的場次…`) }))) : null, await this.versionNote());
   }
   // ── 設定 ──
   async settingsView() {
@@ -2760,11 +2770,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.22-1150"}`);
+          Pasteboard.copy(`版本 ${"2026.11.22-1205"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.22-1150"}`,
+      `版本 ${"2026.11.22-1205"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -3356,7 +3366,9 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
       this.seat = hallOf(hit.version.label);
       this.go(() => this.confirmView({ cinema: hit.cinema, address: hit.ctx.address || hit.cinema.address || "", booking: hit.ctx.booking, sourceUrl: hit.ctx.sourceUrl, date: hit.date, movie: hit.movie, version: hit.version, time: hit.time }));
     };
-    return /* @__PURE__ */ h(Page, { title: multiLabel(dates, winIds), subtitle: `${[scopeLabel, this.nowFormats.join("、")].filter(Boolean).join("｜")}｜${hits.length} 場、${groups.length} 部電影`, onBack: () => this.back() }, groups.length ? null : /* @__PURE__ */ h(Empty, { icon: "🍿", text: "沒有符合的場次，換個時段或範圍試試。" }), groups.map((g) => /* @__PURE__ */ h(Section, { title: `${g.title}（${g.hits.length} 場）`, hint: [g.runtime ? `${g.runtime} 分鐘` : "", g.rating].filter(Boolean).join("｜") || void 0 }, g.hits.map((hit) => /* @__PURE__ */ h(
+    return /* @__PURE__ */ h(Page, { title: multiLabel(dates, winIds), subtitle: `${hits.length} 場｜${groups.length} 部電影`, onBack: () => this.back() }, /* @__PURE__ */ h(Note, { text: `${multiDetail(dates, winIds)}
+影城：${scopeLabel}${this.nowFormats.length ? `
+特殊廳：${this.nowFormats.join("、")}` : ""}` }), groups.length ? null : /* @__PURE__ */ h(Empty, { icon: "🍿", text: "沒有符合的場次，換個時段或範圍試試。" }), groups.map((g) => /* @__PURE__ */ h(Section, { title: `${g.title}（${g.hits.length} 場）`, hint: [g.runtime ? `${g.runtime} 分鐘` : "", g.rating].filter(Boolean).join("｜") || void 0 }, g.hits.map((hit) => /* @__PURE__ */ h(
       Item,
       {
         title: `${many && hit.day ? dateLabel(hit.day).replace(/ .*$/, "") + " " : ""}${hit.time}${isLate(hit.time) ? "（凌晨）" : ""}　${hit.cinema.name}`,

@@ -91,6 +91,7 @@
     movieRuntime: () => movieRuntime,
     moviesOf: () => moviesOf,
     multiDayLive: () => multiDayLive,
+    multiDetail: () => multiDetail,
     multiLabel: () => multiLabel,
     nearest: () => nearest,
     normImageUrl: () => normImageUrl,
@@ -1909,9 +1910,19 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   }
   function multiLabel(dates, winIds) {
     const md = (d) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`;
+    const ds = dates.slice().sort();
+    const run = ds.every((d, i) => !i || d === addDays(ds[i - 1], 1));
+    const day = ds.length === 1 ? md(ds[0]) : run ? `${md(ds[0])}–${md(ds[ds.length - 1])}` : `${ds.length} 天`;
+    const wins = WINDOWS.filter((w2) => winIds.indexOf(w2.id) >= 0);
+    const w = !wins.length || wins.some((x) => x.id === "all") ? "整天" : wins.length === 1 ? wins[0].label : `${wins.length} 個時段`;
+    return `${day}｜${w}`;
+  }
+  function multiDetail(dates, winIds) {
+    const md = (d) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`;
     const wins = WINDOWS.filter((w2) => winIds.indexOf(w2.id) >= 0);
     const w = !wins.length || wins.some((x) => x.id === "all") ? "整天" : wins.map((x) => x.label).join("、");
-    return `${dates.slice().sort().map(md).join("、")}｜${w}`;
+    return `日期：${dates.slice().sort().map(md).join("、")}
+時段：${w}`;
   }
   function groupByMovie(hits) {
     const map = {};

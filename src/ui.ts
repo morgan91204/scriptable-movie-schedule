@@ -76,7 +76,7 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .btn.secondary{background:var(--card);color:var(--accent)}
 .btn.danger{background:var(--card);color:var(--red)}
 .btn:active{opacity:.7}
-.note{margin:10px 12px 0;font-size:13px;color:var(--fg2)}
+.note{margin:10px 12px 0;font-size:13px;color:var(--fg2);white-space:pre-line}
 .note.version{padding:6px 0;-webkit-user-select:none;user-select:none}
 .note.version:active{opacity:.5}
 .note.warn{color:var(--orange)}

@@ -14,7 +14,7 @@ import {
   Cinema, Movie, Settings, Version, TwMovie, TwMovieCinema, CITY_ORDER, TW,
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
   loadSettings, saveSettings, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, cinemaAddress,
-  FORMATS, formatsOf, filterVersions, filterVersionsAny, movieRows, movieDays, nearest, kmLabel, WINDOWS, findShowtimes, findShowtimesMulti, multiLabel, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText, hallOf, tmdbTest, movieExtras, moviePoster, posterReady, posterTint, POSTER_TINTS, normImageUrl, movieRuntime, posterSrc, isLocalSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, foregroundTask, communityStats, communityVote, loadBoxOffice, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, SCRIPTING_IMPORT_URL, ABOUT_URL, PRIVACY_URL, movieRatings, ratingTier,
+  FORMATS, formatsOf, filterVersions, filterVersionsAny, movieRows, movieDays, nearest, kmLabel, WINDOWS, findShowtimes, findShowtimesMulti, multiLabel, multiDetail, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText, hallOf, tmdbTest, movieExtras, moviePoster, posterReady, posterTint, POSTER_TINTS, normImageUrl, movieRuntime, posterSrc, isLocalSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, foregroundTask, communityStats, communityVote, loadBoxOffice, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, SCRIPTING_IMPORT_URL, ABOUT_URL, PRIVACY_URL, movieRatings, ratingTier,
 } from "./core"
 import type { Format, LatLng, Hit, Community, BoxOfficeItem } from "./core"
 
@@ -1225,6 +1225,10 @@ function NowResultsPage({ dates, winIds, scopes, formats }: { dates: string[]; w
   return <List navigationTitle={multiLabel(dates, winIds)} navigationBarTitleDisplayMode={"inline"} refreshable={res.reload}>
     {res.error ? <ErrorRow error={res.error} retry={res.reload} /> : null}
     {!res.data && !res.error ? <Section><Loading text={`查詢${scopeLabel}的場次…`} /></Section> : null}
+    {/* 完整的查詢條件放在內文（導覽列標題只有一行，複選多了會被截掉） */}
+    {res.data ? <Section footer={<Text>{`${multiDetail(dates, winIds)}\n影城：${scopeLabel}${formats.length ? `\n特殊廳：${formats.join("、")}` : ""}`}</Text>}>
+      <Text foregroundStyle={"secondaryLabel"}>{`${res.data.hits.length} 場｜${groups.length} 部電影`}</Text>
+    </Section> : null}
     {res.data && !groups.length ? <Section><Text foregroundStyle={"secondaryLabel"}>沒有符合的場次，換個時段或範圍試試。</Text></Section> : null}
     {groups.map((g) =>
       <Section key={g.title}

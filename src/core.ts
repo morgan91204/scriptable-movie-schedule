@@ -1594,12 +1594,22 @@ export async function findShowtimesMulti(
   hits.sort((a, b) => (a.day || "").localeCompare(b.day || "") || showMinute(a.time) - showMinute(b.time) || (a.km ?? 1e9) - (b.km ?? 1e9));
   return { hits, failed: Array.from(failed), noData: Array.from(noData).filter((n) => !failed.has(n)) };
 }
-/** 複選後畫面上的一行摘要：「11/22、11/23｜晚上 17–21 點、深夜 21 點後」 */
+/** 複選後標題列用的短摘要（只有一行的空間）：「11/22｜晚上 17–21 點」「11/22–11/24｜2 個時段」「3 天｜整天」 */
 export function multiLabel(dates: string[], winIds: string[]): string {
+  const md = (d: string) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`;
+  const ds = dates.slice().sort();
+  const run = ds.every((d, i) => !i || d === addDays(ds[i - 1], 1)); // 連續的幾天
+  const day = ds.length === 1 ? md(ds[0]) : run ? `${md(ds[0])}–${md(ds[ds.length - 1])}` : `${ds.length} 天`;
+  const wins = WINDOWS.filter((w) => winIds.indexOf(w.id) >= 0);
+  const w = !wins.length || wins.some((x) => x.id === "all") ? "整天" : wins.length === 1 ? wins[0].label : `${wins.length} 個時段`;
+  return `${day}｜${w}`;
+}
+/** 完整的查詢條件（放在內文，可以換行）：「日期：11/22、11/24\n時段：晚上 17–21 點、深夜 21 點後」 */
+export function multiDetail(dates: string[], winIds: string[]): string {
   const md = (d: string) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`;
   const wins = WINDOWS.filter((w) => winIds.indexOf(w.id) >= 0);
   const w = !wins.length || wins.some((x) => x.id === "all") ? "整天" : wins.map((x) => x.label).join("、");
-  return `${dates.slice().sort().map(md).join("、")}｜${w}`;
+  return `日期：${dates.slice().sort().map(md).join("、")}\n時段：${w}`;
 }
 
 /** 把結果依電影分組，場次多的排前面 */

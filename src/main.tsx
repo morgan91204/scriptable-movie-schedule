@@ -11,7 +11,7 @@ import {
   Cinema, Settings, Movie, Version, EXTRA, CITY_ORDER, AD_STEPS,
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
   loadSettings, saveSettings, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, TW,
-  FORMATS, formatsOf, filterVersions, filterVersionsAny, movieRows, movieDays, nearest, kmLabel, WINDOWS, findShowtimes, findShowtimesMulti, multiLabel, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText,
+  FORMATS, formatsOf, filterVersions, filterVersionsAny, movieRows, movieDays, nearest, kmLabel, WINDOWS, findShowtimes, findShowtimesMulti, multiLabel, multiDetail, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText,
   hallOf, tmdbTest, movieExtras, moviePoster, movieRuntime, posterSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, foregroundTask, communityStats, communityCached, communityVote, loadBoxOffice, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, ABOUT_URL, PRIVACY_URL, movieRatings, ratingTier,
 } from "./core";
 import type { MovieExtras, Ratings, Community, BoxOfficeItem } from "./core";
@@ -183,7 +183,7 @@ class App {
     return (
       <Page title="🎬 電影行程" subtitle={`${this.cinemas.length} 間影城｜選影城 → 日期 → 電影 → 場次`}>
         <Section>
-          <Item icon="🕘" title="現在有什麼可以看" subtitle="選時段，一次列出常去、附近或某縣市的所有場次" onTap={() => this.go(() => this.nowView())} />
+          <Item icon="🕘" title="現在有什麼可以看" subtitle="依時段找常去、附近或各縣市的場次" onTap={() => this.go(() => this.nowView())} />
           <Item icon="🎞️" title="依電影找場次" subtitle="先選電影，再看哪些影城有放映" onTap={() => this.go(() => this.movieListView(), "讀取電影清單…")} />
           <Item icon="🧭" title="附近的影城" subtitle="依目前位置排序" onTap={() => this.go(() => this.nearbyView(), "取得目前位置…")} />
           <Item icon="🎦" title="依縣市找影院" subtitle={`全台 ${this.cinemas.length} 間，也可以搜尋影城`} onTap={() => this.go(() => this.citiesView())} />
@@ -1128,7 +1128,9 @@ class App {
       this.go(() => this.confirmView({ cinema: hit.cinema, address: hit.ctx.address || hit.cinema.address || "", booking: hit.ctx.booking, sourceUrl: hit.ctx.sourceUrl, date: hit.date, movie: hit.movie, version: hit.version, time: hit.time }));
     };
     return (
-      <Page title={multiLabel(dates, winIds)} subtitle={`${[scopeLabel, this.nowFormats.join("、")].filter(Boolean).join("｜")}｜${hits.length} 場、${groups.length} 部電影`} onBack={() => this.back()}>
+      <Page title={multiLabel(dates, winIds)} subtitle={`${hits.length} 場｜${groups.length} 部電影`} onBack={() => this.back()}>
+        {/* 完整的查詢條件放在內文（標題列只有一行，複選多了會被截掉） */}
+        <Note text={`${multiDetail(dates, winIds)}\n影城：${scopeLabel}${this.nowFormats.length ? `\n特殊廳：${this.nowFormats.join("、")}` : ""}`} />
         {groups.length ? null : <Empty icon="🍿" text="沒有符合的場次，換個時段或範圍試試。" />}
         {groups.map((g) => (
           <Section title={`${g.title}（${g.hits.length} 場）`} hint={[g.runtime ? `${g.runtime} 分鐘` : "", g.rating].filter(Boolean).join("｜") || undefined}>
