@@ -6,6 +6,9 @@ on:
       url:
         description: 要測試的網址（可以多個，用空白分開）
         required: true
+      pattern:
+        description: （選填）要在內容裡找的字（正規表示式），會印出前後文
+        required: false
 permissions: {}
 jobs:
   probe:
@@ -15,6 +18,7 @@ jobs:
       - name: 讀取並顯示回應
         env:
           TARGET: ${{ inputs.url }}
+          PATTERN: ${{ inputs.pattern }}
         run: |
           UA="Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1"
           # 可以一次給好幾個網址（用空白分開）
@@ -25,4 +29,8 @@ jobs:
             echo "── 標題與內容開頭 ──"; grep -aoiE "<title>[^<]*" body.bin | head -2 || true; head -c 600 body.bin | tr '\n' ' ' || true
             echo; echo "── 內容裡的連結（片單、場次、資料介面）──"
             grep -aoiE "(href|src|action|url)[=:] ?[\"'][^\"' ]*(film|programme|schedule|session|ticket|api|json|ashx|activity|game)[^\"' ]*[\"']" body.bin | sort -u | head -40 || true
+            if [ -n "$PATTERN" ]; then
+              echo "── 含「$PATTERN」的片段（共 $(grep -aoE -- "$PATTERN" body.bin | wc -l) 處）──"
+              tr '\n\r\t' '   ' < body.bin | grep -aoE -- ".{0,300}($PATTERN).{0,700}" | head -4 || true
+            fi
           done
