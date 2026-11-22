@@ -68,6 +68,15 @@ if (base) {
   start = since;
 }
 
+// 年度總排行：今年上映的片依累計票房排（已經下檔的也算），前 200 名；這週還有賣出票的標記「上映中」
+const year = end.slice(0, 4);
+const showing = new Set(mode === "week" ? list.map(key) : []);
+const yearList = films
+  .filter((f) => f.release.slice(0, 4) === year && f.total > 0)
+  .sort((a, b) => b.total - a.total)
+  .slice(0, 200)
+  .map((f, i) => ({ rank: i + 1, name: f.name, country: f.country, release: f.release, theaters: f.theaters, week: null, total: f.total, ...(showing.has(key(f)) ? { showing: true } : {}) }));
+
 const result = {
   updated: new Date().toISOString(),
   mode, // week = 週票房排行；total = 近期上映片的累計票房（還沒有上週資料時）
@@ -87,11 +96,12 @@ const result = {
     total: f.total,
     tickets: f.tickets,
   })),
+  year: yearList,
 };
 
 fs.mkdirSync("data", { recursive: true });
 // 快照：這週的累計，順便記住上一份（同一週重跑時用）
 fs.writeFileSync(SNAP, JSON.stringify({ end, films, prev: base ? { end: base.end, films: base.films } : null }) + "\n");
 fs.writeFileSync(OUT, JSON.stringify(result, null, 1) + "\n");
-console.log(`已更新：${mode === "week" ? `週票房 ${start}～${end}` : `累計（近 8 週上映，截至 ${end}）`}，前 ${result.list.length} 名`);
+console.log(`已更新：${mode === "week" ? `週票房 ${start}～${end}` : `累計（近 8 週上映，截至 ${end}）`}，前 ${result.list.length} 名；${year} 年度排行 ${yearList.length} 部`);
 for (const f of result.list.slice(0, 10)) console.log(f.rank, f.name, f.week ?? "", f.total);

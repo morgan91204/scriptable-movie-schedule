@@ -1297,28 +1297,40 @@ export function boxOfficeLines(x: BoxOfficeItem, by: BoxSort = "week"): [string,
   const total = `累計 ${money(x.total)}`;
   return [
     // 排的是哪一種，就把那個數字放前面
-    by === "total" ? [total, week].filter(Boolean).join("｜") : x.since ? `上映至今 ${money(x.total)}` : [week, total].filter(Boolean).join("｜"),
-    [releaseLabel(x.release), x.theaters ? `${x.theaters} 間戲院` : ""].filter(Boolean).join("｜"),
+    by === "year" ? total : by === "total" ? [total, week].filter(Boolean).join("｜") : x.since ? `上映至今 ${money(x.total)}` : [week, total].filter(Boolean).join("｜"),
+    // 年度排行混著已經下檔的片：還在上映的標出來
+    [by === "year" && x.showing ? "上映中" : "", releaseLabel(x.release), x.theaters ? `${x.theaters} 間戲院` : ""].filter(Boolean).join("｜"),
   ];
 }
-/** 票房排行的兩種排法：week = 這一週賣最多的排前面；total = 上映以來累計最多的排前面 */
-export type BoxSort = "week" | "total";
-/** 依排法排好、重新編名次的清單。累計排行的範圍一樣是「這週還有賣出票的電影」，已經下檔的舊片不在裡面 */
+/** 票房排行的三種排法。week、total 排的都是「上映中」的片（這一週還有賣出票的）：week 依這一週的票房、total 依上映以來的累計；
+ *  year = 年度總排行，今年上映的片依累計排，已經下檔的也算 */
+export type BoxSort = "week" | "total" | "year";
+/** 這份資料可以用的排法與按鈕上的字（還沒有週票房、或舊資料沒有年度排行時，選項會少） */
+export function boxSorts(b: BoxOffice): { id: BoxSort; label: string }[] {
+  const out: { id: BoxSort; label: string }[] = [{ id: "week", label: b.mode === "week" ? "本週" : "近期" }];
+  if (b.mode === "week") out.push({ id: "total", label: "累計" });
+  if (b.year && b.year.length) out.push({ id: "year", label: "年度" });
+  return out;
+}
+/** 依排法排好、重新編名次的清單 */
 export function boxOfficeBy(b: BoxOffice, by: BoxSort): BoxOfficeItem[] {
+  if (by === "year") return b.year || [];
   if (by !== "total") return b.list;
   return b.list.slice().sort((x, y) => y.total - x.total).map((x, i) => ({ ...x, rank: i + 1 }));
 }
-/** 排行的標題：「11/9–11/15 全台週票房」或「累計票房（截至 11/15）」 */
+/** 排行的標題：「上映中｜11/9–11/15 週票房」「上映中｜累計票房（截至 11/15）」「2026 年度總排行（截至 11/15）」 */
 export function boxOfficeTitle(b: BoxOffice, by: BoxSort): string {
   const md = (d: string) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`;
-  return by === "total" ? `累計票房（截至 ${md(b.end)}）` : boxOfficeLabel(b);
+  if (by === "year") return `${b.end.slice(0, 4)} 年度總排行（截至 ${md(b.end)}）`;
+  if (by === "total") return `上映中｜累計票房（截至 ${md(b.end)}）`;
+  return b.mode === "week" ? `上映中｜${md(b.start)}–${md(b.end)} 週票房` : boxOfficeLabel(b);
 }
 /** 排行下方的說明 */
 export function boxOfficeFooter(b: BoxOffice, by: BoxSort): string {
-  const scope = `這週有賣出票的電影共 ${b.list.length} 部。`;
-  return by === "total"
-    ? `${scope}累計排行只排這些還在上映的片，已經下檔的不在裡面。資料來源：${b.source}。官方每週更新一次。`
-    : `${scope}${boxOfficeNote(b)}資料來源：${b.source}。官方每週更新一次。`;
+  const src = `資料來源：${b.source}。官方每週更新一次。`;
+  if (by === "year") return `${b.end.slice(0, 4)} 年上映的電影依累計票房排序，共列 ${(b.year || []).length} 部；已經下檔的也在裡面，標「上映中」的是這一週還有賣出票的。${src}`;
+  const scope = `只排上映中的電影：這一週有賣出票的共 ${b.list.length} 部，已經下檔的不在裡面（看「年度」）。`;
+  return by === "total" ? `${scope}${src}` : `${scope}${boxOfficeNote(b)}${src}`;
 }
 /** 電影清單（上映中、即將上映）每一列的兩行說明，各自一行不換行：
  *  第一行：「今天無場次」或上映日期｜分級｜片長｜放映影城數；第二行：英文片名 */
@@ -1976,6 +1988,7 @@ export interface BoxOfficeItem {
   theaters: number; // 上映戲院數
   week: number | null; // 這週票房（元）；mode 是 total 時沒有
   since?: boolean; // week 不是單週：官方上週還沒列入這部片，數字是上映至今的累計
+  showing?: boolean; // 年度排行用：這週還有賣出票（還在上映）
   total: number; // 累計票房（元）
 }
 export interface BoxOffice {
@@ -1985,6 +1998,7 @@ export interface BoxOffice {
   source: string;
   sourceUrl: string;
   list: BoxOfficeItem[];
+  year?: BoxOfficeItem[]; // 年度總排行：今年上映的片依累計票房排，已經下檔的也在裡面（week 一律是 null）
 }
 let boxMem: Promise<BoxOffice> | null = null;
 let boxData: BoxOffice | null = null; // 這次執行讀到的排行（releaseOf 同步查用）
@@ -1992,14 +2006,14 @@ let boxData: BoxOffice | null = null; // 這次執行讀到的排行（releaseOf
 export function loadBoxOffice(): Promise<BoxOffice> {
   return (boxMem ||= (async () => {
     try {
-      const c = JSON.parse(cacheGet("boxoffice2.json") || "null");
+      const c = JSON.parse(cacheGet("boxoffice3.json") || "null");
       if (c && c.data && Date.now() - c.at < 6 * 3600e3) return c.data as BoxOffice;
     } catch (_) {}
     const r = await platform().fetchText(BOXOFFICE_URL + "?t=" + Math.floor(Date.now() / 3600e3), { accept: "application/json" });
     if (r.status !== 200) throw new Error("票房排行暫時讀不到");
     const data = JSON.parse(r.body) as BoxOffice;
     if (!data || !Array.isArray(data.list)) throw new Error("票房排行格式不對");
-    cacheSet("boxoffice2.json", JSON.stringify({ at: Date.now(), data }));
+    cacheSet("boxoffice3.json", JSON.stringify({ at: Date.now(), data }));
     return data;
   })().then((d) => (boxData = d)).catch((e) => {
     boxMem = null;

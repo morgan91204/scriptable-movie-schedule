@@ -43,6 +43,7 @@
     boxOfficeLines: () => boxOfficeLines,
     boxOfficeNote: () => boxOfficeNote,
     boxOfficeTitle: () => boxOfficeTitle,
+    boxSorts: () => boxSorts,
     byShowtime: () => byShowtime,
     cachePoster: () => cachePoster,
     checkLatest: () => checkLatest,
@@ -1704,21 +1705,33 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     const total = `累計 ${money(x.total)}`;
     return [
       // 排的是哪一種，就把那個數字放前面
-      by === "total" ? [total, week].filter(Boolean).join("｜") : x.since ? `上映至今 ${money(x.total)}` : [week, total].filter(Boolean).join("｜"),
-      [releaseLabel(x.release), x.theaters ? `${x.theaters} 間戲院` : ""].filter(Boolean).join("｜")
+      by === "year" ? total : by === "total" ? [total, week].filter(Boolean).join("｜") : x.since ? `上映至今 ${money(x.total)}` : [week, total].filter(Boolean).join("｜"),
+      // 年度排行混著已經下檔的片：還在上映的標出來
+      [by === "year" && x.showing ? "上映中" : "", releaseLabel(x.release), x.theaters ? `${x.theaters} 間戲院` : ""].filter(Boolean).join("｜")
     ];
   }
+  function boxSorts(b) {
+    const out = [{ id: "week", label: b.mode === "week" ? "本週" : "近期" }];
+    if (b.mode === "week") out.push({ id: "total", label: "累計" });
+    if (b.year && b.year.length) out.push({ id: "year", label: "年度" });
+    return out;
+  }
   function boxOfficeBy(b, by) {
+    if (by === "year") return b.year || [];
     if (by !== "total") return b.list;
     return b.list.slice().sort((x, y) => y.total - x.total).map((x, i) => ({ ...x, rank: i + 1 }));
   }
   function boxOfficeTitle(b, by) {
     const md = (d) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`;
-    return by === "total" ? `累計票房（截至 ${md(b.end)}）` : boxOfficeLabel(b);
+    if (by === "year") return `${b.end.slice(0, 4)} 年度總排行（截至 ${md(b.end)}）`;
+    if (by === "total") return `上映中｜累計票房（截至 ${md(b.end)}）`;
+    return b.mode === "week" ? `上映中｜${md(b.start)}–${md(b.end)} 週票房` : boxOfficeLabel(b);
   }
   function boxOfficeFooter(b, by) {
-    const scope = `這週有賣出票的電影共 ${b.list.length} 部。`;
-    return by === "total" ? `${scope}累計排行只排這些還在上映的片，已經下檔的不在裡面。資料來源：${b.source}。官方每週更新一次。` : `${scope}${boxOfficeNote(b)}資料來源：${b.source}。官方每週更新一次。`;
+    const src = `資料來源：${b.source}。官方每週更新一次。`;
+    if (by === "year") return `${b.end.slice(0, 4)} 年上映的電影依累計票房排序，共列 ${(b.year || []).length} 部；已經下檔的也在裡面，標「上映中」的是這一週還有賣出票的。${src}`;
+    const scope = `只排上映中的電影：這一週有賣出票的共 ${b.list.length} 部，已經下檔的不在裡面（看「年度」）。`;
+    return by === "total" ? `${scope}${src}` : `${scope}${boxOfficeNote(b)}${src}`;
   }
   function movieLines(m) {
     const md = (d) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`;
@@ -2210,7 +2223,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   function loadBoxOffice() {
     return boxMem ||= (async () => {
       try {
-        const c = JSON.parse(cacheGet("boxoffice2.json") || "null");
+        const c = JSON.parse(cacheGet("boxoffice3.json") || "null");
         if (c && c.data && Date.now() - c.at < 6 * 36e5) return c.data;
       } catch (_) {
       }
@@ -2218,7 +2231,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
       if (r.status !== 200) throw new Error("票房排行暫時讀不到");
       const data = JSON.parse(r.body);
       if (!data || !Array.isArray(data.list)) throw new Error("票房排行格式不對");
-      cacheSet("boxoffice2.json", JSON.stringify({ at: Date.now(), data }));
+      cacheSet("boxoffice3.json", JSON.stringify({ at: Date.now(), data }));
       return data;
     })().then((d) => boxData = d).catch((e) => {
       boxMem = null;
@@ -2295,12 +2308,13 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   var cache = {};
   async function boxOffice(by) {
     const [b, all] = await Promise.all([loadBoxOffice(), loadMovies().catch(() => [])]);
-    const sort = by === "total" && b.mode === "week" ? "total" : "week";
+    const sorts = boxSorts(b);
+    const sort = sorts.some((x) => x.id === by) ? by : "week";
     return {
       label: boxOfficeTitle(b, sort),
       source: b.source,
       footer: boxOfficeFooter(b, sort),
-      canSort: b.mode === "week",
+      sorts,
       rows: boxOfficeBy(b, sort).map((x) => ({ x, m: matchBoxOffice(x.name, all) || null, lines: boxOfficeLines(x, sort) }))
     };
   }

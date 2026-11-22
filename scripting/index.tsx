@@ -14,7 +14,7 @@ import {
   Cinema, Movie, Settings, Version, TwMovie, TwMovieCinema, CITY_ORDER, TW,
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
   loadSettings, saveSettings, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, cinemaAddress,
-  FORMATS, formatsOf, filterVersions, filterVersionsAny, movieRows, movieDays, nearest, kmLabel, WINDOWS, findShowtimes, findShowtimesMulti, multiLabel, multiDetail, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText, hallOf, tmdbTest, movieExtras, moviePoster, posterReady, posterTint, POSTER_TINTS, normImageUrl, movieRuntime, posterSrc, isLocalSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, foregroundTask, communityStats, communityVote, loadBoxOffice, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, SCRIPTING_IMPORT_URL, ABOUT_URL, PRIVACY_URL, movieRatings, ratingTier,
+  FORMATS, formatsOf, filterVersions, filterVersionsAny, movieRows, movieDays, nearest, kmLabel, WINDOWS, findShowtimes, findShowtimesMulti, multiLabel, multiDetail, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText, hallOf, tmdbTest, movieExtras, moviePoster, posterReady, posterTint, POSTER_TINTS, normImageUrl, movieRuntime, posterSrc, isLocalSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxSorts, foregroundTask, communityStats, communityVote, loadBoxOffice, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, SCRIPTING_IMPORT_URL, ABOUT_URL, PRIVACY_URL, movieRatings, ratingTier,
 } from "./core"
 import type { Format, LatLng, Hit, Community, BoxOfficeItem, BoxSort } from "./core"
 
@@ -901,7 +901,8 @@ function BoxOfficeSections({ movies, query }: { movies: TwMovie[]; query: string
   const box = useLoad(() => loadBoxOffice(), [])
   const [by, setBy] = useState<string>("week") // 排法：本週／累計
   const b = box.data
-  const sort: BoxSort = by === "total" && b?.mode === "week" ? "total" : "week"
+  const sorts = b ? boxSorts(b) : []
+  const sort: BoxSort = sorts.some((x) => x.id === by) ? (by as BoxSort) : "week"
   // 搜尋片名：中文片名或對得到的英文片名
   const shown = (b ? boxOfficeBy(b, sort) : []).filter((x) => !query || `${x.name} ${matchBoxOffice(x.name, movies)?.en || ""}`.toLowerCase().includes(query))
   const films = shown.map((x) => { const m = matchBoxOffice(x.name, movies); return { title: m ? m.title : x.name, slug: m?.slug, en: m?.en } })
@@ -914,10 +915,9 @@ function BoxOfficeSections({ movies, query }: { movies: TwMovie[]; query: string
     ? `\n第 ${bad.map((x) => x.rank).join("、")} 名的海報讀不到（${Array.from(new Set(thumbs.map((t) => t.why).filter(Boolean))).join("；")}），下次進來會再試。`
     : ""
   return <>
-  {b.mode === "week" ? <Section>
+  {sorts.length > 1 ? <Section footer={<Text>本週、累計只排上映中的電影；年度包含已經下檔的。</Text>}>
     <Picker title={"排行"} value={sort} onChanged={(v: string) => setBy(v)} pickerStyle={"segmented"}>
-      <Text tag={"week"}>本週票房</Text>
-      <Text tag={"total"}>累計票房</Text>
+      {sorts.map((x) => <Text key={x.id} tag={x.id}>{x.label}</Text>)}
     </Picker>
   </Section> : null}
   <Section header={<Text>{boxOfficeTitle(b, sort)}</Text>} footer={<Text>{`${shown.length ? "" : "排行上找不到相符的電影。\n"}${boxOfficeFooter(b, sort)}${failNote}`}</Text>}>

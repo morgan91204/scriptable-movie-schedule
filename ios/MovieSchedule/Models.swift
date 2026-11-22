@@ -128,6 +128,7 @@ struct BoxOfficeItem: Codable, Hashable {
     var theaters: Int?
     var week: Double?
     var since: Bool?
+    var showing: Bool?
     var total: Double
 }
 
@@ -142,7 +143,8 @@ struct BoxOfficeBoard: Codable {
     var label: String
     var source: String
     var footer: String?   // 排行下方的說明
-    var canSort: Bool?    // 有週票房時才能切換「本週／累計」
+    struct Sort: Codable, Hashable, Identifiable { var id: String; var label: String }
+    var sorts: [Sort]?    // 可以切換的排法：本週、累計（都只排上映中的片）、年度（含已下檔）
     var rows: [BoxOfficeRow]
 }
 

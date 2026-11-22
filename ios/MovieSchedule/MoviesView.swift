@@ -110,13 +110,14 @@ struct BoxOfficeSection: View {
 
     var body: some View {
         Group {
-            if board.value?.canSort ?? false {
+            if let sorts = board.value?.sorts, sorts.count > 1 {
                 Section {
                     Picker("排行", selection: $sort) {
-                        Text("本週票房").tag("week")
-                        Text("累計票房").tag("total")
+                        ForEach(sorts) { Text($0.label).tag($0.id) }
                     }
                     .pickerStyle(.segmented)
+                } footer: {
+                    Text("本週、累計只排上映中的電影；年度包含已經下檔的。")
                 }
             }
             switch board {

@@ -12,7 +12,7 @@ import {
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
   loadSettings, saveSettings, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, TW,
   FORMATS, formatsOf, filterVersions, filterVersionsAny, movieRows, movieDays, nearest, kmLabel, WINDOWS, findShowtimes, findShowtimesMulti, multiLabel, multiDetail, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText,
-  hallOf, tmdbTest, movieExtras, moviePoster, movieRuntime, posterSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, foregroundTask, communityStats, communityCached, communityVote, loadBoxOffice, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, ABOUT_URL, PRIVACY_URL, movieRatings, ratingTier,
+  hallOf, tmdbTest, movieExtras, moviePoster, movieRuntime, posterSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxSorts, foregroundTask, communityStats, communityCached, communityVote, loadBoxOffice, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, ABOUT_URL, PRIVACY_URL, movieRatings, ratingTier,
 } from "./core";
 import type { MovieExtras, Ratings, Community, BoxOfficeItem, BoxSort } from "./core";
 import { setTabBar, setBackGuard, esc } from "./jsx";
@@ -799,7 +799,8 @@ class App {
   async boxOfficeView(): Promise<string> {
     const [b, all] = await Promise.all([loadBoxOffice(), loadMovies().catch(() => [] as TwMovie[])]);
     const k = this.movieQuery.trim().toLowerCase();
-    const by = this.boxSort;
+    const sorts = boxSorts(b);
+    const by: BoxSort = sorts.some((x) => x.id === this.boxSort) ? this.boxSort : "week";
     const rows = boxOfficeBy(b, by).map((x) => ({ x, m: matchBoxOffice(x.name, all) })).filter(({ x, m }) => !k || `${x.name} ${m?.en || ""}`.toLowerCase().includes(k));
     // 海報：手機上記過的立刻有；沒記過的最多等 0.6 秒，其餘讀好後自動補畫
     const jobs = rows.map(({ x, m }) => moviePoster(m ? m.title : x.name, m?.slug, m?.en).catch(() => ""));
@@ -820,10 +821,9 @@ class App {
     return (
       <Page title="依電影找場次" subtitle={boxOfficeTitle(b, by)} onBack={() => this.back()}>
         {this.movieModeChips()}
-        {b.mode === "week" ? (
+        {sorts.length > 1 ? (
           <Chips>
-            <Chip label="本週票房" muted={by !== "week"} onTap={() => { this.boxSort = "week"; }} />
-            <Chip label="累計票房" muted={by !== "total"} onTap={() => { this.boxSort = "total"; }} />
+            {sorts.map((x) => <Chip label={x.label} sub={x.id === "year" ? "含已下檔" : "上映中"} muted={by !== x.id} onTap={() => { this.boxSort = x.id; }} />)}
           </Chips>
         ) : null}
         <input class="field" name="q" value={this.movieQuery} placeholder="搜尋片名" />

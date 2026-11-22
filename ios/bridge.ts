@@ -11,9 +11,10 @@ let cache: Record<string, string> = {};
 /** 票房排行：連同對得到的場次通電影一起回傳 */
 async function boxOffice(by?: string) {
   const [b, all] = await Promise.all([core.loadBoxOffice(), core.loadMovies().catch(() => [])]);
-  const sort: core.BoxSort = by === "total" && b.mode === "week" ? "total" : "week";
+  const sorts = core.boxSorts(b);
+  const sort: core.BoxSort = sorts.some((x) => x.id === by) ? (by as core.BoxSort) : "week";
   return {
-    label: core.boxOfficeTitle(b, sort), source: b.source, footer: core.boxOfficeFooter(b, sort), canSort: b.mode === "week",
+    label: core.boxOfficeTitle(b, sort), source: b.source, footer: core.boxOfficeFooter(b, sort), sorts,
     rows: core.boxOfficeBy(b, sort).map((x) => ({ x, m: core.matchBoxOffice(x.name, all) || null, lines: core.boxOfficeLines(x, sort) })),
   };
 }
