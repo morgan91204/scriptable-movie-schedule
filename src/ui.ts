@@ -158,7 +158,26 @@ document.addEventListener('click',function(e){
   document.querySelectorAll('input[name],select[name]').forEach(function(i){vals[i.name]=i.value;});
   if(window.__pending){var f=window.__pending;window.__pending=null;f(JSON.stringify({id:id,vals:vals,y:window.scrollY}));}
 });
-window.__render=function(html,to){var y=window.scrollY;document.getElementById('root').innerHTML=html;window.scrollTo(0,to<0?y:to);var f=document.querySelector('input[autofocus]');if(f)setTimeout(function(){f.focus()},50);};
+window.__render=function(html,to){var y=window.scrollY;document.getElementById('root').innerHTML=html;window.scrollTo(0,to<0?y:to);var f=document.querySelector('input[autofocus]');if(f)setTimeout(function(){f.focus()},50);syncHist();};
+// 從螢幕左緣往右滑：回上一頁（等於點左上角的「返回」）。內容會跟著手指稍微移動，放開時滑得夠遠才算
+var sw=null;
+function swReset(){sw=null;var c=document.querySelector('.content');if(c){c.style.transition='transform .15s';c.style.transform='';}}
+document.addEventListener('touchstart',function(e){var t=e.touches[0];
+  sw=(e.touches.length===1&&t.clientX<32&&document.querySelector('.back'))?{x:t.clientX,y:t.clientY,t:Date.now()}:null;},{passive:true});
+document.addEventListener('touchmove',function(e){if(!sw)return;var t=e.touches[0],dx=t.clientX-sw.x,dy=t.clientY-sw.y;
+  if(Math.abs(dy)>60&&Math.abs(dy)>dx){swReset();return;}
+  var c=document.querySelector('.content');if(c&&dx>8){c.style.transition='none';c.style.transform='translateX('+Math.min(dx*0.4,70)+'px)';}},{passive:true});
+document.addEventListener('touchend',function(e){if(!sw)return;var t=e.changedTouches[0],dx=t.clientX-sw.x,dy=t.clientY-sw.y,quick=Date.now()-sw.t<900;
+  swReset();if(dx>70&&Math.abs(dy)<70&&quick){var b=document.querySelector('.back');if(b)b.click();}});
+document.addEventListener('touchcancel',swReset);
+// 網頁版：讓瀏覽器自己的「上一頁」（Safari 的邊緣右滑、Android 的返回鍵）也是回到 App 裡的上一頁，而不是離開網站。
+// 做法：畫面上有「返回」時，在瀏覽紀錄裡墊一筆；瀏覽器往回走到這一筆之前，就替使用者按一次「返回」
+var histOn=/^https?:/.test(location.protocol),histGuard=false,histSkip=false;
+function syncHist(){if(!histOn)return;var has=!!document.querySelector('.back');
+  try{if(has&&!histGuard){history.pushState({ms:1},'');histGuard=true;}
+      else if(!has&&histGuard){histGuard=false;histSkip=true;history.back();}}catch(_){histOn=false;}}
+window.addEventListener('popstate',function(){if(histSkip){histSkip=false;return;}
+  if(!histGuard)return;histGuard=false;var b=document.querySelector('.back');if(b)b.click();});
 document.addEventListener('keydown',function(e){if(e.key==='Enter'){var b=document.querySelector('[data-enter]');if(b)b.click();}});
 </script></body></html>`;
 
