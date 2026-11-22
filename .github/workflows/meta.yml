@@ -42,6 +42,8 @@ jobs:
           curl -fsSL "https://raw.githubusercontent.com/${{ github.repository }}/data/official.json?t=$(date +%s)" -o "$RUNNER_TEMP/prev-official.json" || echo "還沒有官網檔"
       - name: 抓場次通與官網來源的場次（「現在有什麼可以看」用）
         run: node tools/tw.mjs "$RUNNER_TEMP/prev-tw-near.json" "$RUNNER_TEMP/prev-tw-far.json" "$RUNNER_TEMP/tw-near.json" "$RUNNER_TEMP/tw-far.json" "$RUNNER_TEMP/prev-official.json" "$RUNNER_TEMP/official.json"
+      - name: 讀影展場次（金馬影展官網；有進行中或即將開始的影展才會有內容）
+        run: node tools/festival.mjs "$RUNNER_TEMP/festival.json" || echo "影展場次這次略過"
       - name: 發佈到 data 分支
         run: tools/publish-data.sh "$RUNNER_TEMP/meta.json" meta.json "更新資料"
       - name: 發佈開眼場次到 data 分支
@@ -56,3 +58,5 @@ jobs:
           tools/publish-data.sh "$RUNNER_TEMP/tw-far.json" tw-far.json "更新資料"
           git checkout -q -f "$GITHUB_SHA"
           tools/publish-data.sh "$RUNNER_TEMP/official.json" official.json "更新資料"
+          git checkout -q -f "$GITHUB_SHA"
+          tools/publish-data.sh "$RUNNER_TEMP/festival.json" festival.json "更新資料"
