@@ -1122,7 +1122,7 @@ function NowPage() {
   const wins = WINDOWS.filter((w) => !w.todayOnly || hasToday)
   const winIds = selWins.filter((id) => wins.some((w) => w.id === id))
   const cities = sortCities(Array.from(new Set(store.cinemas.map((c) => c.city))))
-  const scopeOptions = [{ id: "fav", label: `常去影城（${settings.favorites.length}）` }, { id: "near", label: "附近 10 間" }, ...cities.map((c) => ({ id: c, label: c }))]
+  const scopeOptions = [{ id: "all", label: `不限（全台 ${store.cinemas.length} 間）` }, { id: "fav", label: `常去影城（${settings.favorites.length}）` }, { id: "near", label: "附近 10 間" }, ...cities.map((c) => ({ id: c, label: c }))]
   // 點一下加入、再點一下拿掉；min1 = 至少留一個
   const toggle = (list: string[], id: string, min1 = false) => {
     const i = list.indexOf(id)
@@ -1147,10 +1147,10 @@ function NowPage() {
     })}
     {multiPick({
       title: "找哪些影城", open: open === "scope", onOpen: flip("scope"),
-      summary: scopes.map((x) => (x === "fav" ? "常去影城" : x === "near" ? "附近 10 間" : x)).join("、"),
+      summary: scopes.map((x) => (x === "all" ? "不限" : x === "fav" ? "常去影城" : x === "near" ? "附近 10 間" : x)).join("、"),
       options: scopeOptions, selected: scopes,
-      onToggle: (id) => setScopes(toggle(scopes, id, true)),
-      footer: "縣市的影城較多、選的天數越多，查詢會比較久。開眼來源的戲院通常只有今天的場次。",
+      onToggle: (id) => setScopes(id === "all" ? ["all"] : toggle(scopes.filter((x) => x !== "all"), id, true)),
+      footer: "縣市的影城較多、選的天數越多，查詢會比較久；「不限」要讀全台每一間，最久。開眼來源的戲院通常只有今天的場次。",
     })}
     {multiPick({
       title: "特殊廳", open: open === "format", onOpen: flip("format"),
@@ -1174,7 +1174,8 @@ function NowResultsPage({ dates, winIds, scopes, formats }: { dates: string[]; w
     const byId = new Map<string, { cinema: Cinema; km: number | null }>()
     const add = (list: { cinema: Cinema; km: number | null }[]) => list.forEach((x) => { const old = byId.get(x.cinema.id); if (!old || (old.km === null && x.km !== null)) byId.set(x.cinema.id, x) })
     for (const sc of scopes) {
-      if (sc === "near") add(nearest(store.cinemas, await locate(), 10))
+      if (sc === "all") add(store.cinemas.map((c) => ({ cinema: c, km: null })))
+      else if (sc === "near") add(nearest(store.cinemas, await locate(), 10))
       else if (sc === "fav") add(store.settings.favorites.map((id) => store.cinemas.find((c) => c.id === id)).filter(Boolean).map((c) => ({ cinema: c as Cinema, km: null })))
       else add(store.cinemas.filter((c) => c.city === sc).map((c) => ({ cinema: c, km: null })))
     }
@@ -1184,7 +1185,7 @@ function NowResultsPage({ dates, winIds, scopes, formats }: { dates: string[]; w
   }, [dates.join(","), winIds.join(","), scopes.join(","), formats.join(",")])
   const groups = res.data ? groupByMovie(res.data.hits) : []
   useEffect(() => { if (res.data) prefetchPosters(groups) }, [res.data]) // 背景先抓海報，進電影頁就不用等
-  const scopeLabel = scopes.map((x) => (x === "fav" ? "常去影城" : x === "near" ? "附近 10 間" : x)).join("、")
+  const scopeLabel = scopes.map((x) => (x === "all" ? "全台影城" : x === "fav" ? "常去影城" : x === "near" ? "附近 10 間" : x)).join("、")
   const many = dates.length > 1 // 複選多天：每一場前面標日期
   return <List navigationTitle={multiLabel(dates, winIds)} navigationBarTitleDisplayMode={"inline"} refreshable={res.reload}>
     {res.error ? <ErrorRow error={res.error} retry={res.reload} /> : null}

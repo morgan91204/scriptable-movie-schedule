@@ -1036,7 +1036,7 @@ class App {
     const cities = Array.from(new Set(this.cinemas.map((c) => c.city))).sort(
       (a, b) => (CITY_ORDER.indexOf(a) + 1 || 99) - (CITY_ORDER.indexOf(b) + 1 || 99)
     );
-    const scopes = [{ id: "fav", label: `常去影城（${this.settings.favorites.length}）` }, { id: "near", label: "附近 10 間" }, ...cities.map((c) => ({ id: c, label: c }))];
+    const scopes = [{ id: "all", label: `不限（全台 ${this.cinemas.length} 間）` }, { id: "fav", label: `常去影城（${this.settings.favorites.length}）` }, { id: "near", label: "附近 10 間" }, ...cities.map((c) => ({ id: c, label: c }))];
     // 點一下加入、再點一下拿掉；min1 = 至少留一個
     const toggle = (list: string[], id: string, min1 = false) => {
       const i = list.indexOf(id);
@@ -1057,9 +1057,9 @@ class App {
             {wins.map((w) => <Chip label={w.label} muted={selWins.indexOf(w.id) < 0} onTap={() => { this.nowWins = w.id === "all" ? ["all"] : toggle(selWins.filter((x) => x !== "all"), w.id); }} />)}
           </Chips>
         </Section>
-        <Section title="找哪些影城" hint="縣市的影城較多、選的天數越多，會花比較久時間。開眼來源的戲院通常只有今天的場次。">
+        <Section title="找哪些影城" hint="縣市的影城較多、選的天數越多，會花比較久時間；「不限」要讀全台每一間，最久。開眼來源的戲院通常只有今天的場次。">
           <Chips>
-            {scopes.map((sc) => <Chip label={sc.label} muted={this.nowScopes.indexOf(sc.id) < 0} onTap={() => { this.nowScopes = toggle(this.nowScopes, sc.id, true); }} />)}
+            {scopes.map((sc) => <Chip label={sc.label} muted={this.nowScopes.indexOf(sc.id) < 0} onTap={() => { this.nowScopes = sc.id === "all" ? ["all"] : toggle(this.nowScopes.filter((x) => x !== "all"), sc.id, true); }} />)}
           </Chips>
         </Section>
         <Section title="特殊廳" hint="都不選就是不限；選了幾種，就找其中任一種。">
@@ -1078,7 +1078,8 @@ class App {
     const byId = new Map<string, { cinema: Cinema; km: number | null }>();
     const add = (list: { cinema: Cinema; km: number | null }[]) => list.forEach((x) => { const old = byId.get(x.cinema.id); if (!old || (old.km === null && x.km !== null)) byId.set(x.cinema.id, x); });
     for (const sc of this.nowScopes) {
-      if (sc === "near") add(nearest(this.cinemas, await this.locate(), 10));
+      if (sc === "all") add(this.cinemas.map((c) => ({ cinema: c, km: null })));
+      else if (sc === "near") add(nearest(this.cinemas, await this.locate(), 10));
       else if (sc === "fav") add(this.settings.favorites.map((id) => this.cinemas.find((c) => c.id === id)).filter(Boolean).map((c) => ({ cinema: c as Cinema, km: null })));
       else add(this.cinemas.filter((c) => c.city === sc).map((c) => ({ cinema: c, km: null })));
     }
@@ -1087,7 +1088,7 @@ class App {
     const { hits, failed, noData } = await findShowtimesMulti(scope, dates, winIds, this.nowFormats as Format[]);
     const groups = groupByMovie(hits);
     prefetchPosters(groups); // 背景先抓海報，進電影頁就不用等
-    const scopeLabel = this.nowScopes.map((sc) => (sc === "fav" ? "常去影城" : sc === "near" ? "附近 10 間" : sc)).join("、");
+    const scopeLabel = this.nowScopes.map((sc) => (sc === "all" ? "全台影城" : sc === "fav" ? "常去影城" : sc === "near" ? "附近 10 間" : sc)).join("、");
     const many = dates.length > 1; // 複選多天：每一場前面標日期
     const open = (hit: Hit) => {
       this.runtime = hit.movie.runtime;

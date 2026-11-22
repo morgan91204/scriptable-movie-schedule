@@ -84,7 +84,9 @@ struct NowView: View {
     private var cityOptions: [String] { Fmt.sortCities(Array(Set(cinemas.map { $0.city }))) }
     private var activeWindows: [String] { windowOptions.map { $0.0 }.filter { windows.contains($0) } }
 
-    private func scopeName(_ id: String) -> String { id == "fav" ? "常去影城" : id == "near" ? "附近 10 間" : id }
+    private func scopeName(_ id: String) -> String { id == "all" ? "不限" : id == "fav" ? "常去影城" : id == "near" ? "附近 10 間" : id }
+    /// 範圍的選項順序：不限（全台）、常去、附近、各縣市
+    private var scopeOptions: [String] { ["all", "fav", "near"] + cityOptions }
     private func short(_ d: String) -> String {
         let p = d.split(separator: "-").compactMap { Int($0) }
         return p.count == 3 ? "\(p[1])/\(p[2])" : d
@@ -132,9 +134,12 @@ struct NowView: View {
                         }
                     }
                 }
-                multiMenu("範圍", summary: (["fav", "near"] + cityOptions).filter { scopes.contains($0) }.map(scopeName).joined(separator: "、")) {
-                    ForEach(["fav", "near"] + cityOptions, id: \.self) { id in
-                        option(scopeName(id), on: scopes.contains(id)) { flip(&scopes, id, keepOne: true) }
+                multiMenu("範圍", summary: scopeOptions.filter { scopes.contains($0) }.map(scopeName).joined(separator: "、")) {
+                    ForEach(scopeOptions, id: \.self) { id in
+                        option(id == "all" ? "不限（全台 \(cinemas.count) 間）" : scopeName(id), on: scopes.contains(id)) {
+                            if id == "all" { scopes = ["all"] } else { scopes.remove("all"); flip(&scopes, id, keepOne: scopes.count == 1 && scopes.contains(id)) }
+                            if scopes.isEmpty { scopes = [id] }
+                        }
                     }
                 }
                 multiMenu("特殊廳", summary: picked.isEmpty ? "不限" : formats.filter { picked.contains($0) }.joined(separator: "、")) {
@@ -144,7 +149,7 @@ struct NowView: View {
                     }
                 }
             } footer: {
-                Text("每一項都可以複選。時段都不選就是整天；特殊廳選了幾種，就找其中任一種。")
+                Text("每一項都可以複選。時段都不選就是整天；特殊廳選了幾種，就找其中任一種。範圍選「不限」要讀全台每一間影城，會比較久。")
             }
             switch result {
             case .loading:
@@ -217,8 +222,10 @@ struct NowView: View {
             // 範圍複選：各範圍的影城合在一起，同一間只查一次（有距離的保留距離）
             var byId: [String: ScopedCinema] = [:]
             var order: [String] = []
-            for sc in (["fav", "near"] + cityOptions) where scopes.contains(sc) {
-                if sc == "near" {
+            for sc in scopeOptions where scopes.contains(sc) {
+                if sc == "all" {
+                    Self.merge(cinemas.map { ScopedCinema(cinema: $0, km: nil) }, into: &byId, order: &order)
+                } else if sc == "near" {
                     let loc = try await LocationFetcher().current()
                     let near: [ScopedCinema] = try await Bridge.shared.call("nearby", [loc.coordinate.latitude, loc.coordinate.longitude, 10])
                     Self.merge(near, into: &byId, order: &order)
