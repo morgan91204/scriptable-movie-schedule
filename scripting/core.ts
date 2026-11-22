@@ -1292,11 +1292,33 @@ export function releaseOf(title: string): string {
   return (boxData?.list.find((x) => communityKey(x.name) === ck)?.release || "").slice(0, 10);
 }
 /** 票房排行每一列的兩行說明：第一行金額，第二行上映日期與戲院數 */
-export function boxOfficeLines(x: BoxOfficeItem): [string, string] {
+export function boxOfficeLines(x: BoxOfficeItem, by: BoxSort = "week"): [string, string] {
+  const week = x.week !== null && !x.since ? `本週 ${money(x.week)}` : "";
+  const total = `累計 ${money(x.total)}`;
   return [
-    x.since ? `上映至今 ${money(x.total)}` : [x.week !== null ? `本週 ${money(x.week)}` : "", `累計 ${money(x.total)}`].filter(Boolean).join("｜"),
+    // 排的是哪一種，就把那個數字放前面
+    by === "total" ? [total, week].filter(Boolean).join("｜") : x.since ? `上映至今 ${money(x.total)}` : [week, total].filter(Boolean).join("｜"),
     [releaseLabel(x.release), x.theaters ? `${x.theaters} 間戲院` : ""].filter(Boolean).join("｜"),
   ];
+}
+/** 票房排行的兩種排法：week = 這一週賣最多的排前面；total = 上映以來累計最多的排前面 */
+export type BoxSort = "week" | "total";
+/** 依排法排好、重新編名次的清單。累計排行的範圍一樣是「這週還有賣出票的電影」，已經下檔的舊片不在裡面 */
+export function boxOfficeBy(b: BoxOffice, by: BoxSort): BoxOfficeItem[] {
+  if (by !== "total") return b.list;
+  return b.list.slice().sort((x, y) => y.total - x.total).map((x, i) => ({ ...x, rank: i + 1 }));
+}
+/** 排行的標題：「11/9–11/15 全台週票房」或「累計票房（截至 11/15）」 */
+export function boxOfficeTitle(b: BoxOffice, by: BoxSort): string {
+  const md = (d: string) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`;
+  return by === "total" ? `累計票房（截至 ${md(b.end)}）` : boxOfficeLabel(b);
+}
+/** 排行下方的說明 */
+export function boxOfficeFooter(b: BoxOffice, by: BoxSort): string {
+  const scope = `這週有賣出票的電影共 ${b.list.length} 部。`;
+  return by === "total"
+    ? `${scope}累計排行只排這些還在上映的片，已經下檔的不在裡面。資料來源：${b.source}。官方每週更新一次。`
+    : `${scope}${boxOfficeNote(b)}資料來源：${b.source}。官方每週更新一次。`;
 }
 /** 電影清單（上映中、即將上映）每一列的兩行說明，各自一行不換行：
  *  第一行：「今天無場次」或上映日期｜分級｜片長｜放映影城數；第二行：英文片名 */

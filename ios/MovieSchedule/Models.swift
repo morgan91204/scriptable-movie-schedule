@@ -134,12 +134,15 @@ struct BoxOfficeItem: Codable, Hashable {
 struct BoxOfficeRow: Codable, Identifiable {
     var x: BoxOfficeItem
     var m: TwMovie?
+    var lines: [String]? // 兩行說明（共用資料層依排法算好：金額一行、上映日期與戲院數一行）
     var id: Int { x.rank }
 }
 
 struct BoxOfficeBoard: Codable {
     var label: String
     var source: String
+    var footer: String?   // 排行下方的說明
+    var canSort: Bool?    // 有週票房時才能切換「本週／累計」
     var rows: [BoxOfficeRow]
 }
 

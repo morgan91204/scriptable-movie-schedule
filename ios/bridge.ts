@@ -9,9 +9,13 @@ const native = (name: string, payload: Record<string, unknown> = {}): Promise<an
 let cache: Record<string, string> = {};
 
 /** 票房排行：連同對得到的場次通電影一起回傳 */
-async function boxOffice() {
+async function boxOffice(by?: string) {
   const [b, all] = await Promise.all([core.loadBoxOffice(), core.loadMovies().catch(() => [])]);
-  return { label: core.boxOfficeLabel(b), source: b.source, rows: b.list.map((x) => ({ x, m: core.matchBoxOffice(x.name, all) || null })) };
+  const sort: core.BoxSort = by === "total" && b.mode === "week" ? "total" : "week";
+  return {
+    label: core.boxOfficeTitle(b, sort), source: b.source, footer: core.boxOfficeFooter(b, sort), canSort: b.mode === "week",
+    rows: core.boxOfficeBy(b, sort).map((x) => ({ x, m: core.matchBoxOffice(x.name, all) || null, lines: core.boxOfficeLines(x, sort) })),
+  };
 }
 /** 現在有什麼可以看：在指定的影城裡找某天某時段的場次，依電影分組 */
 async function nowShowing(scope: { cinema: core.Cinema; km: number | null }[], date: string, winId: string, format: string) {

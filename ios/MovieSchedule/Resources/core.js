@@ -37,9 +37,12 @@
     atDayLive: () => atDayLive,
     baseTitle: () => baseTitle,
     bookingUrl: () => bookingUrl,
+    boxOfficeBy: () => boxOfficeBy,
+    boxOfficeFooter: () => boxOfficeFooter,
     boxOfficeLabel: () => boxOfficeLabel,
     boxOfficeLines: () => boxOfficeLines,
     boxOfficeNote: () => boxOfficeNote,
+    boxOfficeTitle: () => boxOfficeTitle,
     byShowtime: () => byShowtime,
     cachePoster: () => cachePoster,
     checkLatest: () => checkLatest,
@@ -1696,11 +1699,26 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     const ck = communityKey(title);
     return (boxData?.list.find((x) => communityKey(x.name) === ck)?.release || "").slice(0, 10);
   }
-  function boxOfficeLines(x) {
+  function boxOfficeLines(x, by = "week") {
+    const week = x.week !== null && !x.since ? `本週 ${money(x.week)}` : "";
+    const total = `累計 ${money(x.total)}`;
     return [
-      x.since ? `上映至今 ${money(x.total)}` : [x.week !== null ? `本週 ${money(x.week)}` : "", `累計 ${money(x.total)}`].filter(Boolean).join("｜"),
+      // 排的是哪一種，就把那個數字放前面
+      by === "total" ? [total, week].filter(Boolean).join("｜") : x.since ? `上映至今 ${money(x.total)}` : [week, total].filter(Boolean).join("｜"),
       [releaseLabel(x.release), x.theaters ? `${x.theaters} 間戲院` : ""].filter(Boolean).join("｜")
     ];
+  }
+  function boxOfficeBy(b, by) {
+    if (by !== "total") return b.list;
+    return b.list.slice().sort((x, y) => y.total - x.total).map((x, i) => ({ ...x, rank: i + 1 }));
+  }
+  function boxOfficeTitle(b, by) {
+    const md = (d) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`;
+    return by === "total" ? `累計票房（截至 ${md(b.end)}）` : boxOfficeLabel(b);
+  }
+  function boxOfficeFooter(b, by) {
+    const scope = `這週有賣出票的電影共 ${b.list.length} 部。`;
+    return by === "total" ? `${scope}累計排行只排這些還在上映的片，已經下檔的不在裡面。資料來源：${b.source}。官方每週更新一次。` : `${scope}${boxOfficeNote(b)}資料來源：${b.source}。官方每週更新一次。`;
   }
   function movieLines(m) {
     const md = (d) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`;
@@ -2275,9 +2293,16 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   // ios/bridge.ts
   var native = (name, payload = {}) => webkit.messageHandlers.native.postMessage({ name, ...payload });
   var cache = {};
-  async function boxOffice() {
+  async function boxOffice(by) {
     const [b, all] = await Promise.all([loadBoxOffice(), loadMovies().catch(() => [])]);
-    return { label: boxOfficeLabel(b), source: b.source, rows: b.list.map((x) => ({ x, m: matchBoxOffice(x.name, all) || null })) };
+    const sort = by === "total" && b.mode === "week" ? "total" : "week";
+    return {
+      label: boxOfficeTitle(b, sort),
+      source: b.source,
+      footer: boxOfficeFooter(b, sort),
+      canSort: b.mode === "week",
+      rows: boxOfficeBy(b, sort).map((x) => ({ x, m: matchBoxOffice(x.name, all) || null, lines: boxOfficeLines(x, sort) }))
+    };
   }
   async function nowShowing(scope, date, winId, format) {
     const win = WINDOWS.find((w) => w.id === winId) || WINDOWS[WINDOWS.length - 1];

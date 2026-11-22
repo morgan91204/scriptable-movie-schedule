@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.22-1227
+// @movie-schedule-app 電影行程 v2026.11.22-1319
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/parsers.gen.ts
@@ -1561,11 +1561,26 @@ function releaseOf(title) {
   const ck = communityKey(title);
   return (boxData?.list.find((x) => communityKey(x.name) === ck)?.release || "").slice(0, 10);
 }
-function boxOfficeLines(x) {
+function boxOfficeLines(x, by = "week") {
+  const week = x.week !== null && !x.since ? `本週 ${money(x.week)}` : "";
+  const total = `累計 ${money(x.total)}`;
   return [
-    x.since ? `上映至今 ${money(x.total)}` : [x.week !== null ? `本週 ${money(x.week)}` : "", `累計 ${money(x.total)}`].filter(Boolean).join("｜"),
+    // 排的是哪一種，就把那個數字放前面
+    by === "total" ? [total, week].filter(Boolean).join("｜") : x.since ? `上映至今 ${money(x.total)}` : [week, total].filter(Boolean).join("｜"),
     [releaseLabel(x.release), x.theaters ? `${x.theaters} 間戲院` : ""].filter(Boolean).join("｜")
   ];
+}
+function boxOfficeBy(b, by) {
+  if (by !== "total") return b.list;
+  return b.list.slice().sort((x, y) => y.total - x.total).map((x, i) => ({ ...x, rank: i + 1 }));
+}
+function boxOfficeTitle(b, by) {
+  const md = (d) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`;
+  return by === "total" ? `累計票房（截至 ${md(b.end)}）` : boxOfficeLabel(b);
+}
+function boxOfficeFooter(b, by) {
+  const scope = `這週有賣出票的電影共 ${b.list.length} 部。`;
+  return by === "total" ? `${scope}累計排行只排這些還在上映的片，已經下檔的不在裡面。資料來源：${b.source}。官方每週更新一次。` : `${scope}${boxOfficeNote(b)}資料來源：${b.source}。官方每週更新一次。`;
 }
 function movieLines(m) {
   const md = (d) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`;
@@ -2650,7 +2665,7 @@ var App = class {
     ];
     // ── 事件迴圈 ──
     // 背景查 GitHub 上的最新版本（首頁顯示是否為最新版）
-    this.latest = checkLatest("2026.11.22-1227");
+    this.latest = checkLatest("2026.11.22-1319");
     // ── 搜尋 ──
     this.query = "";
     this.tmdbStatus = "";
@@ -2662,6 +2677,7 @@ var App = class {
     this.movieQuery = "";
     /** 電影分頁上方的切換：上映中／票房排行 */
     this.movieMode = "now";
+    this.boxSort = "week";
     // 日期、縣市、特殊廳都可以複選（點一下選、再點一下取消）；換一部片時日期重來
     this.movieFor = "";
     this.movieDates = [];
@@ -2795,11 +2811,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.22-1227"}`);
+          Pasteboard.copy(`版本 ${"2026.11.22-1319"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.22-1227"}`,
+      `版本 ${"2026.11.22-1319"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -3157,10 +3173,12 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
       this.movieMode = "soon";
     } }));
   }
+  // 票房排行的排法：本週／累計
   async boxOfficeView() {
     const [b, all] = await Promise.all([loadBoxOffice(), loadMovies().catch(() => [])]);
     const k = this.movieQuery.trim().toLowerCase();
-    const rows = b.list.map((x) => ({ x, m: matchBoxOffice(x.name, all) })).filter(({ x, m }) => !k || `${x.name} ${m?.en || ""}`.toLowerCase().includes(k));
+    const by = this.boxSort;
+    const rows = boxOfficeBy(b, by).map((x) => ({ x, m: matchBoxOffice(x.name, all) })).filter(({ x, m }) => !k || `${x.name} ${m?.en || ""}`.toLowerCase().includes(k));
     const jobs = rows.map(({ x, m }) => moviePoster(m ? m.title : x.name, m?.slug, m?.en).catch(() => ""));
     const wait = this.rerendering ? 0 : 600;
     const posters = await Promise.all(jobs.map((p) => Promise.race([p, sleep(wait).then(() => void 0)])));
@@ -3175,9 +3193,13 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
       if (src && src === u) cachePoster(u);
       return { src, url: u };
     };
-    return /* @__PURE__ */ h(Page, { title: "依電影找場次", subtitle: boxOfficeLabel(b), onBack: () => this.back() }, this.movieModeChips(), /* @__PURE__ */ h("input", { class: "field", name: "q", value: this.movieQuery, placeholder: "搜尋片名" }), /* @__PURE__ */ h(Button, { label: "搜尋", kind: "secondary", enter: true, onTap: (v) => {
+    return /* @__PURE__ */ h(Page, { title: "依電影找場次", subtitle: boxOfficeTitle(b, by), onBack: () => this.back() }, this.movieModeChips(), b.mode === "week" ? /* @__PURE__ */ h(Chips, null, /* @__PURE__ */ h(Chip, { label: "本週票房", muted: by !== "week", onTap: () => {
+      this.boxSort = "week";
+    } }), /* @__PURE__ */ h(Chip, { label: "累計票房", muted: by !== "total", onTap: () => {
+      this.boxSort = "total";
+    } })) : null, /* @__PURE__ */ h("input", { class: "field", name: "q", value: this.movieQuery, placeholder: "搜尋片名" }), /* @__PURE__ */ h(Button, { label: "搜尋", kind: "secondary", enter: true, onTap: (v) => {
       this.movieQuery = v.q || "";
-    } }), rows.length ? null : /* @__PURE__ */ h(Empty, { icon: "🎞", text: "排行上找不到相符的電影" }), /* @__PURE__ */ h(Section, { title: boxOfficeLabel(b), hint: `這週有賣出票的電影共 ${b.list.length} 部。${boxOfficeNote(b)}資料來源：${b.source}。官方每週更新一次。` }, rows.map(({ x, m }, i) => {
+    } }), rows.length ? null : /* @__PURE__ */ h(Empty, { icon: "🎞", text: "排行上找不到相符的電影" }), /* @__PURE__ */ h(Section, { title: boxOfficeTitle(b, by), hint: boxOfficeFooter(b, by) }, rows.map(({ x, m }, i) => {
       const t = thumb(posters[i]);
       return /* @__PURE__ */ h(
         Item,
@@ -3185,7 +3207,7 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
           rank: x.rank,
           thumb: t,
           title: x.name,
-          subtitle: boxOfficeLines(x).filter(Boolean).join("\n"),
+          subtitle: boxOfficeLines(x, by).filter(Boolean).join("\n"),
           onTap: m ? () => this.go(() => this.movieView(m, ""), `讀取《${m.title}》的放映影城…`) : () => this.go(() => this.boxMovieView(x), `讀取《${x.name}》…`)
         }
       );

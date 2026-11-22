@@ -12,9 +12,9 @@ import {
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
   loadSettings, saveSettings, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, TW,
   FORMATS, formatsOf, filterVersions, filterVersionsAny, movieRows, movieDays, nearest, kmLabel, WINDOWS, findShowtimes, findShowtimesMulti, multiLabel, multiDetail, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText,
-  hallOf, tmdbTest, movieExtras, moviePoster, movieRuntime, posterSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, foregroundTask, communityStats, communityCached, communityVote, loadBoxOffice, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, ABOUT_URL, PRIVACY_URL, movieRatings, ratingTier,
+  hallOf, tmdbTest, movieExtras, moviePoster, movieRuntime, posterSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, foregroundTask, communityStats, communityCached, communityVote, loadBoxOffice, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, ABOUT_URL, PRIVACY_URL, movieRatings, ratingTier,
 } from "./core";
-import type { MovieExtras, Ratings, Community, BoxOfficeItem } from "./core";
+import type { MovieExtras, Ratings, Community, BoxOfficeItem, BoxSort } from "./core";
 import { setTabBar, setBackGuard, esc } from "./jsx";
 import type { TwMovie, TwMovieCinema, Format, LatLng, Hit } from "./core";
 
@@ -795,10 +795,12 @@ class App {
     );
   }
 
+  boxSort: BoxSort = "week"; // 票房排行的排法：本週／累計
   async boxOfficeView(): Promise<string> {
     const [b, all] = await Promise.all([loadBoxOffice(), loadMovies().catch(() => [] as TwMovie[])]);
     const k = this.movieQuery.trim().toLowerCase();
-    const rows = b.list.map((x) => ({ x, m: matchBoxOffice(x.name, all) })).filter(({ x, m }) => !k || `${x.name} ${m?.en || ""}`.toLowerCase().includes(k));
+    const by = this.boxSort;
+    const rows = boxOfficeBy(b, by).map((x) => ({ x, m: matchBoxOffice(x.name, all) })).filter(({ x, m }) => !k || `${x.name} ${m?.en || ""}`.toLowerCase().includes(k));
     // 海報：手機上記過的立刻有；沒記過的最多等 0.6 秒，其餘讀好後自動補畫
     const jobs = rows.map(({ x, m }) => moviePoster(m ? m.title : x.name, m?.slug, m?.en).catch(() => ""));
     const wait = this.rerendering ? 0 : 600;
@@ -816,12 +818,18 @@ class App {
       return { src, url: u };
     };
     return (
-      <Page title="依電影找場次" subtitle={boxOfficeLabel(b)} onBack={() => this.back()}>
+      <Page title="依電影找場次" subtitle={boxOfficeTitle(b, by)} onBack={() => this.back()}>
         {this.movieModeChips()}
+        {b.mode === "week" ? (
+          <Chips>
+            <Chip label="本週票房" muted={by !== "week"} onTap={() => { this.boxSort = "week"; }} />
+            <Chip label="累計票房" muted={by !== "total"} onTap={() => { this.boxSort = "total"; }} />
+          </Chips>
+        ) : null}
         <input class="field" name="q" value={this.movieQuery} placeholder="搜尋片名" />
         <Button label="搜尋" kind="secondary" enter onTap={(v) => { this.movieQuery = v.q || ""; }} />
         {rows.length ? null : <Empty icon="🎞" text="排行上找不到相符的電影" />}
-        <Section title={boxOfficeLabel(b)} hint={`這週有賣出票的電影共 ${b.list.length} 部。${boxOfficeNote(b)}資料來源：${b.source}。官方每週更新一次。`}>
+        <Section title={boxOfficeTitle(b, by)} hint={boxOfficeFooter(b, by)}>
           {rows.map(({ x, m }, i) => {
             const t = thumb(posters[i] as string | undefined);
             return (
@@ -829,7 +837,7 @@ class App {
                 rank={x.rank}
                 thumb={t}
                 title={x.name}
-                subtitle={boxOfficeLines(x).filter(Boolean).join("\n")}
+                subtitle={boxOfficeLines(x, by).filter(Boolean).join("\n")}
                 onTap={m ? () => this.go(() => this.movieView(m, ""), `讀取《${m.title}》的放映影城…`) : () => this.go(() => this.boxMovieView(x), `讀取《${x.name}》…`)}
               />
             );

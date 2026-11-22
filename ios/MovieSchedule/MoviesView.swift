@@ -106,9 +106,19 @@ struct MoviesView: View {
 struct BoxOfficeSection: View {
     var query: String = ""
     @State private var board: Loadable<BoxOfficeBoard> = .loading
+    @State private var sort = "week" // 排法：本週／累計
 
     var body: some View {
         Group {
+            if board.value?.canSort ?? false {
+                Section {
+                    Picker("排行", selection: $sort) {
+                        Text("本週票房").tag("week")
+                        Text("累計票房").tag("total")
+                    }
+                    .pickerStyle(.segmented)
+                }
+            }
             switch board {
             case .loading:
                 Section { LoadingRow(text: "讀取票房排行…") }
@@ -128,11 +138,11 @@ struct BoxOfficeSection: View {
                 } header: {
                     Text(b.label)
                 } footer: {
-                    Text("\(rows.isEmpty ? "排行上找不到相符的電影。\n" : "")這週有賣出票的電影共 \(b.rows.count) 部。\(b.rows.contains { $0.x.since ?? false } ? "標「上映至今」的是官方這週才第一次列入的新片：沒有上週的數字可以相減，排名用的是上映以來的累計，會比單週多。" : "")資料來源：\(b.source)。官方每週更新一次。")
+                    Text("\(rows.isEmpty ? "排行上找不到相符的電影。\n" : "")\(b.footer ?? "資料來源：\(b.source)。官方每週更新一次。")")
                 }
             }
         }
-        .task { if board.value == nil { await load() } }
+        .task(id: sort) { await load() }
     }
 
     private func rowLabel(_ r: BoxOfficeRow) -> some View {
@@ -145,11 +155,10 @@ struct BoxOfficeSection: View {
             PosterView(title: r.m?.title ?? r.x.name, slug: r.m?.slug, en: r.m?.en)
             VStack(alignment: .leading, spacing: 2) {
                 Text(r.x.name).lineLimit(2)
-                // 第一行金額、第二行上映日期與戲院數：各自一行不換行
-                // since：官方這週才第一次列入的新片，沒有單週數字，只顯示上映至今
-                Text((r.x.since ?? false) ? "上映至今 \(Fmt.money(r.x.total))" : [r.x.week.map { "本週 \(Fmt.money($0))" } ?? "", "累計 \(Fmt.money(r.x.total))"].filter { !$0.isEmpty }.joined(separator: "｜"))
-                    .font(.subheadline).foregroundStyle(.secondary).lineLimit(1).minimumScaleFactor(0.8)
-                let second = [Fmt.release(r.x.release), (r.x.theaters ?? 0) > 0 ? "\(r.x.theaters ?? 0) 間戲院" : ""].filter { !$0.isEmpty }.joined(separator: "｜")
+                // 第一行金額、第二行上映日期與戲院數：各自一行不換行（文字由共用資料層依排法算好）
+                let first = r.lines?.first ?? "累計 \(Fmt.money(r.x.total))"
+                let second = (r.lines?.count ?? 0) > 1 ? (r.lines?[1] ?? "") : ""
+                Text(first).font(.subheadline).foregroundStyle(.secondary).lineLimit(1).minimumScaleFactor(0.8)
                 if !second.isEmpty {
                     Text(second).font(.caption).foregroundStyle(.tertiary).lineLimit(1).minimumScaleFactor(0.8)
                 }
@@ -160,7 +169,7 @@ struct BoxOfficeSection: View {
 
     private func load() async {
         do {
-            board = .loaded(try await Bridge.shared.call("boxOffice"))
+            board = .loaded(try await Bridge.shared.call("boxOffice", [sort]))
         } catch {
             board = .failed(errorText(error))
         }
