@@ -1,5 +1,5 @@
 {
- "updated": "2026-11-22T05:36:26.828Z",
+ "updated": "2026-11-22T05:51:20.457Z",
  "mode": "week",
  "start": "2026-11-09",
  "end": "2026-11-15",
@@ -1337,1860 +1337,1460 @@
   {
    "rank": 1,
    "name": "蜘蛛人：重生日",
-   "country": "美國",
    "release": "2026-07-28",
    "theaters": 90,
-   "week": null,
    "total": 600442693,
    "showing": true
   },
   {
    "rank": 2,
    "name": "奧德賽",
-   "country": "美國",
    "release": "2026-07-16",
    "theaters": 93,
-   "week": null,
    "total": 457780072,
    "showing": true
   },
   {
    "rank": 3,
    "name": "超級瑪利歐銀河電影版",
-   "country": "美國",
    "release": "2026-04-01",
    "theaters": 96,
-   "week": null,
    "total": 290755706
   },
   {
    "rank": 4,
    "name": "狸想世界",
-   "country": "美國",
    "release": "2026-03-18",
    "theaters": 92,
-   "week": null,
    "total": 288760165
   },
   {
    "rank": 5,
    "name": "玩具總動員5",
-   "country": "美國",
    "release": "2026-06-17",
    "theaters": 92,
-   "week": null,
    "total": 286198886,
    "showing": true
   },
   {
    "rank": 6,
    "name": "穿著Prada的惡魔2",
-   "country": "美國",
    "release": "2026-04-29",
    "theaters": 93,
-   "week": null,
    "total": 240552157
   },
   {
    "rank": 7,
    "name": "屍速禁區",
-   "country": "韓國",
    "release": "2026-05-22",
    "theaters": 84,
-   "week": null,
    "total": 233799368
   },
   {
    "rank": 8,
    "name": "名偵探柯南 高速公路的墮天使",
-   "country": "日本",
    "release": "2026-06-24",
    "theaters": 88,
-   "week": null,
    "total": 216192064,
    "showing": true
   },
   {
    "rank": 9,
    "name": "劇場版 吉伊卡哇 人魚島的秘密",
-   "country": "日本",
    "release": "2026-07-25",
    "theaters": 88,
-   "week": null,
    "total": 174933361,
    "showing": true
   },
   {
    "rank": 10,
    "name": "極限返航",
-   "country": "美國",
    "release": "2026-03-18",
    "theaters": 94,
-   "week": null,
    "total": 173881727,
    "showing": true
   },
   {
    "rank": 11,
    "name": "惡靈古堡：爆發夜",
-   "country": "美國",
    "release": "2026-09-17",
    "theaters": 91,
-   "week": null,
    "total": 157151765,
    "showing": true
   },
   {
    "rank": 12,
    "name": "愛你致死不渝",
-   "country": "美國",
    "release": "2026-08-07",
    "theaters": 81,
-   "week": null,
    "total": 145345741,
    "showing": true
   },
   {
    "rank": 13,
    "name": "麥可傑克森",
-   "country": "美國",
    "release": "2026-04-22",
    "theaters": 88,
-   "week": null,
    "total": 108122761,
    "showing": true
   },
   {
    "rank": 14,
    "name": "小小兵&大怪獸",
-   "country": "美國",
    "release": "2026-06-30",
    "theaters": 92,
-   "week": null,
    "total": 107618505
   },
   {
    "rank": 15,
    "name": "冠軍之路",
-   "country": "中華民國",
    "release": "2026-01-01",
    "theaters": 96,
-   "week": null,
    "total": 96632791,
    "showing": true
   },
   {
    "rank": 16,
    "name": "網紅老爸",
-   "country": "中華民國",
    "release": "2026-08-27",
    "theaters": 92,
-   "week": null,
    "total": 91275728,
    "showing": true
   },
   {
    "rank": 17,
    "name": "雙囍",
-   "country": "中華民國",
    "release": "2026-02-17",
    "theaters": 97,
-   "week": null,
    "total": 85692259
   },
   {
    "rank": 18,
    "name": "後室",
-   "country": "美國",
    "release": "2026-05-25",
    "theaters": 89,
-   "week": null,
    "total": 84422079
   },
   {
    "rank": 19,
    "name": "粽邪 4：坤蒂拉娜",
-   "country": "中華民國",
    "release": "2026-08-27",
    "theaters": 90,
-   "week": null,
    "total": 81676487,
    "showing": true
   },
   {
    "rank": 20,
    "name": "哥吉拉-0.0",
-   "country": "日本",
    "release": "2026-11-02",
    "theaters": 82,
-   "week": null,
    "total": 74818512,
    "showing": true
   },
   {
    "rank": 21,
    "name": "電影蠟筆小新：奇奇怪怪！我的妖怪假期",
-   "country": "日本",
    "release": "2026-08-07",
    "theaters": 83,
-   "week": null,
    "total": 57192970,
    "showing": true
   },
   {
    "rank": 22,
    "name": "揭密日",
-   "country": "美國",
    "release": "2026-06-09",
    "theaters": 91,
-   "week": null,
    "total": 56691756
   },
   {
    "rank": 23,
    "name": "橡樹街末日",
-   "country": "美國",
    "release": "2026-08-12",
    "theaters": 92,
-   "week": null,
    "total": 50253371,
    "showing": true
   },
   {
    "rank": 24,
    "name": "催眠麥克風",
-   "country": "日本",
    "release": "2026-04-25",
    "theaters": 13,
-   "week": null,
    "total": 47306391,
    "showing": true
   },
   {
    "rank": 25,
    "name": "功夫",
-   "country": "中華民國",
    "release": "2026-02-13",
    "theaters": 98,
-   "week": null,
    "total": 47050244
   },
   {
    "rank": 26,
    "name": "泥面人",
-   "country": "美國",
    "release": "2026-10-21",
    "theaters": 89,
-   "week": null,
    "total": 46496386,
    "showing": true
   },
   {
    "rank": 27,
    "name": "野獸之心",
-   "country": "美國",
    "release": "2026-09-17",
    "theaters": 91,
-   "week": null,
    "total": 45037803,
    "showing": true
   },
   {
    "rank": 28,
    "name": "汪汪隊立大功：恐龍大電影",
-   "country": "美國",
    "release": "2026-08-14",
    "theaters": 88,
-   "week": null,
    "total": 41329134,
    "showing": true
   },
   {
    "rank": 29,
    "name": "電影哆啦A夢：新．大雄的海底鬼岩城",
-   "country": "日本",
    "release": "2026-07-08",
    "theaters": 83,
-   "week": null,
    "total": 40703111,
    "showing": true
   },
   {
    "rank": 30,
    "name": "海洋奇緣 (真人版)",
-   "country": "美國",
    "release": "2026-07-08",
    "theaters": 91,
-   "week": null,
    "total": 39577067,
    "showing": true
   },
   {
    "rank": 31,
    "name": "抓馬戀人",
-   "country": "美國",
    "release": "2026-04-02",
    "theaters": 75,
-   "week": null,
    "total": 36947114
   },
   {
    "rank": 32,
    "name": "寒戰1994",
-   "country": "香港",
    "release": "2026-05-01",
    "theaters": 89,
-   "week": null,
    "total": 34763356
   },
   {
    "rank": 33,
    "name": "李克寧 墓乃伊",
-   "country": "美國",
    "release": "2026-04-15",
    "theaters": 86,
-   "week": null,
    "total": 34263695
   },
   {
    "rank": 34,
    "name": "劇場版「暗殺教室」：我們的時光",
-   "country": "日本",
    "release": "2026-03-27",
    "theaters": 72,
-   "week": null,
    "total": 33052307
   },
   {
    "rank": 35,
    "name": "復仇者聯盟：終局之戰 加碼重映",
-   "country": "美國",
    "release": "2026-09-24",
    "theaters": 83,
-   "week": null,
    "total": 32761451
   },
   {
    "rank": 36,
    "name": "曼達洛人與古古",
-   "country": "美國",
    "release": "2026-05-20",
    "theaters": 90,
-   "week": null,
    "total": 32348873
   },
   {
    "rank": 37,
    "name": "另一個媽咪",
-   "country": "美國",
    "release": "2026-10-08",
    "theaters": 83,
-   "week": null,
    "total": 31109286,
    "showing": true
   },
   {
    "rank": 38,
    "name": "玩命航線",
-   "country": "美國",
    "release": "2026-08-19",
    "theaters": 81,
-   "week": null,
    "total": 30338951
   },
   {
    "rank": 39,
    "name": "名偵探柯南 第30號殺人事件",
-   "country": "日本",
    "release": "2026-11-06",
    "theaters": 88,
-   "week": null,
    "total": 30036247,
    "showing": true
   },
   {
    "rank": 40,
    "name": "山羊巔峰",
-   "country": "美國",
    "release": "2026-02-13",
    "theaters": 87,
-   "week": null,
    "total": 30016261
   },
   {
    "rank": 41,
    "name": "劇場版 魔法少女小圓〈瓦爾普吉斯的迴天〉",
-   "country": "日本",
    "release": "2026-09-04",
    "theaters": 51,
-   "week": null,
    "total": 29345498,
    "showing": true
   },
   {
    "rank": 42,
    "name": "天眼浩劫",
-   "country": "美國",
    "release": "2026-02-06",
    "theaters": 86,
-   "week": null,
    "total": 28300232
   },
   {
    "rank": 43,
    "name": "希望：末日血戰",
-   "country": "韓國",
    "release": "2026-09-04",
    "theaters": 93,
-   "week": null,
    "total": 27113406
   },
   {
    "rank": 44,
    "name": "神木之島",
-   "country": "中華民國",
    "release": "2026-05-08",
    "theaters": 50,
-   "week": null,
    "total": 23676086
   },
   {
    "rank": 45,
    "name": "ONE OK ROCK DETOX JAPAN TOUR 2025 AT NISSAN STADIUM IN CINEMAS",
-   "country": "韓國",
    "release": "2026-04-17",
    "theaters": 33,
-   "week": null,
    "total": 23192170
   },
   {
    "rank": 46,
    "name": "挖掘者",
-   "country": "美國",
    "release": "2026-10-01",
    "theaters": 91,
-   "week": null,
    "total": 21024802,
    "showing": true
   },
   {
    "rank": 47,
    "name": "超人再起",
-   "country": "中華民國",
    "release": "2026-05-08",
    "theaters": 81,
-   "week": null,
    "total": 20662665,
    "showing": true
   },
   {
    "rank": 48,
    "name": "超少女",
-   "country": "美國",
    "release": "2026-06-23",
    "theaters": 92,
-   "week": null,
    "total": 19705496
   },
   {
    "rank": 49,
    "name": "新劇場版 銀魂 -吉原大炎上-",
-   "country": "日本",
    "release": "2026-05-15",
    "theaters": 83,
-   "week": null,
    "total": 17802588
   },
   {
    "rank": 50,
    "name": "天劫倒數 2：大遷徙",
-   "country": "美國",
    "release": "2026-01-09",
    "theaters": 86,
-   "week": null,
    "total": 17697936
   },
   {
    "rank": 51,
    "name": "尋秦記",
-   "country": "香港",
    "release": "2026-01-03",
    "theaters": 81,
-   "week": null,
    "total": 17543017
   },
   {
    "rank": 52,
    "name": "STRAY KIDS: THE DOMINATE EXPERIENCE",
-   "country": "美國",
    "release": "2026-03-13",
    "theaters": 44,
-   "week": null,
    "total": 17511745
   },
   {
    "rank": 53,
    "name": "關鍵公敵",
-   "country": "美國",
    "release": "2026-01-30",
    "theaters": 92,
-   "week": null,
    "total": 17051264
   },
   {
    "rank": 54,
    "name": "怎麼可能我家的祖先是你家的鬼",
-   "country": "中華民國",
    "release": "2026-09-10",
    "theaters": 90,
-   "week": null,
    "total": 16687741,
    "showing": true
   },
   {
    "rank": 55,
    "name": "驚聲尖笑",
-   "country": "美國",
    "release": "2026-06-05",
    "theaters": 86,
-   "week": null,
    "total": 16353430
   },
   {
    "rank": 56,
    "name": "藍色監獄",
-   "country": "日本",
    "release": "2026-08-12",
    "theaters": 70,
-   "week": null,
    "total": 15591541
   },
   {
    "rank": 57,
    "name": "機動戰士鋼彈 閃光的哈薩威 喀耳刻的魔女",
-   "country": "日本",
    "release": "2026-03-19",
    "theaters": 56,
-   "week": null,
    "total": 15549047
   },
   {
    "rank": 58,
    "name": "快打旋風",
-   "country": "美國",
    "release": "2026-10-13",
    "theaters": 90,
-   "week": null,
    "total": 15440281,
    "showing": true
   },
   {
    "rank": 59,
    "name": "關於我轉生變成史萊姆這檔事 劇場版 蒼海之淚篇",
-   "country": "日本",
    "release": "2026-04-28",
    "theaters": 90,
-   "week": null,
    "total": 15288069
   },
   {
    "rank": 60,
    "name": "死亡賭局",
-   "country": "中華民國",
    "release": "2026-04-24",
    "theaters": 88,
-   "week": null,
    "total": 14673738
   },
   {
    "rank": 61,
    "name": "死亡之握：鬼牽手",
-   "country": "中華民國",
    "release": "2026-04-17",
    "theaters": 83,
-   "week": null,
    "total": 14595882
   },
   {
    "rank": 62,
    "name": "神奇數字馬戲團 最終章",
-   "country": "澳洲",
    "release": "2026-06-05",
    "theaters": 48,
-   "week": null,
    "total": 14073881
   },
   {
    "rank": 63,
    "name": "陰兒房：穿越陰深處",
-   "country": "美國",
    "release": "2026-08-19",
    "theaters": 87,
-   "week": null,
    "total": 14069780
   },
   {
    "rank": 64,
    "name": "逃出鯨吞",
-   "country": "美國",
    "release": "2026-10-15",
    "theaters": 88,
-   "week": null,
    "total": 13728410,
    "showing": true
   },
   {
    "rank": 65,
    "name": "太空超人",
-   "country": "美國",
    "release": "2026-05-27",
    "theaters": 92,
-   "week": null,
    "total": 13638297
   },
   {
    "rank": 66,
    "name": "真人快打 II",
-   "country": "美國",
    "release": "2026-05-06",
    "theaters": 91,
-   "week": null,
    "total": 12748196
   },
   {
    "rank": 67,
    "name": "火遮眼",
-   "country": "英國",
    "release": "2026-06-12",
    "theaters": 75,
-   "week": null,
    "total": 11850876
   },
   {
    "rank": 68,
    "name": "祭弒",
-   "country": "中華民國",
    "release": "2026-04-19",
    "theaters": 83,
-   "week": null,
    "total": 11670257
   },
   {
    "rank": 69,
    "name": "宛如星辰的你",
-   "country": "日本",
    "release": "2026-10-16",
    "theaters": 71,
-   "week": null,
    "total": 11620725,
    "showing": true
   },
   {
    "rank": 70,
    "name": "劇場版 我內心的糟糕念頭",
-   "country": "日本",
    "release": "2026-02-13",
    "theaters": 14,
-   "week": null,
    "total": 11020952
   },
   {
    "rank": 71,
    "name": "哈利波特：神秘的魔法石",
-   "country": "美國",
    "release": "2026-08-28",
    "theaters": 16,
-   "week": null,
    "total": 10983463
   },
   {
    "rank": 72,
    "name": "劇場版 「BanG Dream! Ave Mujica prima aurora」",
-   "country": "日本",
    "release": "2026-10-16",
    "theaters": 14,
-   "week": null,
    "total": 10803836,
    "showing": true
   },
   {
    "rank": 73,
    "name": "重返沉默之丘",
-   "country": "美國",
    "release": "2026-01-23",
    "theaters": 79,
-   "week": null,
    "total": 10637434
   },
   {
    "rank": 74,
    "name": "咆哮山莊",
-   "country": "美國",
    "release": "2026-02-13",
    "theaters": 83,
-   "week": null,
    "total": 10517679
   },
   {
    "rank": 75,
    "name": "腎上腺 母侵",
-   "country": "中華民國",
    "release": "2026-06-12",
    "theaters": 49,
-   "week": null,
    "total": 10225042
   },
   {
    "rank": 76,
    "name": "犯罪101",
-   "country": "美國",
    "release": "2026-02-26",
    "theaters": 91,
-   "week": null,
    "total": 10113864
   },
   {
    "rank": 77,
    "name": "驀然回首",
-   "country": "日本",
    "release": "2026-09-11",
    "theaters": 76,
-   "week": null,
    "total": 10051839,
    "showing": true
   },
   {
    "rank": 78,
    "name": "YORUSHIKA LIVE「盜作」",
-   "country": "日本",
    "release": "2026-10-09",
    "theaters": 11,
-   "week": null,
    "total": 9390150,
    "showing": true
   },
   {
    "rank": 79,
    "name": "不存在的罪人",
-   "country": "美國",
    "release": "2026-10-08",
    "theaters": 90,
-   "week": null,
    "total": 9255095,
    "showing": true
   },
   {
    "rank": 80,
    "name": "殺木池：鬼水禁地",
-   "country": "韓國",
    "release": "2026-04-24",
    "theaters": 65,
-   "week": null,
    "total": 9221518
   },
   {
    "rank": 81,
    "name": "致遙不可及彼方的你",
-   "country": "日本",
    "release": "2026-10-23",
    "theaters": 50,
-   "week": null,
    "total": 9165743,
    "showing": true
   },
   {
    "rank": 82,
    "name": "飛吧！熊鷹",
-   "country": "中華民國",
    "release": "2026-04-09",
    "theaters": 50,
-   "week": null,
    "total": 9004579
   },
   {
    "rank": 83,
    "name": "墜2",
-   "country": "美國",
    "release": "2026-09-04",
    "theaters": 73,
-   "week": null,
    "total": 8872072
   },
   {
    "rank": 84,
    "name": "屍變焚場",
-   "country": "美國",
    "release": "2026-07-08",
    "theaters": 80,
-   "week": null,
    "total": 8684958,
    "showing": true
   },
   {
    "rank": 85,
    "name": "日租家庭",
-   "country": "美國",
    "release": "2026-01-26",
    "theaters": 49,
-   "week": null,
    "total": 8504839
   },
   {
    "rank": 86,
    "name": "綿羊偵探團",
-   "country": "美國",
    "release": "2026-05-08",
    "theaters": 75,
-   "week": null,
    "total": 8321820
   },
   {
    "rank": 87,
    "name": "捕風追影",
-   "country": "中國大陸",
    "release": "2026-03-27",
    "theaters": 70,
-   "week": null,
    "total": 8298917
   },
   {
    "rank": 88,
    "name": "IU CONCERT : THE WINNING",
-   "country": "韓國",
    "release": "2026-10-30",
    "theaters": 15,
-   "week": null,
    "total": 8272160,
    "showing": true
   },
   {
    "rank": 89,
    "name": "即刻狂飆",
-   "country": "美國",
    "release": "2026-10-30",
    "theaters": 75,
-   "week": null,
    "total": 8184524,
    "showing": true
   },
   {
    "rank": 90,
    "name": "邪降：覺醒",
-   "country": "泰國",
    "release": "2026-03-20",
    "theaters": 65,
-   "week": null,
    "total": 7869843
   },
   {
    "rank": 91,
    "name": "魯冰花（數位修復版）",
-   "country": "中華民國",
    "release": "2026-07-08",
    "theaters": 67,
-   "week": null,
    "total": 7716243
   },
   {
    "rank": 92,
    "name": "名偵探柯南 引爆摩天樓 4K數位修復版",
-   "country": "日本",
    "release": "2026-05-03",
    "theaters": 50,
-   "week": null,
    "total": 7485329
   },
   {
    "rank": 93,
    "name": "PLAVE Asia Tour [Dash: Quantum Leap] Encore in Cinemas",
-   "country": "韓國",
    "release": "2026-06-05",
    "theaters": 44,
-   "week": null,
    "total": 7402830
   },
   {
    "rank": 94,
    "name": "讓子彈飛",
-   "country": "中國大陸",
    "release": "2026-10-30",
    "theaters": 36,
-   "week": null,
    "total": 7333494,
    "showing": true
   },
   {
    "rank": 95,
    "name": "妳最後留下的歌",
-   "country": "日本",
    "release": "2026-06-05",
    "theaters": 50,
-   "week": null,
    "total": 7306812
   },
   {
    "rank": 96,
    "name": "弒婚遊戲：2度開局",
-   "country": "美國",
    "release": "2026-04-02",
    "theaters": 87,
-   "week": null,
    "total": 7300401
   },
   {
    "rank": 97,
    "name": "荒島囚救",
-   "country": "美國",
    "release": "2026-01-29",
    "theaters": 84,
-   "week": null,
    "total": 7108208
   },
   {
    "rank": 98,
    "name": "秒速5公分 真人版",
-   "country": "日本",
    "release": "2026-02-06",
    "theaters": 82,
-   "week": null,
    "total": 6790518
   },
   {
    "rank": 99,
    "name": "世紀初戀 楊麗花",
-   "country": "中華民國",
    "release": "2026-10-28",
    "theaters": 64,
-   "week": null,
    "total": 6718939,
    "showing": true
   },
   {
    "rank": 100,
    "name": "夏日大作戰 全新4K修復版",
-   "country": "日本",
    "release": "2026-04-02",
    "theaters": 61,
-   "week": null,
    "total": 6656639
   },
   {
    "rank": 101,
    "name": "NO GOOD！歐吉桑",
-   "country": "中華民國",
    "release": "2026-04-10",
    "theaters": 61,
-   "week": null,
    "total": 6592990
   },
   {
    "rank": 102,
    "name": "驚聲尖叫 7",
-   "country": "美國",
    "release": "2026-02-26",
    "theaters": 84,
-   "week": null,
    "total": 6561267
   },
   {
    "rank": 103,
    "name": "失樂園",
-   "country": "中華民國",
    "release": "2026-04-19",
    "theaters": 45,
-   "week": null,
    "total": 6561172,
    "showing": true
   },
   {
    "rank": 104,
    "name": "巧虎電影　勇氣之歌 (國語版)",
-   "country": "日本",
    "release": "2026-02-06",
    "theaters": 19,
-   "week": null,
    "total": 6512060
   },
   {
    "rank": 105,
    "name": "實境誘捕",
-   "country": "美國",
    "release": "2026-09-24",
    "theaters": 62,
-   "week": null,
    "total": 6385381
   },
   {
    "rank": 106,
    "name": "IU CONCERT: THE GOLDEN HOUR",
-   "country": "韓國",
    "release": "2026-10-23",
    "theaters": 15,
-   "week": null,
    "total": 6189243,
    "showing": true
   },
   {
    "rank": 107,
    "name": "你能吃到媽媽煮的飯的次數，還剩365次",
-   "country": "韓國",
    "release": "2026-05-08",
    "theaters": 57,
-   "week": null,
    "total": 6008978
   },
   {
    "rank": 108,
    "name": "28年毀滅倒數：人骨聖殿",
-   "country": "美國",
    "release": "2026-01-16",
    "theaters": 91,
-   "week": null,
    "total": 5946649
   },
   {
    "rank": 109,
    "name": "深度安靜",
-   "country": "中華民國",
    "release": "2026-03-20",
    "theaters": 61,
-   "week": null,
    "total": 5706881
   },
   {
    "rank": 110,
    "name": "怪奇比莉－溫柔重擊巡迴演唱會 3D 電影",
-   "country": "美國",
    "release": "2026-05-08",
    "theaters": 32,
-   "week": null,
    "total": 5674425
   },
   {
    "rank": 111,
    "name": "鬼上車",
-   "country": "美國",
    "release": "2026-06-18",
    "theaters": 74,
-   "week": null,
    "total": 5590488
   },
   {
    "rank": 112,
    "name": "誤闖遺忘島",
-   "country": "美國",
    "release": "2026-09-19",
    "theaters": 84,
-   "week": null,
    "total": 5542639,
    "showing": true
   },
   {
    "rank": 113,
    "name": "消失的金鳳娜",
-   "country": "中華民國",
    "release": "2026-10-14",
    "theaters": 60,
-   "week": null,
    "total": 5531173,
    "showing": true
   },
   {
    "rank": 114,
    "name": "青春豬頭少年不會夢到親愛好朋友",
-   "country": "日本",
    "release": "2026-11-06",
    "theaters": 16,
-   "week": null,
    "total": 5512458,
    "showing": true
   },
   {
    "rank": 115,
    "name": "情感的價值",
-   "country": "挪威",
    "release": "2026-01-23",
    "theaters": 36,
-   "week": null,
    "total": 5471346
   },
   {
    "rank": 116,
    "name": "別離無恙",
-   "country": "日本",
    "release": "2026-05-15",
    "theaters": 64,
-   "week": null,
    "total": 5454682
   },
   {
    "rank": 117,
    "name": "劇場版 少女樂團吶喊吧【後篇】-嗨, 未來-",
-   "country": "日本",
    "release": "2026-01-24",
    "theaters": 16,
-   "week": null,
    "total": 5427352
   },
   {
    "rank": 118,
    "name": "進擊的鼓手 4K重映",
-   "country": "美國",
    "release": "2026-10-16",
    "theaters": 29,
-   "week": null,
    "total": 5404655,
    "showing": true
   },
   {
    "rank": 119,
    "name": "寂地",
-   "country": "美國",
    "release": "2026-08-27",
    "theaters": 76,
-   "week": null,
    "total": 5327137,
    "showing": true
   },
   {
    "rank": 120,
    "name": "劇場版 少女樂團吶喊吧【前篇】-青春狂走曲-",
-   "country": "日本",
    "release": "2026-01-09",
    "theaters": 17,
-   "week": null,
    "total": 5200961
   },
   {
    "rank": 121,
    "name": "特種快遞",
-   "country": "美國",
    "release": "2026-09-24",
    "theaters": 71,
-   "week": null,
    "total": 5171000
   },
   {
    "rank": 122,
    "name": "超拖樂團之我要幹大事啦！",
-   "country": "加拿大",
    "release": "2026-08-14",
    "theaters": 22,
-   "week": null,
    "total": 5141946
   },
   {
    "rank": 123,
    "name": "72小時即刻救援",
-   "country": "美國",
    "release": "2026-03-13",
    "theaters": 75,
-   "week": null,
    "total": 5087532
   },
   {
    "rank": 124,
    "name": "ENHYPEN [WALK THE LINE SUMMER EDITION] IN CINEMAS",
-   "country": "韓國",
    "release": "2026-03-05",
    "theaters": 24,
-   "week": null,
    "total": 5049340
   },
   {
    "rank": 125,
    "name": "金劫任務",
-   "country": "美國",
    "release": "2026-10-08",
    "theaters": 72,
-   "week": null,
    "total": 5029256,
    "showing": true
   },
   {
    "rank": 126,
    "name": "世外",
-   "country": "香港",
    "release": "2026-03-13",
    "theaters": 60,
-   "week": null,
    "total": 4967707
   },
   {
    "rank": 127,
    "name": "電影屁屁偵探：星星與月亮",
-   "country": "日本",
    "release": "2026-01-23",
    "theaters": 71,
-   "week": null,
    "total": 4835455
   },
   {
    "rank": 128,
    "name": "高年級實習生",
-   "country": "韓國",
    "release": "2026-10-14",
    "theaters": 76,
-   "week": null,
    "total": 4507942,
    "showing": true
   },
   {
    "rank": 129,
    "name": "恨女的逆襲",
-   "country": "中華民國",
    "release": "2026-01-16",
    "theaters": 58,
-   "week": null,
    "total": 4195986
   },
   {
    "rank": 130,
    "name": "盜音天才",
-   "country": "美國",
    "release": "2026-05-06",
    "theaters": 57,
-   "week": null,
    "total": 4191420
   },
   {
    "rank": 131,
    "name": "機動戰士鋼彈 閃光的哈薩威",
-   "country": "日本",
    "release": "2026-03-06",
    "theaters": 28,
-   "week": null,
    "total": 4184288
   },
   {
    "rank": 132,
    "name": "偶像學園!X星光樂園 THE MOVIE -相遇的奇蹟-",
-   "country": "日本",
    "release": "2026-08-07",
    "theaters": 10,
-   "week": null,
    "total": 4162225
   },
   {
    "rank": 133,
    "name": "夜王",
-   "country": "香港",
    "release": "2026-03-13",
    "theaters": 70,
-   "week": null,
    "total": 4114949
   },
   {
    "rank": 134,
    "name": "祈念之樹",
-   "country": "日本",
    "release": "2026-02-26",
    "theaters": 72,
-   "week": null,
    "total": 4006549
   },
   {
    "rank": 135,
    "name": "超異能快感：魔法之書",
-   "country": "美國",
    "release": "2026-09-10",
    "theaters": 78,
-   "week": null,
    "total": 3985043,
    "showing": true
   },
   {
    "rank": 136,
    "name": "角落小夥伴電影版：從天而降的雲之冒險",
-   "country": "日本",
    "release": "2026-10-08",
    "theaters": 79,
-   "week": null,
    "total": 3839780,
    "showing": true
   },
   {
    "rank": 137,
    "name": "遊戲人生ZERO",
-   "country": "日本",
    "release": "2026-10-30",
    "theaters": 7,
-   "week": null,
    "total": 3835383
   },
   {
    "rank": 138,
    "name": "空之境界劇場版：第五章 矛盾螺旋",
-   "country": "日本",
    "release": "2026-02-13",
    "theaters": 35,
-   "week": null,
    "total": 3772371
   },
   {
    "rank": 139,
    "name": "為一切人，成為一切",
-   "country": "中華民國",
    "release": "2026-06-12",
    "theaters": 28,
-   "week": null,
    "total": 3753004,
    "showing": true
   },
   {
    "rank": 140,
    "name": "LINKIN PARK：UNSHATTER",
-   "country": "美國",
    "release": "2026-09-30",
    "theaters": 28,
-   "week": null,
    "total": 3631710
   },
   {
    "rank": 141,
    "name": "哈姆奈特",
-   "country": "美國",
    "release": "2026-02-26",
    "theaters": 47,
-   "week": null,
    "total": 3581446
   },
   {
    "rank": 142,
    "name": "農曆三月二十三",
-   "country": "中華民國",
    "release": "2026-05-08",
    "theaters": 46,
-   "week": null,
    "total": 3506583
   },
   {
    "rank": 143,
    "name": "A KITE風箏",
-   "country": "日本",
    "release": "2026-04-10",
    "theaters": 18,
-   "week": null,
    "total": 3503843
   },
   {
    "rank": 144,
    "name": "蠱降",
-   "country": "馬來西亞",
    "release": "2026-04-02",
    "theaters": 59,
-   "week": null,
    "total": 3440628
   },
   {
    "rank": 145,
    "name": "傳奇女伶 高菊花",
-   "country": "中華民國",
    "release": "2026-05-15",
    "theaters": 34,
-   "week": null,
    "total": 3418782
   },
   {
    "rank": 146,
    "name": "Jim Queen：肌情四射",
-   "country": "法國",
    "release": "2026-10-23",
    "theaters": 34,
-   "week": null,
    "total": 3376791,
    "showing": true
   },
   {
    "rank": 147,
    "name": "啵me之我的青春住了鬼",
-   "country": "中華民國",
    "release": "2026-01-23",
    "theaters": 81,
-   "week": null,
    "total": 3324602
   },
   {
    "rank": 148,
    "name": "血鬼村",
-   "country": "越南",
    "release": "2026-08-07",
    "theaters": 48,
-   "week": null,
    "total": 3291126
   },
   {
    "rank": 149,
    "name": "王命之徒",
-   "country": "韓國",
    "release": "2026-02-26",
    "theaters": 63,
-   "week": null,
    "total": 3287663
   },
   {
    "rank": 150,
    "name": "你是不會當樹嗎",
-   "country": "德國",
    "release": "2026-04-15",
    "theaters": 23,
-   "week": null,
    "total": 3285728
   },
   {
    "rank": 151,
    "name": "劇場版 銀河特急 Milky☆Subway",
-   "country": "日本",
    "release": "2026-04-17",
    "theaters": 65,
-   "week": null,
    "total": 3232317
   },
   {
    "rank": 152,
    "name": "他們要殺你",
-   "country": "美國",
    "release": "2026-03-26",
    "theaters": 82,
-   "week": null,
    "total": 3222995
   },
   {
    "rank": 153,
    "name": "我未許願先吹蠟燭",
-   "country": "中華民國",
    "release": "2026-08-14",
    "theaters": 67,
-   "week": null,
    "total": 3112080
   },
   {
    "rank": 154,
    "name": "0時盜數",
-   "country": "英國",
    "release": "2026-04-14",
    "theaters": 74,
-   "week": null,
    "total": 3019557
   },
   {
    "rank": 155,
    "name": "科學新娘！",
-   "country": "美國",
    "release": "2026-03-04",
    "theaters": 68,
-   "week": null,
    "total": 2951293
   },
   {
    "rank": 156,
    "name": "復活男",
-   "country": "韓國",
    "release": "2026-10-01",
    "theaters": 48,
-   "week": null,
    "total": 2901257
   },
   {
    "rank": 157,
    "name": "航海王劇場版：紅髮歌姬",
-   "country": "日本",
    "release": "2026-07-17",
    "theaters": 25,
-   "week": null,
    "total": 2892882
   },
   {
    "rank": 158,
    "name": "全境屍控",
-   "country": "美國",
    "release": "2026-03-06",
    "theaters": 50,
-   "week": null,
    "total": 2883322
   },
   {
    "rank": 159,
    "name": "空之境界劇場版：第七章 殺人考察(後)",
-   "country": "日本",
    "release": "2026-04-24",
    "theaters": 36,
-   "week": null,
    "total": 2876949
   },
   {
    "rank": 160,
    "name": "開棺2：家族詛咒",
-   "country": "越南",
    "release": "2026-05-08",
    "theaters": 49,
-   "week": null,
    "total": 2816561
   },
   {
    "rank": 161,
    "name": "出賣影子的女人",
-   "country": "日本",
    "release": "2026-10-30",
    "theaters": 21,
-   "week": null,
    "total": 2797647,
    "showing": true
   },
   {
    "rank": 162,
    "name": "攻殼機動隊(1995) 4K 數位修復版",
-   "country": "日本",
    "release": "2026-08-28",
    "theaters": 21,
-   "week": null,
    "total": 2788867
   },
   {
    "rank": 163,
    "name": "空之境界劇場版：第四章 伽藍之洞",
-   "country": "日本",
    "release": "2026-01-30",
    "theaters": 35,
-   "week": null,
    "total": 2700424
   },
   {
    "rank": 164,
    "name": "鬼入獄",
-   "country": "印尼",
    "release": "2026-06-10",
    "theaters": 53,
-   "week": null,
    "total": 2677946
   },
   {
    "rank": 165,
    "name": "秒速5公分 導演特別映像版",
-   "country": "日本",
    "release": "2026-03-27",
    "theaters": 62,
-   "week": null,
    "total": 2663053
   },
   {
    "rank": 166,
    "name": "愛在每一天",
-   "country": "菲律賓",
    "release": "2026-04-19",
    "theaters": 22,
-   "week": null,
    "total": 2650260
   },
   {
    "rank": 167,
    "name": "鬼靈居",
-   "country": "泰國",
    "release": "2026-01-30",
    "theaters": 50,
-   "week": null,
    "total": 2632573
   },
   {
    "rank": 168,
    "name": "鏈鋸人 總集篇 前篇+鏈鋸人 總集篇 後篇",
-   "country": "日本",
    "release": "2026-03-20",
    "theaters": 13,
-   "week": null,
    "total": 2596378
   },
   {
    "rank": 169,
    "name": "ATEEZ : LIGHT THE WAY IN CINEMAS",
-   "country": "韓國",
    "release": "2026-08-06",
    "theaters": 17,
-   "week": null,
    "total": 2522185
   },
   {
    "rank": 170,
    "name": "大仙尪仔",
-   "country": "中華民國",
    "release": "2026-09-11",
    "theaters": 57,
-   "week": null,
    "total": 2513890,
    "showing": true
   },
   {
    "rank": 171,
    "name": "魔法少女小圓劇場版 [新篇] 叛逆的物語+五分鐘開頭影像",
-   "country": "日本",
    "release": "2026-08-21",
    "theaters": 11,
-   "week": null,
    "total": 2476147
   },
   {
    "rank": 172,
    "name": "跳躍吧！時空少女 全新4K修復版",
-   "country": "日本",
    "release": "2026-02-26",
    "theaters": 50,
-   "week": null,
    "total": 2465089
   },
   {
    "rank": 173,
    "name": "豪門殺人指南",
-   "country": "美國",
    "release": "2026-02-26",
    "theaters": 65,
-   "week": null,
    "total": 2457302
   },
   {
    "rank": 174,
    "name": "開放性邀請",
-   "country": "美國",
    "release": "2026-08-23",
    "theaters": 34,
-   "week": null,
    "total": 2437843
   },
   {
    "rank": 175,
    "name": "攻殼機動隊 2026",
-   "country": "日本",
    "release": "2026-06-27",
    "theaters": 61,
-   "week": null,
    "total": 2428595
   },
   {
    "rank": 176,
    "name": "Moto極速傳奇",
-   "country": "西班牙",
    "release": "2026-05-08",
    "theaters": 34,
-   "week": null,
    "total": 2416559
   },
   {
    "rank": 177,
    "name": "猩瘋血雨",
-   "country": "美國",
    "release": "2026-01-30",
    "theaters": 88,
-   "week": null,
    "total": 2414969
   },
   {
    "rank": 178,
    "name": "魅影巨星",
-   "country": "美國",
    "release": "2026-04-17",
    "theaters": 21,
-   "week": null,
    "total": 2385915
   },
   {
    "rank": 179,
    "name": "特務搞飛機2",
-   "country": "韓國",
    "release": "2026-08-12",
    "theaters": 75,
-   "week": null,
    "total": 2369993
   },
   {
    "rank": 180,
    "name": "狂野時代",
-   "country": "中國大陸",
    "release": "2026-01-01",
    "theaters": 47,
-   "week": null,
    "total": 2365795
   },
   {
    "rank": 181,
    "name": "重擊人生",
-   "country": "美國",
    "release": "2026-01-23",
    "theaters": 64,
-   "week": null,
    "total": 2349549
   },
   {
    "rank": 182,
    "name": "終戰那一天",
-   "country": "中華民國",
    "release": "2026-08-14",
    "theaters": 23,
-   "week": null,
    "total": 2327964
   },
   {
    "rank": 183,
    "name": "後座力",
-   "country": "英國",
    "release": "2026-04-30",
    "theaters": 23,
-   "week": null,
    "total": 2300532
   },
   {
    "rank": 184,
    "name": "鬼娃娃",
-   "country": "日本",
    "release": "2026-03-06",
    "theaters": 64,
-   "week": null,
    "total": 2290072
   },
   {
    "rank": 185,
    "name": "跟蹤",
-   "country": "美國",
    "release": "2026-07-03",
    "theaters": 20,
-   "week": null,
    "total": 2243703
   },
   {
    "rank": 186,
    "name": "蕭邦！蕭邦！",
-   "country": "波蘭",
    "release": "2026-10-23",
    "theaters": 16,
-   "week": null,
    "total": 2239026,
    "showing": true
   },
   {
    "rank": 187,
    "name": "鬼汙",
-   "country": "泰國",
    "release": "2026-07-17",
    "theaters": 42,
-   "week": null,
    "total": 2203184
   },
   {
    "rank": 188,
    "name": "空之境界劇場版：第六章 忘卻錄音",
-   "country": "日本",
    "release": "2026-03-20",
    "theaters": 35,
-   "week": null,
    "total": 2180361
   },
   {
    "rank": 189,
    "name": "Always Lalisa",
-   "country": "韓國",
    "release": "2026-10-12",
    "theaters": 29,
-   "week": null,
    "total": 2179940
   },
   {
    "rank": 190,
    "name": "MEZZO Forte 次強音",
-   "country": "日本",
    "release": "2026-04-30",
    "theaters": 19,
-   "week": null,
    "total": 2175585
   },
   {
    "rank": 191,
    "name": "空之境界劇場版：未來福音",
-   "country": "日本",
    "release": "2026-07-31",
    "theaters": 36,
-   "week": null,
    "total": 2124738
   },
   {
    "rank": 192,
    "name": "麵包超人電影版：潘坦與約定之星",
-   "country": "日本",
    "release": "2026-10-16",
    "theaters": 32,
-   "week": null,
    "total": 2101784,
    "showing": true
   },
   {
    "rank": 193,
    "name": "出口成髒",
-   "country": "美國",
    "release": "2026-05-10",
    "theaters": 59,
-   "week": null,
    "total": 2084415
   },
   {
    "rank": 194,
    "name": "超限戰",
-   "country": "加拿大",
    "release": "2026-05-13",
    "theaters": 23,
-   "week": null,
    "total": 2037984
   },
   {
    "rank": 195,
    "name": "加速世界 劇場版 INFINITE BURST",
-   "country": "日本",
    "release": "2026-10-23",
    "theaters": 40,
-   "week": null,
    "total": 2013126,
    "showing": true
   },
   {
    "rank": 196,
    "name": "愛的魔樣",
-   "country": "美國",
    "release": "2026-08-14",
    "theaters": 35,
-   "week": null,
    "total": 1961756
   },
   {
    "rank": 197,
    "name": "社群清算",
-   "country": "美國",
    "release": "2026-10-23",
    "theaters": 83,
-   "week": null,
    "total": 1956455,
    "showing": true
   },
   {
    "rank": 198,
    "name": "動物農莊",
-   "country": "美國",
    "release": "2026-04-30",
    "theaters": 71,
-   "week": null,
    "total": 1952773
   },
   {
    "rank": 199,
    "name": "懺悔",
-   "country": "日本",
    "release": "2026-09-18",
    "theaters": 42,
-   "week": null,
    "total": 1890249
   },
   {
    "rank": 200,
    "name": "匿殺",
-   "country": "中國大陸",
    "release": "2026-02-13",
    "theaters": 59,
-   "week": null,
    "total": 1879191
   }
  ],
@@ -3199,1860 +2799,1460 @@
    {
     "rank": 1,
     "name": "蜘蛛人：重生日",
-    "country": "美國",
     "release": "2026-07-28",
     "theaters": 90,
-    "week": null,
     "total": 600442693,
     "showing": true
    },
    {
     "rank": 2,
     "name": "奧德賽",
-    "country": "美國",
     "release": "2026-07-16",
     "theaters": 93,
-    "week": null,
     "total": 457780072,
     "showing": true
    },
    {
     "rank": 3,
     "name": "超級瑪利歐銀河電影版",
-    "country": "美國",
     "release": "2026-04-01",
     "theaters": 96,
-    "week": null,
     "total": 290755706
    },
    {
     "rank": 4,
     "name": "狸想世界",
-    "country": "美國",
     "release": "2026-03-18",
     "theaters": 92,
-    "week": null,
     "total": 288760165
    },
    {
     "rank": 5,
     "name": "玩具總動員5",
-    "country": "美國",
     "release": "2026-06-17",
     "theaters": 92,
-    "week": null,
     "total": 286198886,
     "showing": true
    },
    {
     "rank": 6,
     "name": "穿著Prada的惡魔2",
-    "country": "美國",
     "release": "2026-04-29",
     "theaters": 93,
-    "week": null,
     "total": 240552157
    },
    {
     "rank": 7,
     "name": "屍速禁區",
-    "country": "韓國",
     "release": "2026-05-22",
     "theaters": 84,
-    "week": null,
     "total": 233799368
    },
    {
     "rank": 8,
     "name": "名偵探柯南 高速公路的墮天使",
-    "country": "日本",
     "release": "2026-06-24",
     "theaters": 88,
-    "week": null,
     "total": 216192064,
     "showing": true
    },
    {
     "rank": 9,
     "name": "劇場版 吉伊卡哇 人魚島的秘密",
-    "country": "日本",
     "release": "2026-07-25",
     "theaters": 88,
-    "week": null,
     "total": 174933361,
     "showing": true
    },
    {
     "rank": 10,
     "name": "極限返航",
-    "country": "美國",
     "release": "2026-03-18",
     "theaters": 94,
-    "week": null,
     "total": 173881727,
     "showing": true
    },
    {
     "rank": 11,
     "name": "惡靈古堡：爆發夜",
-    "country": "美國",
     "release": "2026-09-17",
     "theaters": 91,
-    "week": null,
     "total": 157151765,
     "showing": true
    },
    {
     "rank": 12,
     "name": "愛你致死不渝",
-    "country": "美國",
     "release": "2026-08-07",
     "theaters": 81,
-    "week": null,
     "total": 145345741,
     "showing": true
    },
    {
     "rank": 13,
     "name": "麥可傑克森",
-    "country": "美國",
     "release": "2026-04-22",
     "theaters": 88,
-    "week": null,
     "total": 108122761,
     "showing": true
    },
    {
     "rank": 14,
     "name": "小小兵&大怪獸",
-    "country": "美國",
     "release": "2026-06-30",
     "theaters": 92,
-    "week": null,
     "total": 107618505
    },
    {
     "rank": 15,
     "name": "冠軍之路",
-    "country": "中華民國",
     "release": "2026-01-01",
     "theaters": 96,
-    "week": null,
     "total": 96632791,
     "showing": true
    },
    {
     "rank": 16,
     "name": "網紅老爸",
-    "country": "中華民國",
     "release": "2026-08-27",
     "theaters": 92,
-    "week": null,
     "total": 91275728,
     "showing": true
    },
    {
     "rank": 17,
     "name": "雙囍",
-    "country": "中華民國",
     "release": "2026-02-17",
     "theaters": 97,
-    "week": null,
     "total": 85692259
    },
    {
     "rank": 18,
     "name": "後室",
-    "country": "美國",
     "release": "2026-05-25",
     "theaters": 89,
-    "week": null,
     "total": 84422079
    },
    {
     "rank": 19,
     "name": "粽邪 4：坤蒂拉娜",
-    "country": "中華民國",
     "release": "2026-08-27",
     "theaters": 90,
-    "week": null,
     "total": 81676487,
     "showing": true
    },
    {
     "rank": 20,
     "name": "哥吉拉-0.0",
-    "country": "日本",
     "release": "2026-11-02",
     "theaters": 82,
-    "week": null,
     "total": 74818512,
     "showing": true
    },
    {
     "rank": 21,
     "name": "電影蠟筆小新：奇奇怪怪！我的妖怪假期",
-    "country": "日本",
     "release": "2026-08-07",
     "theaters": 83,
-    "week": null,
     "total": 57192970,
     "showing": true
    },
    {
     "rank": 22,
     "name": "揭密日",
-    "country": "美國",
     "release": "2026-06-09",
     "theaters": 91,
-    "week": null,
     "total": 56691756
    },
    {
     "rank": 23,
     "name": "橡樹街末日",
-    "country": "美國",
     "release": "2026-08-12",
     "theaters": 92,
-    "week": null,
     "total": 50253371,
     "showing": true
    },
    {
     "rank": 24,
     "name": "催眠麥克風",
-    "country": "日本",
     "release": "2026-04-25",
     "theaters": 13,
-    "week": null,
     "total": 47306391,
     "showing": true
    },
    {
     "rank": 25,
     "name": "功夫",
-    "country": "中華民國",
     "release": "2026-02-13",
     "theaters": 98,
-    "week": null,
     "total": 47050244
    },
    {
     "rank": 26,
     "name": "泥面人",
-    "country": "美國",
     "release": "2026-10-21",
     "theaters": 89,
-    "week": null,
     "total": 46496386,
     "showing": true
    },
    {
     "rank": 27,
     "name": "野獸之心",
-    "country": "美國",
     "release": "2026-09-17",
     "theaters": 91,
-    "week": null,
     "total": 45037803,
     "showing": true
    },
    {
     "rank": 28,
     "name": "汪汪隊立大功：恐龍大電影",
-    "country": "美國",
     "release": "2026-08-14",
     "theaters": 88,
-    "week": null,
     "total": 41329134,
     "showing": true
    },
    {
     "rank": 29,
     "name": "電影哆啦A夢：新．大雄的海底鬼岩城",
-    "country": "日本",
     "release": "2026-07-08",
     "theaters": 83,
-    "week": null,
     "total": 40703111,
     "showing": true
    },
    {
     "rank": 30,
     "name": "海洋奇緣 (真人版)",
-    "country": "美國",
     "release": "2026-07-08",
     "theaters": 91,
-    "week": null,
     "total": 39577067,
     "showing": true
    },
    {
     "rank": 31,
     "name": "抓馬戀人",
-    "country": "美國",
     "release": "2026-04-02",
     "theaters": 75,
-    "week": null,
     "total": 36947114
    },
    {
     "rank": 32,
     "name": "寒戰1994",
-    "country": "香港",
     "release": "2026-05-01",
     "theaters": 89,
-    "week": null,
     "total": 34763356
    },
    {
     "rank": 33,
     "name": "李克寧 墓乃伊",
-    "country": "美國",
     "release": "2026-04-15",
     "theaters": 86,
-    "week": null,
     "total": 34263695
    },
    {
     "rank": 34,
     "name": "劇場版「暗殺教室」：我們的時光",
-    "country": "日本",
     "release": "2026-03-27",
     "theaters": 72,
-    "week": null,
     "total": 33052307
    },
    {
     "rank": 35,
     "name": "復仇者聯盟：終局之戰 加碼重映",
-    "country": "美國",
     "release": "2026-09-24",
     "theaters": 83,
-    "week": null,
     "total": 32761451
    },
    {
     "rank": 36,
     "name": "曼達洛人與古古",
-    "country": "美國",
     "release": "2026-05-20",
     "theaters": 90,
-    "week": null,
     "total": 32348873
    },
    {
     "rank": 37,
     "name": "另一個媽咪",
-    "country": "美國",
     "release": "2026-10-08",
     "theaters": 83,
-    "week": null,
     "total": 31109286,
     "showing": true
    },
    {
     "rank": 38,
     "name": "玩命航線",
-    "country": "美國",
     "release": "2026-08-19",
     "theaters": 81,
-    "week": null,
     "total": 30338951
    },
    {
     "rank": 39,
     "name": "名偵探柯南 第30號殺人事件",
-    "country": "日本",
     "release": "2026-11-06",
     "theaters": 88,
-    "week": null,
     "total": 30036247,
     "showing": true
    },
    {
     "rank": 40,
     "name": "山羊巔峰",
-    "country": "美國",
     "release": "2026-02-13",
     "theaters": 87,
-    "week": null,
     "total": 30016261
    },
    {
     "rank": 41,
     "name": "劇場版 魔法少女小圓〈瓦爾普吉斯的迴天〉",
-    "country": "日本",
     "release": "2026-09-04",
     "theaters": 51,
-    "week": null,
     "total": 29345498,
     "showing": true
    },
    {
     "rank": 42,
     "name": "天眼浩劫",
-    "country": "美國",
     "release": "2026-02-06",
     "theaters": 86,
-    "week": null,
     "total": 28300232
    },
    {
     "rank": 43,
     "name": "希望：末日血戰",
-    "country": "韓國",
     "release": "2026-09-04",
     "theaters": 93,
-    "week": null,
     "total": 27113406
    },
    {
     "rank": 44,
     "name": "神木之島",
-    "country": "中華民國",
     "release": "2026-05-08",
     "theaters": 50,
-    "week": null,
     "total": 23676086
    },
    {
     "rank": 45,
     "name": "ONE OK ROCK DETOX JAPAN TOUR 2025 AT NISSAN STADIUM IN CINEMAS",
-    "country": "韓國",
     "release": "2026-04-17",
     "theaters": 33,
-    "week": null,
     "total": 23192170
    },
    {
     "rank": 46,
     "name": "挖掘者",
-    "country": "美國",
     "release": "2026-10-01",
     "theaters": 91,
-    "week": null,
     "total": 21024802,
     "showing": true
    },
    {
     "rank": 47,
     "name": "超人再起",
-    "country": "中華民國",
     "release": "2026-05-08",
     "theaters": 81,
-    "week": null,
     "total": 20662665,
     "showing": true
    },
    {
     "rank": 48,
     "name": "超少女",
-    "country": "美國",
     "release": "2026-06-23",
     "theaters": 92,
-    "week": null,
     "total": 19705496
    },
    {
     "rank": 49,
     "name": "新劇場版 銀魂 -吉原大炎上-",
-    "country": "日本",
     "release": "2026-05-15",
     "theaters": 83,
-    "week": null,
     "total": 17802588
    },
    {
     "rank": 50,
     "name": "天劫倒數 2：大遷徙",
-    "country": "美國",
     "release": "2026-01-09",
     "theaters": 86,
-    "week": null,
     "total": 17697936
    },
    {
     "rank": 51,
     "name": "尋秦記",
-    "country": "香港",
     "release": "2026-01-03",
     "theaters": 81,
-    "week": null,
     "total": 17543017
    },
    {
     "rank": 52,
     "name": "STRAY KIDS: THE DOMINATE EXPERIENCE",
-    "country": "美國",
     "release": "2026-03-13",
     "theaters": 44,
-    "week": null,
     "total": 17511745
    },
    {
     "rank": 53,
     "name": "關鍵公敵",
-    "country": "美國",
     "release": "2026-01-30",
     "theaters": 92,
-    "week": null,
     "total": 17051264
    },
    {
     "rank": 54,
     "name": "怎麼可能我家的祖先是你家的鬼",
-    "country": "中華民國",
     "release": "2026-09-10",
     "theaters": 90,
-    "week": null,
     "total": 16687741,
     "showing": true
    },
    {
     "rank": 55,
     "name": "驚聲尖笑",
-    "country": "美國",
     "release": "2026-06-05",
     "theaters": 86,
-    "week": null,
     "total": 16353430
    },
    {
     "rank": 56,
     "name": "藍色監獄",
-    "country": "日本",
     "release": "2026-08-12",
     "theaters": 70,
-    "week": null,
     "total": 15591541
    },
    {
     "rank": 57,
     "name": "機動戰士鋼彈 閃光的哈薩威 喀耳刻的魔女",
-    "country": "日本",
     "release": "2026-03-19",
     "theaters": 56,
-    "week": null,
     "total": 15549047
    },
    {
     "rank": 58,
     "name": "快打旋風",
-    "country": "美國",
     "release": "2026-10-13",
     "theaters": 90,
-    "week": null,
     "total": 15440281,
     "showing": true
    },
    {
     "rank": 59,
     "name": "關於我轉生變成史萊姆這檔事 劇場版 蒼海之淚篇",
-    "country": "日本",
     "release": "2026-04-28",
     "theaters": 90,
-    "week": null,
     "total": 15288069
    },
    {
     "rank": 60,
     "name": "死亡賭局",
-    "country": "中華民國",
     "release": "2026-04-24",
     "theaters": 88,
-    "week": null,
     "total": 14673738
    },
    {
     "rank": 61,
     "name": "死亡之握：鬼牽手",
-    "country": "中華民國",
     "release": "2026-04-17",
     "theaters": 83,
-    "week": null,
     "total": 14595882
    },
    {
     "rank": 62,
     "name": "神奇數字馬戲團 最終章",
-    "country": "澳洲",
     "release": "2026-06-05",
     "theaters": 48,
-    "week": null,
     "total": 14073881
    },
    {
     "rank": 63,
     "name": "陰兒房：穿越陰深處",
-    "country": "美國",
     "release": "2026-08-19",
     "theaters": 87,
-    "week": null,
     "total": 14069780
    },
    {
     "rank": 64,
     "name": "逃出鯨吞",
-    "country": "美國",
     "release": "2026-10-15",
     "theaters": 88,
-    "week": null,
     "total": 13728410,
     "showing": true
    },
    {
     "rank": 65,
     "name": "太空超人",
-    "country": "美國",
     "release": "2026-05-27",
     "theaters": 92,
-    "week": null,
     "total": 13638297
    },
    {
     "rank": 66,
     "name": "真人快打 II",
-    "country": "美國",
     "release": "2026-05-06",
     "theaters": 91,
-    "week": null,
     "total": 12748196
    },
    {
     "rank": 67,
     "name": "火遮眼",
-    "country": "英國",
     "release": "2026-06-12",
     "theaters": 75,
-    "week": null,
     "total": 11850876
    },
    {
     "rank": 68,
     "name": "祭弒",
-    "country": "中華民國",
     "release": "2026-04-19",
     "theaters": 83,
-    "week": null,
     "total": 11670257
    },
    {
     "rank": 69,
     "name": "宛如星辰的你",
-    "country": "日本",
     "release": "2026-10-16",
     "theaters": 71,
-    "week": null,
     "total": 11620725,
     "showing": true
    },
    {
     "rank": 70,
     "name": "劇場版 我內心的糟糕念頭",
-    "country": "日本",
     "release": "2026-02-13",
     "theaters": 14,
-    "week": null,
     "total": 11020952
    },
    {
     "rank": 71,
     "name": "哈利波特：神秘的魔法石",
-    "country": "美國",
     "release": "2026-08-28",
     "theaters": 16,
-    "week": null,
     "total": 10983463
    },
    {
     "rank": 72,
     "name": "劇場版 「BanG Dream! Ave Mujica prima aurora」",
-    "country": "日本",
     "release": "2026-10-16",
     "theaters": 14,
-    "week": null,
     "total": 10803836,
     "showing": true
    },
    {
     "rank": 73,
     "name": "重返沉默之丘",
-    "country": "美國",
     "release": "2026-01-23",
     "theaters": 79,
-    "week": null,
     "total": 10637434
    },
    {
     "rank": 74,
     "name": "咆哮山莊",
-    "country": "美國",
     "release": "2026-02-13",
     "theaters": 83,
-    "week": null,
     "total": 10517679
    },
    {
     "rank": 75,
     "name": "腎上腺 母侵",
-    "country": "中華民國",
     "release": "2026-06-12",
     "theaters": 49,
-    "week": null,
     "total": 10225042
    },
    {
     "rank": 76,
     "name": "犯罪101",
-    "country": "美國",
     "release": "2026-02-26",
     "theaters": 91,
-    "week": null,
     "total": 10113864
    },
    {
     "rank": 77,
     "name": "驀然回首",
-    "country": "日本",
     "release": "2026-09-11",
     "theaters": 76,
-    "week": null,
     "total": 10051839,
     "showing": true
    },
    {
     "rank": 78,
     "name": "YORUSHIKA LIVE「盜作」",
-    "country": "日本",
     "release": "2026-10-09",
     "theaters": 11,
-    "week": null,
     "total": 9390150,
     "showing": true
    },
    {
     "rank": 79,
     "name": "不存在的罪人",
-    "country": "美國",
     "release": "2026-10-08",
     "theaters": 90,
-    "week": null,
     "total": 9255095,
     "showing": true
    },
    {
     "rank": 80,
     "name": "殺木池：鬼水禁地",
-    "country": "韓國",
     "release": "2026-04-24",
     "theaters": 65,
-    "week": null,
     "total": 9221518
    },
    {
     "rank": 81,
     "name": "致遙不可及彼方的你",
-    "country": "日本",
     "release": "2026-10-23",
     "theaters": 50,
-    "week": null,
     "total": 9165743,
     "showing": true
    },
    {
     "rank": 82,
     "name": "飛吧！熊鷹",
-    "country": "中華民國",
     "release": "2026-04-09",
     "theaters": 50,
-    "week": null,
     "total": 9004579
    },
    {
     "rank": 83,
     "name": "墜2",
-    "country": "美國",
     "release": "2026-09-04",
     "theaters": 73,
-    "week": null,
     "total": 8872072
    },
    {
     "rank": 84,
     "name": "屍變焚場",
-    "country": "美國",
     "release": "2026-07-08",
     "theaters": 80,
-    "week": null,
     "total": 8684958,
     "showing": true
    },
    {
     "rank": 85,
     "name": "日租家庭",
-    "country": "美國",
     "release": "2026-01-26",
     "theaters": 49,
-    "week": null,
     "total": 8504839
    },
    {
     "rank": 86,
     "name": "綿羊偵探團",
-    "country": "美國",
     "release": "2026-05-08",
     "theaters": 75,
-    "week": null,
     "total": 8321820
    },
    {
     "rank": 87,
     "name": "捕風追影",
-    "country": "中國大陸",
     "release": "2026-03-27",
     "theaters": 70,
-    "week": null,
     "total": 8298917
    },
    {
     "rank": 88,
     "name": "IU CONCERT : THE WINNING",
-    "country": "韓國",
     "release": "2026-10-30",
     "theaters": 15,
-    "week": null,
     "total": 8272160,
     "showing": true
    },
    {
     "rank": 89,
     "name": "即刻狂飆",
-    "country": "美國",
     "release": "2026-10-30",
     "theaters": 75,
-    "week": null,
     "total": 8184524,
     "showing": true
    },
    {
     "rank": 90,
     "name": "邪降：覺醒",
-    "country": "泰國",
     "release": "2026-03-20",
     "theaters": 65,
-    "week": null,
     "total": 7869843
    },
    {
     "rank": 91,
     "name": "魯冰花（數位修復版）",
-    "country": "中華民國",
     "release": "2026-07-08",
     "theaters": 67,
-    "week": null,
     "total": 7716243
    },
    {
     "rank": 92,
     "name": "名偵探柯南 引爆摩天樓 4K數位修復版",
-    "country": "日本",
     "release": "2026-05-03",
     "theaters": 50,
-    "week": null,
     "total": 7485329
    },
    {
     "rank": 93,
     "name": "PLAVE Asia Tour [Dash: Quantum Leap] Encore in Cinemas",
-    "country": "韓國",
     "release": "2026-06-05",
     "theaters": 44,
-    "week": null,
     "total": 7402830
    },
    {
     "rank": 94,
     "name": "讓子彈飛",
-    "country": "中國大陸",
     "release": "2026-10-30",
     "theaters": 36,
-    "week": null,
     "total": 7333494,
     "showing": true
    },
    {
     "rank": 95,
     "name": "妳最後留下的歌",
-    "country": "日本",
     "release": "2026-06-05",
     "theaters": 50,
-    "week": null,
     "total": 7306812
    },
    {
     "rank": 96,
     "name": "弒婚遊戲：2度開局",
-    "country": "美國",
     "release": "2026-04-02",
     "theaters": 87,
-    "week": null,
     "total": 7300401
    },
    {
     "rank": 97,
     "name": "荒島囚救",
-    "country": "美國",
     "release": "2026-01-29",
     "theaters": 84,
-    "week": null,
     "total": 7108208
    },
    {
     "rank": 98,
     "name": "秒速5公分 真人版",
-    "country": "日本",
     "release": "2026-02-06",
     "theaters": 82,
-    "week": null,
     "total": 6790518
    },
    {
     "rank": 99,
     "name": "世紀初戀 楊麗花",
-    "country": "中華民國",
     "release": "2026-10-28",
     "theaters": 64,
-    "week": null,
     "total": 6718939,
     "showing": true
    },
    {
     "rank": 100,
     "name": "夏日大作戰 全新4K修復版",
-    "country": "日本",
     "release": "2026-04-02",
     "theaters": 61,
-    "week": null,
     "total": 6656639
    },
    {
     "rank": 101,
     "name": "NO GOOD！歐吉桑",
-    "country": "中華民國",
     "release": "2026-04-10",
     "theaters": 61,
-    "week": null,
     "total": 6592990
    },
    {
     "rank": 102,
     "name": "驚聲尖叫 7",
-    "country": "美國",
     "release": "2026-02-26",
     "theaters": 84,
-    "week": null,
     "total": 6561267
    },
    {
     "rank": 103,
     "name": "失樂園",
-    "country": "中華民國",
     "release": "2026-04-19",
     "theaters": 45,
-    "week": null,
     "total": 6561172,
     "showing": true
    },
    {
     "rank": 104,
     "name": "巧虎電影　勇氣之歌 (國語版)",
-    "country": "日本",
     "release": "2026-02-06",
     "theaters": 19,
-    "week": null,
     "total": 6512060
    },
    {
     "rank": 105,
     "name": "實境誘捕",
-    "country": "美國",
     "release": "2026-09-24",
     "theaters": 62,
-    "week": null,
     "total": 6385381
    },
    {
     "rank": 106,
     "name": "IU CONCERT: THE GOLDEN HOUR",
-    "country": "韓國",
     "release": "2026-10-23",
     "theaters": 15,
-    "week": null,
     "total": 6189243,
     "showing": true
    },
    {
     "rank": 107,
     "name": "你能吃到媽媽煮的飯的次數，還剩365次",
-    "country": "韓國",
     "release": "2026-05-08",
     "theaters": 57,
-    "week": null,
     "total": 6008978
    },
    {
     "rank": 108,
     "name": "28年毀滅倒數：人骨聖殿",
-    "country": "美國",
     "release": "2026-01-16",
     "theaters": 91,
-    "week": null,
     "total": 5946649
    },
    {
     "rank": 109,
     "name": "深度安靜",
-    "country": "中華民國",
     "release": "2026-03-20",
     "theaters": 61,
-    "week": null,
     "total": 5706881
    },
    {
     "rank": 110,
     "name": "怪奇比莉－溫柔重擊巡迴演唱會 3D 電影",
-    "country": "美國",
     "release": "2026-05-08",
     "theaters": 32,
-    "week": null,
     "total": 5674425
    },
    {
     "rank": 111,
     "name": "鬼上車",
-    "country": "美國",
     "release": "2026-06-18",
     "theaters": 74,
-    "week": null,
     "total": 5590488
    },
    {
     "rank": 112,
     "name": "誤闖遺忘島",
-    "country": "美國",
     "release": "2026-09-19",
     "theaters": 84,
-    "week": null,
     "total": 5542639,
     "showing": true
    },
    {
     "rank": 113,
     "name": "消失的金鳳娜",
-    "country": "中華民國",
     "release": "2026-10-14",
     "theaters": 60,
-    "week": null,
     "total": 5531173,
     "showing": true
    },
    {
     "rank": 114,
     "name": "青春豬頭少年不會夢到親愛好朋友",
-    "country": "日本",
     "release": "2026-11-06",
     "theaters": 16,
-    "week": null,
     "total": 5512458,
     "showing": true
    },
    {
     "rank": 115,
     "name": "情感的價值",
-    "country": "挪威",
     "release": "2026-01-23",
     "theaters": 36,
-    "week": null,
     "total": 5471346
    },
    {
     "rank": 116,
     "name": "別離無恙",
-    "country": "日本",
     "release": "2026-05-15",
     "theaters": 64,
-    "week": null,
     "total": 5454682
    },
    {
     "rank": 117,
     "name": "劇場版 少女樂團吶喊吧【後篇】-嗨, 未來-",
-    "country": "日本",
     "release": "2026-01-24",
     "theaters": 16,
-    "week": null,
     "total": 5427352
    },
    {
     "rank": 118,
     "name": "進擊的鼓手 4K重映",
-    "country": "美國",
     "release": "2026-10-16",
     "theaters": 29,
-    "week": null,
     "total": 5404655,
     "showing": true
    },
    {
     "rank": 119,
     "name": "寂地",
-    "country": "美國",
     "release": "2026-08-27",
     "theaters": 76,
-    "week": null,
     "total": 5327137,
     "showing": true
    },
    {
     "rank": 120,
     "name": "劇場版 少女樂團吶喊吧【前篇】-青春狂走曲-",
-    "country": "日本",
     "release": "2026-01-09",
     "theaters": 17,
-    "week": null,
     "total": 5200961
    },
    {
     "rank": 121,
     "name": "特種快遞",
-    "country": "美國",
     "release": "2026-09-24",
     "theaters": 71,
-    "week": null,
     "total": 5171000
    },
    {
     "rank": 122,
     "name": "超拖樂團之我要幹大事啦！",
-    "country": "加拿大",
     "release": "2026-08-14",
     "theaters": 22,
-    "week": null,
     "total": 5141946
    },
    {
     "rank": 123,
     "name": "72小時即刻救援",
-    "country": "美國",
     "release": "2026-03-13",
     "theaters": 75,
-    "week": null,
     "total": 5087532
    },
    {
     "rank": 124,
     "name": "ENHYPEN [WALK THE LINE SUMMER EDITION] IN CINEMAS",
-    "country": "韓國",
     "release": "2026-03-05",
     "theaters": 24,
-    "week": null,
     "total": 5049340
    },
    {
     "rank": 125,
     "name": "金劫任務",
-    "country": "美國",
     "release": "2026-10-08",
     "theaters": 72,
-    "week": null,
     "total": 5029256,
     "showing": true
    },
    {
     "rank": 126,
     "name": "世外",
-    "country": "香港",
     "release": "2026-03-13",
     "theaters": 60,
-    "week": null,
     "total": 4967707
    },
    {
     "rank": 127,
     "name": "電影屁屁偵探：星星與月亮",
-    "country": "日本",
     "release": "2026-01-23",
     "theaters": 71,
-    "week": null,
     "total": 4835455
    },
    {
     "rank": 128,
     "name": "高年級實習生",
-    "country": "韓國",
     "release": "2026-10-14",
     "theaters": 76,
-    "week": null,
     "total": 4507942,
     "showing": true
    },
    {
     "rank": 129,
     "name": "恨女的逆襲",
-    "country": "中華民國",
     "release": "2026-01-16",
     "theaters": 58,
-    "week": null,
     "total": 4195986
    },
    {
     "rank": 130,
     "name": "盜音天才",
-    "country": "美國",
     "release": "2026-05-06",
     "theaters": 57,
-    "week": null,
     "total": 4191420
    },
    {
     "rank": 131,
     "name": "機動戰士鋼彈 閃光的哈薩威",
-    "country": "日本",
     "release": "2026-03-06",
     "theaters": 28,
-    "week": null,
     "total": 4184288
    },
    {
     "rank": 132,
     "name": "偶像學園!X星光樂園 THE MOVIE -相遇的奇蹟-",
-    "country": "日本",
     "release": "2026-08-07",
     "theaters": 10,
-    "week": null,
     "total": 4162225
    },
    {
     "rank": 133,
     "name": "夜王",
-    "country": "香港",
     "release": "2026-03-13",
     "theaters": 70,
-    "week": null,
     "total": 4114949
    },
    {
     "rank": 134,
     "name": "祈念之樹",
-    "country": "日本",
     "release": "2026-02-26",
     "theaters": 72,
-    "week": null,
     "total": 4006549
    },
    {
     "rank": 135,
     "name": "超異能快感：魔法之書",
-    "country": "美國",
     "release": "2026-09-10",
     "theaters": 78,
-    "week": null,
     "total": 3985043,
     "showing": true
    },
    {
     "rank": 136,
     "name": "角落小夥伴電影版：從天而降的雲之冒險",
-    "country": "日本",
     "release": "2026-10-08",
     "theaters": 79,
-    "week": null,
     "total": 3839780,
     "showing": true
    },
    {
     "rank": 137,
     "name": "遊戲人生ZERO",
-    "country": "日本",
     "release": "2026-10-30",
     "theaters": 7,
-    "week": null,
     "total": 3835383
    },
    {
     "rank": 138,
     "name": "空之境界劇場版：第五章 矛盾螺旋",
-    "country": "日本",
     "release": "2026-02-13",
     "theaters": 35,
-    "week": null,
     "total": 3772371
    },
    {
     "rank": 139,
     "name": "為一切人，成為一切",
-    "country": "中華民國",
     "release": "2026-06-12",
     "theaters": 28,
-    "week": null,
     "total": 3753004,
     "showing": true
    },
    {
     "rank": 140,
     "name": "LINKIN PARK：UNSHATTER",
-    "country": "美國",
     "release": "2026-09-30",
     "theaters": 28,
-    "week": null,
     "total": 3631710
    },
    {
     "rank": 141,
     "name": "哈姆奈特",
-    "country": "美國",
     "release": "2026-02-26",
     "theaters": 47,
-    "week": null,
     "total": 3581446
    },
    {
     "rank": 142,
     "name": "農曆三月二十三",
-    "country": "中華民國",
     "release": "2026-05-08",
     "theaters": 46,
-    "week": null,
     "total": 3506583
    },
    {
     "rank": 143,
     "name": "A KITE風箏",
-    "country": "日本",
     "release": "2026-04-10",
     "theaters": 18,
-    "week": null,
     "total": 3503843
    },
    {
     "rank": 144,
     "name": "蠱降",
-    "country": "馬來西亞",
     "release": "2026-04-02",
     "theaters": 59,
-    "week": null,
     "total": 3440628
    },
    {
     "rank": 145,
     "name": "傳奇女伶 高菊花",
-    "country": "中華民國",
     "release": "2026-05-15",
     "theaters": 34,
-    "week": null,
     "total": 3418782
    },
    {
     "rank": 146,
     "name": "Jim Queen：肌情四射",
-    "country": "法國",
     "release": "2026-10-23",
     "theaters": 34,
-    "week": null,
     "total": 3376791,
     "showing": true
    },
    {
     "rank": 147,
     "name": "啵me之我的青春住了鬼",
-    "country": "中華民國",
     "release": "2026-01-23",
     "theaters": 81,
-    "week": null,
     "total": 3324602
    },
    {
     "rank": 148,
     "name": "血鬼村",
-    "country": "越南",
     "release": "2026-08-07",
     "theaters": 48,
-    "week": null,
     "total": 3291126
    },
    {
     "rank": 149,
     "name": "王命之徒",
-    "country": "韓國",
     "release": "2026-02-26",
     "theaters": 63,
-    "week": null,
     "total": 3287663
    },
    {
     "rank": 150,
     "name": "你是不會當樹嗎",
-    "country": "德國",
     "release": "2026-04-15",
     "theaters": 23,
-    "week": null,
     "total": 3285728
    },
    {
     "rank": 151,
     "name": "劇場版 銀河特急 Milky☆Subway",
-    "country": "日本",
     "release": "2026-04-17",
     "theaters": 65,
-    "week": null,
     "total": 3232317
    },
    {
     "rank": 152,
     "name": "他們要殺你",
-    "country": "美國",
     "release": "2026-03-26",
     "theaters": 82,
-    "week": null,
     "total": 3222995
    },
    {
     "rank": 153,
     "name": "我未許願先吹蠟燭",
-    "country": "中華民國",
     "release": "2026-08-14",
     "theaters": 67,
-    "week": null,
     "total": 3112080
    },
    {
     "rank": 154,
     "name": "0時盜數",
-    "country": "英國",
     "release": "2026-04-14",
     "theaters": 74,
-    "week": null,
     "total": 3019557
    },
    {
     "rank": 155,
     "name": "科學新娘！",
-    "country": "美國",
     "release": "2026-03-04",
     "theaters": 68,
-    "week": null,
     "total": 2951293
    },
    {
     "rank": 156,
     "name": "復活男",
-    "country": "韓國",
     "release": "2026-10-01",
     "theaters": 48,
-    "week": null,
     "total": 2901257
    },
    {
     "rank": 157,
     "name": "航海王劇場版：紅髮歌姬",
-    "country": "日本",
     "release": "2026-07-17",
     "theaters": 25,
-    "week": null,
     "total": 2892882
    },
    {
     "rank": 158,
     "name": "全境屍控",
-    "country": "美國",
     "release": "2026-03-06",
     "theaters": 50,
-    "week": null,
     "total": 2883322
    },
    {
     "rank": 159,
     "name": "空之境界劇場版：第七章 殺人考察(後)",
-    "country": "日本",
     "release": "2026-04-24",
     "theaters": 36,
-    "week": null,
     "total": 2876949
    },
    {
     "rank": 160,
     "name": "開棺2：家族詛咒",
-    "country": "越南",
     "release": "2026-05-08",
     "theaters": 49,
-    "week": null,
     "total": 2816561
    },
    {
     "rank": 161,
     "name": "出賣影子的女人",
-    "country": "日本",
     "release": "2026-10-30",
     "theaters": 21,
-    "week": null,
     "total": 2797647,
     "showing": true
    },
    {
     "rank": 162,
     "name": "攻殼機動隊(1995) 4K 數位修復版",
-    "country": "日本",
     "release": "2026-08-28",
     "theaters": 21,
-    "week": null,
     "total": 2788867
    },
    {
     "rank": 163,
     "name": "空之境界劇場版：第四章 伽藍之洞",
-    "country": "日本",
     "release": "2026-01-30",
     "theaters": 35,
-    "week": null,
     "total": 2700424
    },
    {
     "rank": 164,
     "name": "鬼入獄",
-    "country": "印尼",
     "release": "2026-06-10",
     "theaters": 53,
-    "week": null,
     "total": 2677946
    },
    {
     "rank": 165,
     "name": "秒速5公分 導演特別映像版",
-    "country": "日本",
     "release": "2026-03-27",
     "theaters": 62,
-    "week": null,
     "total": 2663053
    },
    {
     "rank": 166,
     "name": "愛在每一天",
-    "country": "菲律賓",
     "release": "2026-04-19",
     "theaters": 22,
-    "week": null,
     "total": 2650260
    },
    {
     "rank": 167,
     "name": "鬼靈居",
-    "country": "泰國",
     "release": "2026-01-30",
     "theaters": 50,
-    "week": null,
     "total": 2632573
    },
    {
     "rank": 168,
     "name": "鏈鋸人 總集篇 前篇+鏈鋸人 總集篇 後篇",
-    "country": "日本",
     "release": "2026-03-20",
     "theaters": 13,
-    "week": null,
     "total": 2596378
    },
    {
     "rank": 169,
     "name": "ATEEZ : LIGHT THE WAY IN CINEMAS",
-    "country": "韓國",
     "release": "2026-08-06",
     "theaters": 17,
-    "week": null,
     "total": 2522185
    },
    {
     "rank": 170,
     "name": "大仙尪仔",
-    "country": "中華民國",
     "release": "2026-09-11",
     "theaters": 57,
-    "week": null,
     "total": 2513890,
     "showing": true
    },
    {
     "rank": 171,
     "name": "魔法少女小圓劇場版 [新篇] 叛逆的物語+五分鐘開頭影像",
-    "country": "日本",
     "release": "2026-08-21",
     "theaters": 11,
-    "week": null,
     "total": 2476147
    },
    {
     "rank": 172,
     "name": "跳躍吧！時空少女 全新4K修復版",
-    "country": "日本",
     "release": "2026-02-26",
     "theaters": 50,
-    "week": null,
     "total": 2465089
    },
    {
     "rank": 173,
     "name": "豪門殺人指南",
-    "country": "美國",
     "release": "2026-02-26",
     "theaters": 65,
-    "week": null,
     "total": 2457302
    },
    {
     "rank": 174,
     "name": "開放性邀請",
-    "country": "美國",
     "release": "2026-08-23",
     "theaters": 34,
-    "week": null,
     "total": 2437843
    },
    {
     "rank": 175,
     "name": "攻殼機動隊 2026",
-    "country": "日本",
     "release": "2026-06-27",
     "theaters": 61,
-    "week": null,
     "total": 2428595
    },
    {
     "rank": 176,
     "name": "Moto極速傳奇",
-    "country": "西班牙",
     "release": "2026-05-08",
     "theaters": 34,
-    "week": null,
     "total": 2416559
    },
    {
     "rank": 177,
     "name": "猩瘋血雨",
-    "country": "美國",
     "release": "2026-01-30",
     "theaters": 88,
-    "week": null,
     "total": 2414969
    },
    {
     "rank": 178,
     "name": "魅影巨星",
-    "country": "美國",
     "release": "2026-04-17",
     "theaters": 21,
-    "week": null,
     "total": 2385915
    },
    {
     "rank": 179,
     "name": "特務搞飛機2",
-    "country": "韓國",
     "release": "2026-08-12",
     "theaters": 75,
-    "week": null,
     "total": 2369993
    },
    {
     "rank": 180,
     "name": "狂野時代",
-    "country": "中國大陸",
     "release": "2026-01-01",
     "theaters": 47,
-    "week": null,
     "total": 2365795
    },
    {
     "rank": 181,
     "name": "重擊人生",
-    "country": "美國",
     "release": "2026-01-23",
     "theaters": 64,
-    "week": null,
     "total": 2349549
    },
    {
     "rank": 182,
     "name": "終戰那一天",
-    "country": "中華民國",
     "release": "2026-08-14",
     "theaters": 23,
-    "week": null,
     "total": 2327964
    },
    {
     "rank": 183,
     "name": "後座力",
-    "country": "英國",
     "release": "2026-04-30",
     "theaters": 23,
-    "week": null,
     "total": 2300532
    },
    {
     "rank": 184,
     "name": "鬼娃娃",
-    "country": "日本",
     "release": "2026-03-06",
     "theaters": 64,
-    "week": null,
     "total": 2290072
    },
    {
     "rank": 185,
     "name": "跟蹤",
-    "country": "美國",
     "release": "2026-07-03",
     "theaters": 20,
-    "week": null,
     "total": 2243703
    },
    {
     "rank": 186,
     "name": "蕭邦！蕭邦！",
-    "country": "波蘭",
     "release": "2026-10-23",
     "theaters": 16,
-    "week": null,
     "total": 2239026,
     "showing": true
    },
    {
     "rank": 187,
     "name": "鬼汙",
-    "country": "泰國",
     "release": "2026-07-17",
     "theaters": 42,
-    "week": null,
     "total": 2203184
    },
    {
     "rank": 188,
     "name": "空之境界劇場版：第六章 忘卻錄音",
-    "country": "日本",
     "release": "2026-03-20",
     "theaters": 35,
-    "week": null,
     "total": 2180361
    },
    {
     "rank": 189,
     "name": "Always Lalisa",
-    "country": "韓國",
     "release": "2026-10-12",
     "theaters": 29,
-    "week": null,
     "total": 2179940
    },
    {
     "rank": 190,
     "name": "MEZZO Forte 次強音",
-    "country": "日本",
     "release": "2026-04-30",
     "theaters": 19,
-    "week": null,
     "total": 2175585
    },
    {
     "rank": 191,
     "name": "空之境界劇場版：未來福音",
-    "country": "日本",
     "release": "2026-07-31",
     "theaters": 36,
-    "week": null,
     "total": 2124738
    },
    {
     "rank": 192,
     "name": "麵包超人電影版：潘坦與約定之星",
-    "country": "日本",
     "release": "2026-10-16",
     "theaters": 32,
-    "week": null,
     "total": 2101784,
     "showing": true
    },
    {
     "rank": 193,
     "name": "出口成髒",
-    "country": "美國",
     "release": "2026-05-10",
     "theaters": 59,
-    "week": null,
     "total": 2084415
    },
    {
     "rank": 194,
     "name": "超限戰",
-    "country": "加拿大",
     "release": "2026-05-13",
     "theaters": 23,
-    "week": null,
     "total": 2037984
    },
    {
     "rank": 195,
     "name": "加速世界 劇場版 INFINITE BURST",
-    "country": "日本",
     "release": "2026-10-23",
     "theaters": 40,
-    "week": null,
     "total": 2013126,
     "showing": true
    },
    {
     "rank": 196,
     "name": "愛的魔樣",
-    "country": "美國",
     "release": "2026-08-14",
     "theaters": 35,
-    "week": null,
     "total": 1961756
    },
    {
     "rank": 197,
     "name": "社群清算",
-    "country": "美國",
     "release": "2026-10-23",
     "theaters": 83,
-    "week": null,
     "total": 1956455,
     "showing": true
    },
    {
     "rank": 198,
     "name": "動物農莊",
-    "country": "美國",
     "release": "2026-04-30",
     "theaters": 71,
-    "week": null,
     "total": 1952773
    },
    {
     "rank": 199,
     "name": "懺悔",
-    "country": "日本",
     "release": "2026-09-18",
     "theaters": 42,
-    "week": null,
     "total": 1890249
    },
    {
     "rank": 200,
     "name": "匿殺",
-    "country": "中國大陸",
     "release": "2026-02-13",
     "theaters": 59,
-    "week": null,
     "total": 1879191
    }
   ]
