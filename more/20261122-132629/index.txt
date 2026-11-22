@@ -1,0 +1,6 @@
+01.html 200 138325 https://www.tidf.org.tw/zh-hant/shows/schedule
+02.html 200 36442 https://tiqff.org.tw/Festival.aspx?ID=1574&ek=26&pg=1&d=
+03.html 200 35628 https://tiqff.org.tw/
+04.html 200 64716 https://www.tidf.org.tw/zh-hant
+05.html 404 1229 https://tiqff.org.tw/robots.txt
+06.html 200 2272 https://www.tidf.org.tw/robots.txt
