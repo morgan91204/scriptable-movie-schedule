@@ -1,0 +1,4 @@
+首頁日期 2026-10-09 ~ 2026-10-26 18 天；場次頁 200 表單代碼 有
+2026-10-09 200 153086 {"108":[{"date":"2026-10-09","cinemas":[{"id":1,"title":"\u9ad8\u96c4\u5e02\u96fb\u5f71\u9928","title_en":"Kaohsiung Film Archive","auditoriums":[{"id":9,"title
+2026-10-10 200 218453 {"108":[{"date":"2026-10-10","cinemas":[{"id":1,"title":"\u9ad8\u96c4\u5e02\u96fb\u5f71\u9928","title_en":"Kaohsiung Film Archive","auditoriums":[{"id":9,"title
+2026-10-26 200 165880 {"108":[{"date":"2026-10-26","cinemas":[{"id":1,"title":"\u9ad8\u96c4\u5e02\u96fb\u5f71\u9928","title_en":"Kaohsiung Film Archive","auditoriums":[{"id":9,"title
