@@ -176,7 +176,8 @@ export function Item(props: {
   const fallback = "if(this.dataset.url&&this.src!==this.dataset.url){this.src=this.dataset.url}else{this.remove()}";
   return (
     <div class={cls} onTap={props.onTap} onLongPress={props.onLongPress}>
-      {props.rank ? <span class={"rank" + (props.rank <= 3 ? " top" : "")}>{props.rank}</span> : null}
+      {/* 名次：位數越多字越小，欄寬固定，四位數也不會壓到海報 */}
+      {props.rank ? <span class={"rank" + (props.rank <= 3 ? " top" : "") + (props.rank >= 1000 ? " d4" : props.rank >= 100 ? " d3" : "")}>{props.rank}</span> : null}
       {props.thumb ? (
         props.thumb.pending && !props.thumb.src ? (
           <span class="thumb none" />
