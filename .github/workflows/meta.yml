@@ -62,3 +62,7 @@ jobs:
           tools/publish-data.sh "$RUNNER_TEMP/official.json" official.json "更新資料"
           git checkout -q -f "$GITHUB_SHA"
           tools/publish-data.sh "$RUNNER_TEMP/festival.json" festival.json "更新資料"
+          # 今年的影展另存一份帶年份的檔（跨年後留著回顧）
+          Y=$(TZ=Asia/Taipei date +%Y)
+          git checkout -q -f "$GITHUB_SHA"
+          tools/publish-data.sh "$RUNNER_TEMP/festival-$Y.json" "festival-$Y.json" "更新資料"

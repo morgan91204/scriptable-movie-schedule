@@ -5,6 +5,7 @@ struct FestivalSection: View {
     @State private var board: Loadable<FestivalBoard> = .loading
     @State private var festId = ""
     @State private var date = ""
+    @State private var year = 0 // 0 = 今年（今年還沒有就是最近有資料的那一年）
 
     var body: some View {
         Group {
@@ -15,19 +16,42 @@ struct FestivalSection: View {
                 Section { ErrorRow(message: message) { Task { await load() } } }
             case .loaded(let b):
                 if b.festivals.isEmpty {
-                    Section { Text("目前沒有進行中的影展").foregroundStyle(.secondary) }
+                    Section { Text("目前沒有影展資料").foregroundStyle(.secondary) }
                 } else {
-                    Section {
-                        if b.festivals.count > 1 {
-                            Picker("影展", selection: Binding(get: { b.id }, set: { festId = $0; date = "" })) {
-                                ForEach(b.festivals) { Text($0.name).tag($0.id) }
+                    if let years = b.years, years.count > 1 {
+                        Section {
+                            Picker("年份", selection: Binding(get: { b.year ?? 0 }, set: { year = $0; festId = ""; date = "" })) {
+                                ForEach(years, id: \.self) { Text(String($0)).tag($0) }
                             }
                         }
+                    }
+                    // 還沒結束的和已經結束的分成兩區，各自一個清單，選中的打勾
+                    ForEach(b.groups ?? []) { g in
+                        Section {
+                            ForEach(g.items) { x in
+                                Button {
+                                    festId = x.id; date = ""
+                                } label: {
+                                    HStack(spacing: 8) {
+                                        Image(systemName: g.past ? "checkmark.seal" : "film").foregroundStyle(g.past ? Color.secondary : Color.orange)
+                                        Text(x.name).foregroundStyle(g.past ? Color.secondary : Color.primary)
+                                        Spacer(minLength: 4)
+                                        if x.id == b.id { Image(systemName: "checkmark").foregroundStyle(Color.accentColor) }
+                                    }
+                                }
+                            }
+                        } header: {
+                            Text("\(g.title)｜\(g.items.count) 個影展")
+                        }
+                    }
+                    Section {
                         Picker("日期", selection: Binding(get: { b.date }, set: { date = $0 })) {
                             ForEach(b.dates, id: \.self) { Text(Fmt.dateLabel($0)).tag($0) }
                         }
+                    } header: {
+                        Text(b.name)
                     } footer: {
-                        Text("\(b.name)｜\(b.range)")
+                        Text(b.range + ((b.past ?? false) ? "｜場次僅供回顧" : ""))
                     }
                     Section {
                         ForEach(b.day) { row in
@@ -58,12 +82,12 @@ struct FestivalSection: View {
                 }
             }
         }
-        .task(id: festId + "|" + date) { await load() }
+        .task(id: festId + "|" + date + "|" + String(year)) { await load() }
     }
 
     private func load() async {
         do {
-            board = .loaded(try await Bridge.shared.call("festivalBoard", [festId, date]))
+            board = .loaded(try await Bridge.shared.call("festivalBoard", [festId, date, year]))
         } catch {
             if board.value == nil { board = .failed(errorText(error)) }
         }

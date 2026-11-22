@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.22-2120
+// @movie-schedule-app 電影行程 v2026.11.22-2133
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/parsers.gen.ts
@@ -1747,12 +1747,39 @@ function festivalState(f) {
   const today = todayTPE();
   return f.end < today ? "past" : f.start > today ? "soon" : "now";
 }
-async function loadFestivals() {
-  const data = await loadServed("festival", FESTIVAL_URL, 24 * 14, (d) => Array.isArray(d.festivals)).catch(() => null);
+var festivalYearsNow = [];
+var festivalSort = (list) => {
   const rank = { now: 0, soon: 1, past: 2 };
-  festivalsNow = (data ? data.festivals : []).filter((f) => f && Array.isArray(f.sessions) && f.sessions.length > 0).sort((a, b) => rank[festivalState(a)] - rank[festivalState(b)] || (festivalState(a) === "soon" ? a.start.localeCompare(b.start) : b.start.localeCompare(a.start)));
-  return festivalsNow;
+  return list.filter((f) => f && Array.isArray(f.sessions) && f.sessions.length > 0).sort((a, b) => rank[festivalState(a)] - rank[festivalState(b)] || (festivalState(a) === "soon" ? a.start.localeCompare(b.start) : b.start.localeCompare(a.start)));
+};
+async function loadFestivals(year) {
+  const thisYear = Number(todayTPE().slice(0, 4));
+  const data = await loadServed("festival", FESTIVAL_URL, 24 * 14, (d) => Array.isArray(d.festivals)).catch(() => null);
+  festivalsNow = festivalSort(data ? data.festivals : []);
+  const years = new Set((data && Array.isArray(data.years) ? data.years : []).filter((y) => y >= 2e3 && y <= thisYear && (y !== thisYear || festivalsNow.length > 0)));
+  if (festivalsNow.length) years.add(thisYear);
+  festivalYearsNow = Array.from(years).sort((a, b) => b - a);
+  const want = year && festivalYearsNow.indexOf(year) >= 0 ? year : festivalsNow.length ? thisYear : festivalYearsNow[0] || thisYear;
+  if (want === thisYear) return festivalsNow;
+  const old = await loadServed(`festival-${want}`, FESTIVAL_URL.replace(/\.json$/, `-${want}.json`), 24 * 30, (d) => Array.isArray(d.festivals)).catch(() => null);
+  return festivalSort(old ? old.festivals : []);
 }
+var festivalYears = () => festivalYearsNow;
+var festivalsAny = () => festivalsNow.length > 0 || festivalYearsNow.length > 0;
+function festivalPeriod(f) {
+  const md = (d) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`;
+  return `${md(f.start)}–${md(f.end)}`;
+}
+function festivalGroups(list) {
+  const live = list.filter((f) => festivalState(f) !== "past");
+  const past = list.filter((f) => festivalState(f) === "past");
+  return [
+    { title: "進行中・即將開始", past: false, items: live },
+    { title: "已結束（回顧）", past: true, items: past }
+  ].filter((g) => g.items.length > 0);
+}
+var festivalChipNote = (f) => festivalState(f) === "past" ? festivalPeriod(f) : festivalStateLabel(f);
+var festivalStatusLine = (f) => `${festivalStateLabel(f)}｜${f.start.slice(0, 4)}/${festivalPeriod(f)}`;
 var festivalsReady = () => festivalsNow;
 function festivalDates(f) {
   return Array.from(new Set(f.sessions.map((x) => x.date))).sort();
@@ -1794,7 +1821,7 @@ function festivalCinema(x, cinemas, f) {
 function festivalNote(list) {
   if (list.some((f) => festivalState(f) === "now")) return "進行中";
   const next = list.filter((f) => festivalState(f) === "soon").map((f) => f.start).sort()[0] || "";
-  return next ? `${Number(next.slice(5, 7))}/${Number(next.slice(8, 10))} 開始` : list.length ? "回顧" : "";
+  return next ? `${Number(next.slice(5, 7))}/${Number(next.slice(8, 10))} 開始` : list.length || festivalYearsNow.length ? "回顧" : "";
 }
 function festivalFooter(f) {
   const past = festivalState(f) === "past" ? "這個影展已經結束，場次留著給你回頭看。" : "";
@@ -2907,6 +2934,8 @@ var App = class {
     this.festId = "";
     // 看哪一個影展（同時有兩個以上時可以切換）
     this.festDate = "";
+    // 看哪一天（空 = 今天或影展第一天）
+    this.festYear = 0;
     this.boxSort = "week";
     // 票房排行的排法：本週／累計／年度
     this.boxYears = [];
@@ -2961,14 +2990,14 @@ var App = class {
   }
   /** 最新版本是多少。網頁版問的是自己網站現在上線的版本（重新整理就會拿到的那一版），不是 GitHub 上的 */
   checkVersion() {
-    if (true) return checkLatest("2026.11.22-2120");
+    if (true) return checkLatest("2026.11.22-2133");
     return (async () => {
       try {
         const r = await globalThis.fetch("/api/version?t=" + Date.now(), { cache: "no-store" });
         const latest = String((await r.json()).version || "");
         if (!latest) return null;
         const num = (v) => Number(v.replace(/\D/g, "")) || 0;
-        return { latest, isLatest: num("2026.11.22-2120") >= num(latest) };
+        return { latest, isLatest: num("2026.11.22-2133") >= num(latest) };
       } catch (_) {
         return null;
       }
@@ -3065,11 +3094,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.22-2120"}`);
+          Pasteboard.copy(`版本 ${"2026.11.22-2133"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.22-2120"}`,
+      `版本 ${"2026.11.22-2133"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -3411,7 +3440,7 @@ var App = class {
     if (false) {
       if (!r) return /* @__PURE__ */ h(Note, { text: "（無法確認是否為最新版：連不到網站）" });
       if (r.isLatest) return /* @__PURE__ */ h(Note, { text: "✅ 已是最新版" });
-      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.22-2120"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
+      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.22-2133"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
         globalThis.location.reload();
       } }));
     }
@@ -3502,26 +3531,35 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
       this.movieMode = "box";
     } }), /* @__PURE__ */ h(Chip, { label: "即將上映", muted: this.movieMode !== "soon", onTap: () => {
       this.movieMode = "soon";
-    } }), festivalsReady().length ? /* @__PURE__ */ h(Chip, { label: "影展", sub: festivalNote(festivalsReady()), muted: this.movieMode !== "fest", onTap: () => {
+    } }), festivalsAny() ? /* @__PURE__ */ h(Chip, { label: "影展", sub: festivalNote(festivalsReady()), muted: this.movieMode !== "fest", onTap: () => {
       this.movieMode = "fest";
     } }) : null);
   }
-  // 看哪一天（空 = 今天或影展第一天）
+  // 看哪一年（0 = 今年；今年還沒有就是最近有資料的那一年）
   async festivalListView() {
-    const list = await loadFestivals();
+    const list = await loadFestivals(this.festYear || void 0);
+    const years = festivalYears();
     if (!list.length) {
+      if (this.festYear) {
+        this.festYear = 0;
+        return this.festivalListView();
+      }
       this.movieMode = "now";
       return this.movieListView();
     }
+    const year = Number(list[0].end.slice(0, 4));
     const f = list.find((x) => x.id === this.festId) || list[0];
     const dates = festivalDates(f);
     const date = dates.indexOf(this.festDate) >= 0 ? this.festDate : festivalDefaultDate(f);
     const day = festivalDay(f, date);
-    const md = (d) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`;
-    return /* @__PURE__ */ h(Page, { title: "依電影找場次", subtitle: `${f.name}｜${md(f.start)}–${md(f.end)}`, onBack: () => this.back() }, this.movieModeChips(), list.length > 1 ? /* @__PURE__ */ h(Section, { title: "影展" }, /* @__PURE__ */ h(Chips, null, list.map((x) => /* @__PURE__ */ h(Chip, { label: x.name, sub: festivalStateLabel(x), muted: x.id !== f.id, onTap: () => {
+    return /* @__PURE__ */ h(Page, { title: "依電影找場次", subtitle: `${f.name}｜${festivalStatusLine(f)}`, onBack: () => this.back() }, this.movieModeChips(), years.length > 1 ? /* @__PURE__ */ h(Section, { title: "年份" }, /* @__PURE__ */ h(Chips, null, years.map((y) => /* @__PURE__ */ h(Chip, { label: `${y}`, sub: y === Number(todayTPE().slice(0, 4)) ? "今年" : "", muted: y !== year, onTap: () => {
+      this.festYear = y;
+      this.festId = "";
+      this.festDate = "";
+    } })))) : null, festivalGroups(list).map((g) => /* @__PURE__ */ h(Section, { title: `${g.title}｜${g.items.length} 個影展` }, /* @__PURE__ */ h(Chips, null, g.items.map((x) => /* @__PURE__ */ h(Chip, { label: x.name, sub: festivalChipNote(x), muted: x.id !== f.id, onTap: () => {
       this.festId = x.id;
       this.festDate = "";
-    } })))) : null, /* @__PURE__ */ h(Section, { title: "日期" }, /* @__PURE__ */ h(Chips, null, dates.map((d) => /* @__PURE__ */ h(Chip, { label: dateLabel(d).replace(/（.）.*$/, ""), sub: d === todayTPE() ? "今天" : dateLabel(d).match(/（(.)）/)?.[1] || "", muted: d !== date, onTap: () => {
+    } }))))), /* @__PURE__ */ h(Section, { title: "日期" }, /* @__PURE__ */ h(Chips, null, dates.map((d) => /* @__PURE__ */ h(Chip, { label: dateLabel(d).replace(/（.）.*$/, ""), sub: d === todayTPE() ? "今天" : dateLabel(d).match(/（(.)）/)?.[1] || "", muted: d !== date, onTap: () => {
       this.festDate = d;
     } })))), /* @__PURE__ */ h(Section, { title: `${f.name}｜${dateLabel(date).replace(/ .*$/, "")}｜${day.length} 部、${day.reduce((n, x) => n + x.sessions.length, 0)} 場`, hint: festivalFooter(f) }, day.map(({ film, sessions }) => /* @__PURE__ */ h(
       Item,

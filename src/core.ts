@@ -1561,15 +1561,56 @@ export function festivalState(f: Festival): "now" | "soon" | "past" {
   const today = todayTPE();
   return f.end < today ? "past" : f.start > today ? "soon" : "now";
 }
-/** 今年的影展：進行中的排最前面，再來是即將開始的，已經結束的（留著回頭看）排最後、新的在前。讀不到就是空的 */
-export async function loadFestivals(): Promise<Festival[]> {
-  const data = await loadServed<{ updated: number; festivals: Festival[] }>("festival", FESTIVAL_URL, 24 * 14, (d) => Array.isArray(d.festivals)).catch(() => null);
+let festivalYearsNow: number[] = []; // 有影展資料的年份（新的在前）
+type FestivalFile = { updated: number; years?: number[]; festivals: Festival[] };
+const festivalSort = (list: Festival[]): Festival[] => {
   const rank = { now: 0, soon: 1, past: 2 };
-  festivalsNow = (data ? data.festivals : [])
+  return list
     .filter((f) => f && Array.isArray(f.sessions) && f.sessions.length > 0)
     .sort((a, b) => rank[festivalState(a)] - rank[festivalState(b)] || (festivalState(a) === "soon" ? a.start.localeCompare(b.start) : b.start.localeCompare(a.start)));
-  return festivalsNow;
+};
+/** 某一年的影展：進行中的排最前面，再來是即將開始的，已經結束的排最後、新的在前。讀不到就是空的。
+ *  不指定年份 = 今年；今年還沒有任何影展資料時，改給最近一個有資料的年份（回顧用）。
+ *  往年的影展每年存成一個檔，選到那一年才讀 */
+export async function loadFestivals(year?: number): Promise<Festival[]> {
+  const thisYear = Number(todayTPE().slice(0, 4));
+  const data = await loadServed<FestivalFile>("festival", FESTIVAL_URL, 24 * 14, (d) => Array.isArray(d.festivals)).catch(() => null);
+  festivalsNow = festivalSort(data ? data.festivals : []);
+  const years = new Set<number>((data && Array.isArray(data.years) ? data.years : []).filter((y) => y >= 2000 && y <= thisYear && (y !== thisYear || festivalsNow.length > 0)));
+  if (festivalsNow.length) years.add(thisYear);
+  festivalYearsNow = Array.from(years).sort((a, b) => b - a);
+  const want = year && festivalYearsNow.indexOf(year) >= 0 ? year : festivalsNow.length ? thisYear : festivalYearsNow[0] || thisYear;
+  if (want === thisYear) return festivalsNow;
+  const old = await loadServed<FestivalFile>(`festival-${want}`, FESTIVAL_URL.replace(/\.json$/, `-${want}.json`), 24 * 30, (d) => Array.isArray(d.festivals)).catch(() => null);
+  return festivalSort(old ? old.festivals : []);
 }
+/** 有影展資料的年份，新的在前（要先 loadFestivals 過） */
+export const festivalYears = (): number[] => festivalYearsNow;
+/** 「影展」分類要不要出現：今年有影展，或有往年的可以回顧 */
+export const festivalsAny = (): boolean => festivalsNow.length > 0 || festivalYearsNow.length > 0;
+/** 用代碼找影展（代碼最後帶年份，往年的也找得到） */
+export async function festivalFind(id: string): Promise<Festival | null> {
+  const y = Number((id.match(/-(\d{4})$/) || [])[1]) || 0;
+  return (await loadFestivals(y || undefined)).find((f) => f.id === id) || null;
+}
+/** 影展期間的短寫法：「6/26–7/7」 */
+export function festivalPeriod(f: Festival): string {
+  const md = (d: string) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`;
+  return `${md(f.start)}–${md(f.end)}`;
+}
+/** 把影展分成兩組給畫面分開列：還沒結束的（進行中、即將開始）和已經結束的；空的那組不出現 */
+export function festivalGroups(list: Festival[]): { title: string; past: boolean; items: Festival[] }[] {
+  const live = list.filter((f) => festivalState(f) !== "past");
+  const past = list.filter((f) => festivalState(f) === "past");
+  return [
+    { title: "進行中・即將開始", past: false, items: live },
+    { title: "已結束（回顧）", past: true, items: past },
+  ].filter((g) => g.items.length > 0);
+}
+/** 選單上一個影展的說明：還沒結束的寫狀態（進行中／幾月幾日開始），已結束的寫期間 */
+export const festivalChipNote = (f: Festival): string => (festivalState(f) === "past" ? festivalPeriod(f) : festivalStateLabel(f));
+/** 選中的影展那一行狀態：「已結束｜2026/6/26–7/7」「進行中｜2026/11/6–11/22」 */
+export const festivalStatusLine = (f: Festival): string => `${festivalStateLabel(f)}｜${f.start.slice(0, 4)}/${festivalPeriod(f)}`;
 /** 這次執行已經讀到的影展（沒讀過是空的） */
 export const festivalsReady = (): Festival[] => festivalsNow;
 /** 影展有場次的日期（整個影展期間；已經結束的影展也列，可以回頭看） */
@@ -1625,7 +1666,7 @@ export function festivalCinema(x: { venue: string; room: string }, cinemas: Cine
 export function festivalNote(list: Festival[]): string {
   if (list.some((f) => festivalState(f) === "now")) return "進行中";
   const next = list.filter((f) => festivalState(f) === "soon").map((f) => f.start).sort()[0] || "";
-  return next ? `${Number(next.slice(5, 7))}/${Number(next.slice(8, 10))} 開始` : list.length ? "回顧" : "";
+  return next ? `${Number(next.slice(5, 7))}/${Number(next.slice(8, 10))} 開始` : list.length || festivalYearsNow.length ? "回顧" : "";
 }
 /** 影展清單下方的說明 */
 export function festivalFooter(f: Festival): string {

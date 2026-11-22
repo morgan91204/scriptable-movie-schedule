@@ -237,8 +237,11 @@ async function southFilmFestival() {
 if (import.meta.url === `file://${process.argv[1]}`) {
   const [outPath = "festival.json", prevPath = ""] = process.argv.slice(2);
   let prev = [];
+  let prevYears = [];
   try {
-    prev = JSON.parse(fs.readFileSync(prevPath, "utf8")).festivals || [];
+    const old = JSON.parse(fs.readFileSync(prevPath, "utf8"));
+    prev = old.festivals || [];
+    prevYears = Array.isArray(old.years) ? old.years.filter((y) => Number.isInteger(y)) : [];
   } catch (_) {}
   const got = [];
   for (const [label, job] of [["金馬影展官網", goldenHorse], ["台北電影節官網", taipeiFilmFestival], ["高雄電影節官網", kaohsiungFilmFestival], ["南方影展官網", southFilmFestival]]) {
@@ -262,6 +265,10 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     byId.set(f.id, f);
   }
   const festivals = Array.from(byId.values()).filter((f) => String(f.end || "").slice(0, 4) === year).sort((a, b) => b.start.localeCompare(a.start));
-  fs.writeFileSync(outPath, JSON.stringify({ updated: Date.now(), festivals }) + "\n");
+  // 每年另外存一份 festival-<年份>.json：今年的每次都重寫；跨年後主檔清掉舊的，這份留著給使用者回顧。
+  // years = 有存檔的年份（新的在前），App 用它列出可以選的年份
+  const years = Array.from(new Set([...prevYears, ...(festivals.length ? [Number(year)] : [])])).sort((a, b) => b - a);
+  fs.writeFileSync(outPath, JSON.stringify({ updated: Date.now(), years, festivals }) + "\n");
+  if (festivals.length) fs.writeFileSync(outPath.replace(/\.json$/, `-${year}.json`), JSON.stringify({ updated: Date.now(), festivals }) + "\n");
   console.log(`已寫出 ${festivals.length} 個影展（${festivals.map((f) => f.name + " " + f.start.slice(0, 4)).join("、") || "無"}）；檔案 ${Math.round(fs.statSync(outPath).size / 1024)}KB`);
 }

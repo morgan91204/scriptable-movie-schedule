@@ -241,7 +241,12 @@ struct FestivalDayRow: Codable, Hashable, Identifiable {
 /// 影展分類整頁的資料（由共用資料層算好）
 struct FestivalBoard: Codable {
     struct Item: Codable, Hashable, Identifiable { var id: String; var name: String }
-    var festivals: [Item]   // 進行中或即將開始的影展（空的 = 不顯示影展分類）
+    struct Group: Codable, Hashable, Identifiable { var title: String; var past: Bool; var items: [Item]; var id: String { title } }
+    var festivals: [Item]   // 這一年的影展（空的 = 不顯示影展分類）
+    var groups: [Group]?    // 分成「進行中・即將開始」和「已結束」兩組
+    var years: [Int]?       // 有影展資料的年份，新的在前
+    var year: Int?          // 現在看的是哪一年
+    var past: Bool?         // 選中的影展已經結束
     var note: String        // 「進行中」或「幾月幾日開始」
     var id: String
     var name: String

@@ -80,16 +80,18 @@ async function movieBoard(slug: string, dates: string[], cities: string[], forma
   return { title: base.title, rating: base.rating, runtime: base.runtime, release: base.release || "", total: base.cinemas.length, dates: allDates, selDates, cities: allCities, formats: available, rows };
 }
 /** 影展分類要的資料：有哪些影展、選中的那一個、可選的日期、那一天的片單 */
-async function festivalBoard(festId: string, date: string) {
-  const list = await core.loadFestivals();
+async function festivalBoard(festId: string, date: string, year = 0) {
+  const list = await core.loadFestivals(year || undefined);
+  const years = core.festivalYears();
   const f = list.find((x) => x.id === festId) || list[0];
-  if (!f) return { festivals: [], note: "", id: "", name: "", range: "", footer: "", dates: [], date: "", day: [] };
+  if (!f) return { festivals: [], groups: [], years, year: 0, note: "", id: "", name: "", range: "", footer: "", dates: [], date: "", day: [] };
   const dates = core.festivalDates(f);
   const d = dates.indexOf(date) >= 0 ? date : core.festivalDefaultDate(f);
-  const md = (x: string) => `${Number(x.slice(5, 7))}/${Number(x.slice(8, 10))}`;
+  const item = (x: core.Festival) => ({ id: x.id, name: `${x.name}（${core.festivalChipNote(x)}）` });
   return {
-    festivals: list.map((x) => ({ id: x.id, name: `${x.name}（${core.festivalStateLabel(x)}）` })), note: core.festivalNote(list),
-    id: f.id, name: f.name, range: `${md(f.start)}–${md(f.end)}｜${core.festivalStateLabel(f)}`,
+    festivals: list.map(item), groups: core.festivalGroups(list).map((g) => ({ title: g.title, past: g.past, items: g.items.map(item) })),
+    years, year: Number(list[0].end.slice(0, 4)), note: core.festivalNote(list),
+    id: f.id, name: f.name, range: core.festivalStatusLine(f), past: core.festivalState(f) === "past",
     footer: core.festivalFooter(f),
     dates, date: d,
     day: core.festivalDay(f, d).map(({ film, sessions }) => ({ film, count: sessions.length, lines: core.festivalLines(film, sessions) })),
@@ -97,8 +99,7 @@ async function festivalBoard(festId: string, date: string) {
 }
 /** 影展的一部片：還沒演的所有場次（附對應的影城，確認頁和導航用） */
 async function festivalFilm(festId: string, filmId: string) {
-  const [list, cinemas] = await Promise.all([core.loadFestivals(), core.loadCinemas().catch(() => [])]);
-  const f = list.find((x) => x.id === festId);
+  const [f, cinemas] = await Promise.all([core.festivalFind(festId), core.loadCinemas().catch(() => [])]);
   if (!f) return null;
   const film = f.films.find((x) => x.id === filmId);
   if (!film) return null;
