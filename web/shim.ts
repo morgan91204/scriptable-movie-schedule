@@ -37,7 +37,7 @@ function storeSet(key: string, value: string) {
 }
 
 /** 這些網址本身允許跨網域，直接抓；其他經過自己的 Worker 轉發 */
-const DIRECT = /^https:\/\/(raw\.githubusercontent\.com|movie-ratings\.morgan91204\.workers\.dev)\//;
+const DIRECT = /^https:\/\/(raw\.githubusercontent\.com|movie-ratings\.[\w-]+\.workers\.dev)\//; // 評分伺服器（子網域換過，不寫死）
 
 export const webPlatform: Platform = {
   async fetchText(url, headers, opts) {
