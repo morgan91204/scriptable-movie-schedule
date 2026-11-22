@@ -202,6 +202,38 @@ async function kaohsiungFilmFestival() {
   return { id: `kff-${got[0].slice(0, 4)}`, name: "高雄電影節", start: got[0], end: got[got.length - 1], site: KFF, source: "高雄電影節官網", ticketing: "OPENTIX", films: Object.values(films), sessions };
 }
 
+const SOUTH = "https://festival.south.org.tw/";
+
+/** 南方影展的場次頁：整份場次表直接寫在頁面的程式裡（schedules=[…]）→ 影片與場次。
+ *  一場可能是一部長片，也可能是一個短片單元（films 列出單元裡的片） */
+export function parseSouthPage(html, url = SOUTH) {
+  const films = {};
+  const sessions = [];
+  const m = String(html).match(/schedules\s*=\s*(\[\s*\{[\s\S]*?\}\s*,?\s*\])\s*;/);
+  let rows = [];
+  try { rows = JSON.parse(m[1].replace(/,(\s*[\]}])/g, "$1")); } catch (_) {}
+  const venue = clean((String(html).match(/([\u4e00-\u9fff]{2,12}(?:影城|戲院|電影館))場次表/) || [])[1] || "");
+  const buy = (String(html).match(/<a[^>]+href="(https:\/\/[^"]+)"[^>]*>(?:\s*<[^>]+>)*\s*買票點選這裡/) || [])[1] || "";
+  for (const x of Array.isArray(rows) ? rows : []) {
+    const title = clean(x && x.title);
+    if (!title || !/^\d{4}-\d{2}-\d{2}$/.test(x.date || "") || !/^\d{1,2}:\d{2}$/.test(x.time || "")) continue;
+    films[title] ||= { id: title, title, mins: Number(x.duration) || 0, rating: "", url };
+    sessions.push({ film: title, date: x.date, time: x.time.padStart(5, "0"), venue, room: clean(x.space), ticket: buy });
+  }
+  return { films, sessions };
+}
+/** 讀南方影展的場次：從官網首頁找今年的場次頁（網址每年帶年份），沒有或格式變了回傳 null */
+async function southFilmFestival() {
+  const home = await get(SOUTH);
+  const year = todayTPE().slice(0, 4);
+  const url = (home.match(new RegExp(`href="(https://festival\\.south\\.org\\.tw/[^"#?]*schedule${year}/?)"`)) || [])[1];
+  if (!url) return null;
+  const { films, sessions } = parseSouthPage(await get(url), url);
+  if (!sessions.length) return null;
+  const got = sessions.map((x) => x.date).sort();
+  return { id: `stff-${got[0].slice(0, 4)}`, name: "南方影展", start: got[0], end: got[got.length - 1], site: url, source: "南方影展官網", films: Object.values(films), sessions };
+}
+
 if (import.meta.url === `file://${process.argv[1]}`) {
   const [outPath = "festival.json", prevPath = ""] = process.argv.slice(2);
   let prev = [];
@@ -209,7 +241,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     prev = JSON.parse(fs.readFileSync(prevPath, "utf8")).festivals || [];
   } catch (_) {}
   const got = [];
-  for (const [label, job] of [["金馬影展官網", goldenHorse], ["台北電影節官網", taipeiFilmFestival], ["高雄電影節官網", kaohsiungFilmFestival]]) {
+  for (const [label, job] of [["金馬影展官網", goldenHorse], ["台北電影節官網", taipeiFilmFestival], ["高雄電影節官網", kaohsiungFilmFestival], ["南方影展官網", southFilmFestival]]) {
     try {
       const f = await job();
       if (f) { got.push(f); console.log(`${label}：${f.name} ${f.start}～${f.end}，${f.films.length} 部、${f.sessions.length} 場`); }
