@@ -1,15 +1,16 @@
 # 電影行程網頁版。部署：在這個資料夾執行 npx wrangler deploy（先在 repo 根目錄跑 ./build.sh 產生 public/app.js）
-name = "movie-web"
+name = "app"
 main = "worker.js"
 compatibility_date = "2025-09-01"
 workers_dev = true
 
-[assets]
-directory = "./public"
-binding = "ASSETS"
-
-# App 本體與「關於」「隱私權政策」兩頁（pages/）當成文字打包進 Worker（見 worker.js）；public/.assetsignore 讓它不走靜態檔上傳
+# 所有檔案都打包進 Worker（見 worker.js），不走靜態檔上傳：每次發佈只要上傳這支 Worker
 [[rules]]
 type = "Text"
-globs = ["**/*.js.txt", "**/*.html.txt"]
+globs = ["**/*.js.txt", "**/*.html.txt", "**/*.html", "**/*.webmanifest"]
+fallthrough = true
+
+[[rules]]
+type = "Data"
+globs = ["**/*.png"]
 fallthrough = true

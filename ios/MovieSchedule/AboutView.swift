@@ -21,7 +21,7 @@ enum ExternalScores {
 }
 
 /// 網頁版的網址：「關於」與隱私權政策放在這裡（跟共用資料層的 SITE_URL 一致）
-let siteURL = "https://movie-web.twmovietime.workers.dev"
+let siteURL = "https://app.twmovietime.workers.dev"
 let privacyURL = URL(string: siteURL + "/privacy/")!
 let aboutURL = URL(string: siteURL + "/about/")!
 

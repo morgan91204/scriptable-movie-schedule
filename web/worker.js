@@ -1,4 +1,4 @@
-// 電影行程網頁版：靜態網頁（public/）＋ 抓時刻表用的轉發
+// 電影行程網頁版：靜態網頁（public/、pages/，全部打包在這支 Worker 裡）＋ 抓時刻表用的轉發
 // 瀏覽器不能直接讀其他網站（跨網域限制），所以由這裡代抓，只允許電影相關網站、只允許 GET。
 const ALLOW = [
   "twshowtimes.com", "atmovies.com.tw", "eslite.com", "spot.org.tw", "spot-hs.org.tw", "luxcinema.com.tw",
@@ -16,6 +16,20 @@ import APP_JS from "./public/app.js.txt";
 import ABOUT_HTML from "./pages/about.html.txt";
 import PRIVACY_HTML from "./pages/privacy.html.txt";
 const PAGES = { "/about": ABOUT_HTML, "/privacy": PRIVACY_HTML };
+// 首頁、圖示、manifest 也打包進來，整個網站就是這一支 Worker
+import INDEX_HTML from "./public/index.html";
+import MANIFEST from "./public/manifest.webmanifest";
+import ICON_180 from "./public/icon-180.png";
+import ICON_192 from "./public/icon-192.png";
+import ICON_512 from "./public/icon-512.png";
+const FILES = {
+  "/": [INDEX_HTML, "text/html; charset=utf-8", "no-cache"],
+  "/index.html": [INDEX_HTML, "text/html; charset=utf-8", "no-cache"],
+  "/manifest.webmanifest": [MANIFEST, "application/manifest+json; charset=utf-8", "public, max-age=3600"],
+  "/icon-180.png": [ICON_180, "image/png", "public, max-age=86400"],
+  "/icon-192.png": [ICON_192, "image/png", "public, max-age=86400"],
+  "/icon-512.png": [ICON_512, "image/png", "public, max-age=86400"],
+};
 
 export default {
   async fetch(req, env, ctx) {
@@ -26,7 +40,9 @@ export default {
     }
     const page = PAGES[url.pathname.replace(/\/+$/, "")];
     if (page && req.method === "GET") return new Response(page, { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "public, max-age=600" } });
-    return env.ASSETS.fetch(req);
+    const f = FILES[url.pathname];
+    if (f) return new Response(f[0], { headers: { "content-type": f[1], "cache-control": f[2] } });
+    return new Response("找不到這個頁面", { status: 404, headers: { "content-type": "text/plain; charset=utf-8" } });
   },
 };
 

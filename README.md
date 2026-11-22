@@ -28,9 +28,9 @@
 
 ## 網頁版（不用裝 App）
 
-網址：**https://movie-web.twmovietime.workers.dev**
+網址：**https://app.twmovietime.workers.dev**
 
-[關於與資料來源](https://movie-web.twmovietime.workers.dev/about/)｜[隱私權政策](https://movie-web.twmovietime.workers.dev/privacy/)
+[關於與資料來源](https://app.twmovietime.workers.dev/about/)｜[隱私權政策](https://app.twmovietime.workers.dev/privacy/)
 
 用任何瀏覽器打開就能用，Android、電腦也可以；iPhone 用 Safari 打開後按「分享 → 加入主畫面」，就會像 App 一樣全螢幕開啟。
 

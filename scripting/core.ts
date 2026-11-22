@@ -1823,7 +1823,7 @@ export function ratingTier(kind: "imdb" | "pct", v: number): "good" | "mid" | "b
 // 片名鍵用去掉裝飾字、重映字樣後的片名，所以兩個 App、同一部片的不同場次條目都算在一起。
 
 /** 網頁版的網址（「關於」與隱私權政策也放在這裡） */
-export const SITE_URL = "https://movie-web.twmovietime.workers.dev";
+export const SITE_URL = "https://app.twmovietime.workers.dev";
 export const ABOUT_URL = SITE_URL + "/about/";
 export const PRIVACY_URL = SITE_URL + "/privacy/";
 export const COMMUNITY_API = "https://movie-ratings.twmovietime.workers.dev";

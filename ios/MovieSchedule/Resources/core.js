@@ -2086,7 +2086,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     const x = kind === "imdb" ? v * 10 : v;
     return x >= 75 ? "good" : x >= 60 ? "mid" : "bad";
   }
-  var SITE_URL = "https://movie-web.twmovietime.workers.dev";
+  var SITE_URL = "https://app.twmovietime.workers.dev";
   var ABOUT_URL = SITE_URL + "/about/";
   var PRIVACY_URL = SITE_URL + "/privacy/";
   var COMMUNITY_API = "https://movie-ratings.twmovietime.workers.dev";
