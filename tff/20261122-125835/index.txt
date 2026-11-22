@@ -1,0 +1,4 @@
+01.html 200 379675 https://www.taipeiff.taipei/tw/movies/schedule
+02.html 200 317425 https://www.taipeiff.taipei/tw/movies/list
+03.html 200 272206 https://www.taipeiff.taipei/tw/ticket/info
+04.html 200 20972 https://www.taipeiff.taipei/assets/front/js/main.js

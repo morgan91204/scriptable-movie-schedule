@@ -1,0 +1,677 @@
+//----------------------------
+// Catalog 目錄 :
+//----------------------------
+// - ESM import
+// - init
+// - load
+// - resize
+// - init + resize [x]
+// - 判斷瀏覽器
+// - 判斷裝置
+// - 檢查是否有其他 modal 開著
+// - 設定手機版瀏覽器視窗高 100vh (不含下方工具列)
+// - window scroll event [x]
+// - img 顯示 data-default 預設圖 [x]
+// ----------------------------
+
+//----------------------------
+// import
+//----------------------------
+import base from "./base/base.js?v=2";
+
+// helpers ---------------------------
+// 頁面滾動 fade in 動態
+import "./helpers/scrollFade.js?v=2";
+
+// pointer
+import "./helpers/pointer.js?v=2";
+
+// plugins - locomotive
+// import './helpers/locomotiveScroll.js';
+
+// components ------------------------
+// plugins - OverlayScrollbars
+import "./components/scrollbar.js?v=2";
+
+// plugins - jQuery-selectric
+import "./components/select.js";
+
+// 加減計算
+import "./components/countBtn.js?v=2";
+
+// 表單元件狀態
+import "./components/form.js?v=2";
+
+// 點擊滑動至頁面最上方
+import "./components/gotop.js?v=2";
+
+// layout ----------------------------
+// nav
+import "./layout/nav.js?v=2";
+
+//----------------------------
+// init
+//----------------------------
+const originalAddEventListener = EventTarget.prototype.addEventListener;
+const originalRemoveEventListener = EventTarget.prototype.removeEventListener;
+const eventListenersMap = new WeakMap();
+
+EventTarget.prototype.addEventListenerOnParent = function (
+  eventName,
+  selector,
+  handler,
+  options
+) {
+  if (typeof selector === "string") {
+    const newHandler = function (event) {
+      // console.log('trigger event on  parent:', eventName, selector, handler, options);
+      if (event.target.matches(selector) || event.target.closest(selector)) {
+        if (handler) handler.call(event.target, event);
+      }
+    };
+    originalAddEventListener.call(this, eventName, newHandler, options);
+
+    if (!eventListenersMap.has(this)) {
+      eventListenersMap.set(this, {});
+    }
+    if (!eventListenersMap.get(this)[eventName]) {
+      eventListenersMap.get(this)[eventName] = new Map();
+    }
+    eventListenersMap.get(this)[eventName].set(handler, newHandler);
+  } else if (typeof selector === "function") {
+    originalAddEventListener.call(this, eventName, selector, options);
+  } else {
+    throw new Error("Invalid arguments for EventTarget.addEventListener");
+  }
+};
+
+EventTarget.prototype.removeEventListenerOnParent = function (
+  eventName,
+  handler,
+  options
+) {
+  if (
+    eventListenersMap.has(this) &&
+    eventListenersMap.get(this)[eventName] &&
+    eventListenersMap.get(this)[eventName].has(handler)
+  ) {
+    const newHandler = eventListenersMap.get(this)[eventName].get(handler);
+    originalRemoveEventListener.call(this, eventName, newHandler, options);
+    eventListenersMap.get(this)[eventName].delete(handler);
+  } else {
+    originalRemoveEventListener.call(this, eventName, handler, options);
+  }
+};
+
+(function () {
+  checkBrowser();
+  handleCssVh();
+  checkModalOpen();
+  setTabListShow();
+  setLang();
+  bindCustomEventTrigger();
+  initNavBarVisibility();
+})();
+
+//----------------------------
+// load
+//----------------------------
+window.addEventListener("load", function () {
+  // 引入 plugin
+  // gsap.registerPlugin(ScrollTrigger,ScrollToPlugin);
+
+  // AOS.init({
+  //     duration: 1000,
+  //     delay: 100,
+  //     once: true,
+  // });
+
+  const loading = document.querySelector(".l-loading");
+  loading.classList.add("is-hidden");
+  base._body.classList.remove("is-hidden");
+
+  checkDevice();
+  // checkImgSrc();
+
+  let btnTypeEnum = new Map([
+    ['active', function(target, classname = '-active-'){
+        // console.log(target.dataset.btnGroup);
+        if(target.dataset.btnGroup){
+          let group = document.querySelectorAll(`[data-btn-group="${target.dataset.btnGroup}"]`);
+          group.forEach(function(item){
+            document.querySelectorAll(item.dataset.btnTarget).forEach(function(target){
+              target.classList.remove(classname);
+            });
+          });
+        }
+        target.classList.add(classname);
+    }], 
+    ['toggle', function(target, classname = '-active-'){
+        target.classList.toggle(classname);
+    }], 
+    ['inactive', function(target, classname = '-active-'){
+        target.classList.remove(classname);
+    }],
+    ['out-click', function(target, classname = '-active-'){
+        target.classList.add(classname);
+  
+        function removeClass(event){
+          if( !target.contains(event.target) ){
+            target.classList.remove(classname);
+            document.removeEventListener('click', removeClass);
+          }
+        }
+  
+        document.addEventListener('click', removeClass);
+    }],
+    ['out-toggle', function(target, classname = '-active-'){
+      target.classList.toggle(classname);
+  
+      function removeClass(event){
+        if( !target.contains(event.target) ){
+          target.classList.remove(classname);
+          document.removeEventListener('click', removeClass);
+        }
+      }
+  
+      if( target.classList.contains(classname) ){
+        document.addEventListener('click', removeClass);
+      }else{
+        document.removeEventListener('click', removeClass);
+      }
+    }],
+  ]);
+
+  // 按鈕開關
+  this.document.addEventListenerOnParent('click', '[data-btn-target]', function (event) {
+    // 委派掛在 document 上，子層無法用 stopPropagation 攔下，只能在這裡自行略過
+    if (event.target.closest('.js-stop-propagation')) return;
+
+    let btn = event.target;
+    if (!btn.hasAttribute('data-btn')) {
+      btn = btn.closest('[data-btn]');
+    }
+
+    if (!btnTypeEnum.has(btn.getAttribute('data-btn'))) {
+      console.warn('the element', btn, 'has a wrong data-btn type.');
+      console.warn('data-btn type error, replace with "inactive".');
+    }
+    let type = btnTypeEnum.has(btn.getAttribute('data-btn')) ? btn.getAttribute('data-btn') : 'inactive';
+    let classnames = (btn.getAttribute('data-btn-classname') || '-active-').split(/\s+/).filter(Boolean);
+    let targetSelector = btn.getAttribute('data-btn-target');
+    let targetList = getTargetElements(btn, targetSelector);
+    let fn = btnTypeEnum.get(type);
+
+    targetList.forEach(function(target) {
+      classnames.forEach(function(classname) {
+        fn(target, classname);
+      });
+    });
+  });
+});
+
+function getTargetElements(btn, selector) {
+  if (selector === '[self]') {
+    return [btn];
+  } else if (selector === '[parent]') {
+    return [btn.parentElement];
+  } else if (selector.startsWith('[closest:')) {
+    let closestSelector = selector.match(/\[closest:(.+?)\]/)[1];
+    let closestElement = btn.closest(closestSelector);
+    return closestElement ? [closestElement] : [];
+  } else if (selector === '[child]') {
+    return Array.from(btn.children);
+  } else if (selector.startsWith('[child-has:')) {
+    let childSelector = selector.match(/\[child-has:(.+?)\]/)[1];
+    return Array.from(btn.querySelectorAll(':scope > ' + childSelector));
+  } else {
+    return document.querySelectorAll(selector);
+  }
+}
+
+//----------------------------
+// resize
+//----------------------------
+let resizeTimer = "";
+window.addEventListener("resize", function () {
+  if (window.innerWidth !== base._winW) {
+    base._winW = window.innerWidth;
+  }
+  // 更新 100vh
+  handleCssVh();
+});
+
+//----------------------------
+// init + resize
+//----------------------------
+// new ResizeObserver(function() {
+
+// }).observe(base.base._body);
+
+//----------------------------
+// 語系塞入
+//----------------------------
+function setLang() {
+  let lang = "zh-Hant-TW";
+  if (_pageLang && _pageLang == "en") {
+    lang = "en";
+  }
+  document.documentElement.lang = lang;
+}
+
+//----------------------------
+// 判斷瀏覽器
+//----------------------------
+function checkBrowser() {
+  const usrAgent = navigator.userAgent.toLowerCase();
+  let usrBrowser = "";
+
+  if (usrAgent.includes("firefox")) {
+    usrBrowser = "firefox";
+  } else if (usrAgent.includes("opera")) {
+    usrBrowser = "opera";
+  } else if (usrAgent.includes("trident")) {
+    if (usrAgent.includes("msie")) {
+      usrBrowser = "ie";
+    } else {
+      usrBrowser = "ie11";
+    }
+  } else if (usrAgent.includes("edge")) {
+    usrBrowser = "edge";
+  } else if (usrAgent.includes("chrome")) {
+    usrBrowser = "chrome";
+  } else if (usrAgent.includes("safari")) {
+    usrBrowser = "safari";
+  } else {
+    usrBrowser = "unknown";
+  }
+
+  base._body.classList.add(usrBrowser);
+}
+
+//----------------------------
+// 判斷裝置
+//----------------------------
+function checkDevice() {
+  const usrAgent = navigator.userAgent;
+  const isTouchDevice = "ontouchstart" in document.documentElement;
+
+  if (isTouchDevice) {
+    // 是觸控裝置
+    base._body.classList.add("is-touch");
+
+    // 判斷手機系統是 Android 還是 IOS
+    if (usrAgent.match(/(iphone|ipad|ipod);?/i)) {
+      // 是 IOS
+    } else if (usrAgent.match(/android/i)) {
+      // 是 Android
+    } else {
+      // 其他、電腦的瀏覽器
+    }
+  } else {
+    // 不是觸控裝置
+    base._body.classList.add("not-touch");
+  }
+
+  // 使用 matchMedia 方法檢測是否支援 hover 狀態
+  // if (window.matchMedia('(hover: none)').matches) {
+  //   // 不支援 hover 狀態
+  // } else {
+  //   // 支援 hover 狀態
+  // }
+}
+
+//----------------------------
+// 檢查是否有其他 modal 開著
+//----------------------------
+function checkModalOpen() {
+  const modals = document.querySelectorAll(".modal");
+  modals.forEach((el) => {
+    // 關閉 modal
+    el.addEventListener("hidden.bs.modal", function (e) {
+      let isModalOpen = el.classList.contains("show");
+
+      if (isModalOpen) {
+        // 有 modal 開著
+        base._body.classList.add("modal-open");
+      }
+    });
+  });
+}
+
+//----------------------------
+// 設定手機版瀏覽器視窗高 100vh (不含下方工具列)
+//----------------------------
+function handleCssVh() {
+  const vh = window.innerHeight * 0.01;
+  document.documentElement.style.setProperty("--vh", `${vh}px`);
+}
+
+//----------------------------
+// window scroll event
+//----------------------------
+let prevScrollY = 0,
+  delta = 5,
+  scrollDirection = null, // 記錄當前滾動方向: 'down' | 'up' | null
+  scrollTimer = null,
+  isChangingDirection = false; // 標記是否正在方向改變的冷卻期
+
+function handleScroll() {
+  let scrollY = window.scrollY;
+  const nav = document.querySelector('.l-nav');
+  const page = document.querySelector('[data-page]');
+
+  if (Math.abs(prevScrollY - scrollY) >= delta) {
+    let newDirection = scrollY > prevScrollY ? 'down' : 'up';
+    
+    // 檢查滾動方向是否改變，且不在冷卻期間
+    if (scrollDirection !== newDirection && !isChangingDirection) {
+      // 設定冷卻期標記
+      isChangingDirection = true;
+      
+      // 清除之前的計時器
+      if (scrollTimer) {
+        clearTimeout(scrollTimer);
+      }
+      
+      // 立即執行 class 切換
+      if (newDirection === 'down') {
+        // 往下滾動
+        if (nav) nav.classList.remove('-show-nav-bar-');
+        if (page) page.classList.remove('-show-nav-bar-');
+      } else {
+        // 往上滾動
+        if (nav) nav.classList.add('-show-nav-bar-');
+        if (page) page.classList.add('-show-nav-bar-');
+      }
+      
+      scrollDirection = newDirection;
+      
+      // 0.5 秒後解除冷卻期
+      scrollTimer = setTimeout(() => {
+        isChangingDirection = false;
+      }, 500);
+    }
+    
+    // 持續更新滾動位置
+    prevScrollY = scrollY;
+  }
+}
+
+window.addEventListener('scroll', handleScroll);
+
+initNavBarVisibility();
+
+//----------------------------
+// 初始化導航欄顯示狀態
+//----------------------------
+function initNavBarVisibility() {
+  const nav = document.querySelector('.l-nav');
+  const page = document.querySelector('[data-page]');
+  
+  if (nav) nav.classList.add('-show-nav-bar-');
+  if (page) page.classList.add('-show-nav-bar-');
+}
+
+//----------------------------
+// img 顯示 data-default 預設圖
+//----------------------------
+// function checkImgSrc() {
+//   const fieldImgs = document.querySelectorAll('img[data-default]');
+
+//   fieldImgs.forEach((el) => {
+//     el.addEventListener('error', setDefaultImg(el));
+//   });
+// }
+
+// function setDefaultImg(el) {
+//   let defaultSrc = el.dataset.default;
+//   el.src = defaultSrc;
+
+//   // 如果有使用 lazysizes
+//   if (el.classList.contains('lazyloaded')) {
+//     el.dataset.src = defaultSrc;
+//   }
+// }
+
+//----------------------------
+// js-badge 數量綁定
+//----------------------------
+let badgeList = document.querySelectorAll(".js-badge");
+badgeList.forEach((el) => {
+  el.style.setProperty("--num", el.dataset.number);
+  el.querySelector(".js-badge-text").textContent = el.dataset.number;
+});
+
+//----------------------------
+// fullscreen nav 開關事件
+//----------------------------
+let isAlreadyOpen = false;
+
+let fixedNav = document.querySelector(".l-nav");
+let fullscreenNav = document.querySelector(".site-nav.-full-screen-");
+let FStoggleBtn = document.querySelectorAll(".site-nav_toggle-btn");
+FStoggleBtn.forEach((el) => {
+  el.addEventListener("click", (ev) => {
+    if (fullscreenNav.classList.contains("-active-")) {
+      fullscreenNav.classList.remove("-active-");
+      fixedNav.classList.remove("-black-bg-");
+      if (!isAlreadyOpen) {
+        base._body.classList.remove("-lock-scroll-");
+      }
+    } else {
+      if (base._body.classList.contains("-lock-scroll-")) {
+        isAlreadyOpen = true;
+      } else {
+        isAlreadyOpen = false;
+      }
+
+      fullscreenNav.classList.add("-active-");
+      fixedNav.classList.add("-black-bg-");
+      base._body.classList.add("-lock-scroll-");
+    }
+  });
+});
+fixedNav?.querySelector(".l-nav__bg")?.addEventListener("click", () => {
+  fixedNav.classList.remove("-black-bg-");
+  fullscreenNav.classList.remove("-active-");
+  base._body.classList.remove("-lock-scroll-");
+});
+
+//----------------------------
+// footer marquee
+//----------------------------
+const MARQUEE_VELOCITY = 50; // (px/s)
+const MARQUEE_GAP = 24; // 需與 Swiper 的 spaceBetween 一致
+
+// 連續捲動靠 autoplay delay:0 逐格續接，搭配 sass 中
+// .swiper-marquee .swiper-wrapper 的 transition-timing-function: linear。
+// speed 代表「捲過一張 slide」的毫秒數，由設計速度換算而來。
+function measureMarquee() {
+  const slides = document.querySelectorAll(".swiper-marquee .swiper-slide");
+  let totalWidth = 0;
+  slides.forEach((slide) => {
+    totalWidth = totalWidth + slide.clientWidth + MARQUEE_GAP;
+  });
+
+  const count = slides.length;
+  const perSlideWidth = count > 0 ? totalWidth / count : 0;
+
+  return {
+    count,
+    perSlideSpeed: Math.max(
+      1,
+      Math.round((perSlideWidth / MARQUEE_VELOCITY) * 1000)
+    ),
+  };
+}
+
+// 贊助商筆數由後台決定，常常填不滿一個畫面寬；Swiper 的 loop 需要足夠的
+// slide 才能無縫接續（不足時只會前進一格就停住並印出 Loop Warning）。
+// 因此內容超出容器時先把整組 slide 複製到足夠寬度，再交給 loop。
+// 回傳值同時代表「這次要不要捲動」：內容塞得下就靜態呈現。
+function getMarqueeTrackWidth(wrapper) {
+  return Array.prototype.reduce.call(
+    wrapper.children,
+    (sum, slide) => sum + slide.clientWidth + MARQUEE_GAP,
+    0
+  );
+}
+
+function shouldRunMarquee(el) {
+  const wrapper = el.querySelector(".swiper-wrapper");
+  if (!wrapper || wrapper.children.length === 0) return false;
+
+  const containerWidth = el.clientWidth || window.innerWidth;
+  return getMarqueeTrackWidth(wrapper) > containerWidth;
+}
+
+function fillMarqueeTrack(el) {
+  const wrapper = el.querySelector(".swiper-wrapper");
+  if (!wrapper) return false;
+
+  const originals = Array.prototype.slice.call(wrapper.children);
+  if (originals.length === 0) return false;
+
+  const containerWidth = el.clientWidth || window.innerWidth;
+  if (!shouldRunMarquee(el)) return false;
+
+  let safety = 0;
+  while (
+    getMarqueeTrackWidth(wrapper) < containerWidth * 3 &&
+    safety < 12
+  ) {
+    originals.forEach((slide) => wrapper.appendChild(slide.cloneNode(true)));
+    safety++;
+  }
+
+  return true;
+}
+
+if (
+  document.querySelector(".swiper.swiper-marquee") &&
+  document.querySelectorAll(".swiper-marquee .swiper-slide").length > 0
+) {
+  const marqueeEl = document.querySelector(".swiper.swiper-marquee");
+  let marqueeLoop = fillMarqueeTrack(marqueeEl);
+  let marquee = measureMarquee();
+
+  const createMarqueeSwiper = () =>
+    new Swiper(marqueeEl, {
+      slidesPerView: "auto",
+      spaceBetween: MARQUEE_GAP,
+      speed: marquee.perSlideSpeed,
+      loop: marqueeLoop,
+      loopAdditionalSlides: 3,
+      allowTouchMove: true,
+      autoplay: marqueeLoop
+        ? {
+            delay: 0,
+            disableOnInteraction: false,
+            pauseOnMouseEnter: true,
+          }
+        : false,
+    });
+
+  let marqueeSwiper = createMarqueeSwiper();
+
+  // 贊助商 logo 走 lazysizes 延遲載入，首次量測拿到的是 CSS min-width 下限，
+  // 圖片載入後由首頁呼叫此函式重新判斷是否需捲動，並校正捲動速度。
+  window.restartFooterMarquee = function () {
+    if (!marqueeLoop && shouldRunMarquee(marqueeEl)) {
+      marqueeSwiper.destroy(true, true);
+      marqueeLoop = fillMarqueeTrack(marqueeEl);
+      marquee = measureMarquee();
+      marqueeSwiper = createMarqueeSwiper();
+      return;
+    }
+
+    marquee = measureMarquee();
+    marqueeSwiper.params.speed = marquee.perSlideSpeed;
+    marqueeSwiper.update();
+
+    if (marqueeLoop && !marqueeSwiper.autoplay.running) {
+      marqueeSwiper.autoplay.start();
+    }
+  };
+}
+
+// 試呼叫彈窗
+// templateModal( 'medium', {
+//   title: '這是測試的 title',
+//   text: '測試的文案測試的文案測試的文案測試的文案測試的文案測試的文案',
+//   buttonList: [
+//     {
+//       type: 'link',
+//       url: './index.php',
+//       icon: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
+//         <circle class="custom-icon_circle-triangle-right_circle" cx="12" cy="12" r="8.59091" stroke="#231815" stroke-width="0.818182"/>
+//         <path   class="custom-icon_circle-triangle-right_triangle" d="M8.71587 11.3674L13.7277 8.45266C14.1781 8.19072 14.7273 8.5383 14.7273 9.0853V14.9147C14.7273 15.4617 14.1781 15.8093 13.7277 15.5474L8.71587 12.6327C8.24621 12.3595 8.24621 11.6405 8.71587 11.3674Z" fill="#231815"/>
+//       </svg>`,
+//       text: '點此前往首頁'
+//     },
+//     {
+//       type: 'button,cancel,noBorder',
+//       icon: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
+//         <circle class="custom-icon_circle-triangle-right_circle" cx="12" cy="12" r="8.59091" stroke="#231815" stroke-width="0.818182"/>
+//         <path   class="custom-icon_circle-triangle-right_triangle" d="M8.71587 11.3674L13.7277 8.45266C14.1781 8.19072 14.7273 8.5383 14.7273 9.0853V14.9147C14.7273 15.4617 14.1781 15.8093 13.7277 15.5474L8.71587 12.6327C8.24621 12.3595 8.24621 11.6405 8.71587 11.3674Z" fill="#231815"/>
+//       </svg>`,
+//       text: '確認'
+//     }
+//   ]
+// })
+
+//----------------------------
+// l-page 滾動顯示選單(電腦版)
+//----------------------------
+function setTabListShow() {
+  const tabListPos = document.querySelector(".js-show-tablist");
+  if (!tabListPos) return;
+  const tabListFixed = document.querySelector(".m-page-tablist.-fixed-");
+
+  // 滾動顯示選單(電腦版)
+  function scrollPage() {
+    const scrollY = window.scrollY;
+    const tabListPosBottom =
+      tabListPos.offsetHeight + tabListPos.offsetTop - base._navH;
+
+    if (!tabListFixed) return;
+
+    if (scrollY >= tabListPosBottom) {
+      tabListFixed.classList.add("is-show");
+    } else {
+      tabListFixed.classList.remove("is-show");
+    }
+  }
+  window.addEventListener("scroll", scrollPage);
+}
+
+//----------------------------
+// 下拉選單文字內推
+//----------------------------
+function addSelectLabelPadding() {
+  const selectList = document.querySelectorAll("[form-state] .c-select");
+  selectList.forEach((el) => {
+    el.closest("[form-state]").classList.add("-has-select-");
+  });
+}
+addSelectLabelPadding();
+
+function bindCustomEventTrigger(){
+  $('body').on('click', '[data-trigger-event]', function(event){
+    let target = event.target;
+    if( !target.hasAttribute('data-trigger-event') ){
+      target = target.closest('[data-trigger-event]');
+    }
+
+    let eventNameGroup = String(target.getAttribute('data-trigger-event')).split('|');
+    let detailAttr = target.getAttribute('data-trigger-event-detail') || {};
+    eventNameGroup.forEach(function(eventName){
+      let customEvent = new CustomEvent(eventName, { detail: detailAttr, bubbles: true, cancelable: true });
+      
+      if(eventName.trim() === '') return;
+      target.dispatchEvent(customEvent);
+
+    });
+  });
+}
