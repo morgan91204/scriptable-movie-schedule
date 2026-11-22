@@ -164,7 +164,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   // 只留「今年」的影展（結束日在今年），跨年後舊的自動清掉
   const year = todayTPE().slice(0, 4);
   const byId = new Map();
-  for (const f of prev) if (f && f.id && Array.isArray(f.sessions)) byId.set(f.id, f);
+  for (const f of prev) if (f && /-\d{4}$/.test(f.id || "") && Array.isArray(f.sessions)) byId.set(f.id, f); // 代碼要帶年份（舊格式的不留）
   for (const f of got) {
     const old = byId.get(f.id);
     // 這次讀到的場次比上次少很多（官網正在改、只讀到一部分）：不要蓋掉比較完整的舊資料
