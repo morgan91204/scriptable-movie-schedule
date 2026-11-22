@@ -1,0 +1,4 @@
+場次頁 200 373523 預設日 2026-06-26 最後一天 2026-07-07 表單代碼 有
+2026-06-26 json 200 92753 {"status":"success","msg":[{"aid":"845","group":"a04d39477b84","area":"41468139ECf7","startdate":"2026-06-26","starttime":"19:00","offtime":
+2026-06-27 json 200 217781 {"status":"success","msg":[{"aid":"537","group":"FD45e3c29142","area":"41468139ECf7","startdate":"2026-06-27","starttime":"19:00","offtime":
+2026-07-07 json 200 123298 {"status":"success","msg":[{"aid":"544","group":"dd947BA6633D","area":"1bD98F398391","startdate":"2026-07-07","starttime":"19:00","offtime":
