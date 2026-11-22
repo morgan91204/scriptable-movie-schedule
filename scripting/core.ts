@@ -1590,7 +1590,7 @@ export function festivalStateLabel(f: Festival): string {
 /** 場地的顯示名稱：官網只寫「MUVIE」「台北信義威秀」，補成看得懂的；影廳接在後面 */
 export function festivalPlace(x: { venue: string; room: string }): string {
   const v = /^MUVIE$/i.test(x.venue) ? "MUVIE CINEMAS" : x.venue;
-  const room = /廳$/.test(x.room) || !x.room ? x.room : `${x.room} 廳`;
+  const room = /^[A-Za-z0-9 ]+$/.test(x.room) ? `${x.room} 廳` : x.room; // 只有英數的廳名（TITAN）補上「廳」；「3F放映廳」「2F放映室」原樣
   return [v, room].filter(Boolean).join(" ");
 }
 /** 影展的某一天：每部片一筆，附當天的場次（依第一場的時間排） */

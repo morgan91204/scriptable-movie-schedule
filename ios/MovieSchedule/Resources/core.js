@@ -1954,7 +1954,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   }
   function festivalPlace(x) {
     const v = /^MUVIE$/i.test(x.venue) ? "MUVIE CINEMAS" : x.venue;
-    const room = /廳$/.test(x.room) || !x.room ? x.room : `${x.room} 廳`;
+    const room = /^[A-Za-z0-9 ]+$/.test(x.room) ? `${x.room} 廳` : x.room;
     return [v, room].filter(Boolean).join(" ");
   }
   function festivalDay(f, date) {

@@ -1,6 +1,6 @@
 // 影展場次總表：讀影展官網公開的場次表，整理成 festival.json（data 分支），App 看到裡面有還沒演的場次就顯示「影展」分類。
 // 目前支援金馬影展官網（台北金馬影展、金馬奇幻影展等共用同一套系統）：只讀公開網頁，購票連結原樣帶出、不讀售票網站。
-// 也支援台北電影節官網（不用登入的公開場次頁，資料是網頁自己用的 JSON）。
+// 也支援台北電影節、高雄電影節官網（不用登入的公開場次頁，資料是網頁自己用的 JSON）。
 // 今年已經結束的影展也留著（可以回頭看）：官網還看得到就重讀，換屆看不到了就沿用上一次存的。
 // 用法：node tools/festival.mjs <輸出檔> [上一次的 festival.json]
 //       也可以 import { parseGoldenHorseDay, goldenHorseDates } 單獨測解析
@@ -144,6 +144,64 @@ async function taipeiFilmFestival() {
   return { id: `tff-${dates[0].slice(0, 4)}`, name: "台北電影節", start: dates[0], end: dates[dates.length - 1], site: TFF, source: "台北電影節官網", ticketing: "OPENTIX", films: Object.values(films), sessions };
 }
 
+// ── 高雄電影節 ──
+const KFF = "https://www.kff.tw/schedule";
+/** 場次頁回傳的某一天資料（網頁自己用的 JSON）→ 影片與場次。節目（program）是放映的單位：可能是一部長片，也可能是幾部短片的組合 */
+export function parseKffDay(json) {
+  const films = {};
+  const sessions = [];
+  const days = json && typeof json === "object" ? Object.values(json).flat() : [];
+  for (const day of days) {
+    for (const c of (day && day.cinemas) || []) {
+      for (const a of c.auditoriums || []) {
+        for (const p of a.programs || []) {
+          const b = p.belong_program || {};
+          const id = String(b.id || p.belong || "");
+          if (!id || !p.date || !/^\d{1,2}:\d{2}/.test(p.start_time || "")) continue;
+          const first = Array.isArray(b.film_row) ? b.film_row[0] : null;
+          const img = first && typeof first.share_image === "string" && first.share_image.startsWith("/") ? "https://www.kff.tw" + encodeURI(first.share_image) : "";
+          const lvl = b.rating_level || {};
+          films[id] ||= { id, title: clean(b.title), mins: Number(b.time_length) || 0, rating: clean(lvl.txt) + (lvl.year && lvl.year !== "0" ? lvl.year + "+" : ""), url: KFF, ...(img ? { poster: img } : {}) };
+          sessions.push({ film: id, date: p.date, time: p.start_time.slice(0, 5).padStart(5, "0"), venue: clean(c.title), room: clean(a.title), ticket: /^https:\/\//.test(b.link || "") ? b.link : "" });
+        }
+      }
+    }
+  }
+  return { films, sessions };
+}
+/** 讀整個高雄電影節的場次（官網目前顯示的那一屆）；沒有場次表回傳 null。
+ *  跟一般訪客的瀏覽器一樣：先開公開的場次頁，再用頁面上附的表單代碼逐日要資料，不需要登入 */
+async function kaohsiungFilmFestival() {
+  const home = await get("https://www.kff.tw/");
+  const dates = Array.from(new Set(Array.from(home.matchAll(/<option value="(\d{4}-\d{2}-\d{2})"/g)).map((m) => m[1]))).sort();
+  if (!dates.length) return null;
+  const page = await fetch(KFF, { headers: { "User-Agent": UA, "Accept-Language": "zh-TW,zh;q=0.9" }, signal: AbortSignal.timeout(30000) });
+  if (!page.ok) throw new Error(`${page.status} ${KFF}`);
+  const html = await page.text();
+  const cookie = (page.headers.getSetCookie?.() || []).map((c) => c.split(";")[0]).join("; ");
+  const form = (html.match(/<meta name="csrf-token" content="([^"]+)"/) || [])[1];
+  if (!form) return null;
+  const films = {};
+  const sessions = [];
+  for (const d of dates.slice(0, 40)) {
+    await new Promise((r) => setTimeout(r, 800));
+    try {
+      const r = await fetch("https://www.kff.tw/schedule/ajax", {
+        method: "POST",
+        headers: { "User-Agent": UA, "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8", "X-Requested-With": "XMLHttpRequest", "X-CSRF-TOKEN": form, Accept: "application/json, text/javascript, */*", Referer: KFF, Cookie: cookie },
+        body: new URLSearchParams({ select_cate: "108", datepicker_date: d }).toString(), // 108 = 長短片（另一類是 XR 體驗，不是放映場次）
+        signal: AbortSignal.timeout(30000),
+      });
+      const day = parseKffDay(await r.json());
+      Object.assign(films, { ...day.films, ...films });
+      sessions.push(...day.sessions.filter((x) => x.date === d));
+    } catch (_) {} // 這一天讀不到就略過
+  }
+  if (!sessions.length) return null;
+  const got = sessions.map((x) => x.date).sort();
+  return { id: `kff-${got[0].slice(0, 4)}`, name: "高雄電影節", start: got[0], end: got[got.length - 1], site: KFF, source: "高雄電影節官網", ticketing: "OPENTIX", films: Object.values(films), sessions };
+}
+
 if (import.meta.url === `file://${process.argv[1]}`) {
   const [outPath = "festival.json", prevPath = ""] = process.argv.slice(2);
   let prev = [];
@@ -151,7 +209,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     prev = JSON.parse(fs.readFileSync(prevPath, "utf8")).festivals || [];
   } catch (_) {}
   const got = [];
-  for (const [label, job] of [["金馬影展官網", goldenHorse], ["台北電影節官網", taipeiFilmFestival]]) {
+  for (const [label, job] of [["金馬影展官網", goldenHorse], ["台北電影節官網", taipeiFilmFestival], ["高雄電影節官網", kaohsiungFilmFestival]]) {
     try {
       const f = await job();
       if (f) { got.push(f); console.log(`${label}：${f.name} ${f.start}～${f.end}，${f.films.length} 部、${f.sessions.length} 場`); }
