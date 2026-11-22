@@ -12,7 +12,7 @@ import {
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
   loadSettings, saveSettings, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, TW,
   FORMATS, formatsOf, filterVersions, filterVersionsAny, movieRows, movieDays, nearest, kmLabel, WINDOWS, findShowtimes, findShowtimesMulti, multiLabel, multiDetail, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText,
-  hallOf, tmdbTest, movieExtras, moviePoster, movieRuntime, posterSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxSorts, boxYears, boxYearsPicked, foregroundTask, communityStats, communityCached, communityVote, loadBoxOffice, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, ABOUT_URL, PRIVACY_URL, movieRatings, ratingTier,
+  hallOf, tmdbTest, movieExtras, moviePoster, movieRuntime, posterSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxSorts, boxYears, boxYearsPicked, foregroundTask, communityStats, communityCached, communityVote, loadBoxOffice, loadBoxOfficeFull, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, ABOUT_URL, PRIVACY_URL, movieRatings, ratingTier,
 } from "./core";
 import type { MovieExtras, Ratings, Community, BoxOfficeItem, BoxSort } from "./core";
 import { setTabBar, setBackGuard, esc } from "./jsx";
@@ -798,7 +798,8 @@ class App {
   boxSort: BoxSort = "week"; // 票房排行的排法：本週／累計／年度
   boxYears: string[] = []; // 年度排行選了哪幾年（空 = 最新的一年）
   async boxOfficeView(): Promise<string> {
-    const [b, all] = await Promise.all([loadBoxOffice(), loadMovies().catch(() => [] as TwMovie[])]);
+    // 年度排行的其他年份是另一個檔，切到「年度」才下載
+    const [b, all] = await Promise.all([this.boxSort === "year" ? loadBoxOfficeFull() : loadBoxOffice(), loadMovies().catch(() => [] as TwMovie[])]);
     const k = this.movieQuery.trim().toLowerCase();
     const sorts = boxSorts(b);
     const by: BoxSort = sorts.some((x) => x.id === this.boxSort) ? this.boxSort : "week";

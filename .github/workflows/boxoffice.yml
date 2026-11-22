@@ -29,13 +29,13 @@ jobs:
           FORCE: ${{ inputs.force && '1' || '' }}
       - name: 有變化才提交
         run: |
-          if git diff --quiet -- dist/boxoffice.json data/boxoffice-snapshot.json; then
+          git add dist/boxoffice.json dist/boxoffice-years.json data/boxoffice-snapshot.json
+          if git diff --cached --quiet; then
             echo "官方資料沒有更新"
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add dist/boxoffice.json data/boxoffice-snapshot.json
           git commit -m "更新票房排行（$(node -p "require('./dist/boxoffice.json').end")）"
           git pull --rebase origin main
           git push origin HEAD:main

@@ -7,6 +7,7 @@ import fs from "node:fs";
 const SRC = "https://boxofficetw.tfai.org.tw/OpenData/statistic/since2016";
 const SNAP = "data/boxoffice-snapshot.json";
 const OUT = "dist/boxoffice.json";
+const YEARS_OUT = "dist/boxoffice-years.json";
 const TOP = 300; // 排到底：這週有賣出票的片全部列出（通常 100 多部）
 
 const day = (s) => String(s || "").slice(0, 10);
@@ -68,7 +69,7 @@ if (base) {
   start = since;
 }
 
-// 年度總排行：各年上映的片依累計票房排（已經下檔的也算），每年前 200 名，列最近 5 年；這週還有賣出票的標記「上映中」
+// 年度總排行：各年上映的片依累計票房排（已經下檔的也算），每年前 200 名；這週還有賣出票的標記「上映中」
 const year = end.slice(0, 4);
 const showing = new Set(mode === "week" ? list.map(key) : []);
 const everything = src.List.filter((x) => x.Name && day(x.ReleaseDate)).map((x) => ({
@@ -84,11 +85,12 @@ const yearOf = (y) =>
     .sort((a, b) => b.total - a.total)
     .slice(0, 200)
     .map((f, i) => ({ rank: i + 1, name: f.name, country: f.country, release: f.release, theaters: f.theaters, week: null, total: f.total, ...(showing.has(key(f)) ? { showing: true } : {}) }));
+// 官方開放資料從 2016 年起：每一年都列。這些另外存成一個檔（dist/boxoffice-years.json），App 切到「年度」才下載，
+// 平常看本週／累計不用多下載這一包
 const years = {};
-for (let i = 0; i < 5; i++) {
-  const y = String(Number(year) - i);
-  const l = yearOf(y);
-  if (l.length) years[y] = l;
+for (let y = Number(year); y >= 2016; y--) {
+  const l = yearOf(String(y));
+  if (l.length) years[String(y)] = l;
 }
 const yearList = years[year] || [];
 
@@ -111,13 +113,14 @@ const result = {
     total: f.total,
     tickets: f.tickets,
   })),
-  year: yearList, // 今年的（舊版 App 讀這個）
-  years, // 各年的：年份 → 排行
+  year: yearList, // 今年的年度排行
+  years: { [year]: yearList }, // 主檔只放今年；其他年份在 boxoffice-years.json
 };
 
 fs.mkdirSync("data", { recursive: true });
 // 快照：這週的累計，順便記住上一份（同一週重跑時用）
 fs.writeFileSync(SNAP, JSON.stringify({ end, films, prev: base ? { end: base.end, films: base.films } : null }) + "\n");
 fs.writeFileSync(OUT, JSON.stringify(result, null, 1) + "\n");
+fs.writeFileSync(YEARS_OUT, JSON.stringify({ updated: result.updated, end, years }) + "\n");
 console.log(`已更新：${mode === "week" ? `週票房 ${start}～${end}` : `累計（近 8 週上映，截至 ${end}）`}，前 ${result.list.length} 名；年度排行 ${Object.entries(years).map(([y, l]) => `${y}:${l.length}`).join(" ")}`);
 for (const f of result.list.slice(0, 10)) console.log(f.rank, f.name, f.week ?? "", f.total);

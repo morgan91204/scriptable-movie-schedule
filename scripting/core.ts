@@ -2042,6 +2042,32 @@ export function loadBoxOffice(): Promise<BoxOffice> {
     throw e;
   }));
 }
+/** 各年的年度排行（官方資料從 2016 年起），另外一個檔：切到「年度」才下載 */
+export const BOXOFFICE_YEARS_URL = "https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/main/dist/boxoffice-years.json";
+let boxYearsMem: Promise<BoxOffice> | null = null;
+/** 票房排行＋所有年份的年度排行（手機上記 6 小時）。年份檔讀不到時，照樣回傳只有今年的那份 */
+export function loadBoxOfficeFull(): Promise<BoxOffice> {
+  return (boxYearsMem ||= (async () => {
+    const b = await loadBoxOffice();
+    let years: Record<string, BoxOfficeItem[]> | null = null;
+    try {
+      const c = JSON.parse(cacheGet("boxoffice-years.json") || "null");
+      if (c && c.years && c.end === b.end && Date.now() - c.at < 6 * 3600e3) years = c.years;
+    } catch (_) {}
+    if (!years) {
+      const r = await platform().fetchText(BOXOFFICE_YEARS_URL + "?t=" + Math.floor(Date.now() / 3600e3), { accept: "application/json" });
+      if (r.status !== 200) throw new Error("年度排行暫時讀不到");
+      const d = JSON.parse(r.body);
+      if (!d || typeof d.years !== "object") throw new Error("年度排行格式不對");
+      years = d.years as Record<string, BoxOfficeItem[]>;
+      cacheSet("boxoffice-years.json", JSON.stringify({ at: Date.now(), end: d.end, years }));
+    }
+    return { ...b, years: { ...(b.years || {}), ...years } };
+  })().catch(async (e) => {
+    boxYearsMem = null; // 下次再試
+    return loadBoxOffice(); // 至少有今年的
+  }));
+}
 /** 金額：1.53 億、1,534 萬 */
 export function money(n: number): string {
   if (n >= 1e8) return (n / 1e8).toFixed(2).replace(/\.?0+$/, "") + " 億";

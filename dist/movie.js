@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.22-1326
+// @movie-schedule-app 電影行程 v2026.11.22-1335
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/parsers.gen.ts
@@ -2110,6 +2110,31 @@ function loadBoxOffice() {
     throw e;
   });
 }
+var BOXOFFICE_YEARS_URL = "https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/main/dist/boxoffice-years.json";
+var boxYearsMem = null;
+function loadBoxOfficeFull() {
+  return boxYearsMem ||= (async () => {
+    const b = await loadBoxOffice();
+    let years = null;
+    try {
+      const c = JSON.parse(cacheGet("boxoffice-years.json") || "null");
+      if (c && c.years && c.end === b.end && Date.now() - c.at < 6 * 36e5) years = c.years;
+    } catch (_) {
+    }
+    if (!years) {
+      const r = await platform().fetchText(BOXOFFICE_YEARS_URL + "?t=" + Math.floor(Date.now() / 36e5), { accept: "application/json" });
+      if (r.status !== 200) throw new Error("年度排行暫時讀不到");
+      const d = JSON.parse(r.body);
+      if (!d || typeof d.years !== "object") throw new Error("年度排行格式不對");
+      years = d.years;
+      cacheSet("boxoffice-years.json", JSON.stringify({ at: Date.now(), end: d.end, years }));
+    }
+    return { ...b, years: { ...b.years || {}, ...years } };
+  })().catch(async (e) => {
+    boxYearsMem = null;
+    return loadBoxOffice();
+  });
+}
 function money(n) {
   if (n >= 1e8) return (n / 1e8).toFixed(2).replace(/\.?0+$/, "") + " 億";
   if (n >= 1e4) return String(Math.round(n / 1e4)).replace(/\B(?=(\d{3})+(?!\d))/g, ",") + " 萬";
@@ -2696,7 +2721,7 @@ var App = class {
     ];
     // ── 事件迴圈 ──
     // 背景查 GitHub 上的最新版本（首頁顯示是否為最新版）
-    this.latest = checkLatest("2026.11.22-1326");
+    this.latest = checkLatest("2026.11.22-1335");
     // ── 搜尋 ──
     this.query = "";
     this.tmdbStatus = "";
@@ -2844,11 +2869,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.22-1326"}`);
+          Pasteboard.copy(`版本 ${"2026.11.22-1335"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.22-1326"}`,
+      `版本 ${"2026.11.22-1335"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -3208,7 +3233,7 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
   }
   // 年度排行選了哪幾年（空 = 最新的一年）
   async boxOfficeView() {
-    const [b, all] = await Promise.all([loadBoxOffice(), loadMovies().catch(() => [])]);
+    const [b, all] = await Promise.all([this.boxSort === "year" ? loadBoxOfficeFull() : loadBoxOffice(), loadMovies().catch(() => [])]);
     const k = this.movieQuery.trim().toLowerCase();
     const sorts = boxSorts(b);
     const by = sorts.some((x) => x.id === this.boxSort) ? this.boxSort : "week";

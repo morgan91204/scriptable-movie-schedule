@@ -10,7 +10,8 @@ let cache: Record<string, string> = {};
 
 /** 票房排行：連同對得到的場次通電影一起回傳 */
 async function boxOffice(by?: string, years?: string[]) {
-  const [b, all] = await Promise.all([core.loadBoxOffice(), core.loadMovies().catch(() => [])]);
+  // 年度排行的其他年份是另一個檔，切到「年度」才下載
+  const [b, all] = await Promise.all([by === "year" ? core.loadBoxOfficeFull() : core.loadBoxOffice(), core.loadMovies().catch(() => [])]);
   const sorts = core.boxSorts(b);
   const sort: core.BoxSort = sorts.some((x) => x.id === by) ? (by as core.BoxSort) : "week";
   const picked = core.boxYearsPicked(b, years || []);

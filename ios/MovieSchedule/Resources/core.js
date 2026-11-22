@@ -14,6 +14,7 @@
     AT_DATA_URL: () => AT_DATA_URL,
     AT_SUPPLEMENT: () => AT_SUPPLEMENT,
     BOXOFFICE_URL: () => BOXOFFICE_URL,
+    BOXOFFICE_YEARS_URL: () => BOXOFFICE_YEARS_URL,
     CINEMA_APPS: () => CINEMA_APPS,
     CITY_ORDER: () => CITY_ORDER,
     COMMUNITY_API: () => COMMUNITY_API,
@@ -78,6 +79,7 @@
     lateIsTonight: () => lateIsTonight,
     lateOnOwnDate: () => lateOnOwnDate,
     loadBoxOffice: () => loadBoxOffice,
+    loadBoxOfficeFull: () => loadBoxOfficeFull,
     loadCinemas: () => loadCinemas,
     loadMovies: () => loadMovies,
     loadSettings: () => loadSettings,
@@ -2259,6 +2261,31 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
       throw e;
     });
   }
+  var BOXOFFICE_YEARS_URL = "https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/main/dist/boxoffice-years.json";
+  var boxYearsMem = null;
+  function loadBoxOfficeFull() {
+    return boxYearsMem ||= (async () => {
+      const b = await loadBoxOffice();
+      let years = null;
+      try {
+        const c = JSON.parse(cacheGet("boxoffice-years.json") || "null");
+        if (c && c.years && c.end === b.end && Date.now() - c.at < 6 * 36e5) years = c.years;
+      } catch (_) {
+      }
+      if (!years) {
+        const r = await platform().fetchText(BOXOFFICE_YEARS_URL + "?t=" + Math.floor(Date.now() / 36e5), { accept: "application/json" });
+        if (r.status !== 200) throw new Error("年度排行暫時讀不到");
+        const d = JSON.parse(r.body);
+        if (!d || typeof d.years !== "object") throw new Error("年度排行格式不對");
+        years = d.years;
+        cacheSet("boxoffice-years.json", JSON.stringify({ at: Date.now(), end: d.end, years }));
+      }
+      return { ...b, years: { ...b.years || {}, ...years } };
+    })().catch(async (e) => {
+      boxYearsMem = null;
+      return loadBoxOffice();
+    });
+  }
   function money(n) {
     if (n >= 1e8) return (n / 1e8).toFixed(2).replace(/\.?0+$/, "") + " 億";
     if (n >= 1e4) return String(Math.round(n / 1e4)).replace(/\B(?=(\d{3})+(?!\d))/g, ",") + " 萬";
@@ -2328,7 +2355,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   var native = (name, payload = {}) => webkit.messageHandlers.native.postMessage({ name, ...payload });
   var cache = {};
   async function boxOffice(by, years) {
-    const [b, all] = await Promise.all([loadBoxOffice(), loadMovies().catch(() => [])]);
+    const [b, all] = await Promise.all([by === "year" ? loadBoxOfficeFull() : loadBoxOffice(), loadMovies().catch(() => [])]);
     const sorts = boxSorts(b);
     const sort = sorts.some((x) => x.id === by) ? by : "week";
     const picked = boxYearsPicked(b, years || []);
