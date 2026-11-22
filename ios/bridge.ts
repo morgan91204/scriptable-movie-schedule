@@ -9,20 +9,16 @@ const native = (name: string, payload: Record<string, unknown> = {}): Promise<an
 let cache: Record<string, string> = {};
 
 /** 票房排行：連同對得到的場次通電影一起回傳 */
-async function boxOffice(by?: string) {
+async function boxOffice(by?: string, years?: string[]) {
   const [b, all] = await Promise.all([core.loadBoxOffice(), core.loadMovies().catch(() => [])]);
   const sorts = core.boxSorts(b);
   const sort: core.BoxSort = sorts.some((x) => x.id === by) ? (by as core.BoxSort) : "week";
+  const picked = core.boxYearsPicked(b, years || []);
   return {
-    label: core.boxOfficeTitle(b, sort), source: b.source, footer: core.boxOfficeFooter(b, sort), sorts,
-    rows: core.boxOfficeBy(b, sort).map((x) => ({ x, m: core.matchBoxOffice(x.name, all) || null, lines: core.boxOfficeLines(x, sort) })),
+    label: core.boxOfficeTitle(b, sort, picked), source: b.source, footer: core.boxOfficeFooter(b, sort, picked), sorts,
+    sort, years: core.boxYears(b), selYears: picked, // 年度排行可以選的年份、實際採用的年份
+    rows: core.boxOfficeBy(b, sort, picked).map((x) => ({ x, m: core.matchBoxOffice(x.name, all) || null, lines: core.boxOfficeLines(x, sort) })),
   };
-}
-/** 現在有什麼可以看：在指定的影城裡找某天某時段的場次，依電影分組 */
-async function nowShowing(scope: { cinema: core.Cinema; km: number | null }[], date: string, winId: string, format: string) {
-  const win = core.WINDOWS.find((w) => w.id === winId) || core.WINDOWS[core.WINDOWS.length - 1];
-  const { hits, failed, noData } = await core.findShowtimes(scope, date, win, (format || "") as any);
-  return { groups: core.groupByMovie(hits), failed, noData };
 }
 /** 複選版：多個日期、時段、特殊廳一起找 */
 async function nowShowingMulti(scope: { cinema: core.Cinema; km: number | null }[], dates: string[], winIds: string[], formats: string[]) {

@@ -106,7 +106,8 @@ struct MoviesView: View {
 struct BoxOfficeSection: View {
     var query: String = ""
     @State private var board: Loadable<BoxOfficeBoard> = .loading
-    @State private var sort = "week" // 排法：本週／累計
+    @State private var sort = "week" // 排法：本週／累計／年度
+    @State private var years: Set<String> = [] // 年度排行選了哪幾年（空 = 最新的一年）
 
     var body: some View {
         Group {
@@ -118,6 +119,33 @@ struct BoxOfficeSection: View {
                     .pickerStyle(.segmented)
                 } footer: {
                     Text("本週、累計只排上映中的電影；年度包含已經下檔的。")
+                }
+            }
+            if sort == "year", let options = board.value?.years, options.count > 1 {
+                let picked = board.value?.selYears ?? []
+                Section {
+                    // 年份可以複選：選單點了不會關，可以連續勾
+                    Menu {
+                        ForEach(options, id: \.self) { y in
+                            Button {
+                                var next = Set(picked)
+                                if next.contains(y) { if next.count > 1 { next.remove(y) } } else { next.insert(y) }
+                                years = next
+                            } label: {
+                                if picked.contains(y) { Label("\(y) 年", systemImage: "checkmark") } else { Text("\(y) 年") }
+                            }
+                        }
+                    } label: {
+                        HStack {
+                            Text("年份").foregroundStyle(Color.primary)
+                            Spacer()
+                            Text(picked.joined(separator: "、")).foregroundStyle(.secondary).lineLimit(1)
+                            Image(systemName: "chevron.up.chevron.down").font(.caption).foregroundStyle(.tertiary)
+                        }
+                    }
+                    .menuActionDismissBehavior(.disabled)
+                } footer: {
+                    Text("可以複選，選了幾年就合在一起排。")
                 }
             }
             switch board {
@@ -143,7 +171,7 @@ struct BoxOfficeSection: View {
                 }
             }
         }
-        .task(id: sort) { await load() }
+        .task(id: sort + "|" + years.sorted().joined(separator: ",")) { await load() }
     }
 
     private func rowLabel(_ r: BoxOfficeRow) -> some View {
@@ -170,7 +198,7 @@ struct BoxOfficeSection: View {
 
     private func load() async {
         do {
-            board = .loaded(try await Bridge.shared.call("boxOffice", [sort]))
+            board = .loaded(try await Bridge.shared.call("boxOffice", [sort, years.sorted()]))
         } catch {
             board = .failed(errorText(error))
         }

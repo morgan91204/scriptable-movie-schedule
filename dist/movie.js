@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.22-1322
+// @movie-schedule-app 電影行程 v2026.11.22-1326
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/parsers.gen.ts
@@ -1574,23 +1574,42 @@ function boxOfficeLines(x, by = "week") {
 function boxSorts(b) {
   const out = [{ id: "week", label: b.mode === "week" ? "本週" : "近期" }];
   if (b.mode === "week") out.push({ id: "total", label: "累計" });
-  if (b.year && b.year.length) out.push({ id: "year", label: "年度" });
+  if (boxYears(b).length) out.push({ id: "year", label: "年度" });
   return out;
 }
-function boxOfficeBy(b, by) {
-  if (by === "year") return b.year || [];
+function boxYears(b) {
+  const ys = Object.keys(b.years || {}).filter((y) => (b.years[y] || []).length);
+  if (!ys.length && b.year && b.year.length) ys.push(b.end.slice(0, 4));
+  return ys.sort().reverse();
+}
+function boxYearsPicked(b, years) {
+  const all = boxYears(b);
+  const picked = (years || []).filter((y) => all.indexOf(y) >= 0).sort();
+  return picked.length ? picked : all.slice(0, 1);
+}
+var yearText = (ys) => ys.length === 1 ? ys[0] : ys.every((y, i) => !i || Number(y) === Number(ys[i - 1]) + 1) ? `${ys[0]}–${ys[ys.length - 1]}` : ys.join("、");
+function boxOfficeBy(b, by, years) {
+  if (by === "year") {
+    const ys = boxYearsPicked(b, years);
+    const of = (y) => b.years && b.years[y] || (y === b.end.slice(0, 4) ? b.year || [] : []);
+    if (ys.length === 1) return of(ys[0]);
+    return ys.flatMap(of).sort((x, y) => y.total - x.total).map((x, i) => ({ ...x, rank: i + 1 }));
+  }
   if (by !== "total") return b.list;
   return b.list.slice().sort((x, y) => y.total - x.total).map((x, i) => ({ ...x, rank: i + 1 }));
 }
-function boxOfficeTitle(b, by) {
+function boxOfficeTitle(b, by, years) {
   const md = (d) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`;
-  if (by === "year") return `${b.end.slice(0, 4)} 年度總排行（截至 ${md(b.end)}）`;
+  if (by === "year") return `${yearText(boxYearsPicked(b, years))} 年度總排行（截至 ${md(b.end)}）`;
   if (by === "total") return `上映中｜累計票房（截至 ${md(b.end)}）`;
   return b.mode === "week" ? `上映中｜${md(b.start)}–${md(b.end)} 週票房` : boxOfficeLabel(b);
 }
-function boxOfficeFooter(b, by) {
+function boxOfficeFooter(b, by, years) {
   const src = `資料來源：${b.source}。官方每週更新一次。`;
-  if (by === "year") return `${b.end.slice(0, 4)} 年上映的電影依累計票房排序，共列 ${(b.year || []).length} 部；已經下檔的也在裡面，標「上映中」的是這一週還有賣出票的。${src}`;
+  if (by === "year") {
+    const ys = boxYearsPicked(b, years);
+    return `${yearText(ys)} 年上映的電影依累計票房排序${ys.length > 1 ? "（各年取前 200 名合併）" : "，列前 200 名"}；已經下檔的也在裡面，標「上映中」的是這一週還有賣出票的。年度依上映日期歸屬，票房是上映以來的累計。${src}`;
+  }
   const scope = `只排上映中的電影：這一週有賣出票的共 ${b.list.length} 部，已經下檔的不在裡面（看「年度」）。`;
   return by === "total" ? `${scope}${src}` : `${scope}${boxOfficeNote(b)}${src}`;
 }
@@ -2076,7 +2095,7 @@ var boxData = null;
 function loadBoxOffice() {
   return boxMem ||= (async () => {
     try {
-      const c = JSON.parse(cacheGet("boxoffice3.json") || "null");
+      const c = JSON.parse(cacheGet("boxoffice4.json") || "null");
       if (c && c.data && Date.now() - c.at < 6 * 36e5) return c.data;
     } catch (_) {
     }
@@ -2084,7 +2103,7 @@ function loadBoxOffice() {
     if (r.status !== 200) throw new Error("票房排行暫時讀不到");
     const data = JSON.parse(r.body);
     if (!data || !Array.isArray(data.list)) throw new Error("票房排行格式不對");
-    cacheSet("boxoffice3.json", JSON.stringify({ at: Date.now(), data }));
+    cacheSet("boxoffice4.json", JSON.stringify({ at: Date.now(), data }));
     return data;
   })().then((d) => boxData = d).catch((e) => {
     boxMem = null;
@@ -2677,7 +2696,7 @@ var App = class {
     ];
     // ── 事件迴圈 ──
     // 背景查 GitHub 上的最新版本（首頁顯示是否為最新版）
-    this.latest = checkLatest("2026.11.22-1322");
+    this.latest = checkLatest("2026.11.22-1326");
     // ── 搜尋 ──
     this.query = "";
     this.tmdbStatus = "";
@@ -2690,6 +2709,8 @@ var App = class {
     /** 電影分頁上方的切換：上映中／票房排行 */
     this.movieMode = "now";
     this.boxSort = "week";
+    // 票房排行的排法：本週／累計／年度
+    this.boxYears = [];
     // 日期、縣市、特殊廳都可以複選（點一下選、再點一下取消）；換一部片時日期重來
     this.movieFor = "";
     this.movieDates = [];
@@ -2823,11 +2844,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.22-1322"}`);
+          Pasteboard.copy(`版本 ${"2026.11.22-1326"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.22-1322"}`,
+      `版本 ${"2026.11.22-1326"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -3185,13 +3206,15 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
       this.movieMode = "soon";
     } }));
   }
-  // 票房排行的排法：本週／累計
+  // 年度排行選了哪幾年（空 = 最新的一年）
   async boxOfficeView() {
     const [b, all] = await Promise.all([loadBoxOffice(), loadMovies().catch(() => [])]);
     const k = this.movieQuery.trim().toLowerCase();
     const sorts = boxSorts(b);
     const by = sorts.some((x) => x.id === this.boxSort) ? this.boxSort : "week";
-    const rows = boxOfficeBy(b, by).map((x) => ({ x, m: matchBoxOffice(x.name, all) })).filter(({ x, m }) => !k || `${x.name} ${m?.en || ""}`.toLowerCase().includes(k));
+    const yearOptions = boxYears(b);
+    const years = boxYearsPicked(b, this.boxYears);
+    const rows = boxOfficeBy(b, by, years).map((x) => ({ x, m: matchBoxOffice(x.name, all) })).filter(({ x, m }) => !k || `${x.name} ${m?.en || ""}`.toLowerCase().includes(k));
     const jobs = rows.map(({ x, m }) => moviePoster(m ? m.title : x.name, m?.slug, m?.en).catch(() => ""));
     const wait = this.rerendering ? 0 : 600;
     const posters = await Promise.all(jobs.map((p) => Promise.race([p, sleep(wait).then(() => void 0)])));
@@ -3206,11 +3229,13 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
       if (src && src === u) cachePoster(u);
       return { src, url: u };
     };
-    return /* @__PURE__ */ h(Page, { title: "依電影找場次", subtitle: boxOfficeTitle(b, by), onBack: () => this.back() }, this.movieModeChips(), sorts.length > 1 ? /* @__PURE__ */ h(Chips, null, sorts.map((x) => /* @__PURE__ */ h(Chip, { label: x.label, sub: x.id === "year" ? "含已下檔" : "上映中", muted: by !== x.id, onTap: () => {
+    return /* @__PURE__ */ h(Page, { title: "依電影找場次", subtitle: boxOfficeTitle(b, by, years), onBack: () => this.back() }, this.movieModeChips(), sorts.length > 1 ? /* @__PURE__ */ h(Chips, null, sorts.map((x) => /* @__PURE__ */ h(Chip, { label: x.label, sub: x.id === "year" ? "含已下檔" : "上映中", muted: by !== x.id, onTap: () => {
       this.boxSort = x.id;
-    } }))) : null, /* @__PURE__ */ h("input", { class: "field", name: "q", value: this.movieQuery, placeholder: "搜尋片名" }), /* @__PURE__ */ h(Button, { label: "搜尋", kind: "secondary", enter: true, onTap: (v) => {
+    } }))) : null, by === "year" && yearOptions.length > 1 ? /* @__PURE__ */ h(Section, { title: "年份", hint: "可以複選，選了幾年就合在一起排。" }, /* @__PURE__ */ h(Chips, null, yearOptions.map((y) => /* @__PURE__ */ h(Chip, { label: y, muted: years.indexOf(y) < 0, onTap: () => {
+      this.boxYears = years.indexOf(y) < 0 ? [...years, y] : years.length > 1 ? years.filter((z) => z !== y) : years;
+    } })))) : null, /* @__PURE__ */ h("input", { class: "field", name: "q", value: this.movieQuery, placeholder: "搜尋片名" }), /* @__PURE__ */ h(Button, { label: "搜尋", kind: "secondary", enter: true, onTap: (v) => {
       this.movieQuery = v.q || "";
-    } }), rows.length ? null : /* @__PURE__ */ h(Empty, { icon: "🎞", text: "排行上找不到相符的電影" }), /* @__PURE__ */ h(Section, { title: boxOfficeTitle(b, by), hint: boxOfficeFooter(b, by) }, rows.map(({ x, m }, i) => {
+    } }), rows.length ? null : /* @__PURE__ */ h(Empty, { icon: "🎞", text: "排行上找不到相符的電影" }), /* @__PURE__ */ h(Section, { title: boxOfficeTitle(b, by, years), hint: boxOfficeFooter(b, by, years) }, rows.map(({ x, m }, i) => {
       const t = thumb(posters[i]);
       return /* @__PURE__ */ h(
         Item,

@@ -145,6 +145,9 @@ struct BoxOfficeBoard: Codable {
     var footer: String?   // 排行下方的說明
     struct Sort: Codable, Hashable, Identifiable { var id: String; var label: String }
     var sorts: [Sort]?    // 可以切換的排法：本週、累計（都只排上映中的片）、年度（含已下檔）
+    var sort: String?        // 實際採用的排法
+    var years: [String]?     // 年度排行可以選的年份（新的在前）
+    var selYears: [String]?  // 實際採用的年份
     var rows: [BoxOfficeRow]
 }
 

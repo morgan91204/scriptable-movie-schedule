@@ -44,6 +44,8 @@
     boxOfficeNote: () => boxOfficeNote,
     boxOfficeTitle: () => boxOfficeTitle,
     boxSorts: () => boxSorts,
+    boxYears: () => boxYears,
+    boxYearsPicked: () => boxYearsPicked,
     byShowtime: () => byShowtime,
     cachePoster: () => cachePoster,
     checkLatest: () => checkLatest,
@@ -1713,23 +1715,42 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   function boxSorts(b) {
     const out = [{ id: "week", label: b.mode === "week" ? "本週" : "近期" }];
     if (b.mode === "week") out.push({ id: "total", label: "累計" });
-    if (b.year && b.year.length) out.push({ id: "year", label: "年度" });
+    if (boxYears(b).length) out.push({ id: "year", label: "年度" });
     return out;
   }
-  function boxOfficeBy(b, by) {
-    if (by === "year") return b.year || [];
+  function boxYears(b) {
+    const ys = Object.keys(b.years || {}).filter((y) => (b.years[y] || []).length);
+    if (!ys.length && b.year && b.year.length) ys.push(b.end.slice(0, 4));
+    return ys.sort().reverse();
+  }
+  function boxYearsPicked(b, years) {
+    const all = boxYears(b);
+    const picked = (years || []).filter((y) => all.indexOf(y) >= 0).sort();
+    return picked.length ? picked : all.slice(0, 1);
+  }
+  var yearText = (ys) => ys.length === 1 ? ys[0] : ys.every((y, i) => !i || Number(y) === Number(ys[i - 1]) + 1) ? `${ys[0]}–${ys[ys.length - 1]}` : ys.join("、");
+  function boxOfficeBy(b, by, years) {
+    if (by === "year") {
+      const ys = boxYearsPicked(b, years);
+      const of = (y) => b.years && b.years[y] || (y === b.end.slice(0, 4) ? b.year || [] : []);
+      if (ys.length === 1) return of(ys[0]);
+      return ys.flatMap(of).sort((x, y) => y.total - x.total).map((x, i) => ({ ...x, rank: i + 1 }));
+    }
     if (by !== "total") return b.list;
     return b.list.slice().sort((x, y) => y.total - x.total).map((x, i) => ({ ...x, rank: i + 1 }));
   }
-  function boxOfficeTitle(b, by) {
+  function boxOfficeTitle(b, by, years) {
     const md = (d) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`;
-    if (by === "year") return `${b.end.slice(0, 4)} 年度總排行（截至 ${md(b.end)}）`;
+    if (by === "year") return `${yearText(boxYearsPicked(b, years))} 年度總排行（截至 ${md(b.end)}）`;
     if (by === "total") return `上映中｜累計票房（截至 ${md(b.end)}）`;
     return b.mode === "week" ? `上映中｜${md(b.start)}–${md(b.end)} 週票房` : boxOfficeLabel(b);
   }
-  function boxOfficeFooter(b, by) {
+  function boxOfficeFooter(b, by, years) {
     const src = `資料來源：${b.source}。官方每週更新一次。`;
-    if (by === "year") return `${b.end.slice(0, 4)} 年上映的電影依累計票房排序，共列 ${(b.year || []).length} 部；已經下檔的也在裡面，標「上映中」的是這一週還有賣出票的。${src}`;
+    if (by === "year") {
+      const ys = boxYearsPicked(b, years);
+      return `${yearText(ys)} 年上映的電影依累計票房排序${ys.length > 1 ? "（各年取前 200 名合併）" : "，列前 200 名"}；已經下檔的也在裡面，標「上映中」的是這一週還有賣出票的。年度依上映日期歸屬，票房是上映以來的累計。${src}`;
+    }
     const scope = `只排上映中的電影：這一週有賣出票的共 ${b.list.length} 部，已經下檔的不在裡面（看「年度」）。`;
     return by === "total" ? `${scope}${src}` : `${scope}${boxOfficeNote(b)}${src}`;
   }
@@ -2223,7 +2244,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   function loadBoxOffice() {
     return boxMem ||= (async () => {
       try {
-        const c = JSON.parse(cacheGet("boxoffice3.json") || "null");
+        const c = JSON.parse(cacheGet("boxoffice4.json") || "null");
         if (c && c.data && Date.now() - c.at < 6 * 36e5) return c.data;
       } catch (_) {
       }
@@ -2231,7 +2252,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
       if (r.status !== 200) throw new Error("票房排行暫時讀不到");
       const data = JSON.parse(r.body);
       if (!data || !Array.isArray(data.list)) throw new Error("票房排行格式不對");
-      cacheSet("boxoffice3.json", JSON.stringify({ at: Date.now(), data }));
+      cacheSet("boxoffice4.json", JSON.stringify({ at: Date.now(), data }));
       return data;
     })().then((d) => boxData = d).catch((e) => {
       boxMem = null;
@@ -2306,22 +2327,22 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   // ios/bridge.ts
   var native = (name, payload = {}) => webkit.messageHandlers.native.postMessage({ name, ...payload });
   var cache = {};
-  async function boxOffice(by) {
+  async function boxOffice(by, years) {
     const [b, all] = await Promise.all([loadBoxOffice(), loadMovies().catch(() => [])]);
     const sorts = boxSorts(b);
     const sort = sorts.some((x) => x.id === by) ? by : "week";
+    const picked = boxYearsPicked(b, years || []);
     return {
-      label: boxOfficeTitle(b, sort),
+      label: boxOfficeTitle(b, sort, picked),
       source: b.source,
-      footer: boxOfficeFooter(b, sort),
+      footer: boxOfficeFooter(b, sort, picked),
       sorts,
-      rows: boxOfficeBy(b, sort).map((x) => ({ x, m: matchBoxOffice(x.name, all) || null, lines: boxOfficeLines(x, sort) }))
+      sort,
+      years: boxYears(b),
+      selYears: picked,
+      // 年度排行可以選的年份、實際採用的年份
+      rows: boxOfficeBy(b, sort, picked).map((x) => ({ x, m: matchBoxOffice(x.name, all) || null, lines: boxOfficeLines(x, sort) }))
     };
-  }
-  async function nowShowing(scope, date, winId, format) {
-    const win = WINDOWS.find((w) => w.id === winId) || WINDOWS[WINDOWS.length - 1];
-    const { hits, failed, noData } = await findShowtimes(scope, date, win, format || "");
-    return { groups: groupByMovie(hits), failed, noData };
   }
   async function nowShowingMulti(scope, dates, winIds, formats) {
     const { hits, failed, noData } = await findShowtimesMulti(scope, dates, winIds, formats);

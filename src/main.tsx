@@ -12,7 +12,7 @@ import {
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
   loadSettings, saveSettings, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, TW,
   FORMATS, formatsOf, filterVersions, filterVersionsAny, movieRows, movieDays, nearest, kmLabel, WINDOWS, findShowtimes, findShowtimesMulti, multiLabel, multiDetail, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText,
-  hallOf, tmdbTest, movieExtras, moviePoster, movieRuntime, posterSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxSorts, foregroundTask, communityStats, communityCached, communityVote, loadBoxOffice, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, ABOUT_URL, PRIVACY_URL, movieRatings, ratingTier,
+  hallOf, tmdbTest, movieExtras, moviePoster, movieRuntime, posterSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxSorts, boxYears, boxYearsPicked, foregroundTask, communityStats, communityCached, communityVote, loadBoxOffice, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, ABOUT_URL, PRIVACY_URL, movieRatings, ratingTier,
 } from "./core";
 import type { MovieExtras, Ratings, Community, BoxOfficeItem, BoxSort } from "./core";
 import { setTabBar, setBackGuard, esc } from "./jsx";
@@ -795,13 +795,16 @@ class App {
     );
   }
 
-  boxSort: BoxSort = "week"; // 票房排行的排法：本週／累計
+  boxSort: BoxSort = "week"; // 票房排行的排法：本週／累計／年度
+  boxYears: string[] = []; // 年度排行選了哪幾年（空 = 最新的一年）
   async boxOfficeView(): Promise<string> {
     const [b, all] = await Promise.all([loadBoxOffice(), loadMovies().catch(() => [] as TwMovie[])]);
     const k = this.movieQuery.trim().toLowerCase();
     const sorts = boxSorts(b);
     const by: BoxSort = sorts.some((x) => x.id === this.boxSort) ? this.boxSort : "week";
-    const rows = boxOfficeBy(b, by).map((x) => ({ x, m: matchBoxOffice(x.name, all) })).filter(({ x, m }) => !k || `${x.name} ${m?.en || ""}`.toLowerCase().includes(k));
+    const yearOptions = boxYears(b);
+    const years = boxYearsPicked(b, this.boxYears); // 年度可以複選
+    const rows = boxOfficeBy(b, by, years).map((x) => ({ x, m: matchBoxOffice(x.name, all) })).filter(({ x, m }) => !k || `${x.name} ${m?.en || ""}`.toLowerCase().includes(k));
     // 海報：手機上記過的立刻有；沒記過的最多等 0.6 秒，其餘讀好後自動補畫
     const jobs = rows.map(({ x, m }) => moviePoster(m ? m.title : x.name, m?.slug, m?.en).catch(() => ""));
     const wait = this.rerendering ? 0 : 600;
@@ -819,17 +822,26 @@ class App {
       return { src, url: u };
     };
     return (
-      <Page title="依電影找場次" subtitle={boxOfficeTitle(b, by)} onBack={() => this.back()}>
+      <Page title="依電影找場次" subtitle={boxOfficeTitle(b, by, years)} onBack={() => this.back()}>
         {this.movieModeChips()}
         {sorts.length > 1 ? (
           <Chips>
             {sorts.map((x) => <Chip label={x.label} sub={x.id === "year" ? "含已下檔" : "上映中"} muted={by !== x.id} onTap={() => { this.boxSort = x.id; }} />)}
           </Chips>
         ) : null}
+        {by === "year" && yearOptions.length > 1 ? (
+          <Section title="年份" hint="可以複選，選了幾年就合在一起排。">
+            <Chips>
+              {yearOptions.map((y) => (
+                <Chip label={y} muted={years.indexOf(y) < 0} onTap={() => { this.boxYears = years.indexOf(y) < 0 ? [...years, y] : years.length > 1 ? years.filter((z) => z !== y) : years; }} />
+              ))}
+            </Chips>
+          </Section>
+        ) : null}
         <input class="field" name="q" value={this.movieQuery} placeholder="搜尋片名" />
         <Button label="搜尋" kind="secondary" enter onTap={(v) => { this.movieQuery = v.q || ""; }} />
         {rows.length ? null : <Empty icon="🎞" text="排行上找不到相符的電影" />}
-        <Section title={boxOfficeTitle(b, by)} hint={boxOfficeFooter(b, by)}>
+        <Section title={boxOfficeTitle(b, by, years)} hint={boxOfficeFooter(b, by, years)}>
           {rows.map(({ x, m }, i) => {
             const t = thumb(posters[i] as string | undefined);
             return (
