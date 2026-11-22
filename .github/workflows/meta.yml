@@ -45,7 +45,7 @@ jobs:
       - name: 讀影展場次（各影展官網；今年已經結束的也留著）
         run: |
           curl -fsSL "https://raw.githubusercontent.com/${{ github.repository }}/data/festival.json?t=$(date +%s)" -o "$RUNNER_TEMP/prev-festival.json" || echo "還沒有影展檔"
-          node tools/festival.mjs "$RUNNER_TEMP/festival.json" "$RUNNER_TEMP/prev-festival.json" || echo "影展場次這次略過"
+          FESTIVAL_BASE="https://raw.githubusercontent.com/${{ github.repository }}/data" node tools/festival.mjs "$RUNNER_TEMP/festival.json" "$RUNNER_TEMP/prev-festival.json" || echo "影展場次這次略過"
       - name: 發佈到 data 分支
         run: tools/publish-data.sh "$RUNNER_TEMP/meta.json" meta.json "更新資料"
       - name: 發佈開眼場次到 data 分支
@@ -62,7 +62,9 @@ jobs:
           tools/publish-data.sh "$RUNNER_TEMP/official.json" official.json "更新資料"
           git checkout -q -f "$GITHUB_SHA"
           tools/publish-data.sh "$RUNNER_TEMP/festival.json" festival.json "更新資料"
-          # 今年的影展另存一份帶年份的檔（跨年後留著回顧）
-          Y=$(TZ=Asia/Taipei date +%Y)
-          git checkout -q -f "$GITHUB_SHA"
-          tools/publish-data.sh "$RUNNER_TEMP/festival-$Y.json" "festival-$Y.json" "更新資料"
+          # 每年的影展另存一份帶年份的檔（跨年後留著回顧）
+          for F in "$RUNNER_TEMP"/festival-20[0-9][0-9].json; do
+            [ -f "$F" ] || continue
+            git checkout -q -f "$GITHUB_SHA"
+            tools/publish-data.sh "$F" "$(basename "$F")" "更新資料"
+          done

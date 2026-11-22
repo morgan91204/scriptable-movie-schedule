@@ -281,6 +281,46 @@ async function tidf() {
   return { id: `${tour ? "tidftour" : "tidf"}-${got[0].slice(0, 4)}`, name: tour ? "TIDF 巡迴展" : "台灣國際紀錄片影展", start: got[0], end: got[got.length - 1], site: TIDF, source: "台灣國際紀錄片影展官網", films: Object.values(films), sessions };
 }
 
+const TIQFF = "https://tiqff.org.tw/Festival.aspx?ID=1574"; // 「本屆影展」底下的場次表
+
+/** 臺灣國際酷兒影展場次表的內容（一張表：片名、日期、時間、地點；官網沒有給片長和結束時間）→ 影片與場次 */
+export function parseTiqffTable(html) {
+  const films = {};
+  const sessions = [];
+  for (const row of String(html).split(/<tr[\s>]/).slice(1)) {
+    const cell = (cls) => clean((row.match(new RegExp(`<td class="${cls}"[^>]*>([\\s\\S]*?)</td>`)) || [])[1]);
+    const title = clean(((row.match(/<td class="itemname"[^>]*>([\s\S]*?)<\/td>/) || [])[1] || "").split(/<!--|<div/)[0]);
+    const date = cell("date");
+    const time = cell("time");
+    if (!title || !/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^\d{1,2}:\d{2}$/.test(time)) continue;
+    films[title] ||= { id: title, title, mins: 0, rating: "", url: TIQFF };
+    sessions.push({ film: title, date, time: time.padStart(5, "0"), venue: cell("place"), room: "", ticket: "" });
+  }
+  return { films, sessions };
+}
+/** 讀臺灣國際酷兒影展的場次（官網「本屆影展」目前放的那一屆）。
+ *  跟一般訪客的瀏覽器一樣：先開公開的場次頁，再用頁面上附的代碼要表格內容，不需要登入 */
+async function queerFilmFestival() {
+  const page = await fetch(TIQFF, { headers: { "User-Agent": UA, "Accept-Language": "zh-TW,zh;q=0.9" }, signal: AbortSignal.timeout(30000) });
+  if (!page.ok) throw new Error(`${page.status} ${TIQFF}`);
+  const html = await page.text();
+  const cookie = (page.headers.getSetCookie?.() || []).map((c) => c.split(";")[0]).join("; ");
+  const hid = (name) => (html.match(new RegExp(`id="ContentPlaceHolder1_${name}" value="([^"]*)"`)) || [])[1] || "";
+  if (!hid("hfGUID") || !hid("hfEnumAgnKey")) return null;
+  await new Promise((r) => setTimeout(r, 800));
+  const r = await fetch("https://tiqff.org.tw/Festival.aspx/LoadToyBrick_HTML", {
+    method: "POST",
+    headers: { "User-Agent": UA, "Content-Type": "application/json; charset=utf-8", "X-Requested-With": "XMLHttpRequest", Accept: "application/json, text/javascript, */*", Referer: TIQFF, Cookie: cookie },
+    body: JSON.stringify({ guid: hid("hfGUID"), strID: hid("hfProgramID"), strSubID: hid("hfID"), strType: hid("hfProgramTitle"), strMediaType: hid("hfMediaType"), strKeyword: hid("hfKeyword"), inputArgs: JSON.stringify([{ FieldType: "QParameter", FieldName: "FestivalID", FieldValue: hid("hfEnumAgnKey"), Comparison: "=" }]), strPageID: hid("hfPage") || "1" }),
+    signal: AbortSignal.timeout(30000),
+  });
+  const data = await r.json();
+  const { films, sessions } = parseTiqffTable((data && data.d && Array.isArray(data.d.data) && data.d.data[0]) || "");
+  if (!sessions.length) return null;
+  const got = sessions.map((x) => x.date).sort();
+  return { id: `tiqff-${got[0].slice(0, 4)}`, name: "臺灣國際酷兒影展", start: got[0], end: got[got.length - 1], site: TIQFF, source: "臺灣國際酷兒影展官網", films: Object.values(films), sessions };
+}
+
 if (import.meta.url === `file://${process.argv[1]}`) {
   const [outPath = "festival.json", prevPath = ""] = process.argv.slice(2);
   let prev = [];
@@ -291,7 +331,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     prevYears = Array.isArray(old.years) ? old.years.filter((y) => Number.isInteger(y)) : [];
   } catch (_) {}
   const got = [];
-  for (const [label, job] of [["金馬影展官網", goldenHorse], ["台北電影節官網", taipeiFilmFestival], ["高雄電影節官網", kaohsiungFilmFestival], ["南方影展官網", southFilmFestival], ["紀錄片影展官網", tidf]]) {
+  for (const [label, job] of [["金馬影展官網", goldenHorse], ["台北電影節官網", taipeiFilmFestival], ["高雄電影節官網", kaohsiungFilmFestival], ["南方影展官網", southFilmFestival], ["紀錄片影展官網", tidf], ["酷兒影展官網", queerFilmFestival]]) {
     try {
       const f = await job();
       if (f) { got.push(f); console.log(`${label}：${f.name} ${f.start}～${f.end}，${f.films.length} 部、${f.sessions.length} 場`); }
@@ -313,8 +353,32 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   }
   const festivals = Array.from(byId.values()).filter((f) => String(f.end || "").slice(0, 4) === year).sort((a, b) => b.start.localeCompare(a.start));
   // 每年另外存一份 festival-<年份>.json：今年的每次都重寫；跨年後主檔清掉舊的，這份留著給使用者回顧。
+  // 官網還放著往年那一屆的（還沒換屆），補進那一年的存檔：先讀線上現有的存檔，只加新的或變完整的，其他不動
+  const archYears = [];
+  const base = process.env.FESTIVAL_BASE || "";
+  for (const y of Array.from(new Set(got.map((f) => String(f.end).slice(0, 4)))).filter((y) => /^20\d\d$/.test(y) && y < year)) {
+    let old = null;
+    try {
+      if (!base) throw new Error("沒有設定存檔位置");
+      const r = await fetch(`${base}/festival-${y}.json?t=${Date.now()}`, { signal: AbortSignal.timeout(30000) });
+      if (r.status === 404) old = { festivals: [] };
+      else if (r.ok) old = await r.json();
+      else throw new Error(String(r.status));
+    } catch (e) { console.log(`${y} 年的存檔讀不到（${String(e.message || e)}），這次不動它`); continue; }
+    const list = Array.isArray(old.festivals) ? old.festivals : [];
+    let changed = false;
+    for (const f of got.filter((x) => String(x.end).slice(0, 4) === y)) {
+      const i = list.findIndex((x) => x.id === f.id);
+      if (i >= 0 && f.sessions.length <= list[i].sessions.length) continue; // 已經有、而且沒有比較完整
+      if (i >= 0) list[i] = f; else list.push(f);
+      changed = true;
+      console.log(`${f.name} ${y}：補進 ${y} 年的存檔（${f.sessions.length} 場）`);
+    }
+    if (list.length) archYears.push(Number(y));
+    if (changed) fs.writeFileSync(outPath.replace(/\.json$/, `-${y}.json`), JSON.stringify({ updated: Date.now(), festivals: list.sort((a, b) => b.start.localeCompare(a.start)) }) + "\n");
+  }
   // years = 有存檔的年份（新的在前），App 用它列出可以選的年份
-  const years = Array.from(new Set([...prevYears, ...(festivals.length ? [Number(year)] : [])])).sort((a, b) => b - a);
+  const years = Array.from(new Set([...prevYears, ...archYears, ...(festivals.length ? [Number(year)] : [])])).sort((a, b) => b - a);
   fs.writeFileSync(outPath, JSON.stringify({ updated: Date.now(), years, festivals }) + "\n");
   if (festivals.length) fs.writeFileSync(outPath.replace(/\.json$/, `-${year}.json`), JSON.stringify({ updated: Date.now(), festivals }) + "\n");
   console.log(`已寫出 ${festivals.length} 個影展（${festivals.map((f) => f.name + " " + f.start.slice(0, 4)).join("、") || "無"}）；檔案 ${Math.round(fs.statSync(outPath).size / 1024)}KB`);
