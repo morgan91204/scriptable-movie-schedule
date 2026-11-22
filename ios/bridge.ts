@@ -104,7 +104,7 @@ async function festivalFilm(festId: string, filmId: string) {
   const film = f.films.find((x) => x.id === filmId);
   if (!film) return null;
   return {
-    name: `${f.name}（${core.festivalStateLabel(f)}）`, film, past: core.festivalState(f) === "past",
+    name: `${f.name}（${core.festivalStateLabel(f)}）`, film, past: core.festivalState(f) === "past", trailerUrl: core.festivalTrailer(film).url, trailerLabel: core.festivalTrailer(film).label,
     sessions: core.festivalFilmSessions(f, filmId).map((x) => ({ date: x.date, time: x.time, place: core.festivalPlace(x), room: x.room, ticket: x.ticket || film.url, cinema: core.festivalCinema(x, cinemas, f) })),
   };
 }

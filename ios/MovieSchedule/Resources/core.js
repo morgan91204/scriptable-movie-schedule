@@ -84,6 +84,7 @@
     festivalState: () => festivalState,
     festivalStateLabel: () => festivalStateLabel,
     festivalStatusLine: () => festivalStatusLine,
+    festivalTrailer: () => festivalTrailer,
     festivalYears: () => festivalYears,
     festivalsAny: () => festivalsAny,
     festivalsReady: () => festivalsReady,
@@ -1935,6 +1936,9 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     return got.filter((d) => !!d);
   }
   var FESTIVAL_URL = "https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/data/festival.json";
+  function festivalTrailer(film) {
+    return /^https:\/\//.test(film.trailer || "") ? { url: film.trailer, label: "觀看預告" } : { url: `https://www.youtube.com/results?search_query=${encodeURIComponent(film.title + " 預告")}`, label: "搜尋預告" };
+  }
   var festivalsNow = [];
   function festivalState(f) {
     const today = todayTPE();
@@ -2680,6 +2684,8 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
       name: `${f.name}（${festivalStateLabel(f)}）`,
       film,
       past: festivalState(f) === "past",
+      trailerUrl: festivalTrailer(film).url,
+      trailerLabel: festivalTrailer(film).label,
       sessions: festivalFilmSessions(f, filmId).map((x) => ({ date: x.date, time: x.time, place: festivalPlace(x), room: x.room, ticket: x.ticket || film.url, cinema: festivalCinema(x, cinemas, f) }))
     };
   }

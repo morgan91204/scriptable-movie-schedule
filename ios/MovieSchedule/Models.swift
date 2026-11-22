@@ -269,5 +269,7 @@ struct FestivalFilmDetail: Codable {
     var name: String
     var film: FestivalFilm
     var past: Bool? // 影展已經結束（場次僅供回顧）
+    var trailerUrl: String?   // 官網放的預告，沒有就是 YouTube 搜尋結果
+    var trailerLabel: String? // 「觀看預告」或「搜尋預告」
     var sessions: [FestivalSessionRow]
 }

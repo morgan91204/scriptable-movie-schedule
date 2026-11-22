@@ -11,6 +11,8 @@ const unescape = (s) => String(s || "").replace(/&nbsp;/g, " ").replace(/&amp;/g
 const clean = (s) => unescape(String(s || "").replace(/<[^>]+>/g, " ")).replace(/\s+/g, " ").trim();
 const pad = (d) => d.replace(/^(\d{4})-(\d{1,2})-(\d{1,2})$/, (_, y, m, x) => `${y}-${m.padStart(2, "0")}-${x.padStart(2, "0")}`);
 
+/** 頁面上嵌的 YouTube 影片（官網放的預告）→ 觀看網址；頻道連結不算 */
+export const youtubeIn = (html) => { const m = String(html).match(/(?:youtube(?:-nocookie)?\.com\/(?:embed\/|watch\?v=)|youtu\.be\/)([\w-]{11})(?![\w-])/); return m ? `https://www.youtube.com/watch?v=${m[1]}` : ""; };
 const GH = "https://www.goldenhorse.org.tw/film/programme/schedule/";
 /** 場次頁上日期選單可選的日期（= 這一屆影展的每一天），YYYY-MM-DD */
 export function goldenHorseDates(html) {
@@ -63,7 +65,7 @@ async function get(url) {
 const todayTPE = () => new Date(Date.now() + 8 * 3600e3).toISOString().slice(0, 10);
 
 /** 讀整個金馬影展的場次（官網目前顯示的那一屆，演過的也讀）；沒有場次表回傳 null */
-/** 上一次存的劇照網址（影展代碼 → 影片代碼 → 網址）：已經查過的片不用每次重讀官網的影片頁 */
+/** 上一次存的劇照與預告（影展代碼 → 影片代碼 → { poster, trailer }）：已經查過的片不用每次重讀官網的影片頁 */
 const KNOWN_STILLS = {};
 /** 金馬影片介紹頁上的劇照（小張的） */
 export const goldenHorseStill = (html) => (String(html).match(/https:\/\/storage\.googleapis\.com\/tghff_outland\/image\/photo\/[^"'\s)]+\.(?:jpe?g|png|webp)/i) || [])[0] || "";
@@ -92,12 +94,15 @@ async function goldenHorse() {
   const known = KNOWN_STILLS[`${id}-${dates[0].slice(0, 4)}`] || {};
   let asked = 0;
   for (const f of Object.values(films)) {
-    if (known[f.id]) { f.poster = known[f.id]; continue; }
+    const k = known[f.id];
+    if (k && k.poster && k.trailer !== undefined) { f.poster = k.poster; f.trailer = k.trailer; continue; } // trailer 查過沒有會存成空字串
     if (asked >= 200) continue;
     asked++;
     await new Promise((r) => setTimeout(r, 400));
-    const img = goldenHorseStill(await get(f.url).catch(() => ""));
+    const page = await get(f.url).catch(() => "");
+    const img = goldenHorseStill(page) || (k && k.poster) || "";
     if (img) f.poster = img;
+    if (page) f.trailer = youtubeIn(page);
   }
   return { id: `${id}-${dates[0].slice(0, 4)}`, name, start: dates[0], end: dates[dates.length - 1], site: GH, source: "金馬影展官網", ticketing: "拓元售票", films: Object.values(films), sessions };
 }
@@ -176,7 +181,7 @@ export function parseKffDay(json) {
           const first = Array.isArray(b.film_row) ? b.film_row[0] : null;
           const img = first && typeof first.share_image === "string" && first.share_image.startsWith("/") ? "https://www.kff.tw" + encodeURI(first.share_image) : "";
           const lvl = b.rating_level || {};
-          films[id] ||= { id, title: clean(b.title), mins: Number(b.time_length) || 0, rating: clean(lvl.txt) + (lvl.year && lvl.year !== "0" ? lvl.year + "+" : ""), url: KFF, ...(img ? { poster: img } : {}) };
+          films[id] ||= { id, title: clean(b.title), mins: Number(b.time_length) || 0, rating: clean(lvl.txt) + (lvl.year && lvl.year !== "0" ? lvl.year + "+" : ""), url: KFF, ...(img ? { poster: img } : {}), ...(first && /^[\w-]{11}$/.test(first.trailer_id || "") ? { trailer: `https://www.youtube.com/watch?v=${first.trailer_id}` } : {}) };
           sessions.push({ film: id, date: p.date, time: p.start_time.slice(0, 5).padStart(5, "0"), venue: clean(c.title), room: clean(a.title), ticket: /^https:\/\//.test(b.link || "") ? b.link : "" });
         }
       }
@@ -308,7 +313,7 @@ export function parseTidfPage(html) {
         if (!start || !title) continue;
         const yt = (part.match(/img\.youtube\.com\/vi\/([\w-]{6,})\//) || [])[1];
         const ticket = (part.match(/class="tl-ticket-link[^"]*" href="(https:\/\/[^"]+)"/) || [])[1] || "";
-        films[id] ||= { id, title, mins: range[ev] || 0, rating: clean((part.match(/class="tl-film-level[^"]*"[^>]*>([^<]*)</) || [])[1]), url: more ? "https://www.tidf.org.tw" + more.replace(/&amp;/g, "&").replace(/[?&]schedule_id=\d+/, "") : TIDF, ...(yt ? { poster: `https://img.youtube.com/vi/${yt}/mqdefault.jpg` } : {}) };
+        films[id] ||= { id, title, mins: range[ev] || 0, rating: clean((part.match(/class="tl-film-level[^"]*"[^>]*>([^<]*)</) || [])[1]), url: more ? "https://www.tidf.org.tw" + more.replace(/&amp;/g, "&").replace(/[?&]schedule_id=\d+/, "") : TIDF, ...(yt ? { poster: `https://img.youtube.com/vi/${yt}/mqdefault.jpg`, trailer: `https://www.youtube.com/watch?v=${yt}` } : {}) };
         sessions.push({ film: id, date, time: start.padStart(5, "0"), venue, room: "", ticket: ticket.replace(/&amp;/g, "&") });
       }
     }
@@ -454,11 +459,14 @@ async function womenMakeWaves() {
   for (const f of Object.values(films)) {
     const page = f.page;
     delete f.page;
-    if (known[f.id]) { f.poster = known[f.id]; continue; }
+    const k = known[f.id];
+    if (k && k.poster && k.trailer !== undefined) { f.poster = k.poster; f.trailer = k.trailer; continue; }
     if (!page) continue;
     await new Promise((r) => setTimeout(r, 400));
-    const img = wmwStill(await get(page).catch(() => ""));
+    const html = await get(page).catch(() => "");
+    const img = wmwStill(html) || (k && k.poster) || "";
     if (img) f.poster = img;
+    if (html) f.trailer = youtubeIn(html);
   }
   return { id, name: "台灣國際女性影展", start: got[0], end: got[got.length - 1], site: WMW, source: "台灣國際女性影展官網", films: Object.values(films), sessions };
 }
@@ -472,7 +480,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     prev = old.festivals || [];
     prevYears = Array.isArray(old.years) ? old.years.filter((y) => Number.isInteger(y)) : [];
   } catch (_) {}
-  for (const f of prev) { const m = (KNOWN_STILLS[f.id] = {}); for (const x of f.films || []) if (x.poster) m[x.id] = x.poster; }
+  for (const f of prev) { const m = (KNOWN_STILLS[f.id] = {}); for (const x of f.films || []) if (x.poster) m[x.id] = { poster: x.poster, trailer: x.trailer }; }
   const got = [];
   for (const [label, job] of [["金馬影展官網", goldenHorse], ["台北電影節官網", taipeiFilmFestival], ["高雄電影節官網", kaohsiungFilmFestival], ["南方影展官網", southFilmFestival], ["紀錄片影展官網", tidf], ["酷兒影展官網", queerFilmFestival], ["桃園電影節官網", taoyuanFilmFestival], ["女性影展官網", womenMakeWaves]]) {
     try {

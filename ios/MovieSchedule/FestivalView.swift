@@ -120,6 +120,14 @@ struct FestivalFilmView: View {
                                 .font(.subheadline).foregroundStyle(.secondary)
                             Text(d.name).font(.subheadline).foregroundStyle(.secondary)
                             Text("影展片名，院線上映時可能不同").font(.footnote).foregroundStyle(.tertiary)
+                            if let t = d.trailerUrl, let turl = URL(string: t) {
+                                Button { openURL(turl) } label: {
+                                    Label(d.trailerLabel ?? "觀看預告", systemImage: "play.fill")
+                                        .font(.subheadline.weight(.semibold)).lineLimit(1)
+                                        .foregroundStyle(.white) // 列表裡的圖示預設會染成藍色
+                                }
+                                .buttonStyle(.borderedProminent).buttonBorderShape(.capsule).tint(.red).padding(.top, 4)
+                            }
                         }
                     }
                     .listRowBackground(Color.clear)
