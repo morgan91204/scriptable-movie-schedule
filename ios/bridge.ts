@@ -32,7 +32,9 @@ async function patchSettings(patch: Record<string, unknown>) {
 async function fillMovie(slug: string, date: string | null, ids: string[]) {
   return core.fillMovieDay(await core.movieDay(slug, date || undefined), ids);
 }
-const extra: Record<string, (...a: any[]) => any> = { boxOffice, nowShowing, nearby, patchSettings, fillMovie };
+/** 特殊廳清單（跟其他版本同一份） */
+const formatList = () => core.FORMATS;
+const extra: Record<string, (...a: any[]) => any> = { boxOffice, nowShowing, nearby, patchSettings, fillMovie, formatList };
 
 (globalThis as any).MS = {
   init(saved: Record<string, string>) {

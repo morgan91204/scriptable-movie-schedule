@@ -1300,17 +1300,23 @@ export async function cinemaAddress(c: Cinema): Promise<string> {
 
 // ───────────────────────── 特殊廳 ─────────────────────────
 
-export const FORMATS = ["IMAX", "4DX", "ScreenX", "MX4D", "杜比"] as const;
+// 所有版本（Scriptable、Scripting、網頁、原生 App）的特殊廳篩選都只用這一份清單和 formatsOf，沒有第二套規則。
+// 判斷方式：看來源網頁上每排場次前面的版本標籤裡有沒有這些字（各影城寫法不同，所以一類對應好幾種寫法）
+export const FORMATS = ["IMAX", "杜比", "4DX", "MX4D", "ScreenX", "巨幕", "LED", "頂級廳", "3D"] as const;
 export type Format = (typeof FORMATS)[number];
 const FORMAT_RE: Record<Format, RegExp> = {
   IMAX: /IMAX/i,
+  杜比: /DOLBY|杜比|(?<![A-Z])DVA(?![A-Z])|ATMOS/i, // Dolby Cinema、秀泰的 DVA（Dolby Vision＋Atmos）、Atmos 廳
   "4DX": /4DX/i,
-  ScreenX: /SCREEN\s*X/i,
   MX4D: /MX4D/i,
-  杜比: /DOLBY|杜比/i,
+  ScreenX: /SCREEN\s*X/i,
+  巨幕: /巨幕|寬巨|TITAN|LUXE|ULTRA/i, // 秀泰 巨幕／寬巨／ULTRA、MUVIE TITAN、新光 LUXE
+  LED: /(?<![A-Z])LED(?![A-Z])|ONYX/i, // LG LED Cinema 等 LED 螢幕廳
+  頂級廳: /gold\s*class|mucrown|金鑽|貴賓|VIP|皇家|丹普|REMMI/i,
+  "3D": /(?<![A-Z0-9])3D/i,
 };
 
-/** 版本標籤屬於哪些特殊廳，例如「IMAX 雷射 英語」→ ["IMAX"] */
+/** 版本標籤屬於哪些特殊廳，例如「IMAX 雷射 英語」→ ["IMAX"]；一個標籤可以同時屬於好幾類（「IMAX 3D」） */
 export function formatsOf(label: string): Format[] {
   return FORMATS.filter((f) => FORMAT_RE[f].test(label));
 }

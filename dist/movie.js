@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.22-0534
+// @movie-schedule-app 電影行程 v2026.11.22-1026
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/parsers.gen.ts
@@ -1560,13 +1560,20 @@ async function fillMovieDay(day, ids) {
   return day;
 }
 var movieDayFilled = (day, ids) => day.cinemas.every((c) => c.full || ids.indexOf(c.id) < 0);
-var FORMATS = ["IMAX", "4DX", "ScreenX", "MX4D", "杜比"];
+var FORMATS = ["IMAX", "杜比", "4DX", "MX4D", "ScreenX", "巨幕", "LED", "頂級廳", "3D"];
 var FORMAT_RE = {
   IMAX: /IMAX/i,
+  杜比: /DOLBY|杜比|(?<![A-Z])DVA(?![A-Z])|ATMOS/i,
+  // Dolby Cinema、秀泰的 DVA（Dolby Vision＋Atmos）、Atmos 廳
   "4DX": /4DX/i,
-  ScreenX: /SCREEN\s*X/i,
   MX4D: /MX4D/i,
-  杜比: /DOLBY|杜比/i
+  ScreenX: /SCREEN\s*X/i,
+  巨幕: /巨幕|寬巨|TITAN|LUXE|ULTRA/i,
+  // 秀泰 巨幕／寬巨／ULTRA、MUVIE TITAN、新光 LUXE
+  LED: /(?<![A-Z])LED(?![A-Z])|ONYX/i,
+  // LG LED Cinema 等 LED 螢幕廳
+  頂級廳: /gold\s*class|mucrown|金鑽|貴賓|VIP|皇家|丹普|REMMI/i,
+  "3D": /(?<![A-Z0-9])3D/i
 };
 function formatsOf(label) {
   return FORMATS.filter((f) => FORMAT_RE[f].test(label));
@@ -2501,7 +2508,7 @@ var App = class {
     ];
     // ── 事件迴圈 ──
     // 背景查 GitHub 上的最新版本（首頁顯示是否為最新版）
-    this.latest = checkLatest("2026.11.22-0534");
+    this.latest = checkLatest("2026.11.22-1026");
     // ── 搜尋 ──
     this.query = "";
     this.tmdbStatus = "";
@@ -2636,11 +2643,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.22-0534"}`);
+          Pasteboard.copy(`版本 ${"2026.11.22-1026"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.22-0534"}`,
+      `版本 ${"2026.11.22-1026"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }

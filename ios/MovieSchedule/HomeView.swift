@@ -75,7 +75,8 @@ struct NowView: View {
         ("soon", "接下來 3 小時"), ("morning", "中午前"), ("afternoon", "下午 12–17 點"),
         ("evening", "晚上 17–21 點"), ("night", "深夜 21 點後"), ("all", "整天"),
     ]
-    private static let formats = ["IMAX", "4DX", "ScreenX", "MX4D", "杜比"]
+    /// 特殊廳清單由共用資料層提供（跟其他版本同一份），讀到之前先用這份
+    @State private var formats = ["IMAX", "杜比", "4DX", "MX4D", "ScreenX", "巨幕", "LED", "頂級廳", "3D"]
 
     var body: some View {
         List {
@@ -98,7 +99,7 @@ struct NowView: View {
                 }
                 Picker("特殊廳", selection: $format) {
                     Text("全部").tag("")
-                    ForEach(Self.formats, id: \.self) { Text($0).tag($0) }
+                    ForEach(formats, id: \.self) { Text($0).tag($0) }
                 }
             }
             switch result {
@@ -144,6 +145,7 @@ struct NowView: View {
         .navigationBarTitleDisplayMode(.inline)
         .refreshable { await load() }
         .task(id: "\(date)|\(window)|\(scope)|\(format)") { await load() }
+        .task { if let list = try? await Bridge.shared.call("formatList", [], as: [String].self), !list.isEmpty { formats = list } }
     }
 
     private func load() async {

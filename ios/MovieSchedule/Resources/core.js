@@ -1689,13 +1689,20 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
       return "";
     }
   }
-  var FORMATS = ["IMAX", "4DX", "ScreenX", "MX4D", "杜比"];
+  var FORMATS = ["IMAX", "杜比", "4DX", "MX4D", "ScreenX", "巨幕", "LED", "頂級廳", "3D"];
   var FORMAT_RE = {
     IMAX: /IMAX/i,
+    杜比: new RegExp("DOLBY|杜比|(?<![A-Z])DVA(?![A-Z])|ATMOS", "i"),
+    // Dolby Cinema、秀泰的 DVA（Dolby Vision＋Atmos）、Atmos 廳
     "4DX": /4DX/i,
-    ScreenX: /SCREEN\s*X/i,
     MX4D: /MX4D/i,
-    杜比: /DOLBY|杜比/i
+    ScreenX: /SCREEN\s*X/i,
+    巨幕: /巨幕|寬巨|TITAN|LUXE|ULTRA/i,
+    // 秀泰 巨幕／寬巨／ULTRA、MUVIE TITAN、新光 LUXE
+    LED: new RegExp("(?<![A-Z])LED(?![A-Z])|ONYX", "i"),
+    // LG LED Cinema 等 LED 螢幕廳
+    頂級廳: /gold\s*class|mucrown|金鑽|貴賓|VIP|皇家|丹普|REMMI/i,
+    "3D": new RegExp("(?<![A-Z0-9])3D", "i")
   };
   function formatsOf(label) {
     return FORMATS.filter((f) => FORMAT_RE[f].test(label));
@@ -2156,7 +2163,8 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   async function fillMovie(slug, date, ids) {
     return fillMovieDay(await movieDay(slug, date || void 0), ids);
   }
-  var extra = { boxOffice, nowShowing, nearby, patchSettings, fillMovie };
+  var formatList = () => FORMATS;
+  var extra = { boxOffice, nowShowing, nearby, patchSettings, fillMovie, formatList };
   globalThis.MS = {
     init(saved) {
       cache = saved || {};
