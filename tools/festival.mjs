@@ -490,7 +490,7 @@ export function parseTicffPage(html, year, url = TICFF) {
     const age = clean((clean(head).match(/Age\s*([^\s｜|]+)/) || [])[1]);
     const first = (box.match(/<a href="([^"#]+)"[^>]*title="[^"]*在本視窗開啟/) || [])[1] || "";
     const m = place.match(/^(.+?)\s*(\d+)\s*廳/);
-    films[title] ||= { id: title, title, mins, rating: age ? (/^\d/.test(age) ? `${age.replace(/\s+/g, "")} 歲` : age) : "", url: first ? new URL(first, TICFF).href : url };
+    films[title] ||= { id: title, title, mins, rating: /^\d/.test(age) ? `${age} 歲` : /[\u4e00-\u9fff]/.test(age) ? age : "", url: first ? new URL(first, TICFF).href : url };
     sessions.push({ film: title, date: `${year}-${md[1].padStart(2, "0")}-${md[2].padStart(2, "0")}`, time: time[1].padStart(5, "0"), venue: m ? m[1] : place, room: m ? m[2] : "", ticket: "" });
   }
   return { films, sessions };
