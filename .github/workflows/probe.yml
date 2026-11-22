@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       url:
-        description: 要測試的網址
+        description: 要測試的網址（可以多個，用空白分開）
         required: true
 permissions: {}
 jobs:
@@ -17,8 +17,12 @@ jobs:
           TARGET: ${{ inputs.url }}
         run: |
           UA="Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1"
-          curl -sS -m 40 -L -A "$UA" -H "Accept-Language: zh-TW,zh;q=0.9" -D headers.txt -o body.bin -w "狀態 %{http_code}，大小 %{size_download}，最後網址 %{url_effective}\n" -- "$TARGET" || true
-          echo "── 標頭 ──"; head -25 headers.txt || true
-          echo "── 內容開頭 ──"; head -c 1500 body.bin || true
-          echo; echo "── 內容裡像是資料介面的網址 ──"
-          grep -aoiE "[\"'][^\"' ]*(api|ashx|json|GetShow|ShowTime|session)[^\"' ]*[\"']" body.bin | sort -u | head -40 || true
+          # 可以一次給好幾個網址（用空白分開）
+          for U in $TARGET; do
+            echo "════════ $U"
+            curl -sS -m 40 -L -A "$UA" -H "Accept-Language: zh-TW,zh;q=0.9" -D headers.txt -o body.bin -w "狀態 %{http_code}，大小 %{size_download}，最後網址 %{url_effective}\n" -- "$U" || true
+            echo "── 標頭（重點）──"; grep -iE "^(HTTP|server|content-type|cf-mitigated|location|x-powered-by|set-cookie)" headers.txt | cut -c1-160 | head -12 || true
+            echo "── 標題與內容開頭 ──"; grep -aoiE "<title>[^<]*" body.bin | head -2 || true; head -c 600 body.bin | tr '\n' ' ' || true
+            echo; echo "── 內容裡的連結（片單、場次、資料介面）──"
+            grep -aoiE "(href|src|action|url)[=:] ?[\"'][^\"' ]*(film|programme|schedule|session|ticket|api|json|ashx|activity|game)[^\"' ]*[\"']" body.bin | sort -u | head -40 || true
+          done
