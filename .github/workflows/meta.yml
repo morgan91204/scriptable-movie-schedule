@@ -17,7 +17,7 @@ concurrency:
 jobs:
   update:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -35,9 +35,24 @@ jobs:
         run: curl -fsSL "https://raw.githubusercontent.com/${{ github.repository }}/data/at.json?t=$(date +%s)" -o "$RUNNER_TEMP/prev-at.json" || echo "還沒有，從頭抓"
       - name: 抓開眼場次（只有開眼有的戲院、要補頂級影廳的威秀）
         run: node tools/at.mjs "$RUNNER_TEMP/prev-at.json" "$RUNNER_TEMP/at.json"
+      - name: 取上一次的場次通場次
+        run: |
+          curl -fsSL "https://raw.githubusercontent.com/${{ github.repository }}/data/tw-near.json?t=$(date +%s)" -o "$RUNNER_TEMP/prev-tw-near.json" || echo "還沒有近期檔"
+          curl -fsSL "https://raw.githubusercontent.com/${{ github.repository }}/data/tw-far.json?t=$(date +%s)" -o "$RUNNER_TEMP/prev-tw-far.json" || echo "還沒有遠期檔"
+          curl -fsSL "https://raw.githubusercontent.com/${{ github.repository }}/data/official.json?t=$(date +%s)" -o "$RUNNER_TEMP/prev-official.json" || echo "還沒有官網檔"
+      - name: 抓場次通與官網來源的場次（「現在有什麼可以看」用）
+        run: node tools/tw.mjs "$RUNNER_TEMP/prev-tw-near.json" "$RUNNER_TEMP/prev-tw-far.json" "$RUNNER_TEMP/tw-near.json" "$RUNNER_TEMP/tw-far.json" "$RUNNER_TEMP/prev-official.json" "$RUNNER_TEMP/official.json"
       - name: 發佈到 data 分支
         run: tools/publish-data.sh "$RUNNER_TEMP/meta.json" meta.json "更新資料"
       - name: 發佈開眼場次到 data 分支
         run: |
           git checkout -q -f "$GITHUB_SHA"
           tools/publish-data.sh "$RUNNER_TEMP/at.json" at.json "更新資料"
+      - name: 發佈場次通場次到 data 分支
+        run: |
+          git checkout -q -f "$GITHUB_SHA"
+          tools/publish-data.sh "$RUNNER_TEMP/tw-near.json" tw-near.json "更新資料"
+          git checkout -q -f "$GITHUB_SHA"
+          tools/publish-data.sh "$RUNNER_TEMP/tw-far.json" tw-far.json "更新資料"
+          git checkout -q -f "$GITHUB_SHA"
+          tools/publish-data.sh "$RUNNER_TEMP/official.json" official.json "更新資料"

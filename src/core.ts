@@ -240,7 +240,7 @@ async function loadAtTheaters(): Promise<Cinema[]> {
 
 // ── 伺服器先抓好的開眼場次 ──
 // 開眼每個網頁要 3 秒左右。GitHub Actions 每小時把「只有開眼有的戲院」和「要補頂級影廳的威秀」今明兩天的片單抓好，
-// 存成一個檔（data 分支的 at.json）；App 先讀這個檔，沒有、超過 3 小時沒更新或讀不到，才自己去讀開眼。
+// 存成一個檔（data 分支的 at.json）；App 先讀這個檔，沒有、超過 12 小時沒更新或讀不到，才自己去讀開眼。
 export const AT_DATA_URL = "https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/data/at.json";
 export interface AtData {
   updated: number;
@@ -251,7 +251,7 @@ let atDataMem: { at: number; job: Promise<AtData | null> } | null = null;
 function loadAtData(): Promise<AtData | null> {
   if (!metaOn) return Promise.resolve(null);
   if (atDataMem && Date.now() - atDataMem.at < 20 * 60e3) return atDataMem.job;
-  const fresh = (d: AtData | null) => (d && d.days && Date.now() - d.updated < 3 * 3600e3 ? d : null);
+  const fresh = (d: AtData | null) => (d && d.days && Date.now() - d.updated < 12 * 3600e3 ? d : null); // 排程常隔好幾小時才跑，抓寬一點
   const job = (async (): Promise<AtData | null> => {
     let disk: { at: number; data: AtData } | null = null;
     try {
@@ -288,8 +288,51 @@ async function atDay(c: Cinema, date?: string): Promise<AtDay> {
   return atDayLive(c.url, date);
 }
 
+// ── 伺服器先抓好的場次通場次 ──
+// 「現在有什麼可以看」查一個縣市要讀幾十間影城、每間一兩頁，手機一頁一頁讀又要各自解析，是它慢的主因。
+// GitHub Actions 每小時把場次通所有影城的片單抓好，分成兩個檔：近期（今天、明天）和遠期（後天起 5 天）。
+// App 先讀這兩個檔（一兩個請求），沒有、太久沒更新或讀不到，才自己去讀場次通。
+export const TW_NEAR_URL = "https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/data/tw-near.json";
+export const TW_FAR_URL = "https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/data/tw-far.json";
+interface TwServed { date: string; dates: string[]; address: string; booking: string; movies: Movie[] }
+interface TwData { updated: number; days: Record<string, Record<string, TwServed>> } // 影城代碼 → 日期 → 片單
+/** 官網來源的影城（誠品、光點、真善美）：伺服器抓好的整份時刻表。光點華山要一部片讀一頁，手機自己讀要幾十個請求 */
+export const OFFICIAL_URL = "https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/data/official.json";
+interface OfficialData { updated: number; cinemas: Record<string, MultiDay> }
+// GitHub 的免費排程常常隔好幾個小時才跑一次（寫每小時也一樣），所以過期時間抓寬：
+// 今明兩天與官網來源 12 小時、後天起 24 小時。場次公布後很少更動；超過這個時間就改由手機自己讀
+const servedMem: Record<string, { at: number; job: Promise<any> }> = {};
+function loadServed<T extends { updated: number }>(name: string, url: string, maxHours: number, ok: (d: T) => boolean): Promise<T | null> {
+  if (!metaOn) return Promise.resolve(null);
+  const hit = servedMem[name];
+  if (hit && Date.now() - hit.at < 20 * 60e3) return hit.job;
+  const fresh = (d: T | null) => (d && ok(d) && Date.now() - d.updated < maxHours * 3600e3 ? d : null);
+  const job = (async (): Promise<T | null> => {
+    let disk: { at: number; data: T } | null = null;
+    try {
+      disk = JSON.parse(cacheGet(name + ".json") || "null");
+    } catch (_) {}
+    if (disk && Date.now() - disk.at < 30 * 60e3) return fresh(disk.data);
+    const net = (async () => {
+      const r = await platform().fetchText(url + "?t=" + Math.floor(Date.now() / (20 * 60e3)), { accept: "application/json" });
+      if (r.status !== 200) return null;
+      const data = JSON.parse(r.body) as T;
+      if (!data || !ok(data)) return null;
+      cacheSet(name + ".json", JSON.stringify({ at: Date.now(), data }));
+      return data;
+    })().catch(() => null);
+    const got = await Promise.race([net, delay(6000).then(() => null)]);
+    return fresh(got || (disk ? disk.data : null));
+  })();
+  servedMem[name] = { at: Date.now(), job };
+  return job;
+}
+const loadTwData = (far: boolean) =>
+  loadServed<TwData>(far ? "tw-far" : "tw-near", far ? TW_FAR_URL : TW_NEAR_URL, far ? 24 : 12, (d) => typeof d.days === "object");
+
 const twDayCache: Record<string, TwDay> = {};
-async function twDay(c: Cinema, date?: string): Promise<TwDay> {
+/** 直接讀場次通的影城頁（不經過伺服器資料；伺服器產生資料時也用這個） */
+export async function twDayLive(c: Cinema, date?: string): Promise<TwDay> {
   const key = c.id + "|" + (date || "");
   if (!twDayCache[key]) {
     const url = date ? `${TW}/cinemas/${c.id}/${date}/` : c.url;
@@ -297,15 +340,36 @@ async function twDay(c: Cinema, date?: string): Promise<TwDay> {
   }
   return twDayCache[key];
 }
+async function twDay(c: Cinema, date?: string): Promise<TwDay> {
+  const today = todayTPE();
+  const day = date || today;
+  const key = c.id + "|" + (date || "");
+  if (twDayCache[key]) return twDayCache[key];
+  // 先看伺服器抓好的：今天、明天在近期檔，後天起在遠期檔
+  const off = Math.round((Date.parse(day + "T00:00:00Z") - Date.parse(today + "T00:00:00Z")) / 86400e3);
+  if (off >= 0 && off <= 6) {
+    const data = await loadTwData(off >= 2);
+    const hit = data?.days[c.id]?.[day];
+    if (hit && hit.date === day) return (twDayCache[key] = { cinema: c.name, ...hit });
+  }
+  return twDayLive(c, date);
+}
 
 const multiCache: Record<string, MultiDay> = {};
+/** 直接讀影城官網（不經過伺服器資料；伺服器產生資料時也用這個） */
+export async function multiDayLive(c: Cinema): Promise<MultiDay> {
+  if (c.source === "eslite") return parse<MultiDay>("parseEslite", await getText(c.url));
+  if (c.source === "spot-hs") return parse<MultiDay>("parseSpotHs", await getText(c.url));
+  if (c.source === "lux") return luxCinema();
+  return spotTaipei();
+}
 async function multiDay(c: Cinema): Promise<MultiDay> {
   if (multiCache[c.id]) return multiCache[c.id];
-  let r: MultiDay;
-  if (c.source === "eslite") r = await parse<MultiDay>("parseEslite", await getText(c.url));
-  else if (c.source === "spot-hs") r = await parse<MultiDay>("parseSpotHs", await getText(c.url));
-  else if (c.source === "lux") r = await luxCinema();
-  else r = await spotTaipei();
+  // 先看伺服器抓好的：裡面要還有今天以後的場次才算數
+  const data = await loadServed<OfficialData>("official", OFFICIAL_URL, 12, (d) => typeof d.cinemas === "object");
+  const hit = data?.cinemas[c.id];
+  const today = todayTPE();
+  const r = hit && hit.schedules && Object.keys(hit.schedules).some((d) => d >= today) ? hit : await multiDayLive(c);
   multiCache[c.id] = r;
   return r;
 }
