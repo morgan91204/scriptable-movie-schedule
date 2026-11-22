@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.22-1130
+// @movie-schedule-app 電影行程 v2026.11.22-1143
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/parsers.gen.ts
@@ -1944,10 +1944,10 @@ function ratingTier(kind, v) {
   const x = kind === "imdb" ? v * 10 : v;
   return x >= 75 ? "good" : x >= 60 ? "mid" : "bad";
 }
-var SITE_URL = "https://movie-web.morgan91204.workers.dev";
+var SITE_URL = "https://movie-web.twmovietime.workers.dev";
 var ABOUT_URL = SITE_URL + "/about/";
 var PRIVACY_URL = SITE_URL + "/privacy/";
-var COMMUNITY_API = "https://movie-ratings.morgan91204.workers.dev";
+var COMMUNITY_API = "https://movie-ratings.twmovietime.workers.dev";
 function deviceId() {
   const ok = (x) => !!x && /^[A-Za-z0-9_-]{16,64}$/.test(x);
   const saved = cacheGet("device-id.txt");
@@ -2615,7 +2615,7 @@ var App = class {
     ];
     // ── 事件迴圈 ──
     // 背景查 GitHub 上的最新版本（首頁顯示是否為最新版）
-    this.latest = checkLatest("2026.11.22-1130");
+    this.latest = checkLatest("2026.11.22-1143");
     // ── 搜尋 ──
     this.query = "";
     this.tmdbStatus = "";
@@ -2760,11 +2760,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.22-1130"}`);
+          Pasteboard.copy(`版本 ${"2026.11.22-1143"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.22-1130"}`,
+      `版本 ${"2026.11.22-1143"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }

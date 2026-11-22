@@ -1,7 +1,7 @@
 // 觀眾評分總表：把 Worker 的 /v1/all 存成靜態檔，App 平常讀這個檔，不用每開一部片就打一次伺服器。
 // 用法：node tools/community.mjs <輸出檔>（GitHub Actions 每 30 分鐘跑一次，內容有變才提交到 data 分支）
 import fs from "node:fs";
-const API = "https://movie-ratings.morgan91204.workers.dev/v1/all";
+const API = "https://movie-ratings.twmovietime.workers.dev/v1/all";
 const out = process.argv[2] || "community.json";
 const res = await fetch(API, { headers: { accept: "application/json" } });
 if (res.status === 404) {
