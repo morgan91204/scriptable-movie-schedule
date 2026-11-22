@@ -74,6 +74,8 @@ struct PosterView: View {
     var slug: String? = nil
     var en: String? = nil
     var width: CGFloat = 44
+    /// 有給上映日期 = 已下檔的舊片：用輕量查法（一部片一個小請求），不走完整查詢
+    var lightRelease: String? = nil
 
     @State private var image: UIImage?
     @State private var done = false
@@ -95,7 +97,13 @@ struct PosterView: View {
     }
 
     private func load() async {
-        guard let url = try? await Bridge.shared.call("moviePoster", [title, js(slug), js(en)], as: String.self), !url.isEmpty else {
+        var found: String?
+        if let lightRelease {
+            found = try? await Bridge.shared.call("posterLight", [title, lightRelease], as: String.self)
+        } else {
+            found = try? await Bridge.shared.call("moviePoster", [title, js(slug), js(en)], as: String.self)
+        }
+        guard let url = found, !url.isEmpty else {
             done = true
             return
         }

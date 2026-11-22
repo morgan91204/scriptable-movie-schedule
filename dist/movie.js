@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.22-1337
+// @movie-schedule-app 電影行程 v2026.11.22-1350
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/parsers.gen.ts
@@ -1289,6 +1289,37 @@ async function posterLane(job) {
 }
 var posterOnly = {};
 var posterDone = {};
+var posterLightMem = {};
+function posterLight(title, release) {
+  const k = "|" + title;
+  return posterLightMem[k] ||= (async () => {
+    const nk = normTitle(title);
+    const all = readExtras();
+    const hit = all["t|" + nk] || all["n|" + nk] || all["p|" + nk];
+    if (hit?.poster && !/ytimg\.com/.test(hit.poster)) return normImageUrl(hit.poster);
+    const me = await metaOf(title);
+    if (me && me.p) return normImageUrl(me.p);
+    const own = all["l|" + nk];
+    if (own && Date.now() - own.at < (own.poster ? 30 : 3) * 864e5) return own.poster;
+    const year = Number((release || "").slice(0, 4)) || 0;
+    const poster = await posterLane(async () => {
+      try {
+        const q = baseTitle(title).toLowerCase().replace(/[\\/?#%]/g, " ").trim();
+        const r = await platform().fetchText(`https://v3.sg.media-imdb.com/suggestion/x/${encodeURIComponent(q)}.json`, { "User-Agent": UA });
+        const d = JSON.parse(r.body).d || [];
+        const x = d.find((v) => /^tt/.test(v.id) && (v.qid === "movie" || v.qid === "tvMovie" || v.qid === "video") && v.i?.imageUrl && (!year || !v.y || Math.abs(Number(v.y) - year) <= 1));
+        const u = String(x?.i?.imageUrl || "");
+        return /^https:\/\/m\.media-amazon\.com\//.test(u) ? u.replace(/\._V1_.*?(\.\w+)$/, "._V1_UX300_$1") : "";
+      } catch (_) {
+        return "";
+      }
+    });
+    const latest = readExtras();
+    latest["l|" + nk] = { poster, trailer: "", trailerName: "", at: Date.now() };
+    cacheSet("extras.json", JSON.stringify(latest));
+    return poster;
+  })().then((u) => posterDone[k] = u);
+}
 function moviePoster(title, slug, en) {
   const k = (slug || "") + "|" + title;
   return posterOnly[k] ||= (async () => {
@@ -1604,11 +1635,12 @@ function boxOfficeTitle(b, by, years) {
   if (by === "total") return `上映中｜累計票房（截至 ${md(b.end)}）`;
   return b.mode === "week" ? `上映中｜${md(b.start)}–${md(b.end)} 週票房` : boxOfficeLabel(b);
 }
+var BOX_PAGE = 100;
 function boxOfficeFooter(b, by, years) {
   const src = `資料來源：${b.source}。官方每週更新一次。`;
   if (by === "year") {
     const ys = boxYearsPicked(b, years);
-    return `${yearText(ys)} 年上映的電影依累計票房排序${ys.length > 1 ? "（各年取前 200 名合併）" : "，列前 200 名"}；已經下檔的也在裡面，標「上映中」的是這一週還有賣出票的。年度依上映日期歸屬，票房是上映以來的累計。${src}`;
+    return `${yearText(ys)} 年上映、有票房紀錄的電影依累計票房排序；已經下檔的也在裡面，標「上映中」的是這一週還有賣出票的。年度依上映日期歸屬，票房是上映以來的累計。一次顯示 100 部，舊片的海報會慢慢補上，找不到的用預設海報。${src}`;
   }
   const scope = `只排上映中的電影：這一週有賣出票的共 ${b.list.length} 部，已經下檔的不在裡面（看「年度」）。`;
   return by === "total" ? `${scope}${src}` : `${scope}${boxOfficeNote(b)}${src}`;
@@ -2129,7 +2161,9 @@ function loadBoxOfficeFull() {
       years = d.years;
       cacheSet("boxoffice-years.json", JSON.stringify({ at: Date.now(), end: d.end, years }));
     }
-    return { ...b, years: { ...b.years || {}, ...years } };
+    const full = {};
+    for (const y of Object.keys(years)) full[y] = years[y].map((x) => ({ ...x, week: null, country: x.country || "" }));
+    return { ...b, years: { ...b.years || {}, ...full } };
   })().catch(async (e) => {
     boxYearsMem = null;
     return loadBoxOffice();
@@ -2140,12 +2174,13 @@ function money(n) {
   if (n >= 1e4) return String(Math.round(n / 1e4)).replace(/\B(?=(\d{3})+(?!\d))/g, ",") + " 萬";
   return String(Math.round(n)) + " 元";
 }
-function matchBoxOffice(name, movies) {
-  const k = communityKey(name);
-  return movies.find((m) => communityKey(m.title) === k);
-}
 function boxOfficeNote(b) {
   return b.list.some((x) => x.since) ? "標「上映至今」的是官方這週才第一次列入的新片：沒有上週的數字可以相減，排名用的是上映以來的累計，會比單週多。" : "";
+}
+function boxMatcher(movies) {
+  const map = {};
+  for (const m of movies) map[communityKey(m.title)] ||= m;
+  return (name) => map[communityKey(name)];
 }
 function boxOfficeLabel(b) {
   const md = (d) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`;
@@ -2721,7 +2756,7 @@ var App = class {
     ];
     // ── 事件迴圈 ──
     // 背景查 GitHub 上的最新版本（首頁顯示是否為最新版）
-    this.latest = checkLatest("2026.11.22-1337");
+    this.latest = checkLatest("2026.11.22-1350");
     // ── 搜尋 ──
     this.query = "";
     this.tmdbStatus = "";
@@ -2736,6 +2771,10 @@ var App = class {
     this.boxSort = "week";
     // 票房排行的排法：本週／累計／年度
     this.boxYears = [];
+    // 年度排行選了哪幾年（空 = 最新的一年）
+    this.boxLimit = 100;
+    // 年度排行目前顯示幾列
+    this.boxPageKey = "";
     // 日期、縣市、特殊廳都可以複選（點一下選、再點一下取消）；換一部片時日期重來
     this.movieFor = "";
     this.movieDates = [];
@@ -2869,11 +2908,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.22-1337"}`);
+          Pasteboard.copy(`版本 ${"2026.11.22-1350"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.22-1337"}`,
+      `版本 ${"2026.11.22-1350"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -3231,7 +3270,6 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
       this.movieMode = "soon";
     } }));
   }
-  // 年度排行選了哪幾年（空 = 最新的一年）
   async boxOfficeView() {
     const [b, all] = await Promise.all([this.boxSort === "year" ? loadBoxOfficeFull() : loadBoxOffice(), loadMovies().catch(() => [])]);
     const k = this.movieQuery.trim().toLowerCase();
@@ -3239,15 +3277,23 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
     const by = sorts.some((x) => x.id === this.boxSort) ? this.boxSort : "week";
     const yearOptions = boxYears(b);
     const years = boxYearsPicked(b, this.boxYears);
-    const rows = boxOfficeBy(b, by, years).map((x) => ({ x, m: matchBoxOffice(x.name, all) })).filter(({ x, m }) => !k || `${x.name} ${m?.en || ""}`.toLowerCase().includes(k));
-    const jobs = rows.map(({ x, m }) => moviePoster(m ? m.title : x.name, m?.slug, m?.en).catch(() => ""));
-    const wait = this.rerendering ? 0 : 600;
+    const match = boxMatcher(all);
+    const found = boxOfficeBy(b, by, years).map((x) => ({ x, m: match(x.name) })).filter(({ x, m }) => !k || `${x.name} ${m?.en || ""}`.toLowerCase().includes(k));
+    const paged = by === "year";
+    const pageKey = `${by}|${years.join(",")}|${k}`;
+    if (this.boxPageKey !== pageKey) {
+      this.boxPageKey = pageKey;
+      this.boxLimit = BOX_PAGE;
+    }
+    const rows = paged ? found.slice(0, this.boxLimit) : found;
+    const jobs = rows.map(({ x, m }) => (paged && !m ? posterLight(x.name, x.release) : moviePoster(m ? m.title : x.name, m?.slug, m?.en)).catch(() => ""));
+    const wait = this.rerendering ? 0 : paged ? 150 : 600;
     const posters = await Promise.all(jobs.map((p) => Promise.race([p, sleep(wait).then(() => void 0)])));
     const late = jobs.filter((_, i) => posters[i] === void 0);
     const batches = [];
     for (let i = 0; i < late.length; i += 8) batches.push(Promise.all(late.slice(i, i + 8)));
     if (batches.length) this.late = batches;
-    prefetchPosters(rows.map(({ x, m }) => ({ title: m ? m.title : x.name, slug: m?.slug, en: m?.en })), 300, 0, 0);
+    if (!paged) prefetchPosters(rows.map(({ x, m }) => ({ title: m ? m.title : x.name, slug: m?.slug, en: m?.en })), 300, 0, 0);
     const thumb = (u) => {
       if (u === void 0) return { src: "", pending: true };
       const src = posterSrc(u);
@@ -3274,7 +3320,9 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
           onTap: m ? () => this.go(() => this.movieView(m, ""), `讀取《${m.title}》的放映影城…`) : () => this.go(() => this.boxMovieView(x), `讀取《${x.name}》…`)
         }
       );
-    })));
+    })), paged && found.length > rows.length ? /* @__PURE__ */ h(Button, { label: `顯示更多（還有 ${found.length - rows.length} 部）`, kind: "secondary", onTap: () => {
+      this.boxLimit += BOX_PAGE;
+    } }) : null);
   }
   /** 票房排行上、場次通已經沒有場次的片：海報、評分、預告、觀眾評分與票房 */
   async boxMovieView(x) {

@@ -136,6 +136,7 @@ struct BoxOfficeRow: Codable, Identifiable {
     var x: BoxOfficeItem
     var m: TwMovie?
     var lines: [String]? // 兩行說明（共用資料層依排法算好：金額一行、上映日期與戲院數一行）
+    var light: Bool?     // 已下檔的舊片：海報用輕量查法（一部片一個小請求）
     var id: Int { x.rank }
 }
 
@@ -148,6 +149,7 @@ struct BoxOfficeBoard: Codable {
     var sort: String?        // 實際採用的排法
     var years: [String]?     // 年度排行可以選的年份（新的在前）
     var selYears: [String]?  // 實際採用的年份
+    var total: Int?          // 符合條件的總數（比 rows 多的話還有下一批）
     var rows: [BoxOfficeRow]
 }
 

@@ -963,6 +963,54 @@ const posterDone: Record<string, string> = {};
 export function posterReady(title: string, slug?: string): string | undefined {
   return posterDone[(slug || "") + "|" + title];
 }
+/** 只看已經有的海報（手機記過的、伺服器查好的），沒有就回傳空字串，不上網找。
+ *  年度排行有好幾千部已下檔的舊片，一部一部上網找會打出上千個請求，所以那裡只用這個 */
+export async function posterKnown(title: string, slug?: string): Promise<string> {
+  const k = (slug || "") + "|" + title;
+  if (posterDone[k] !== undefined) return posterDone[k];
+  const nk = normTitle(title);
+  const all = readExtras();
+  const hit = all["t|" + nk] || all["n|" + nk] || all["p|" + nk];
+  if (hit?.poster) return (posterDone[k] = normImageUrl(hit.poster));
+  const me = await metaOf(title);
+  const u = me && me.p ? normImageUrl(me.p) : "";
+  if (posterDone[k] === undefined) posterDone[k] = u; // 讓 posterReady 知道「查過了」（之後真的上網找到，會再蓋掉）
+  return u;
+}
+const posterLightMem: Record<string, Promise<string>> = {};
+/** 已下檔舊片用的輕量查法：先看已經有的；沒有就只問 IMDb 的搜尋建議一次（一個很小的請求，回應裡就有海報圖），
+ *  年份要跟上映年相差 1 年內才採用。不走完整查詢（那要連場次通、開眼、YouTube 好幾個網站，舊片幾乎都查不到）。
+ *  結果記在手機上：找到的 30 天、沒找到的 3 天 */
+export function posterLight(title: string, release?: string): Promise<string> {
+  const k = "|" + title;
+  return (posterLightMem[k] ||= (async () => {
+    const nk = normTitle(title);
+    const all = readExtras();
+    const hit = all["t|" + nk] || all["n|" + nk] || all["p|" + nk];
+    if (hit?.poster && !/ytimg\.com/.test(hit.poster)) return normImageUrl(hit.poster);
+    const me = await metaOf(title);
+    if (me && me.p) return normImageUrl(me.p);
+    const own = all["l|" + nk] as (MovieExtras & { at: number }) | undefined;
+    if (own && Date.now() - own.at < (own.poster ? 30 : 3) * 86400e3) return own.poster;
+    const year = Number((release || "").slice(0, 4)) || 0;
+    const poster = await posterLane(async () => {
+      try {
+        const q = baseTitle(title).toLowerCase().replace(/[\\/?#%]/g, " ").trim();
+        const r = await platform().fetchText(`https://v3.sg.media-imdb.com/suggestion/x/${encodeURIComponent(q)}.json`, { "User-Agent": UA });
+        const d = (JSON.parse(r.body).d || []) as any[];
+        const x = d.find((v) => /^tt/.test(v.id) && (v.qid === "movie" || v.qid === "tvMovie" || v.qid === "video") && v.i?.imageUrl && (!year || !v.y || Math.abs(Number(v.y) - year) <= 1));
+        const u = String(x?.i?.imageUrl || "");
+        return /^https:\/\/m\.media-amazon\.com\//.test(u) ? u.replace(/\._V1_.*?(\.\w+)$/, "._V1_UX300_$1") : "";
+      } catch (_) {
+        return "";
+      }
+    });
+    const latest = readExtras();
+    latest["l|" + nk] = { poster, trailer: "", trailerName: "", at: Date.now() } as MovieExtras & { at: number };
+    cacheSet("extras.json", JSON.stringify(latest));
+    return poster;
+  })().then((u) => (posterDone[k] = u)));
+}
 export function moviePoster(title: string, slug?: string, en?: string): Promise<string> {
   const k = (slug || "") + "|" + title;
   return (posterOnly[k] ||= (async () => {
@@ -1343,12 +1391,14 @@ export function boxOfficeTitle(b: BoxOffice, by: BoxSort, years?: string[]): str
   if (by === "total") return `上映中｜累計票房（截至 ${md(b.end)}）`;
   return b.mode === "week" ? `上映中｜${md(b.start)}–${md(b.end)} 週票房` : boxOfficeLabel(b);
 }
+/** 年度排行一次顯示幾列（一年有六百部左右，全選是好幾千部：分批顯示，底下放「顯示更多」） */
+export const BOX_PAGE = 100;
 /** 排行下方的說明 */
 export function boxOfficeFooter(b: BoxOffice, by: BoxSort, years?: string[]): string {
   const src = `資料來源：${b.source}。官方每週更新一次。`;
   if (by === "year") {
     const ys = boxYearsPicked(b, years);
-    return `${yearText(ys)} 年上映的電影依累計票房排序${ys.length > 1 ? "（各年取前 200 名合併）" : "，列前 200 名"}；已經下檔的也在裡面，標「上映中」的是這一週還有賣出票的。年度依上映日期歸屬，票房是上映以來的累計。${src}`;
+    return `${yearText(ys)} 年上映、有票房紀錄的電影依累計票房排序；已經下檔的也在裡面，標「上映中」的是這一週還有賣出票的。年度依上映日期歸屬，票房是上映以來的累計。一次顯示 100 部，舊片的海報會慢慢補上，找不到的用預設海報。${src}`;
   }
   const scope = `只排上映中的電影：這一週有賣出票的共 ${b.list.length} 部，已經下檔的不在裡面（看「年度」）。`;
   return by === "total" ? `${scope}${src}` : `${scope}${boxOfficeNote(b)}${src}`;
@@ -2062,7 +2112,10 @@ export function loadBoxOfficeFull(): Promise<BoxOffice> {
       years = d.years as Record<string, BoxOfficeItem[]>;
       cacheSet("boxoffice-years.json", JSON.stringify({ at: Date.now(), end: d.end, years }));
     }
-    return { ...b, years: { ...(b.years || {}), ...years } };
+    // 年份檔為了省空間沒有 week、country 欄位：補上預設值
+    const full: Record<string, BoxOfficeItem[]> = {};
+    for (const y of Object.keys(years)) full[y] = years[y].map((x) => ({ ...x, week: null, country: x.country || "" }));
+    return { ...b, years: { ...(b.years || {}), ...full } };
   })().catch(async (e) => {
     boxYearsMem = null; // 下次再試
     return loadBoxOffice(); // 至少有今年的
@@ -2084,6 +2137,12 @@ export function boxOfficeNote(b: BoxOffice): string {
   return b.list.some((x) => x.since)
     ? "標「上映至今」的是官方這週才第一次列入的新片：沒有上週的數字可以相減，排名用的是上映以來的累計，會比單週多。"
     : "";
+}
+/** 同上，但先把片單整理成對照表：排行有好幾千列時，不用每一列都把整份片單比一遍 */
+export function boxMatcher<T extends { title: string }>(movies: T[]): (name: string) => T | undefined {
+  const map: Record<string, T> = {};
+  for (const m of movies) map[communityKey(m.title)] ||= m;
+  return (name) => map[communityKey(name)];
 }
 /** 排行的期間說明：「10/26–11/1 週票房」或「截至 11/1 累計」 */
 export function boxOfficeLabel(b: BoxOffice): string {

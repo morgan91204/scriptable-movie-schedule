@@ -12,7 +12,7 @@ import {
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
   loadSettings, saveSettings, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, TW,
   FORMATS, formatsOf, filterVersions, filterVersionsAny, movieRows, movieDays, nearest, kmLabel, WINDOWS, findShowtimes, findShowtimesMulti, multiLabel, multiDetail, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText,
-  hallOf, tmdbTest, movieExtras, moviePoster, movieRuntime, posterSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxSorts, boxYears, boxYearsPicked, foregroundTask, communityStats, communityCached, communityVote, loadBoxOffice, loadBoxOfficeFull, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, ABOUT_URL, PRIVACY_URL, movieRatings, ratingTier,
+  hallOf, tmdbTest, movieExtras, moviePoster, movieRuntime, posterSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityCached, communityVote, loadBoxOffice, loadBoxOfficeFull, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, ABOUT_URL, PRIVACY_URL, movieRatings, ratingTier,
 } from "./core";
 import type { MovieExtras, Ratings, Community, BoxOfficeItem, BoxSort } from "./core";
 import { setTabBar, setBackGuard, esc } from "./jsx";
@@ -797,6 +797,8 @@ class App {
 
   boxSort: BoxSort = "week"; // 票房排行的排法：本週／累計／年度
   boxYears: string[] = []; // 年度排行選了哪幾年（空 = 最新的一年）
+  boxLimit = 100; // 年度排行目前顯示幾列
+  boxPageKey = "";
   async boxOfficeView(): Promise<string> {
     // 年度排行的其他年份是另一個檔，切到「年度」才下載
     const [b, all] = await Promise.all([this.boxSort === "year" ? loadBoxOfficeFull() : loadBoxOffice(), loadMovies().catch(() => [] as TwMovie[])]);
@@ -805,17 +807,27 @@ class App {
     const by: BoxSort = sorts.some((x) => x.id === this.boxSort) ? this.boxSort : "week";
     const yearOptions = boxYears(b);
     const years = boxYearsPicked(b, this.boxYears); // 年度可以複選
-    const rows = boxOfficeBy(b, by, years).map((x) => ({ x, m: matchBoxOffice(x.name, all) })).filter(({ x, m }) => !k || `${x.name} ${m?.en || ""}`.toLowerCase().includes(k));
-    // 海報：手機上記過的立刻有；沒記過的最多等 0.6 秒，其餘讀好後自動補畫
-    const jobs = rows.map(({ x, m }) => moviePoster(m ? m.title : x.name, m?.slug, m?.en).catch(() => ""));
-    const wait = this.rerendering ? 0 : 600;
+    const match = boxMatcher(all);
+    const found = boxOfficeBy(b, by, years).map((x) => ({ x, m: match(x.name) })).filter(({ x, m }) => !k || `${x.name} ${m?.en || ""}`.toLowerCase().includes(k));
+    // 年度排行一年有六百部左右、全選是好幾千部：一次顯示 100 列，底下「顯示更多」。換了排法、年份或搜尋字就從頭開始
+    const paged = by === "year";
+    const pageKey = `${by}|${years.join(",")}|${k}`;
+    if (this.boxPageKey !== pageKey) {
+      this.boxPageKey = pageKey;
+      this.boxLimit = BOX_PAGE;
+    }
+    const rows = paged ? found.slice(0, this.boxLimit) : found;
+    // 海報：手機上記過的立刻有；沒記過的最多等 0.6 秒，其餘讀好後自動補畫。
+    // 年度排行大多是已下檔的舊片：用輕量查法（一部片一個小請求），而且只查畫面上這一批；畫面不等它，好了再補畫
+    const jobs = rows.map(({ x, m }) => (paged && !m ? posterLight(x.name, x.release) : moviePoster(m ? m.title : x.name, m?.slug, m?.en)).catch(() => ""));
+    const wait = this.rerendering ? 0 : paged ? 150 : 600;
     const posters = await Promise.all(jobs.map((p) => Promise.race([p, sleep(wait).then(() => undefined)])));
     const late = jobs.filter((_, i) => posters[i] === undefined);
     // 排行現在排到底（一百多部）：還沒好的每 8 張補畫一次
     const batches: Promise<unknown>[] = [];
     for (let i = 0; i < late.length; i += 8) batches.push(Promise.all(late.slice(i, i + 8)));
     if (batches.length) this.late = batches;
-    prefetchPosters(rows.map(({ x, m }) => ({ title: m ? m.title : x.name, slug: m?.slug, en: m?.en })), 300, 0, 0);
+    if (!paged) prefetchPosters(rows.map(({ x, m }) => ({ title: m ? m.title : x.name, slug: m?.slug, en: m?.en })), 300, 0, 0);
     const thumb = (u: string | undefined) => {
       if (u === undefined) return { src: "" , pending: true };
       const src = posterSrc(u);
@@ -858,6 +870,9 @@ class App {
             );
           })}
         </Section>
+        {paged && found.length > rows.length ? (
+          <Button label={`顯示更多（還有 ${found.length - rows.length} 部）`} kind="secondary" onTap={() => { this.boxLimit += BOX_PAGE; }} />
+        ) : null}
       </Page>
     );
   }

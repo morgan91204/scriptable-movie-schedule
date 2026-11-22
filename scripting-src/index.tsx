@@ -14,7 +14,7 @@ import {
   Cinema, Movie, Settings, Version, TwMovie, TwMovieCinema, CITY_ORDER, TW,
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
   loadSettings, saveSettings, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, cinemaAddress,
-  FORMATS, formatsOf, filterVersions, filterVersionsAny, movieRows, movieDays, nearest, kmLabel, WINDOWS, findShowtimes, findShowtimesMulti, multiLabel, multiDetail, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText, hallOf, tmdbTest, movieExtras, moviePoster, posterReady, posterTint, POSTER_TINTS, normImageUrl, movieRuntime, posterSrc, isLocalSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxSorts, boxYears, boxYearsPicked, foregroundTask, communityStats, communityVote, loadBoxOffice, loadBoxOfficeFull, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, SCRIPTING_IMPORT_URL, ABOUT_URL, PRIVACY_URL, movieRatings, ratingTier,
+  FORMATS, formatsOf, filterVersions, filterVersionsAny, movieRows, movieDays, nearest, kmLabel, WINDOWS, findShowtimes, findShowtimesMulti, multiLabel, multiDetail, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText, hallOf, tmdbTest, movieExtras, moviePoster, posterReady, posterTint, POSTER_TINTS, normImageUrl, movieRuntime, posterSrc, isLocalSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityVote, loadBoxOffice, loadBoxOfficeFull, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, SCRIPTING_IMPORT_URL, ABOUT_URL, PRIVACY_URL, movieRatings, ratingTier,
 } from "./core"
 import type { Format, LatLng, Hit, Community, BoxOfficeItem, BoxSort } from "./core"
 
@@ -416,7 +416,7 @@ function PosterBox({ w, h, r, img, ver, pending, title }: { w: number; h: number
 
 /** 列表的小海報統一在這裡查網址、下載（一次 4 張），好了整批重畫一次。
  *  每一格都不帶自己的狀態：列表裡一掛上就更新狀態的元件，Scripting 偶爾會整格漏畫 */
-function useThumbs(items: { title: string; slug?: string; en?: string }[], key: string): (m: { title: string; slug?: string }) => { img: any; why: string; pending: boolean } {
+function useThumbs(items: { title: string; slug?: string; en?: string; light?: boolean; release?: string }[], key: string): (m: { title: string; slug?: string }) => { img: any; why: string; pending: boolean } {
   const [, setTick] = useState(0)
   const imgs = useMemo(() => ({} as Record<string, any>), []) // 這次進畫面解碼好的圖
   useEffect(() => {
@@ -431,7 +431,8 @@ function useThumbs(items: { title: string; slug?: string; en?: string }[], key: 
     const run = async () => {
       for (let m = queue.shift(); m && alive; m = queue.shift()) {
         try {
-          const u = normImageUrl((await moviePoster(m.title, m.slug, m.en)) || "")
+          // light：已下檔的舊片用輕量查法（一部片一個小請求）
+          const u = normImageUrl((await (m.light ? posterLight(m.title, m.release) : moviePoster(m.title, m.slug, m.en))) || "")
           if (u && !posterImageNow(u)) await loadPosterImage(u)
         } catch (_) {}
         bump()
@@ -908,10 +909,18 @@ function BoxOfficeSections({ movies, query }: { movies: TwMovie[]; query: string
   const [yearOpen, setYearOpen] = useState(false)
   const yearOptions = b ? boxYears(b) : []
   const years = b ? boxYearsPicked(b, pickedYears) : []
+  const match = useMemo(() => boxMatcher(movies), [movies.length])
   // 搜尋片名：中文片名或對得到的英文片名
-  const shown = (b ? boxOfficeBy(b, sort, years) : []).filter((x) => !query || `${x.name} ${matchBoxOffice(x.name, movies)?.en || ""}`.toLowerCase().includes(query))
-  const films = shown.map((x) => { const m = matchBoxOffice(x.name, movies); return { title: m ? m.title : x.name, slug: m?.slug, en: m?.en } })
-  const thumbOf = useThumbs(films, `${b ? b.list.length : 0}|${movies.length}|${query}|${sort}|${years.join(",")}`)
+  const found = (b ? boxOfficeBy(b, sort, years) : []).filter((x) => !query || `${x.name} ${match(x.name)?.en || ""}`.toLowerCase().includes(query))
+  // 年度排行一年有六百部左右、全選是好幾千部：一次顯示 100 列，底下「顯示更多」。換了排法、年份或搜尋字就從頭開始
+  const paged = sort === "year"
+  const pageKey = `${sort}|${years.join(",")}|${query}`
+  const [page, setPage] = useState<{ key: string; n: number }>({ key: "", n: BOX_PAGE })
+  const limit = page.key === pageKey ? page.n : BOX_PAGE
+  const shown = paged ? found.slice(0, limit) : found
+  // 年度排行大多是已下檔的舊片：用輕量查法，而且只查畫面上這一批；畫面先出來，海報好了再補上
+  const films = shown.map((x) => { const m = match(x.name); return { title: m ? m.title : x.name, slug: m?.slug, en: m?.en, light: paged && !m, release: x.release } })
+  const thumbOf = useThumbs(films, `${b ? b.list.length : 0}|${movies.length}|${query}|${sort}|${years.join(",")}|${shown.length}`)
   if (box.error) return <ErrorRow error={box.error} retry={box.reload} />
   if (!b) return <Section><Loading text={"讀取票房排行…"} /></Section>
   const thumbs = films.map(thumbOf)
@@ -936,7 +945,7 @@ function BoxOfficeSections({ movies, query }: { movies: TwMovie[]; query: string
   }) : null}
   <Section header={<Text>{boxOfficeTitle(b, sort, years)}</Text>} footer={<Text>{`${shown.length ? "" : "排行上找不到相符的電影。\n"}${boxOfficeFooter(b, sort, years)}${failNote}`}</Text>}>
     {shown.map((x, i) => {
-      const m = matchBoxOffice(x.name, movies)
+      const m = match(x.name)
       const lines = boxOfficeLines(x, sort)
       const body = <HStack spacing={10}>
         <Text font={x.rank >= 100 ? "subheadline" : "title3"} fontWeight={"bold"} monospacedDigit foregroundStyle={x.rank <= 3 ? "systemOrange" : "secondaryLabel"} lineLimit={1} minScaleFactor={0.6} frame={{ width: 34 }}>{String(x.rank)}</Text>
@@ -951,6 +960,9 @@ function BoxOfficeSections({ movies, query }: { movies: TwMovie[]; query: string
       </HStack>
       return <NavigationLink key={x.rank} destination={m ? <MoviePage movie={m} /> : <BoxOfficeMoviePage item={x} />}>{body}</NavigationLink>
     })}
+    {paged && found.length > shown.length
+      ? <Button title={`顯示更多（還有 ${found.length - shown.length} 部）`} systemImage={"chevron.down"} action={() => setPage({ key: pageKey, n: limit + BOX_PAGE })} />
+      : null}
   </Section>
   </>
 }

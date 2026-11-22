@@ -69,7 +69,7 @@ if (base) {
   start = since;
 }
 
-// 年度總排行：各年上映的片依累計票房排（已經下檔的也算），每年前 200 名；這週還有賣出票的標記「上映中」
+// 年度總排行：各年上映的片依累計票房排（已經下檔的也算），有票房的全部列出；這週還有賣出票的標記「上映中」
 const year = end.slice(0, 4);
 const showing = new Set(mode === "week" ? list.map(key) : []);
 const everything = src.List.filter((x) => x.Name && day(x.ReleaseDate)).map((x) => ({
@@ -83,8 +83,8 @@ const yearOf = (y) =>
   everything
     .filter((f) => f.release.slice(0, 4) === y && f.total > 0)
     .sort((a, b) => b.total - a.total)
-    .slice(0, 200)
-    .map((f, i) => ({ rank: i + 1, name: f.name, country: f.country, release: f.release, theaters: f.theaters, week: null, total: f.total, ...(showing.has(key(f)) ? { showing: true } : {}) }));
+    // 全部列出（一年大約六百部）；欄位只留畫面用得到的，檔案才不會太大
+    .map((f, i) => ({ rank: i + 1, name: f.name, release: f.release, theaters: f.theaters, total: f.total, ...(showing.has(key(f)) ? { showing: true } : {}) }));
 // 官方開放資料從 2016 年起：每一年都列。這些另外存成一個檔（dist/boxoffice-years.json），App 切到「年度」才下載，
 // 平常看本週／累計不用多下載這一包
 const years = {};
@@ -113,8 +113,8 @@ const result = {
     total: f.total,
     tickets: f.tickets,
   })),
-  year: yearList, // 今年的年度排行
-  years: { [year]: yearList }, // 主檔只放今年；其他年份在 boxoffice-years.json
+  year: yearList.slice(0, 200), // 今年的年度排行前 200 名（主檔保持小；完整的和其他年份在 boxoffice-years.json）
+  years: { [year]: yearList.slice(0, 200) },
 };
 
 fs.mkdirSync("data", { recursive: true });

@@ -25,6 +25,7 @@ SHARED="src/core.ts src/platform.ts src/parsers.ts src/parsers.gen.ts src/at-lis
 rm -rf build/scripting-check && mkdir -p build/scripting-check
 cp $SHARED scripting-src/index.tsx scripting-src/platform-scripting.ts scripting-src/scripting-shim.d.ts src/dom-shim.d.ts build/scripting-check/
 npx tsc -p tsconfig.scripting.json
+npx tsc -p tsconfig.ios.json   # 原生 App 的資料層入口（ios/bridge.ts）：少了函式、打錯名字在這裡就會擋下來
 rm -rf scripting && mkdir scripting
 cp $SHARED scripting-src/index.tsx scripting-src/platform-scripting.ts scripting/
 node -e '

@@ -108,6 +108,7 @@ struct BoxOfficeSection: View {
     @State private var board: Loadable<BoxOfficeBoard> = .loading
     @State private var sort = "week" // 排法：本週／累計／年度
     @State private var years: Set<String> = [] // 年度排行選了哪幾年（空 = 最新的一年）
+    @State private var limit = 100 // 年度排行目前顯示幾列（一年六百部左右，分批顯示）
 
     var body: some View {
         Group {
@@ -160,8 +161,7 @@ struct BoxOfficeSection: View {
             case .failed(let message):
                 Section { ErrorRow(message: message) { Task { await load() } } }
             case .loaded(let b):
-                let k = query.trimmingCharacters(in: .whitespaces).lowercased()
-                let rows = b.rows.filter { k.isEmpty || "\($0.x.name) \($0.m?.en ?? "")".lowercased().contains(k) }
+                let rows = b.rows // 搜尋與分批都由共用資料層處理
                 Section {
                     ForEach(rows) { r in
                         if let m = r.m {
@@ -170,6 +170,15 @@ struct BoxOfficeSection: View {
                             rowLabel(r)
                         }
                     }
+                    if let total = b.total, total > rows.count {
+                        // 滑到這一列就自動載入下一批（也可以直接點）
+                        Button {
+                            limit += 100
+                        } label: {
+                            Label("顯示更多（還有 \(total - rows.count) 部）", systemImage: "chevron.down")
+                        }
+                        .onAppear { limit = rows.count + 100 }
+                    }
                 } header: {
                     Text(b.label)
                 } footer: {
@@ -177,7 +186,10 @@ struct BoxOfficeSection: View {
                 }
             }
         }
-        .task(id: sort + "|" + years.sorted().joined(separator: ",")) { await load() }
+        .task(id: [sort, years.sorted().joined(separator: ","), query, String(limit)].joined(separator: "|")) { await load() }
+        .onChange(of: sort) { _, _ in limit = 100 }
+        .onChange(of: years) { _, _ in limit = 100 }
+        .onChange(of: query) { _, _ in limit = 100 }
     }
 
     private func rowLabel(_ r: BoxOfficeRow) -> some View {
@@ -187,7 +199,7 @@ struct BoxOfficeSection: View {
                 .foregroundStyle(r.x.rank <= 3 ? Color.orange : Color.secondary)
                 .lineLimit(1).minimumScaleFactor(0.6)
                 .frame(width: 36)
-            PosterView(title: r.m?.title ?? r.x.name, slug: r.m?.slug, en: r.m?.en)
+            PosterView(title: r.m?.title ?? r.x.name, slug: r.m?.slug, en: r.m?.en, lightRelease: (r.light ?? false) ? (r.x.release ?? "") : nil)
             VStack(alignment: .leading, spacing: 2) {
                 Text(r.x.name).lineLimit(2)
                 // 第一行金額、第二行上映日期與戲院數：各自一行不換行（文字由共用資料層依排法算好）
@@ -204,7 +216,7 @@ struct BoxOfficeSection: View {
 
     private func load() async {
         do {
-            board = .loaded(try await Bridge.shared.call("boxOffice", [sort, years.sorted()]))
+            board = .loaded(try await Bridge.shared.call("boxOffice", [sort, years.sorted(), query.trimmingCharacters(in: .whitespaces), limit]))
         } catch {
             board = .failed(errorText(error))
         }

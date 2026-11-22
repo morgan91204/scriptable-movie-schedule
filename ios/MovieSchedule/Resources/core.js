@@ -15,6 +15,7 @@
     AT_SUPPLEMENT: () => AT_SUPPLEMENT,
     BOXOFFICE_URL: () => BOXOFFICE_URL,
     BOXOFFICE_YEARS_URL: () => BOXOFFICE_YEARS_URL,
+    BOX_PAGE: () => BOX_PAGE,
     CINEMA_APPS: () => CINEMA_APPS,
     CITY_ORDER: () => CITY_ORDER,
     COMMUNITY_API: () => COMMUNITY_API,
@@ -38,6 +39,7 @@
     atDayLive: () => atDayLive,
     baseTitle: () => baseTitle,
     bookingUrl: () => bookingUrl,
+    boxMatcher: () => boxMatcher,
     boxOfficeBy: () => boxOfficeBy,
     boxOfficeFooter: () => boxOfficeFooter,
     boxOfficeLabel: () => boxOfficeLabel,
@@ -105,6 +107,8 @@
     normImageUrl: () => normImageUrl,
     normTitle: () => normTitle,
     nowHM: () => nowHM,
+    posterKnown: () => posterKnown,
+    posterLight: () => posterLight,
     posterReady: () => posterReady,
     posterSrc: () => posterSrc,
     posterTint: () => posterTint,
@@ -1418,6 +1422,49 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   function posterReady(title, slug) {
     return posterDone[(slug || "") + "|" + title];
   }
+  async function posterKnown(title, slug) {
+    const k = (slug || "") + "|" + title;
+    if (posterDone[k] !== void 0) return posterDone[k];
+    const nk = normTitle(title);
+    const all = readExtras();
+    const hit = all["t|" + nk] || all["n|" + nk] || all["p|" + nk];
+    if (hit?.poster) return posterDone[k] = normImageUrl(hit.poster);
+    const me = await metaOf(title);
+    const u = me && me.p ? normImageUrl(me.p) : "";
+    if (posterDone[k] === void 0) posterDone[k] = u;
+    return u;
+  }
+  var posterLightMem = {};
+  function posterLight(title, release) {
+    const k = "|" + title;
+    return posterLightMem[k] ||= (async () => {
+      const nk = normTitle(title);
+      const all = readExtras();
+      const hit = all["t|" + nk] || all["n|" + nk] || all["p|" + nk];
+      if (hit?.poster && !/ytimg\.com/.test(hit.poster)) return normImageUrl(hit.poster);
+      const me = await metaOf(title);
+      if (me && me.p) return normImageUrl(me.p);
+      const own = all["l|" + nk];
+      if (own && Date.now() - own.at < (own.poster ? 30 : 3) * 864e5) return own.poster;
+      const year = Number((release || "").slice(0, 4)) || 0;
+      const poster = await posterLane(async () => {
+        try {
+          const q = baseTitle(title).toLowerCase().replace(/[\\/?#%]/g, " ").trim();
+          const r = await platform().fetchText(`https://v3.sg.media-imdb.com/suggestion/x/${encodeURIComponent(q)}.json`, { "User-Agent": UA });
+          const d = JSON.parse(r.body).d || [];
+          const x = d.find((v) => /^tt/.test(v.id) && (v.qid === "movie" || v.qid === "tvMovie" || v.qid === "video") && v.i?.imageUrl && (!year || !v.y || Math.abs(Number(v.y) - year) <= 1));
+          const u = String(x?.i?.imageUrl || "");
+          return /^https:\/\/m\.media-amazon\.com\//.test(u) ? u.replace(/\._V1_.*?(\.\w+)$/, "._V1_UX300_$1") : "";
+        } catch (_) {
+          return "";
+        }
+      });
+      const latest = readExtras();
+      latest["l|" + nk] = { poster, trailer: "", trailerName: "", at: Date.now() };
+      cacheSet("extras.json", JSON.stringify(latest));
+      return poster;
+    })().then((u) => posterDone[k] = u);
+  }
   function moviePoster(title, slug, en) {
     const k = (slug || "") + "|" + title;
     return posterOnly[k] ||= (async () => {
@@ -1747,11 +1794,12 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     if (by === "total") return `上映中｜累計票房（截至 ${md(b.end)}）`;
     return b.mode === "week" ? `上映中｜${md(b.start)}–${md(b.end)} 週票房` : boxOfficeLabel(b);
   }
+  var BOX_PAGE = 100;
   function boxOfficeFooter(b, by, years) {
     const src = `資料來源：${b.source}。官方每週更新一次。`;
     if (by === "year") {
       const ys = boxYearsPicked(b, years);
-      return `${yearText(ys)} 年上映的電影依累計票房排序${ys.length > 1 ? "（各年取前 200 名合併）" : "，列前 200 名"}；已經下檔的也在裡面，標「上映中」的是這一週還有賣出票的。年度依上映日期歸屬，票房是上映以來的累計。${src}`;
+      return `${yearText(ys)} 年上映、有票房紀錄的電影依累計票房排序；已經下檔的也在裡面，標「上映中」的是這一週還有賣出票的。年度依上映日期歸屬，票房是上映以來的累計。一次顯示 100 部，舊片的海報會慢慢補上，找不到的用預設海報。${src}`;
     }
     const scope = `只排上映中的電影：這一週有賣出票的共 ${b.list.length} 部，已經下檔的不在裡面（看「年度」）。`;
     return by === "total" ? `${scope}${src}` : `${scope}${boxOfficeNote(b)}${src}`;
@@ -2280,7 +2328,9 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
         years = d.years;
         cacheSet("boxoffice-years.json", JSON.stringify({ at: Date.now(), end: d.end, years }));
       }
-      return { ...b, years: { ...b.years || {}, ...years } };
+      const full = {};
+      for (const y of Object.keys(years)) full[y] = years[y].map((x) => ({ ...x, week: null, country: x.country || "" }));
+      return { ...b, years: { ...b.years || {}, ...full } };
     })().catch(async (e) => {
       boxYearsMem = null;
       return loadBoxOffice();
@@ -2297,6 +2347,11 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   }
   function boxOfficeNote(b) {
     return b.list.some((x) => x.since) ? "標「上映至今」的是官方這週才第一次列入的新片：沒有上週的數字可以相減，排名用的是上映以來的累計，會比單週多。" : "";
+  }
+  function boxMatcher(movies) {
+    const map = {};
+    for (const m of movies) map[communityKey(m.title)] ||= m;
+    return (name) => map[communityKey(name)];
   }
   function boxOfficeLabel(b) {
     const md = (d) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`;
@@ -2354,11 +2409,16 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   // ios/bridge.ts
   var native = (name, payload = {}) => webkit.messageHandlers.native.postMessage({ name, ...payload });
   var cache = {};
-  async function boxOffice(by, years) {
+  async function boxOffice(by, years, query, limit) {
     const [b, all] = await Promise.all([by === "year" ? loadBoxOfficeFull() : loadBoxOffice(), loadMovies().catch(() => [])]);
     const sorts = boxSorts(b);
     const sort = sorts.some((x) => x.id === by) ? by : "week";
     const picked = boxYearsPicked(b, years || []);
+    const match = boxMatcher(all);
+    const k = (query || "").trim().toLowerCase();
+    const found = boxOfficeBy(b, sort, picked).map((x) => ({ x, m: match(x.name) || null })).filter(({ x, m }) => !k || `${x.name} ${m?.en || ""}`.toLowerCase().includes(k));
+    const paged = sort === "year";
+    const rows = (paged ? found.slice(0, limit || BOX_PAGE) : found).map(({ x, m }) => ({ x, m, lines: boxOfficeLines(x, sort), light: paged && !m }));
     return {
       label: boxOfficeTitle(b, sort, picked),
       source: b.source,
@@ -2368,8 +2428,15 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
       years: boxYears(b),
       selYears: picked,
       // 年度排行可以選的年份、實際採用的年份
-      rows: boxOfficeBy(b, sort, picked).map((x) => ({ x, m: matchBoxOffice(x.name, all) || null, lines: boxOfficeLines(x, sort) }))
+      total: found.length,
+      // 符合條件的總數（比 rows 多的話還有下一批）
+      rows
     };
+  }
+  async function nowShowing(scope, date, winId, format) {
+    const win = WINDOWS.find((w) => w.id === winId) || WINDOWS[WINDOWS.length - 1];
+    const { hits, failed, noData } = await findShowtimes(scope, date, win, format || "");
+    return { groups: groupByMovie(hits), failed, noData };
   }
   async function nowShowingMulti(scope, dates, winIds, formats) {
     const { hits, failed, noData } = await findShowtimesMulti(scope, dates, winIds, formats);

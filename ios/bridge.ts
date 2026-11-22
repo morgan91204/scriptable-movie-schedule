@@ -9,17 +9,30 @@ const native = (name: string, payload: Record<string, unknown> = {}): Promise<an
 let cache: Record<string, string> = {};
 
 /** 票房排行：連同對得到的場次通電影一起回傳 */
-async function boxOffice(by?: string, years?: string[]) {
+async function boxOffice(by?: string, years?: string[], query?: string, limit?: number) {
   // 年度排行的其他年份是另一個檔，切到「年度」才下載
   const [b, all] = await Promise.all([by === "year" ? core.loadBoxOfficeFull() : core.loadBoxOffice(), core.loadMovies().catch(() => [])]);
   const sorts = core.boxSorts(b);
   const sort: core.BoxSort = sorts.some((x) => x.id === by) ? (by as core.BoxSort) : "week";
   const picked = core.boxYearsPicked(b, years || []);
+  const match = core.boxMatcher(all);
+  const k = (query || "").trim().toLowerCase();
+  const found = core.boxOfficeBy(b, sort, picked).map((x) => ({ x, m: match(x.name) || null })).filter(({ x, m }) => !k || `${x.name} ${m?.en || ""}`.toLowerCase().includes(k));
+  // 年度排行有好幾千列：一次只回傳 limit 列（畫面上按「顯示更多」再要），並標記哪些列是已下檔的舊片（海報用輕量查法）
+  const paged = sort === "year";
+  const rows = (paged ? found.slice(0, limit || core.BOX_PAGE) : found).map(({ x, m }) => ({ x, m, lines: core.boxOfficeLines(x, sort), light: paged && !m }));
   return {
     label: core.boxOfficeTitle(b, sort, picked), source: b.source, footer: core.boxOfficeFooter(b, sort, picked), sorts,
     sort, years: core.boxYears(b), selYears: picked, // 年度排行可以選的年份、實際採用的年份
-    rows: core.boxOfficeBy(b, sort, picked).map((x) => ({ x, m: core.matchBoxOffice(x.name, all) || null, lines: core.boxOfficeLines(x, sort) })),
+    total: found.length, // 符合條件的總數（比 rows 多的話還有下一批）
+    rows,
   };
+}
+/** 現在有什麼可以看：在指定的影城裡找某天某時段的場次，依電影分組 */
+async function nowShowing(scope: { cinema: core.Cinema; km: number | null }[], date: string, winId: string, format: string) {
+  const win = core.WINDOWS.find((w) => w.id === winId) || core.WINDOWS[core.WINDOWS.length - 1];
+  const { hits, failed, noData } = await core.findShowtimes(scope, date, win, (format || "") as any);
+  return { groups: core.groupByMovie(hits), failed, noData };
 }
 /** 複選版：多個日期、時段、特殊廳一起找 */
 async function nowShowingMulti(scope: { cinema: core.Cinema; km: number | null }[], dates: string[], winIds: string[], formats: string[]) {
