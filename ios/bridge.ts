@@ -19,6 +19,11 @@ async function nowShowing(scope: { cinema: core.Cinema; km: number | null }[], d
   const { hits, failed, noData } = await core.findShowtimes(scope, date, win, (format || "") as any);
   return { groups: core.groupByMovie(hits), failed, noData };
 }
+/** 複選版：多個日期、時段、特殊廳一起找 */
+async function nowShowingMulti(scope: { cinema: core.Cinema; km: number | null }[], dates: string[], winIds: string[], formats: string[]) {
+  const { hits, failed, noData } = await core.findShowtimesMulti(scope, dates, winIds, formats as core.Format[]);
+  return { groups: core.groupByMovie(hits), failed, noData, label: core.multiLabel(dates, winIds) };
+}
 /** 離我最近的影城 */
 async function nearby(lat: number, lng: number, limit: number) {
   return core.nearest(await core.loadCinemas(), { lat, lng }, limit || 20);
@@ -34,7 +39,7 @@ async function fillMovie(slug: string, date: string | null, ids: string[]) {
 }
 /** 特殊廳清單（跟其他版本同一份） */
 const formatList = () => core.FORMATS;
-const extra: Record<string, (...a: any[]) => any> = { boxOffice, nowShowing, nearby, patchSettings, fillMovie, formatList };
+const extra: Record<string, (...a: any[]) => any> = { boxOffice, nowShowing, nowShowingMulti, nearby, patchSettings, fillMovie, formatList };
 
 (globalThis as any).MS = {
   init(saved: Record<string, string>) {

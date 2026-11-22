@@ -54,6 +54,8 @@ final class ScreenshotTests: XCTestCase {
             // 改成「整天」，半夜跑也有結果可以看版面
             if tap(app.buttons.matching(NSPredicate(format: "label BEGINSWITH '時段'")).firstMatch, "時段選單", timeout: 10) {
                 tap(app.buttons["整天"], "整天", timeout: 5)
+                // 選單可以複選，點了不會自己關：點一下畫面下方把它收起來
+                app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.92)).tap()
             }
             shot("now", wait: 20)
             back()

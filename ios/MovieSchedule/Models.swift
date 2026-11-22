@@ -155,6 +155,7 @@ struct Hit: Codable, Hashable {
     var time: String
     var date: String
     var km: Double?
+    var day: String? // 查的是哪一天（複選多天時分日期顯示）
     var ctx: Context?
 }
 

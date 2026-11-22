@@ -1395,6 +1395,7 @@ export interface Hit {
   time: string;
   date: string;
   km: number | null;
+  day?: string; // 查的是哪一天（複選多天時用來分日期顯示；凌晨場算前一個營業日）
   ctx: { booking: string; sourceUrl: string; address: string };
 }
 
@@ -1463,6 +1464,49 @@ export async function findShowtimes(
   await Promise.all([0, 1, 2, 3, 4, 5].map(worker)); // 同時最多 6 間，避免一次打太多網站
   hits.sort((a, b) => showMinute(a.time) - showMinute(b.time) || (a.km ?? 1e9) - (b.km ?? 1e9));
   return { hits, failed: Array.from(failed), noData: Array.from(noData).filter((n) => !failed.has(n)) };
+}
+
+/** 複選版：多個日期 × 多個時段 × 多種特殊廳一起找（影城的片單有快取，同一間同一天只會讀一次）。
+ *  時段沒選＝整天；「接下來 3 小時」只對今天有效；特殊廳沒選＝不限，選了幾種就是「其中任一種」 */
+export async function findShowtimesMulti(
+  scope: { cinema: Cinema; km: number | null }[],
+  dates: string[],
+  winIds: string[],
+  formats: Format[] = []
+): Promise<{ hits: Hit[]; failed: string[]; noData: string[] }> {
+  const today = todayTPE();
+  const days = Array.from(new Set(dates.length ? dates : [today])).sort();
+  let wins = WINDOWS.filter((w) => winIds.indexOf(w.id) >= 0);
+  if (!wins.length || wins.some((w) => w.id === "all")) wins = WINDOWS.filter((w) => w.id === "all");
+  const seen = new Set<string>();
+  const hits: Hit[] = [];
+  const failed = new Set<string>();
+  const noData = new Set<string>();
+  for (const day of days) {
+    // 「接下來 3 小時」只有今天有意義；其他天如果只選了它，就不查那一天
+    const use = wins.filter((w) => !w.todayOnly || day === today);
+    for (const w of use) {
+      const r = await findShowtimes(scope, day, w, "");
+      for (const h of r.hits) {
+        if (formats.length && !formatsOf(h.version.label).some((f) => formats.indexOf(f) >= 0)) continue;
+        const k = [h.cinema.id, h.date, h.movie.title, h.version.label, h.time].join("|");
+        if (seen.has(k)) continue; // 時段重疊（例如同時選了「接下來 3 小時」和「晚上」）
+        seen.add(k);
+        hits.push({ ...h, day });
+      }
+      r.failed.forEach((n) => failed.add(n));
+      r.noData.forEach((n) => noData.add(n));
+    }
+  }
+  hits.sort((a, b) => (a.day || "").localeCompare(b.day || "") || showMinute(a.time) - showMinute(b.time) || (a.km ?? 1e9) - (b.km ?? 1e9));
+  return { hits, failed: Array.from(failed), noData: Array.from(noData).filter((n) => !failed.has(n)) };
+}
+/** 複選後畫面上的一行摘要：「11/22、11/23｜晚上 17–21 點、深夜 21 點後」 */
+export function multiLabel(dates: string[], winIds: string[]): string {
+  const md = (d: string) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`;
+  const wins = WINDOWS.filter((w) => winIds.indexOf(w.id) >= 0);
+  const w = !wins.length || wins.some((x) => x.id === "all") ? "整天" : wins.map((x) => x.label).join("、");
+  return `${dates.slice().sort().map(md).join("、")}｜${w}`;
 }
 
 /** 把結果依電影分組，場次多的排前面 */

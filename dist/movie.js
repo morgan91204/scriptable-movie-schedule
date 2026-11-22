@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.22-1026
+// @movie-schedule-app 電影行程 v2026.11.22-1033
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/parsers.gen.ts
@@ -1667,6 +1667,39 @@ async function findShowtimes(scope, date, win, format = "", onProgress) {
   hits.sort((a, b) => showMinute(a.time) - showMinute(b.time) || (a.km ?? 1e9) - (b.km ?? 1e9));
   return { hits, failed: Array.from(failed), noData: Array.from(noData).filter((n) => !failed.has(n)) };
 }
+async function findShowtimesMulti(scope, dates, winIds, formats = []) {
+  const today = todayTPE();
+  const days = Array.from(new Set(dates.length ? dates : [today])).sort();
+  let wins = WINDOWS.filter((w) => winIds.indexOf(w.id) >= 0);
+  if (!wins.length || wins.some((w) => w.id === "all")) wins = WINDOWS.filter((w) => w.id === "all");
+  const seen = /* @__PURE__ */ new Set();
+  const hits = [];
+  const failed = /* @__PURE__ */ new Set();
+  const noData = /* @__PURE__ */ new Set();
+  for (const day of days) {
+    const use = wins.filter((w) => !w.todayOnly || day === today);
+    for (const w of use) {
+      const r = await findShowtimes(scope, day, w, "");
+      for (const h2 of r.hits) {
+        if (formats.length && !formatsOf(h2.version.label).some((f) => formats.indexOf(f) >= 0)) continue;
+        const k = [h2.cinema.id, h2.date, h2.movie.title, h2.version.label, h2.time].join("|");
+        if (seen.has(k)) continue;
+        seen.add(k);
+        hits.push({ ...h2, day });
+      }
+      r.failed.forEach((n) => failed.add(n));
+      r.noData.forEach((n) => noData.add(n));
+    }
+  }
+  hits.sort((a, b) => (a.day || "").localeCompare(b.day || "") || showMinute(a.time) - showMinute(b.time) || (a.km ?? 1e9) - (b.km ?? 1e9));
+  return { hits, failed: Array.from(failed), noData: Array.from(noData).filter((n) => !failed.has(n)) };
+}
+function multiLabel(dates, winIds) {
+  const md = (d) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`;
+  const wins = WINDOWS.filter((w2) => winIds.indexOf(w2.id) >= 0);
+  const w = !wins.length || wins.some((x) => x.id === "all") ? "整天" : wins.map((x) => x.label).join("、");
+  return `${dates.slice().sort().map(md).join("、")}｜${w}`;
+}
 function groupByMovie(hits) {
   const map = {};
   for (const h2 of hits) {
@@ -2508,7 +2541,7 @@ var App = class {
     ];
     // ── 事件迴圈 ──
     // 背景查 GitHub 上的最新版本（首頁顯示是否為最新版）
-    this.latest = checkLatest("2026.11.22-1026");
+    this.latest = checkLatest("2026.11.22-1033");
     // ── 搜尋 ──
     this.query = "";
     this.tmdbStatus = "";
@@ -2525,11 +2558,14 @@ var App = class {
     // ── 位置 ──
     this.me = null;
     // ── 現在有什麼可以看 ──
-    this.nowDate = "";
-    this.nowWin = "soon";
-    this.nowScope = "fav";
+    // 四個條件都可以複選（點一下選、再點一下取消）
+    this.nowDates = [];
+    // 空 = 今天
+    this.nowWins = ["soon"];
+    // 空 = 整天
+    this.nowScopes = ["fav"];
     // fav / near / 縣市名稱
-    this.nowFormat = "";
+    this.nowFormats = [];
   }
   go(view, loading = "讀取中…") {
     this.loadingText = loading;
@@ -2643,11 +2679,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.22-1026"}`);
+          Pasteboard.copy(`版本 ${"2026.11.22-1033"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.22-1026"}`,
+      `版本 ${"2026.11.22-1033"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -3156,50 +3192,67 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
       }
     ))));
   }
+  // 空 = 不限
   nowView() {
     const today = todayTPE();
     const dates = [0, 1, 2, 3, 4, 5, 6].map((i) => addDays(today, i));
-    const date = this.nowDate || today;
-    const wins = WINDOWS.filter((w) => !w.todayOnly || date === today);
-    const win = wins.find((w) => w.id === this.nowWin) || wins[0];
+    const picked = this.nowDates.filter((d) => dates.indexOf(d) >= 0);
+    const selDates = picked.length ? picked : [today];
+    const hasToday = selDates.indexOf(today) >= 0;
+    const wins = WINDOWS.filter((w) => !w.todayOnly || hasToday);
+    const selWins = this.nowWins.filter((id) => wins.some((w) => w.id === id));
     const cities = Array.from(new Set(this.cinemas.map((c) => c.city))).sort(
       (a, b) => (CITY_ORDER.indexOf(a) + 1 || 99) - (CITY_ORDER.indexOf(b) + 1 || 99)
     );
     const scopes = [{ id: "fav", label: `常去影城（${this.settings.favorites.length}）` }, { id: "near", label: "附近 10 間" }, ...cities.map((c) => ({ id: c, label: c }))];
-    return /* @__PURE__ */ h(Page, { title: "現在有什麼可以看", onBack: () => this.back() }, /* @__PURE__ */ h(Section, { title: "日期" }, /* @__PURE__ */ h(Chips, null, dates.map((d) => /* @__PURE__ */ h(Chip, { label: dateLabel(d).replace(/（.）.*$/, ""), sub: d === today ? "今天" : d === addDays(today, 1) ? "明天" : dateLabel(d).match(/（(.)）/)?.[1] || "", muted: d !== date, onTap: () => {
-      this.nowDate = d;
-    } })))), /* @__PURE__ */ h(Section, { title: "開演時段" }, /* @__PURE__ */ h(Chips, null, wins.map((w) => /* @__PURE__ */ h(Chip, { label: w.label, muted: w.id !== win.id, onTap: () => {
-      this.nowWin = w.id;
-    } })))), /* @__PURE__ */ h(Section, { title: "找哪些影城", hint: "縣市的影城較多，會花比較久時間。開眼來源的戲院通常只有今天的場次。" }, /* @__PURE__ */ h(Chips, null, scopes.map((sc) => /* @__PURE__ */ h(Chip, { label: sc.label, muted: sc.id !== this.nowScope, onTap: () => {
-      this.nowScope = sc.id;
-    } })))), /* @__PURE__ */ h(Section, { title: "特殊廳" }, /* @__PURE__ */ h(Chips, null, ["", ...FORMATS].map((f) => /* @__PURE__ */ h(Chip, { label: f || "不限", muted: f !== this.nowFormat, onTap: () => {
-      this.nowFormat = f;
-    } })))), /* @__PURE__ */ h(Button, { label: "🔍 找場次", onTap: () => this.go(() => this.nowResultsView(date, win.id), "正在查詢各影城的場次…") }));
+    const toggle = (list, id, min1 = false) => {
+      const i = list.indexOf(id);
+      if (i < 0) return [...list, id];
+      return min1 && list.length === 1 ? list : list.filter((x) => x !== id);
+    };
+    return /* @__PURE__ */ h(Page, { title: "現在有什麼可以看", subtitle: "每一項都可以複選", onBack: () => this.back() }, /* @__PURE__ */ h(Section, { title: "日期" }, /* @__PURE__ */ h(Chips, null, dates.map((d) => /* @__PURE__ */ h(Chip, { label: dateLabel(d).replace(/（.）.*$/, ""), sub: d === today ? "今天" : d === addDays(today, 1) ? "明天" : dateLabel(d).match(/（(.)）/)?.[1] || "", muted: selDates.indexOf(d) < 0, onTap: () => {
+      this.nowDates = toggle(selDates, d, true);
+    } })))), /* @__PURE__ */ h(Section, { title: "開演時段", hint: "都不選就是整天。「接下來 3 小時」只找今天。" }, /* @__PURE__ */ h(Chips, null, wins.map((w) => /* @__PURE__ */ h(Chip, { label: w.label, muted: selWins.indexOf(w.id) < 0, onTap: () => {
+      this.nowWins = w.id === "all" ? ["all"] : toggle(selWins.filter((x) => x !== "all"), w.id);
+    } })))), /* @__PURE__ */ h(Section, { title: "找哪些影城", hint: "縣市的影城較多、選的天數越多，會花比較久時間。開眼來源的戲院通常只有今天的場次。" }, /* @__PURE__ */ h(Chips, null, scopes.map((sc) => /* @__PURE__ */ h(Chip, { label: sc.label, muted: this.nowScopes.indexOf(sc.id) < 0, onTap: () => {
+      this.nowScopes = toggle(this.nowScopes, sc.id, true);
+    } })))), /* @__PURE__ */ h(Section, { title: "特殊廳", hint: "都不選就是不限；選了幾種，就找其中任一種。" }, /* @__PURE__ */ h(Chips, null, /* @__PURE__ */ h(Chip, { label: "不限", muted: this.nowFormats.length > 0, onTap: () => {
+      this.nowFormats = [];
+    } }), FORMATS.map((f) => /* @__PURE__ */ h(Chip, { label: f, muted: this.nowFormats.indexOf(f) < 0, onTap: () => {
+      this.nowFormats = toggle(this.nowFormats, f);
+    } })))), /* @__PURE__ */ h(Button, { label: "🔍 找場次", onTap: () => this.go(() => this.nowResultsView(selDates, selWins), "正在查詢各影城的場次…") }));
   }
-  async nowResultsView(date, winId) {
-    const win = WINDOWS.find((w) => w.id === winId) || WINDOWS[0];
-    let scope;
-    if (this.nowScope === "near") scope = nearest(this.cinemas, await this.locate(), 10);
-    else if (this.nowScope === "fav") scope = this.settings.favorites.map((id) => this.cinemas.find((c) => c.id === id)).filter(Boolean).map((c) => ({ cinema: c, km: null }));
-    else scope = this.cinemas.filter((c) => c.city === this.nowScope).map((c) => ({ cinema: c, km: null }));
+  async nowResultsView(dates, winIds) {
+    const byId = /* @__PURE__ */ new Map();
+    const add = (list) => list.forEach((x) => {
+      const old = byId.get(x.cinema.id);
+      if (!old || old.km === null && x.km !== null) byId.set(x.cinema.id, x);
+    });
+    for (const sc of this.nowScopes) {
+      if (sc === "near") add(nearest(this.cinemas, await this.locate(), 10));
+      else if (sc === "fav") add(this.settings.favorites.map((id) => this.cinemas.find((c) => c.id === id)).filter(Boolean).map((c) => ({ cinema: c, km: null })));
+      else add(this.cinemas.filter((c) => c.city === sc).map((c) => ({ cinema: c, km: null })));
+    }
+    const scope = Array.from(byId.values());
     if (!scope.length) throw new Error("沒有可以查的影城。先在影城頁加入常去影城，或改選附近／縣市。");
-    const { hits, failed, noData } = await findShowtimes(scope, date, win, this.nowFormat);
+    const { hits, failed, noData } = await findShowtimesMulti(scope, dates, winIds, this.nowFormats);
     const groups = groupByMovie(hits);
     prefetchPosters(groups);
-    const scopeLabel = this.nowScope === "fav" ? "常去影城" : this.nowScope === "near" ? "附近 10 間" : this.nowScope;
+    const scopeLabel = this.nowScopes.map((sc) => sc === "fav" ? "常去影城" : sc === "near" ? "附近 10 間" : sc).join("、");
+    const many = dates.length > 1;
     const open = (hit) => {
       this.runtime = hit.movie.runtime;
       this.seat = hallOf(hit.version.label);
       this.go(() => this.confirmView({ cinema: hit.cinema, address: hit.ctx.address || hit.cinema.address || "", booking: hit.ctx.booking, sourceUrl: hit.ctx.sourceUrl, date: hit.date, movie: hit.movie, version: hit.version, time: hit.time }));
     };
-    return /* @__PURE__ */ h(Page, { title: `${dateLabel(date).replace(/ .*$/, "")} ${win.label}`, subtitle: `${scopeLabel}｜${hits.length} 場、${groups.length} 部電影`, onBack: () => this.back() }, groups.length ? null : /* @__PURE__ */ h(Empty, { icon: "🍿", text: "這個時段沒有符合的場次，換個時段或範圍試試。" }), groups.map((g) => /* @__PURE__ */ h(Section, { title: `${g.title}（${g.hits.length} 場）`, hint: [g.runtime ? `${g.runtime} 分鐘` : "", g.rating].filter(Boolean).join("｜") || void 0 }, g.hits.map((hit) => /* @__PURE__ */ h(
+    return /* @__PURE__ */ h(Page, { title: multiLabel(dates, winIds), subtitle: `${[scopeLabel, this.nowFormats.join("、")].filter(Boolean).join("｜")}｜${hits.length} 場、${groups.length} 部電影`, onBack: () => this.back() }, groups.length ? null : /* @__PURE__ */ h(Empty, { icon: "🍿", text: "沒有符合的場次，換個時段或範圍試試。" }), groups.map((g) => /* @__PURE__ */ h(Section, { title: `${g.title}（${g.hits.length} 場）`, hint: [g.runtime ? `${g.runtime} 分鐘` : "", g.rating].filter(Boolean).join("｜") || void 0 }, g.hits.map((hit) => /* @__PURE__ */ h(
       Item,
       {
-        title: `${hit.time}${isLate(hit.time) ? "（凌晨）" : ""}　${hit.cinema.name}`,
+        title: `${many && hit.day ? dateLabel(hit.day).replace(/ .*$/, "") + " " : ""}${hit.time}${isLate(hit.time) ? "（凌晨）" : ""}　${hit.cinema.name}`,
         subtitle: [hit.version.label, kmLabel(hit.km)].filter(Boolean).join("｜"),
         onTap: () => open(hit)
       }
-    )))), failed.length ? /* @__PURE__ */ h(Note, { kind: "warn", text: `有 ${failed.length} 間讀取失敗：${failed.join("、")}` }) : null, noData.length ? /* @__PURE__ */ h(Note, { text: `這幾間目前沒有這天的場次資料（來源還沒更新），請到影城官網查詢：${noData.join("、")}` }) : null);
+    )))), failed.length ? /* @__PURE__ */ h(Note, { kind: "warn", text: `有 ${failed.length} 間讀取失敗：${failed.join("、")}` }) : null, noData.length ? /* @__PURE__ */ h(Note, { text: `這幾間目前沒有所選日期的場次資料（來源還沒更新），請到影城官網查詢：${noData.join("、")}` }) : null);
   }
   // 從捷徑或 Safari 分享場次通／誠品／光點網址時，直接跳到那間影城
   startFrom(url) {

@@ -52,6 +52,7 @@
     fillRuntimes: () => fillRuntimes,
     filterVersions: () => filterVersions,
     findShowtimes: () => findShowtimes,
+    findShowtimesMulti: () => findShowtimesMulti,
     fmt: () => fmt,
     foregroundTask: () => foregroundTask,
     formatsOf: () => formatsOf,
@@ -80,6 +81,7 @@
     movieRatings: () => movieRatings,
     movieRuntime: () => movieRuntime,
     moviesOf: () => moviesOf,
+    multiLabel: () => multiLabel,
     nearest: () => nearest,
     normImageUrl: () => normImageUrl,
     normTitle: () => normTitle,
@@ -1796,6 +1798,39 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     hits.sort((a, b) => showMinute(a.time) - showMinute(b.time) || (a.km ?? 1e9) - (b.km ?? 1e9));
     return { hits, failed: Array.from(failed), noData: Array.from(noData).filter((n) => !failed.has(n)) };
   }
+  async function findShowtimesMulti(scope, dates, winIds, formats = []) {
+    const today = todayTPE();
+    const days = Array.from(new Set(dates.length ? dates : [today])).sort();
+    let wins = WINDOWS.filter((w) => winIds.indexOf(w.id) >= 0);
+    if (!wins.length || wins.some((w) => w.id === "all")) wins = WINDOWS.filter((w) => w.id === "all");
+    const seen = /* @__PURE__ */ new Set();
+    const hits = [];
+    const failed = /* @__PURE__ */ new Set();
+    const noData = /* @__PURE__ */ new Set();
+    for (const day of days) {
+      const use = wins.filter((w) => !w.todayOnly || day === today);
+      for (const w of use) {
+        const r = await findShowtimes(scope, day, w, "");
+        for (const h of r.hits) {
+          if (formats.length && !formatsOf(h.version.label).some((f) => formats.indexOf(f) >= 0)) continue;
+          const k = [h.cinema.id, h.date, h.movie.title, h.version.label, h.time].join("|");
+          if (seen.has(k)) continue;
+          seen.add(k);
+          hits.push({ ...h, day });
+        }
+        r.failed.forEach((n) => failed.add(n));
+        r.noData.forEach((n) => noData.add(n));
+      }
+    }
+    hits.sort((a, b) => (a.day || "").localeCompare(b.day || "") || showMinute(a.time) - showMinute(b.time) || (a.km ?? 1e9) - (b.km ?? 1e9));
+    return { hits, failed: Array.from(failed), noData: Array.from(noData).filter((n) => !failed.has(n)) };
+  }
+  function multiLabel(dates, winIds) {
+    const md = (d) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`;
+    const wins = WINDOWS.filter((w2) => winIds.indexOf(w2.id) >= 0);
+    const w = !wins.length || wins.some((x) => x.id === "all") ? "整天" : wins.map((x) => x.label).join("、");
+    return `${dates.slice().sort().map(md).join("、")}｜${w}`;
+  }
   function groupByMovie(hits) {
     const map = {};
     for (const h of hits) {
@@ -2153,6 +2188,10 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     const { hits, failed, noData } = await findShowtimes(scope, date, win, format || "");
     return { groups: groupByMovie(hits), failed, noData };
   }
+  async function nowShowingMulti(scope, dates, winIds, formats) {
+    const { hits, failed, noData } = await findShowtimesMulti(scope, dates, winIds, formats);
+    return { groups: groupByMovie(hits), failed, noData, label: multiLabel(dates, winIds) };
+  }
   async function nearby(lat, lng, limit) {
     return nearest(await loadCinemas(), { lat, lng }, limit || 20);
   }
@@ -2164,7 +2203,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     return fillMovieDay(await movieDay(slug, date || void 0), ids);
   }
   var formatList = () => FORMATS;
-  var extra = { boxOffice, nowShowing, nearby, patchSettings, fillMovie, formatList };
+  var extra = { boxOffice, nowShowing, nowShowingMulti, nearby, patchSettings, fillMovie, formatList };
   globalThis.MS = {
     init(saved) {
       cache = saved || {};

@@ -65,42 +65,86 @@ struct HomeView: View {
 struct NowView: View {
     let cinemas: [Cinema]
     @ObservedObject private var settings = SettingsStore.shared
-    @State private var date = Fmt.today()
-    @State private var window = "soon"
-    @State private var scope = "fav"
-    @State private var format = ""
+    // 四個條件都可以複選
+    @State private var dates: Set<String> = [Fmt.today()]
+    @State private var windows: Set<String> = ["soon"] // 空 = 整天
+    @State private var scopes: Set<String> = ["fav"]
+    @State private var picked: Set<String> = [] // 特殊廳；空 = 不限
     @State private var result: Loadable<NowResult> = .loading
 
-    private static let windows: [(String, String)] = [
+    private static let allWindows: [(String, String)] = [
         ("soon", "接下來 3 小時"), ("morning", "中午前"), ("afternoon", "下午 12–17 點"),
         ("evening", "晚上 17–21 點"), ("night", "深夜 21 點後"), ("all", "整天"),
     ]
     /// 特殊廳清單由共用資料層提供（跟其他版本同一份），讀到之前先用這份
     @State private var formats = ["IMAX", "杜比", "4DX", "MX4D", "ScreenX", "巨幕", "LED", "頂級廳", "3D"]
 
+    private var dayOptions: [String] { (0..<7).map { Fmt.addDays(Fmt.today(), $0) } }
+    private var windowOptions: [(String, String)] { Self.allWindows.filter { $0.0 != "soon" || dates.contains(Fmt.today()) } }
+    private var cityOptions: [String] { Fmt.sortCities(Array(Set(cinemas.map { $0.city }))) }
+    private var activeWindows: [String] { windowOptions.map { $0.0 }.filter { windows.contains($0) } }
+
+    private func scopeName(_ id: String) -> String { id == "fav" ? "常去影城" : id == "near" ? "附近 10 間" : id }
+    private func short(_ d: String) -> String {
+        let p = d.split(separator: "-").compactMap { Int($0) }
+        return p.count == 3 ? "\(p[1])/\(p[2])" : d
+    }
+
+    /// 一組可以複選的選項：點開選單，每個選項點一下打勾、再點一下取消（選單不會關掉）
+    private func multiMenu(_ title: String, summary: String, @ViewBuilder content: () -> some View) -> some View {
+        Menu {
+            content()
+        } label: {
+            HStack {
+                Text(title).foregroundStyle(Color.primary)
+                Spacer()
+                Text(summary).foregroundStyle(.secondary).lineLimit(1)
+                Image(systemName: "chevron.up.chevron.down").font(.caption).foregroundStyle(.tertiary)
+            }
+        }
+        .menuActionDismissBehavior(.disabled)
+    }
+    private func option(_ label: String, on: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            if on { Label(label, systemImage: "checkmark") } else { Text(label) }
+        }
+    }
+    private func flip(_ set: inout Set<String>, _ id: String, keepOne: Bool = false) {
+        if set.contains(id) {
+            if !(keepOne && set.count == 1) { set.remove(id) }
+        } else {
+            set.insert(id)
+        }
+    }
+
     var body: some View {
         List {
             Section {
-                Picker("日期", selection: $date) {
-                    ForEach(0..<7, id: \.self) { i in
-                        let d = Fmt.addDays(Fmt.today(), i)
-                        Text(Fmt.dateLabel(d)).tag(d)
+                multiMenu("日期", summary: dates.sorted().map(short).joined(separator: "、")) {
+                    ForEach(dayOptions, id: \.self) { d in
+                        option(Fmt.dateLabel(d), on: dates.contains(d)) { flip(&dates, d, keepOne: true) }
                     }
                 }
-                Picker("時段", selection: $window) {
-                    ForEach(Self.windows.filter { $0.0 != "soon" || date == Fmt.today() }, id: \.0) { w in
-                        Text(w.1).tag(w.0)
+                multiMenu("時段", summary: activeWindows.isEmpty || activeWindows.contains("all") ? "整天" : windowOptions.filter { activeWindows.contains($0.0) }.map { $0.1 }.joined(separator: "、")) {
+                    ForEach(windowOptions, id: \.0) { w in
+                        option(w.1, on: activeWindows.contains(w.0) || (w.0 == "all" && activeWindows.isEmpty)) {
+                            if w.0 == "all" { windows = ["all"] } else { windows.remove("all"); flip(&windows, w.0) }
+                        }
                     }
                 }
-                Picker("範圍", selection: $scope) {
-                    Text("常去影城").tag("fav")
-                    Text("附近 10 間").tag("near")
-                    ForEach(Fmt.sortCities(Array(Set(cinemas.map { $0.city }))), id: \.self) { Text($0).tag($0) }
+                multiMenu("範圍", summary: (["fav", "near"] + cityOptions).filter { scopes.contains($0) }.map(scopeName).joined(separator: "、")) {
+                    ForEach(["fav", "near"] + cityOptions, id: \.self) { id in
+                        option(scopeName(id), on: scopes.contains(id)) { flip(&scopes, id, keepOne: true) }
+                    }
                 }
-                Picker("特殊廳", selection: $format) {
-                    Text("全部").tag("")
-                    ForEach(formats, id: \.self) { Text($0).tag($0) }
+                multiMenu("特殊廳", summary: picked.isEmpty ? "不限" : formats.filter { picked.contains($0) }.joined(separator: "、")) {
+                    option("不限", on: picked.isEmpty) { picked = [] }
+                    ForEach(formats, id: \.self) { f in
+                        option(f, on: picked.contains(f)) { flip(&picked, f) }
+                    }
                 }
+            } footer: {
+                Text("每一項都可以複選。時段都不選就是整天；特殊廳選了幾種，就找其中任一種。")
             }
             switch result {
             case .loading:
@@ -109,7 +153,7 @@ struct NowView: View {
                 Section { ErrorRow(message: message) { Task { await load() } } }
             case .loaded(let r):
                 if r.groups.isEmpty {
-                    Section { Text("這個時段沒有場次").foregroundStyle(.secondary) }
+                    Section { Text("沒有符合的場次，換個時段或範圍試試。").foregroundStyle(.secondary) }
                 }
                 ForEach(r.groups) { g in
                     Section {
@@ -118,7 +162,11 @@ struct NowView: View {
                                 ConfirmView(pick: ShowPick(title: h.movie.title, versionLabel: h.version.label, cinemaName: h.cinema.name, address: h.ctx?.address ?? h.cinema.address ?? "", date: h.date, time: h.time, runtime: h.movie.runtime ?? g.runtime ?? 0, bookingUrl: h.ctx?.booking ?? "", cinema: h.cinema))
                             } label: {
                                 HStack(spacing: 10) {
-                                    Text(h.time + (Fmt.isLate(h.time) ? "（凌晨）" : "")).font(.body.monospacedDigit().weight(.semibold))
+                                    VStack(alignment: .leading, spacing: 0) {
+                                        // 複選多天：時間上面標日期
+                                        if dates.count > 1, let d = h.day { Text(short(d)).font(.caption2).foregroundStyle(.secondary) }
+                                        Text(h.time + (Fmt.isLate(h.time) ? "（凌晨）" : "")).font(.body.monospacedDigit().weight(.semibold))
+                                    }
                                     VStack(alignment: .leading, spacing: 2) {
                                         Text(h.cinema.name).lineLimit(1)
                                         Text([h.version.label, kmLabel(h.km)].filter { !$0.isEmpty }.joined(separator: "｜")).font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
@@ -134,7 +182,7 @@ struct NowView: View {
                     }
                 }
                 if let none = r.noData, !none.isEmpty {
-                    Section { Text("這幾間目前沒有這天的場次資料（來源還沒更新），請到影城官網查詢：\(none.joined(separator: "、"))").font(.footnote).foregroundStyle(.secondary) }
+                    Section { Text("這幾間目前沒有所選日期的場次資料（來源還沒更新），請到影城官網查詢：\(none.joined(separator: "、"))").font(.footnote).foregroundStyle(.secondary) }
                 }
                 if let failed = r.failed, !failed.isEmpty {
                     Section { Text("讀不到：\(failed.joined(separator: "、"))").font(.footnote).foregroundStyle(.secondary) }
@@ -144,25 +192,45 @@ struct NowView: View {
         .navigationTitle("現在有什麼可以看")
         .navigationBarTitleDisplayMode(.inline)
         .refreshable { await load() }
-        .task(id: "\(date)|\(window)|\(scope)|\(format)") { await load() }
+        .task(id: [dates.sorted(), windows.sorted(), scopes.sorted(), picked.sorted()].map { $0.joined(separator: ",") }.joined(separator: "|")) {
+            try? await Task.sleep(nanoseconds: 600_000_000) // 連續勾選時等一下再查，不用每點一下就重查
+            if Task.isCancelled { return }
+            await load()
+        }
         .task { if let list = try? await Bridge.shared.call("formatList", [], as: [String].self), !list.isEmpty { formats = list } }
+    }
+
+    private static func merge(_ rows: [ScopedCinema], into byId: inout [String: ScopedCinema], order: inout [String]) {
+        for r in rows {
+            if let old = byId[r.cinema.id] {
+                if old.km == nil, r.km != nil { byId[r.cinema.id] = r }
+            } else {
+                byId[r.cinema.id] = r
+                order.append(r.cinema.id)
+            }
+        }
     }
 
     private func load() async {
         result = .loading
         do {
-            var list: [ScopedCinema]
-            if scope == "near" {
-                let loc = try await LocationFetcher().current()
-                list = try await Bridge.shared.call("nearby", [loc.coordinate.latitude, loc.coordinate.longitude, 10])
-            } else if scope == "fav" {
-                list = settings.favorites.compactMap { id in cinemas.first { $0.id == id } }.map { ScopedCinema(cinema: $0, km: nil) }
-            } else {
-                list = cinemas.filter { $0.city == scope }.map { ScopedCinema(cinema: $0, km: nil) }
+            // 範圍複選：各範圍的影城合在一起，同一間只查一次（有距離的保留距離）
+            var byId: [String: ScopedCinema] = [:]
+            var order: [String] = []
+            for sc in (["fav", "near"] + cityOptions) where scopes.contains(sc) {
+                if sc == "near" {
+                    let loc = try await LocationFetcher().current()
+                    let near: [ScopedCinema] = try await Bridge.shared.call("nearby", [loc.coordinate.latitude, loc.coordinate.longitude, 10])
+                    Self.merge(near, into: &byId, order: &order)
+                } else if sc == "fav" {
+                    Self.merge(settings.favorites.compactMap { id in cinemas.first { $0.id == id } }.map { ScopedCinema(cinema: $0, km: nil) }, into: &byId, order: &order)
+                } else {
+                    Self.merge(cinemas.filter { $0.city == sc }.map { ScopedCinema(cinema: $0, km: nil) }, into: &byId, order: &order)
+                }
             }
+            let list = order.compactMap { byId[$0] }
             if list.isEmpty { throw BridgeError(message: "沒有可以查的影城。先加入常去影城，或改選附近／縣市。") }
-            let win = (window == "soon" && date != Fmt.today()) ? "all" : window
-            result = .loaded(try await Bridge.shared.call("nowShowing", [Bridge.json(list), date, win, format]))
+            result = .loaded(try await Bridge.shared.call("nowShowingMulti", [Bridge.json(list), dates.sorted(), activeWindows, formats.filter { picked.contains($0) }]))
         } catch is CancellationError {
             // 條件改了，新的查詢會接手
         } catch {
