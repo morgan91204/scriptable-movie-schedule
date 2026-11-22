@@ -1,0 +1,1036 @@
+<!DOCTYPE html>
+<html lang='zh_TW'>
+<head>
+<meta http-equiv='Content-Type' content='text/html; charset=utf-8' />
+<meta http-equiv='Cache-control' content='max-age=600, must-revalidate'>
+<meta name='keywords' content='金馬獎,金馬影展,影展,創投,電影'>
+<meta property='og:type' content='movie' />
+<meta property='og:url' content=' https://www.goldenhorse.org.tw/film/about/overview/' />
+<link href='https://storage.googleapis.com/tghff_outland/css/reset.css'  media='screen' rel='stylesheet' type='text/css' />
+<link href='https://storage.googleapis.com/tghff_outland/css/style.css?t=2403111515'  media='screen' rel='stylesheet' type='text/css' />
+<link href='https://storage.googleapis.com/tghff_outland/css/style-theme.css?23D8D4FDD18CF'  media='screen' rel='stylesheet' type='text/css' />
+<link href='https://storage.googleapis.com/tghff_outland/js/fancyBox-v2.1.5-0/jquery.fancybox.css'  media='screen' rel='stylesheet' type='text/css' />
+<link href='https://storage.googleapis.com/tghff_outland/css/style-cover-menu.css?2307281248'  media='screen' rel='stylesheet' type='text/css' />
+<SCRIPT SRC='https://storage.googleapis.com/tghff_outland/js/system.js?2108301404'></SCRIPT>
+<SCRIPT SRC='https://storage.googleapis.com/tghff_outland/js/jquery-1.12.4.min.js'></SCRIPT>
+<SCRIPT SRC='https://storage.googleapis.com/tghff_outland/js/fancyBox-v2.1.5-0/jquery.fancybox.pack.js'></SCRIPT>
+<SCRIPT SRC='https://storage.googleapis.com/tghff_outland/js/jquery.placeholder.js'></SCRIPT>
+<SCRIPT SRC='https://storage.googleapis.com/tghff_outland/js/jquery.tendina.min.js'></SCRIPT>
+<SCRIPT LANGUAGE='JavaScript' type='text/javascript'>
+
+function fancyAlert(msg,callbackYes){
+	var argLength = arguments.length;
+	if(argLength == 2){
+		jQuery.fancybox({
+			'modal' : true,
+			'helpers' : {
+				'overlay' : {
+					'locked' : false
+				}
+			},
+			'live' : false,
+			'content' : '<div style="margin:1px; width:500px;">'+msg+'<div style="text-align:right;margin-top:10px;"><input type="button" id="fancyConfirm_ok" class="btn btn-default" value="確定"></div></div>',
+			'beforeShow' : function(){
+				jQuery("#fancyConfirm_ok").click(function(){
+					callbackYes();
+					$.fancybox.close();
+				});
+			}
+		});
+	}else{
+		jQuery.fancybox({
+			'modal' : true,
+			'helpers' : {
+				'overlay' : {
+					'locked' : false
+				}
+			},
+			'content' : '<div style="margin:1px; width:500px;">'+msg+'<div style="text-align:right;margin-top:10px;"><input type="button" id="fancyConfirm_ok" class="btn btn-default" value="確定"></div></div>',
+			'beforeShow' : function(){
+				jQuery("#fancyConfirm_ok").click(function(){
+					$.fancybox.close();
+				});
+			}
+		});
+	}
+}
+
+function fancyConfirm(msg,callbackYes,callbackNo){
+	var argLength = arguments.length;
+	if(argLength == 3){
+		jQuery.fancybox({
+			'modal' : true,
+			'content' : '<div style="margin:1px; width:500px;">'+msg+'<div style="text-align:right;margin-top:10px;"><input type="button" id="fancyConfirm_ok" class="btn btn-default" value="確定"><input type="button" id="fancyconfirm_cancel" class="btn btn-default" value="取消"></div></div>',
+			'beforeShow' : function(){
+				jQuery("#fancyConfirm_ok").click(function(){
+					callbackYes();
+					$.fancybox.close();
+				});
+				jQuery("#fancyconfirm_cancel").click(function(){
+					callbackNo();
+					$.fancybox.close();
+				});
+			}
+		});
+	}else{
+		jQuery.fancybox({
+			'modal' : true,
+			'content' : '<div style="margin:1px; width:500px;">'+msg+'<div style="text-align:right;margin-top:10px;"><input type="button" id="fancyConfirm_ok" class="btn btn-default" value="確定"><input type="button" id="fancyconfirm_cancel" class="btn btn-default" value="取消"></div></div>',
+			'beforeShow' : function(){
+				jQuery("#fancyConfirm_ok").click(function(){
+					callbackYes();
+					$.fancybox.close();
+				});
+				jQuery("#fancyconfirm_cancel").click(function(){
+					$.fancybox.close();
+				});
+			}
+		});
+	}
+}
+
+</SCRIPT>
+<SCRIPT LANGUAGE='JavaScript' type='text/javascript'>
+	//===== 切換語版 =====
+	function change_lang(){
+		var before_lang="r=ch";
+		var after_lang ="r=en";
+		if(location.search != ""){
+			if(location.href.match(before_lang)!=null){				
+				document.location.href = location.href.replace(before_lang,after_lang);
+			}else{
+				document.location.href = (location.href.indexOf("?")!=-1 ) ? location.href.replace("\?","\?"+after_lang+"&") : location.href+"&"+after_lang;				
+			}
+		}else if(location.hash != ""){
+			document.location.href = location.href.replace(location.hash,"")+"?"+after_lang+location.hash;				
+		}else{
+			document.location.href = location.href.replace("#","")+"?"+after_lang;
+		}
+	}
+</SCRIPT>
+<SCRIPT LANGUAGE='JavaScript' type='text/javascript'>
+$("#cover-menu-mask").hide();
+	function openMenu(menuType) {
+		$("#cover-menu-mask").show();
+		//nav
+		var nav_array = ["awards","film","fpp","academy"];
+		if(!$("#nav-"+menuType).hasClass("active")){
+			$("#nav-"+menuType).addClass("active");
+		}
+		for (var i=0; i<nav_array.length; ++i) {
+			if( menuType == nav_array[i] ){
+				nav_array.splice(i,1);
+				$(".cover-menu ."+menuType).show();
+			}
+		}
+		for (var i=0; i<nav_array.length; ++i) {
+			$("#nav-"+nav_array[i]).removeClass("active");
+			$(".cover-menu .title").hide();
+			$(".cover-menu ."+nav_array[i]).hide();
+		}
+		//funcnav
+		var funcnav_array = ["account","aboutus","news","events","highlights","sponsorship"];
+		if(!$("#funcnav-"+menuType).hasClass("active")){
+			$("#funcnav-"+menuType).addClass("active");
+		}
+		for (var i=0; i<funcnav_array.length; ++i) {
+			if( menuType == funcnav_array[i] ){
+				funcnav_array.splice(i,1);
+				$(".cover-menu ."+menuType).show();
+			}
+		}
+		for (var i=0; i<funcnav_array.length; ++i) {
+			$("#funcnav-"+funcnav_array[i]).removeClass("active");
+			$(".cover-menu .title").hide();
+			$(".cover-menu ."+funcnav_array[i]).hide();
+		}
+		
+		//於網站地圖頁點選時，要跳過的主功能
+		if($("#nav-"+menuType).hasClass("active")){
+			var hide_element_array = ["account","aboutus","news","events","highlights","sponsorship"];
+		}
+		else{
+			var hide_element_array = ["singin","news","events","highlights","sponsorship"];
+		}
+		for (var i=0; i<hide_element_array.length; ++i) {
+			$(".cover-menu ."+hide_element_array[i]).hide();
+		}
+		$(".sitemap ul").css("margin-top","0px");
+		$(".sitemap ul").css("margin-bottom","0px");
+		
+	}
+	function closeMenu() {
+		$("#cover-menu-mask").hide();
+		//$(".sitemap ul").css("margin","20px");
+		//nav
+		$(".navbar-nav li").removeClass("active");
+		$("#nav-film").addClass("active");
+		//funcnav
+		$(".funcnav span").removeClass("active");
+		$("#funcnav-film").addClass("active");
+	}
+
+</SCRIPT>
+
+
+<!-- Start: Header -->
+
+<!-- Global site tag (gtag.js) - Google Analytics -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-LLT0SR40MV"></script>
+<script >
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-LLT0SR40MV');
+</script>
+<title>台北金馬影展 Taipei Golden Horse Film Festival</title>
+
+<!--[if lt IE 9]>
+<script src="https://storage.googleapis.com/tghff_outland/js/html5shiv.js"></script>
+<script src="https://storage.googleapis.com/tghff_outland/js/excanvas.js"></script>
+<script src="https://storage.googleapis.com/tghff_outland/js/respond.js"></script>
+<![endif]-->
+<!--[if IE 8]>
+<style>
+.container {
+	width: auto;
+	min-width: 1100px;
+	max-width: 1920px;
+}
+</style>
+<![endif]-->
+
+
+<style>
+.navbar-nav > li#nav-fpp  { 
+	padding-left: 15px !important;
+}
+.navbar-nav > li#nav-fpp > div > div.line {
+	left: 4px !important; 
+}
+</style>
+</head>
+
+<body id='body'>
+<a name='top'></a>
+<div id='wrapper'>
+	<div id="header" class="sticky clearfix">
+		<div class='funcnav'>
+					<div class='container'>
+							<ul class='nav pull-right' role='tablist'>
+										<li><a  href='https://tghff.tixcraft.com/'>影展購票</a></li>
+					<li><a  href='https://www.goldenhorse.org.tw/ghxvieshow/events/'>聯名影廳</a></li>
+					<li><a href="https://virtual.goldenhorse.org.tw" target="_blank">線上影院</a></li>					<li><a id="funcnav-news"  href='https://www.goldenhorse.org.tw/news/'>最新消息</a></li>
+					<li><a id="nav-events"  href='https://www.goldenhorse.org.tw/events/'>年度活動</a></li>
+					<li><a id="funcnav-highlights"  href='https://www.goldenhorse.org.tw/highlights/'>影音圖輯</a></li>
+					<li><a id="funcnav-sponsorship"  href='https://www.goldenhorse.org.tw/sponsorship/'>贊助金馬</a></li>
+					<li class='block' style='white-space: nowrap;'><span id="funcnav-aboutus"  onclick="openMenu('aboutus');">關於我們</span></li>
+					<li><a id="funcnav-industry"  href='https://www.goldenhorse.org.tw/industry/'>業界 | 媒體</a></li>
+					<li class='block' style='white-space: nowrap;'>
+					<a  href="https://www.goldenhorse.org.tw/signin/">登入</a> | <a  href="https://www.goldenhorse.org.tw/signup/"> 註冊</a>					</li>
+					<li><a href='javascript:change_lang();'>EN</a></li>
+				</ul>
+			</div>
+		</div>
+		<span id='reservation_expire_alert'></span>
+
+		<div class='message' style='display:none;padding:30px 10px;color:#ffffff;text-align:center;background-color:#FF0000;' id='red_message'><!-- 取代alert 的訊息 --></div><div class='message' style='display:none;padding:30px 10px;color:#000000;text-align:center;background-color: #99ff66;' id='green_message'><!-- 取代alert 的訊息 --></div><SCRIPT LANGUAGE='JavaScript'>var message_tag_id='';function set_yellow_message(mword,tag_id){if(tag_id==undefined || tag_id==null || tag_id==''){tag_id='red_message';}message_tag_id=tag_id;$('#'+message_tag_id).html(mword);$('#'+message_tag_id).show();setTimeout('call_disappear();', 7000);}
+ function call_disappear(){$('#'+message_tag_id).html(''); $('#'+message_tag_id).hide();}</script>
+				<div class='navbar navbar-default' role='navigation'>
+			<div class='container'>
+				<div class='collapse navbar-collapse'>
+										<a href="https://www.goldenhorse.org.tw"><div class="navbar-brand"></div></a>
+					<ul class='nav navbar-nav pull-right'>
+					<li id="nav-awards"  onclick="openMenu('awards');"><div><div class="line"></div><span>金馬獎</span><div class="date">11.22</div></div></li><li id="nav-film" class='active' onclick="openMenu('film');"><div><div class="line"></div><span>影展</span><div class="date"><div class="FFF">04.10-04.19</div><div class="CFF">07.24-08.16</div><div class="FF">11.06-11.22</div></div></div></li><li id="nav-fpp"  onclick="openMenu('fpp');"><div><div class="line"></div><span>創投會議</span><div class="date">11.17-11.19</div></div></li><li id="nav-academy"  onclick="openMenu('academy');"><div><div class="line"></div><span>電影學院</span><div class="date">10.19-11.22</div></div></li>					</ul>
+				</div>
+			</div>
+		</div>
+<script >
+jQuery(window).scroll(function() {
+	var _header_el	= jQuery("#header.sticky");
+		_scrollTop 	= jQuery(document).scrollTop();
+		_topBar_H 	= jQuery("#topBar").outerHeight() || 0;
+
+	if(_scrollTop > _topBar_H) {
+		_header_el.addClass('fixed');
+		_header_H = _header_el.outerHeight() || 0;
+		if(!_header_el.hasClass('transparent') && !_header_el.hasClass('translucent')) {
+			jQuery('body').css({"padding-top":_header_H+"px"});
+		}
+		$('#header.sticky #nav-film .date div').hide();
+		$('#header.sticky #nav-film .date div.FF').show();
+	} 
+	else {
+		_header_el.removeClass('fixed');
+		if(!_header_el.hasClass('transparent') && !_header_el.hasClass('translucent')) {
+			jQuery('body').css({"padding-top":"0px"});
+		}
+		$('#header.sticky #nav-film .date div').show();
+	}
+});
+
+const signoutBtn = document.getElementById('btn-signout');
+if (signoutBtn) {
+  signoutBtn.addEventListener('click', function () {
+    signout('signout');
+  });
+}
+const accountBtn = document.getElementById('funcnav-account');
+if (accountBtn) {
+  accountBtn.addEventListener('click', function () {
+    openMenu('account');
+  });
+}
+
+</script>
+			</div>
+	<div id="cover-menu-mask" style="display:none;">
+		<div class="close" onclick="closeMenu();">⊗</div>
+		<div class="cover-menu">
+		
+<!-- Start: Content Pager -->
+<div class="sitemap">
+<ul>	<li class='title' style='display:none;'><a href='https://www.goldenhorse.org.tw/awards/about/overview/'  >金馬獎</a></li> 
+	<li class='awards' style='display:none;'> 
+		<div class='row'> 
+			<div class='list '> 
+				<div> 
+					<a href='https://www.goldenhorse.org.tw/awards/about/overview/' class='text-bold ' target='_self'>關於金馬獎</a> 
+						<ul> 
+					<li>❯ <a href='https://www.goldenhorse.org.tw/awards/about/overview/' class='small_mask '  target='_self'>金馬獎介紹</a></li> 
+					<li>❯ <a href='https://www.goldenhorse.org.tw/awards/about/milestones/' class='small_mask '  target='_self'>獎項沿革</a></li> 
+					<li>❯ <a href='https://www.goldenhorse.org.tw/awards/about/statuettes/' class='small_mask '  target='_self'>金馬獎座</a></li> 
+					<li>❯ <a href='https://www.goldenhorse.org.tw/awards/about/song/' class='small_mask '  target='_self'>金馬奔騰</a></li> 
+						</ul> 
+					</div> 
+			</div> 
+			<div class='list '> 
+				<div> 
+					<a href='https://www.goldenhorse.org.tw/awards/submission/guidelines/' class='text-bold ' target='_self'>競賽</a> 
+						<ul> 
+					<li>❯ <a href='https://www.goldenhorse.org.tw/awards/submission/guidelines/' class='small_mask '  target='_self'>競賽規章</a></li> 
+					<li>❯ <a href='https://www.goldenhorse.org.tw/awards/submission/online/' class='small_mask '  target='_self'>線上報名</a></li> 
+					<li>❯ <a href='https://www.goldenhorse.org.tw/awards/submission/jury/' class='small_mask '  target='_self'>評審</a></li> 
+					<li>❯ <a href='https://www.goldenhorse.org.tw/awards/submission/choice/' class='small_mask '  target='_self'>觀眾票選最佳影片</a></li> 
+						</ul> 
+					</div> 
+			</div> 
+			<div class='list '> 
+				<div> 
+					<a href='https://www.goldenhorse.org.tw/awards/nw/' class='text-bold ' target='_self'>入圍得獎</a> 
+						<ul> 
+						</ul> 
+					</div> 
+			</div> 
+			<div class='list '> 
+				<div> 
+					<a href='https://www.goldenhorse.org.tw/awards/ceremony/info/' class='text-bold ' target='_self'>頒獎典禮</a> 
+						<ul> 
+					<li>❯ <a href='https://www.goldenhorse.org.tw/awards/ceremony/info/' class='small_mask '  target='_self'>典禮資訊</a></li> 
+					<li>❯ <a href='https://www.goldenhorse.org.tw/awards/ceremony/program/' class='small_mask '  target='_self'>典禮場刊</a></li> 
+						</ul> 
+					</div> 
+		</div> 
+	</li> 
+</ul> 
+<ul>	<li class='title' style='display:none;'><a href='https://www.goldenhorse.org.tw/film/about/overview/'  >影展</a></li> 
+	<li class='film' style='display:none;'> 
+		<div class='row'> 
+			<div class='list '> 
+				<div> 
+					<a href='https://www.goldenhorse.org.tw/film/about/overview/' class='text-bold ' target='_self'>關於影展</a> 
+						<ul> 
+					<li>❯ <a href='https://www.goldenhorse.org.tw/film/about/overview/' class='small_mask text-checked'  target='_self'>影展介紹</a></li> 
+					<li>❯ <a href='https://www.goldenhorse.org.tw/film/about/entry/' class='small_mask '  target='_self'>報名規章</a></li> 
+					<li>❯ <a href='https://www.goldenhorse.org.tw/film/about/submission/' class='small_mask '  target='_self'>線上報名</a></li> 
+					<li>❯ <a href='https://www.goldenhorse.org.tw/film/about/archive/' class='small_mask '  target='_self'>歷屆影展</a></li> 
+					<li>❯ <a href='https://www.goldenhorse.org.tw/film/about/programme/' class='small_mask '  target='_self'>歷屆專刊下載</a></li> 
+						</ul> 
+					</div> 
+			</div> 
+			<div class='list '> 
+				<div> 
+					<a href='https://www.goldenhorse.org.tw/film/programme/films/' class='text-bold ' target='_self'>節目資訊</a> 
+						<ul> 
+					<li>❯ <a href='https://www.goldenhorse.org.tw/film/programme/films/' class='small_mask '  target='_self'>影片介紹</a></li> 
+					<li>❯ <a href='https://www.goldenhorse.org.tw/film/programme/schedule/' class='small_mask '  target='_self'>場次表</a></li> 
+					<li>❯ <a href='https://www.goldenhorse.org.tw/film/programme/download/' class='small_mask '  target='_self'>專刊下載</a></li> 
+					<li>❯ <a href='https://www.goldenhorse.org.tw/film/programme/related/' class='small_mask '  target='_self'>相關文章</a></li> 
+						</ul> 
+					</div> 
+			</div> 
+			<div class='list '> 
+				<div> 
+					<a href='https://www.goldenhorse.org.tw/film/notesevents/announcements/' class='text-bold ' target='_self'>公告及活動</a> 
+						<ul> 
+					<li>❯ <a href='https://www.goldenhorse.org.tw/film/notesevents/announcements/' class='small_mask '  target='_self'>影展公告</a></li> 
+					<li>❯ <a href='https://www.goldenhorse.org.tw/film/notesevents/choice/' class='small_mask '  target='_self'>觀眾票選</a></li> 
+					<li>❯ <a href='https://www.goldenhorse.org.tw/film/notesevents/events/' class='small_mask '  target='_self'>周邊活動</a></li> 
+						</ul> 
+					</div> 
+			</div> 
+			<div class='list '> 
+				<div> 
+					<a href='https://www.goldenhorse.org.tw/film/tickets_venues/ticketing/' class='text-bold ' target='_self'>售票及場地</a> 
+						<ul> 
+					<li>❯ <a href='https://www.goldenhorse.org.tw/film/tickets_venues/ticketing/' class='small_mask '  target='_self'>售票資訊</a></li> 
+					<li>❯ <a href='https://www.goldenhorse.org.tw/film/tickets_venues/venues/' class='small_mask '  target='_self'>場地資訊</a></li> 
+					<li>❯ <a href='https://tghff.tixcraft.com/' class='small_mask '  target='_blank'>線上購票</a></li> 
+					<li>❯ <a href='https://www.goldenhorse.org.tw/film/tickets_venues/qa/' class='small_mask '  target='_self'>購票Q&amp;A</a></li> 
+						</ul> 
+					</div> 
+		</div> 
+	</li> 
+</ul> 
+<ul>	<li class='title' style='display:none;'><a href='https://www.goldenhorse.org.tw/fpp/about/'  >創投會議</a></li> 
+	<li class='fpp' style='display:none;'> 
+		<div class='row'> 
+			<div class='list '> 
+				<div> 
+					<a href='https://www.goldenhorse.org.tw/fpp/about/' class='text-bold ' target='_self'>創投會議沿革介紹</a> 
+						<ul> 
+						</ul> 
+					</div> 
+				<div> 
+					<a href='https://www.goldenhorse.org.tw/fpp/archives/' class='text-bold ' target='_self'>歷屆入選企劃</a> 
+					</div> 
+				<div> 
+					<a href='https://www.goldenhorse.org.tw/fpp/completed/' class='text-bold ' target='_self'>歷屆完成作品</a> 
+					</div> 
+			</div> 
+			<div class='list '> 
+				<div> 
+					<a href='https://www.goldenhorse.org.tw/fpp/submission/guidelines/' class='text-bold ' target='_self'>企劃報名</a> 
+						<ul> 
+					<li>❯ <a href='https://www.goldenhorse.org.tw/fpp/submission/guidelines/' class='small_mask '  target='_self'>FPP企劃案報名規章</a></li> 
+					<li>❯ <a href='https://www.goldenhorse.org.tw/fpp/submission/wipguidelines/' class='small_mask '  target='_self'>WIP企劃案報名規章</a></li> 
+					<li>❯ <a href='https://www.goldenhorse.org.tw/fpp/submission/seriesguidelines/' class='small_mask '  target='_self'>Series企劃案報名規章</a></li> 
+					<li>❯ <a href='https://www.goldenhorse.org.tw/fpp/submission/online/' class='small_mask '  target='_self'>線上報名</a></li> 
+						</ul> 
+					</div> 
+			</div> 
+			<div class='list '> 
+				<div> 
+					<a href='https://www.goldenhorse.org.tw/fpp/projects/' class='text-bold ' target='_self'>入選企劃</a> 
+					</div> 
+				<div> 
+					<a href='https://www.goldenhorse.org.tw/fpp/professionals/' class='text-bold ' target='_self'>與會公司介紹</a> 
+						<ul> 
+						</ul> 
+					</div> 
+				<div> 
+					<a href='https://www.goldenhorse.org.tw/fpp/jury_awards/jury/' class='text-bold ' target='_self'>評審及獎項</a> 
+						<ul> 
+					<li>❯ <a href='https://www.goldenhorse.org.tw/fpp/jury_awards/jury/' class='small_mask '  target='_self'>評審</a></li> 
+					<li>❯ <a href='https://www.goldenhorse.org.tw/fpp/jury_awards/award/' class='small_mask '  target='_self'>獎項</a></li> 
+						</ul> 
+					</div> 
+			</div> 
+			<div class='list '> 
+				<div> 
+					<a href='https://www.goldenhorse.org.tw/fpp/reservation/' class='text-bold ' target='_self'>會議預約</a> 
+						<ul> 
+						</ul> 
+					</div> 
+				<div> 
+					<a href='https://www.goldenhorse.org.tw/fpp/meetings/schedule/' class='text-bold ' target='_self'>會議活動</a> 
+						<ul> 
+					<li>❯ <a href='https://www.goldenhorse.org.tw/fpp/meetings/schedule/' class='small_mask '  target='_self'>活動流程</a></li> 
+					<li>❯ <a href='https://www.goldenhorse.org.tw/fpp/meetings/events/' class='small_mask '  target='_self'>周邊活動</a></li> 
+						</ul> 
+					</div> 
+				<div> 
+					<a href='https://www.goldenhorse.org.tw/fpp/gima/professionals/' class='text-bold ' target='_self'>金音創作獎媒合活動</a> 
+						<ul> 
+					<li>❯ <a href='https://www.goldenhorse.org.tw/fpp/gima/professionals/' class='small_mask '  target='_self'>音樂人代表介紹</a></li> 
+					<li>❯ <a href='https://www.goldenhorse.org.tw/fpp/gima/reservation/' class='small_mask '  target='_self'>媒合會議預約</a></li> 
+						</ul> 
+					</div> 
+		</div> 
+	</li> 
+</ul> 
+<ul>	<li class='title' style='display:none;'><a href='https://www.goldenhorse.org.tw/academy/about/overview/'  >電影學院</a></li> 
+	<li class='academy' style='display:none;'> 
+		<div class='row'> 
+			<div class='list '> 
+				<div> 
+					<a href='https://www.goldenhorse.org.tw/academy/about/overview/' class='text-bold ' target='_self'>關於電影學院</a> 
+						<ul> 
+					<li>❯ <a href='https://www.goldenhorse.org.tw/academy/about/overview/' class='small_mask '  target='_self'>學院介紹</a></li> 
+					<li>❯ <a href='https://www.goldenhorse.org.tw/academy/about/archive/' class='small_mask '  target='_self'>歷屆作品</a></li> 
+					<li>❯ <a href='https://www.goldenhorse.org.tw/academy/about/mentor/' class='small_mask '  target='_self'>歷屆師資</a></li> 
+					<li>❯ <a href='https://www.goldenhorse.org.tw/academy/about/talent/' class='small_mask '  target='_self'>歷屆學員</a></li> 
+						</ul> 
+					</div> 
+			</div> 
+			<div class='list '> 
+				<div> 
+					<a href='https://www.goldenhorse.org.tw/academy/submission/guidelines/' class='text-bold ' target='_self'>學院報名</a> 
+						<ul> 
+					<li>❯ <a href='https://www.goldenhorse.org.tw/academy/submission/guidelines/' class='small_mask '  target='_self'>報名規章</a></li> 
+					<li>❯ <a href='https://www.goldenhorse.org.tw/academy/submission/online/' class='small_mask '  target='_self'>線上報名</a></li> 
+						</ul> 
+					</div> 
+			</div> 
+			<div class='list '> 
+				<div> 
+					<a href='https://www.goldenhorse.org.tw/academy/participants/talents/' class='text-bold ' target='_self'>學院入選名單</a> 
+						<ul> 
+					<li>❯ <a href='https://www.goldenhorse.org.tw/academy/participants/talents/' class='small_mask '  target='_self'>入選名單</a></li> 
+					<li>❯ <a href='https://www.goldenhorse.org.tw/academy/participants/mentor/' class='small_mask '  target='_self'>導師</a></li> 
+					<li>❯ <a href='https://www.goldenhorse.org.tw/academy/participants/schedule/' class='small_mask '  target='_self'>課程表</a></li> 
+						</ul> 
+					</div> 
+				<div> 
+					<a href='https://www.goldenhorse.org.tw/academy/results/' class='text-bold ' target='_self'>學院成果放映</a> 
+						<ul> 
+						</ul> 
+					</div> 
+			</div> 
+			<div class='list '> 
+				<div> 
+					<a href='https://www.goldenhorse.org.tw/academy/filmacademyplus/plusoverview/' class='text-bold ' target='_self'>關於電影學院<font class="h4 text-normal">＋</font></a> 
+						<ul> 
+					<li>❯ <a href='https://www.goldenhorse.org.tw/academy/filmacademyplus/class/' class='small_mask '  target='_self'>電影大師課</a></li> 
+					<li>❯ <a href='https://www.goldenhorse.org.tw/academy/filmacademyplus/studio/' class='small_mask '  target='_self'>電影工作坊</a></li> 
+					<li>❯ <a href='https://www.goldenhorse.org.tw/academy/filmacademyplus/forum/' class='small_mask '  target='_self'>電影論壇</a></li> 
+					<li>❯ <a href='https://www.goldenhorse.org.tw/academy/filmacademyplus/critics/' class='small_mask '  target='_self'>亞洲電影觀察團</a></li> 
+					<li>❯ <a href='https://www.goldenhorse.org.tw/academy/filmacademyplus/teen/' class='small_mask '  target='_self'>青少年電影課</a></li> 
+					<li>❯ <a href='https://www.goldenhorse.org.tw/academy/filmacademyplus/currents/' class='small_mask '  target='_self'>影迷新世代</a></li> 
+					<li>❯ <a href='https://www.goldenhorse.org.tw/academy/filmacademyplus/classonline/' class='small_mask '  target='_self'>電影大師課／線上課程</a></li> 
+						</ul> 
+					</div> 
+		</div> 
+	</li> 
+</ul> 
+<ul>	<li class='title' style='display:none;'><a href='https://tghff.tixcraft.com/' target='_blank' >影展購票</a></li> 
+</ul> 
+<ul>	<li class='title' style='display:none;'><a href='https://www.goldenhorse.org.tw/news/'  >最新消息</a></li> 
+</ul> 
+<ul>	<li class='title' style='display:none;'><a href='https://www.goldenhorse.org.tw/events/'  >年度活動</a></li> 
+</ul> 
+<ul>	<li class='title' style='display:none;'><a href='https://www.goldenhorse.org.tw/highlights/'  >影音圖輯</a></li> 
+</ul> 
+<ul>	<li class='title' style='display:none;'><a href='https://www.goldenhorse.org.tw/sponsorship/'  >贊助金馬</a></li> 
+</ul> 
+<ul>	<li class='title' style='display:none;'><a href='https://www.goldenhorse.org.tw/aboutus/about/'  >關於我們</a></li> 
+	<li class='aboutus' style='display:none;'> 
+		<div class='row'> 
+			<div class='list '> 
+				<div> 
+					<a href='https://www.goldenhorse.org.tw/aboutus/about/' class='text-bold ' target='_self'>關於我們</a> 
+						<ul> 
+						</ul> 
+					</div> 
+			</div> 
+			<div class='list '> 
+				<div> 
+					<a href='https://www.goldenhorse.org.tw/aboutus/history/' class='text-bold ' target='_self'>大事紀</a> 
+						<ul> 
+						</ul> 
+					</div> 
+			</div> 
+			<div class='list '> 
+				<div> 
+					<a href='https://www.goldenhorse.org.tw/aboutus/contact/' class='text-bold ' target='_self'>聯絡我們</a> 
+						<ul> 
+						</ul> 
+					</div> 
+		</div> 
+	</li> 
+</ul> 
+<ul>	<li class='title' style='display:none;'><a href='https://www.goldenhorse.org.tw/industry/'  >業界 | 媒體</a></li> 
+</ul> 
+<ul>	<li class='title' style='display:none;'><a href='https://www.goldenhorse.org.tw/account/general/breadcrumbs/'  >帳戶管理</a></li> 
+	<li class='account' style='display:none;'> 
+		<div class='row'> 
+			<div class='list_special '> 
+				<div> 
+					<a href='https://www.goldenhorse.org.tw/account/general/breadcrumbs/' class='text-bold ' target='_self'>一般功能</a> 
+						<ul> 
+					<li>❯ <a href='https://www.goldenhorse.org.tw/account/general/password/' class='small_mask '  target='_self'>修改個人密碼</a></li> 
+					<li>❯ <a href='https://www.goldenhorse.org.tw/account/general/member/' class='small_mask '  target='_self'>修改基本資料</a></li> 
+					<li>❯ <a href='https://www.goldenhorse.org.tw/account/general/schedule/' class='small_mask '  target='_self'>管理我的片單</a></li> 
+					<li>❯ <a href='https://tghff.tixcraft.com/order/' class='small_mask '  target='_blank'>購票紀錄(拓元購票)</a></li> 
+					<li>❯ <a href='https://www.goldenhorse.org.tw/account/general/events/' class='small_mask '  target='_self'>年度活動報名紀錄</a></li> 
+					<li>❯ <a href='https://www.goldenhorse.org.tw/account/general/payment/' class='small_mask '  target='_self'>付款紀錄查詢</a></li> 
+					<li>❯ <a href='https://www.goldenhorse.org.tw/account/general/delete/' class='small_mask '  target='_self'>刪除帳號申請</a></li> 
+						</ul> 
+					</div> 
+			</div> 
+			<div class='list_special '> 
+				<div> 
+					<a href='https://www.goldenhorse.org.tw/account/film/' class='text-bold ' target='_self'>影展觀摩影片報名紀錄</a> 
+						<ul> 
+						</ul> 
+					</div> 
+				<div> 
+					<a href='https://www.goldenhorse.org.tw/account/awards/' class='text-bold ' target='_self'>金馬獎報名紀錄</a> 
+						<ul> 
+						</ul> 
+					</div> 
+				<div> 
+					<a href='https://www.goldenhorse.org.tw/account/press/' class='text-bold ' target='_self'>媒體採訪報名紀錄</a> 
+						<ul> 
+						</ul> 
+					</div> 
+				<div> 
+					<a href='https://www.goldenhorse.org.tw/account/badge/' class='text-bold ' target='_self'>參展證申請紀錄</a> 
+						<ul> 
+						</ul> 
+					</div> 
+			</div> 
+			<div class='list_special '> 
+				<div> 
+					<a href='https://www.goldenhorse.org.tw/account/fppsubmission/' class='text-bold ' target='_self'>創投會議報名紀錄</a> 
+						<ul> 
+						</ul> 
+					</div> 
+				<div> 
+					<a href='https://www.goldenhorse.org.tw/account/fppmeetings/' class='text-bold ' target='_self'>創投會議預約紀錄</a> 
+						<ul> 
+						</ul> 
+					</div> 
+				<div> 
+					<a href='https://www.goldenhorse.org.tw/account/gima/' class='text-bold ' target='_self'>金音創作獎會議預約紀錄</a> 
+						<ul> 
+						</ul> 
+					</div> 
+				<div> 
+					<a href='https://www.goldenhorse.org.tw/account/academy/' class='text-bold ' target='_self'>電影學院報名紀錄</a> 
+						<ul> 
+						</ul> 
+					</div> 
+		</div> 
+	</li> 
+</ul> 
+
+</div>
+<!-- End: Content Pager -->		</div>
+	</div>
+	
+<!-- End: Header -->
+
+<!-- Start: Content -->
+<div class='container' id='content'>
+	<div class='row' style='border-top: 1px solid #c0c0c0;'>
+		<!--- Start: Image -->
+		
+
+		<!--- End: Image -->
+	</div>
+
+	<div class='row'>
+		<div class='col-lg-1-75 col-xs-1'></div>
+		<div class='col-lg-8-5 col-xs-10 content-page'>
+			<!--- Start: Breadcrumb -->
+			
+<ul class='breadcrumb'>
+	<li><a href='https://www.goldenhorse.org.tw'>首頁</a></li>
+	<li><a href='https://www.goldenhorse.org.tw/film/about/overview/'>影展</a></li> 
+	<li><a href='https://www.goldenhorse.org.tw/film/about/overview/'>關於影展</a></li> 
+	<li class='active'>影展介紹</li> 
+</ul>
+			<!--- End: Breadcrumb -->
+
+			<!-- Start: Content Pager -->
+			
+<!-- Start: Content Pager -->
+<div id='html'>
+	
+	<div style="text-align: justify;">金馬影展由台北金馬影展執行委員會主辦，為臺灣規模最大、歷史最悠久的國際觀摩影展。以推廣電影藝術，並透過世界電影提升文化交流為職志。<br /><br />自1980年舉辦第一屆影展以來，曾策畫楚浮、柏格曼、雷奈、阿莫多瓦、奇士勞斯基、貝拉塔爾、伊丹十三等導演專題，拓展國內影迷視野，也邀請國際影人來臺共襄盛舉，歷年包含彼得格林納威、阿巴斯基亞羅斯塔米、艾騰伊格言、狄奧安哲羅普洛斯、奧利維耶阿薩亞斯、佛杭蘇瓦歐容、克里斯多夫贊努西、尼可拉溫丁黑芬、達頓兄弟、克里斯汀穆基、伊莎貝雨蓓、丹尼維勒納夫、李歐卡霍、茱麗葉畢諾許等歐美影人，以及來自亞洲各地的名導明星，包含大島渚、森田芳光、黑澤清、是枝裕和、三谷幸喜、青山真治、新海誠、細田守、北野武、役所廣司、妻夫木聰、宮崎葵、三浦春馬、長澤雅美、金基德、李滄東、雅斯敏阿莫、阿比查邦韋拉斯塔古、布里蘭特曼多薩、陳英雄等，都曾來臺與影迷交流。除與世界影壇接軌，也積極深耕華語電影，策畫相關單元，華語影壇諸多重量級影人，包括侯孝賢、李安、蔡明亮、許鞍華、杜琪峯、關錦鵬、陳可辛、婁燁、王家衛、爾冬陞、李屏賓、張曼玉、郭富城等人，皆曾應邀參與影展，並舉辦大師講堂。<br /><br />自2010年起，金馬執委會於４月推出金馬奇幻影展；2018年起，更於7/8月舉行金馬經典影展；加上11月的金馬影展，每年度總共舉辦三個影展。<br /><br /><br />
+<div style="text-align: center;"><span style="font-size: 19px;"><strong>【</strong><strong style="font-size: 20px;">金馬</strong></span><strong style="font-size: 20px;">國際</strong><strong style="font-size: 20px;">影展 Taipei Golden Horse Film Festival</strong><strong style="font-size: 19px;">】<br /></strong><strong style="font-size: 20px;"><span style="color: #993300;">2026台北金馬影展將於11月6日至11月22日舉行。<br /><br /></span></strong></div>
+<div style="text-align: center;">
+<div style="text-align: left;">
+<div><img style="display: block; margin-left: auto; margin-right: auto;" title="2026金馬影展主視覺海報" src="https://storage.googleapis.com/tghff_outland/image/photo/2026/GHFF/huge/photo_1fd82e5b311fbd82c9e1e83a06364cf5.jpeg" alt="2026金馬影展主視覺海報" width="70%" /></div>
+<div style="text-align: justify;">
+<div><br />本屆金馬攜手的創意團隊「一席之地」由導演殷振豪率領金馬最佳美術設計梁碩麟、iroiroLAB監製林沁兒、JynCollective品牌策展顧問林柔君，提出「電影，以光影築山河；金馬，因相聚成江湖」的概念，構思「再見江湖」年度主題，並邀請知名設計團隊Blob Club吳建龍、畢展熒製作精彩吸睛的主視覺。歡迎電影人和觀眾在光影山河間相逢相惜，共築金馬電影江湖。</div>
+<div><br />2026年度主題「再見江湖」以影壇如江湖為靈感，電影讓人們跨越時間與空間交會，而金馬則讓不同世代、地域的影人齊聚。電影的每一道影格，都是時間的軌跡，無數影像彼此堆疊，形塑出一座山、一座城市，乃至一方天地。一部部電影構築出屬於金馬的江湖，人們在故事裡相聚相散，也在光影間攜手前行。</div>
+<div><br />主視覺以白晝與黑夜兩款呈現，透過色彩轉換及光影層次的時間變化，既呼應電影的開場與散場，也映照電影人的聚合與分離。畫面中，層層山巒展現大山大景的遼闊氣勢；交錯堆疊的構圖，拓展出綿延無盡的創作天地，宛如持續誕生的電影，在時代與故事之間不斷累積。兩款主視覺也能並置拼接，如同電影銀幕的展開，讓山巒自然鋪展，展現沉靜而開闊的山水意境，搭配水墨、書畫獨有的落款形式，加深視覺敘事與場景張力。</div>
+<div><br />視覺色彩則以電影色票為基底，山水畫的渲染與潑墨為形，以《悲情城市》（1989）、《少年吔，安啦！》（1992）、《重慶森林》（1994）、《臥虎藏龍》（2000）、《無間道》（2002）、《投名狀》（2007）、《那些年，我們一起追的女孩》（2011）、《血觀音》（2017）、《陽光普照》（2019）、《同學麥娜絲》（2020）、《瀑布》（2021）、《當男人戀愛時》（2021）、《周處除三害》（2023）、《大濛》（2025）等經典電影配色為靈感，透過虛實交融、層層暈染，將穿梭群山間的流動光影，化作江湖的情感與能量，也串聯起不同世代電影人的相遇與傳承，形成一幅持續生成的金馬新江湖。</div>
+<div><br />設計也把「江湖氣息」元素延伸至金馬標準字，將「氣」化作自由流動的風雲煙霧，繚繞在「金馬」二字，也象徵著人因電影薈萃，氣凝成形，金馬江湖於此誕生。</div>
+</div>
+</div>
+</div>
+</div>
+<p style="text-align: start;">&nbsp;</p>
+<div>
+<div style="text-align: justify;">
+<p style="text-align: start;">&nbsp;</p>
+<div style="text-align: start;">
+<div style="text-align: center;"><strong style="font-size: 20px;"><strong>【金馬經典</strong><strong>影展 Golden Horse Classic Film Festival】<br /></strong></strong><strong style="font-size: 20px;"><span style="color: #993300;">2026金馬經典影展：比利懷德120週年紀念展<br />台北場－7月24日至8月13日；台中場－8月5日至8月16日<br /><span style="text-align: justify; color: #000000; font-size: 16px;">&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;</span></span></strong></div>
+<div style="text-align: justify;">
+<p><img style="display: block; margin-left: auto; margin-right: auto;" title="2026金馬經典影展" src="https://storage.googleapis.com/tghff_outland/image/photo/2026/GHFF/huge/photo_ac4556fd4502419f1df94cc5d97c8d56.jpeg" alt="2026金馬經典影展" width="75%" /></p>
+<p><span><br />今年適逢美國電影大師比利懷德（Billy Wilder, 1906-2002）120歲冥誕，金馬經典影展特別策劃「2026金馬經典影展：比利懷德120週年紀念展」，將與台中市影視發展基金會於七、八月在台北、台中兩地隆重登場！</span></p>
+<p><span>​</span></p>
+<p><span>本次影展大銀幕重現比利懷德執導的25部電影作品，見證他囊括七座奧斯卡、三座金球獎、坎城影展大獎、柏林與威尼斯影展終身成就獎的輝煌生涯。這也是金馬經典影展從明星、類型到作者，分門切入好萊塢精華的三部曲。</span>比利懷德被譽為好萊塢最偉大的全能編導之一，他以辛辣幽默的對白、精密紮實的劇本，以及對人性深刻的洞察聞名。這位被視為美國影壇巨擘的影人其實出身奧匈帝國，早年前往柏林追尋電影夢，後因納粹掌權被迫流亡法國，落腳好萊塢後大放異彩。本次放映不僅網羅他膾炙人口的《日落大道》（1950）、《龍鳳配》（1954）、《七年之癢》（1955）、《熱情如火》（1959）、《公寓春光》（1960）等超級經典，更蒐齊多部在台灣難得一見的珍貴影片。&nbsp;</p>
+</div>
+<p style="text-align: justify;">&nbsp;</p>
+<p style="text-align: justify;"><strong>◆【2026金馬經典影展：比利懷德120週年紀念展】放映片單 Line-up：</strong></p>
+<p style="text-align: justify;">&nbsp;</p>
+<p style="text-align: justify;"><span>▎《壞種》（Mauvaise graine, 1934）</span></p>
+<p style="text-align: justify;"><span>▎《荳蔻年華》（The Major and the Minor, 1942）</span></p>
+<p style="text-align: justify;"><span>▎《開羅諜報戰（又名:大破羅美爾）》（Five Graves to Cairo, 1943）</span></p>
+<p style="text-align: justify;"><span>▎《雙重保險（又名:火車謀殺案）》（Double Indemnity,1944）</span></p>
+<p style="text-align: justify;"><span>▎《失去的週末》（The Lost Weekend, 1945）</span></p>
+<p style="text-align: justify;"><span>▎《璇宮艷舞》（The Emperor Waltz, 1948）</span></p>
+<p style="text-align: justify;"><span>▎《柏林豔史》（A Foreign Affair, 1948）</span></p>
+<p style="text-align: justify;"><span>▎《日落大道（又名:紅樓金粉）》（Sunset Boulevard, 1950）</span></p>
+<p style="text-align: justify;"><span>▎《倒扣的王牌》（Ace in the Hole, 1951）</span></p>
+<p style="text-align: justify;"><span>▎《戰地軍魂》（Stalag 17, 1953）</span></p>
+<p style="text-align: justify;"><span>▎《龍鳳配》（Sabrina, 1954）</span></p>
+<p style="text-align: justify;"><span>▎《七年之癢（又名:七年一覺飄香夢）》（The Seven Year Itch, 1955）</span></p>
+<p style="text-align: justify;"><span>▎《壯志凌雲》（The Spirit of St. Louis, 1957）</span></p>
+<p style="text-align: justify;"><span>▎《黃昏之戀》（Love in the Afternoon, 1957）</span></p>
+<p style="text-align: justify;"><span>▎《情婦》（Witness for the Prosecution, 1957）</span></p>
+<p style="text-align: justify;"><span>▎《熱情如火》（Some Like It Hot, 1959）</span></p>
+<p style="text-align: justify;"><span>▎《公寓春光》（The Apartment, 1960）</span></p>
+<p style="text-align: justify;"><span>▎《一二三》（One, Two, Three, 1961）</span></p>
+<p style="text-align: justify;"><span>▎《愛瑪姑娘》（Irma la Douce, 1963）</span></p>
+<p style="text-align: justify;"><span>▎《紅唇香吻》（Kiss Me, Stupid, 1964）</span></p>
+<p style="text-align: justify;"><span>▎《飛來福》（The Fortune Cookie, 1966）</span></p>
+<p style="text-align: justify;"><span>▎《神探福爾摩斯》（The Private Life of Sherlock Holmes, 1970）</span></p>
+<p style="text-align: justify;"><span>▎《兩代情》（Avanti!, 1972）</span></p>
+<p style="text-align: justify;"><span>▎《滿城風雨》（The Front Page, 1974）</span></p>
+<p style="text-align: justify;"><span>▎《麗人劫》（Fedora, 1978）</span><span style="text-align: start;"><br /><br /></span></p>
+<div style="text-align: justify;">
+<div style="text-align: center;">
+<div style="text-align: left;">
+<div style="text-align: center;"><br /><strong style="font-size: 20px;">【金馬</strong><strong style="font-size: 20px;">奇幻</strong><strong style="font-size: 20px;">影展 Golden Horse Fantastic Film Festival】</strong></div>
+</div>
+</div>
+</div>
+</div>
+<p style="text-align: center;"><strong style="font-size: 20px;"><span style="color: #993300;">2026金馬奇幻影展－4月10日至4月19日<br /><br /></span></strong></p>
+</div>
+</div>
+<div>
+<div style="text-align: center;"><img title="2026金馬奇幻主視覺海報" src="https://storage.googleapis.com/tghff_outland/image/photo/2026/GHFF/huge/photo_91f63ad3b446c953fecee66d4592db4e.jpeg" alt="2026金馬奇幻主視覺海報" width="50%" /></div>
+<div style="text-align: justify;">
+<p style="text-align: justify;"><span><br />2026金馬奇幻影展於4月10日至19日在台北熱鬧展開！金馬奇幻影展為台灣首次以「奇幻」為名的主題影展，自2010年創辦至今，內容涵蓋科幻、恐怖、驚悚、歌舞、喜劇、武俠、動畫、愛情以及各類cult film，打破觀眾對電影的想像界限，展開獨特的觀影體驗。</span></p>
+<p style="text-align: justify;">&nbsp;</p>
+<p style="text-align: justify;"><span>開幕片由名導大衛羅利攜手奧斯卡得主安海瑟薇的《魅影巨星》（Mother Mary），以及日本動畫導演四宮義俊角逐柏林影展金熊獎的首部動畫長片《花綠青綻放之時》（A New Dawn）榮膺，兩部東西方矚目新作將齊聚金馬奇幻影展，讓台灣觀眾搶先一睹。</span></p>
+<p style="text-align: justify;">&nbsp;</p>
+<p style="text-align: justify;"><span>今年導演專題聚焦A24名導大衛羅利、柏林金熊獎得主伊爾蒂蔻恩伊達兩位導演多部代表作，不僅邀來兩人矚目新片首映《魅影巨星》、《你是不會當樹嗎》，也將影迷敲碗多年的口碑佳作一舉搬上大銀幕。除了兩大導演，影展更祭出華麗奇幻陣容，包括英國鬼才班偉特利腦洞大開的多重宇宙冒險、布萊德利庫柏再展編導才華的婚姻喜劇、好萊塢女神亞曼達塞佛瑞以出眾演技詮釋女教主，還有丹麥影帝邁茲米克森、「馬男波傑克」威爾阿奈特、奧斯卡得主蘿拉鄧等巨星新作。橫跨科幻、驚悚、恐怖、喜劇與動畫，將引領觀眾走入不可思議的奇幻影像異境。</span></p>
+<p style="text-align: justify;"><span>​</span></p>
+<p style="text-align: justify;"><span>「狂歡場」，除了秒殺的定目片《洛基恐怖秀》將再度點燃現場熱情，還首度放映致敬紀錄片《奇異旅程：洛基恐怖秀》，帶領觀眾深入瘋狂的洛基宇宙。本屆活動場還加碼推出惡搞喜劇《小姐好白》，現場將會重現各種笑到噴飯的橋段。「影迷許願池」計有李奧納多狄卡皮歐盛世美顏並在柏林影展封帝的《羅密歐與茱麗葉》、《暴蜂尼亞》改編的韓國原作《拯救綠色星球！》、正宗「人間國寶」坂東玉三郎主演的《夜叉池》4K修復版，以及布魯斯威利、梅莉史翠普和歌蒂韓三大巨星聯袂主演的黑色喜劇《捉神弄鬼》。精彩作品齊發，要讓影迷看得大呼過癮。</span></p>
+<p>&nbsp;</p>
+<p><span>本屆金馬奇幻影展滿座率高達八成，完售64場，創下620萬的票房。10天的瘋狂旅程，50部特色鮮明的電影，20位來自各地的影人出席座談，21家廠商品牌跨界合作、發出超過3000份好禮、2個戲院場地熱情支持、近100位工作人員的參與、超過3萬人次的影迷同歡，讓現場活動熱鬧非凡​。</span></p>
+</div>
+</div></div>
+
+<!-- 本頁專用CSS -->
+<style>
+#html ul{
+	display: block;
+	list-style-type: disc;
+	-moz-padding-start: 70px;
+	-webkit-padding-start: 70px;
+	-khtml-padding-start: 70px;
+	-o-padding-start: 70px;
+	padding-start: 70px;
+}
+#html ol {
+	display: block;
+	list-style-type: decimal;
+	-moz-padding-start: 70px;
+	-webkit-padding-start: 70px;
+	-khtml-padding-start: 70px;
+	-o-padding-start: 70px;
+	padding-start: 70px;
+}
+#html table th, 
+#html table td {
+	border: none;
+	background: #ffffff;
+}
+#html pre {
+	white-space: pre-wrap;
+}
+p {
+    margin-block-start: 0em !important;
+    margin-block-end: 0em !important;
+}
+/*
+#html ul , #html ol {
+	float : none;
+}
+ul , ol{
+	clear: none;
+}
+img{
+	display : inline;
+}
+*/
+</style>
+<!-- End: Content Pager -->
+			<!-- End: Content Pager -->
+			
+		</div>
+		<div class='col-lg-1-75 col-xs-1'></div>
+	</div>
+</div>
+<!-- End: Content -->
+
+<!-- Start: Footer -->
+<div id='footer' class='footer'>
+	<style>
+.footer {
+	padding: 20px !important;
+}
+.footer .data {
+	margin-top: 0px;
+	text-align: center;
+}
+.footer .data a:hover {
+	filter: 'alpha(opacity=70)';
+	filter: Alpha(Opacity=70, FinishOpacity=70, Style=2);
+	-moz-opacity:0.7;
+	opacity: 0.7;
+	filter: progid:DXImageTransform.Microsoft.Alpha(opacity=70); /* IE6~IE8*/
+}
+
+.footer-banner {
+	text-align: center;
+}
+.footer-banner ul {
+	display: inline-block;
+	margin: 0px auto;
+}
+.footer-banner li {
+	float: left;
+	padding: 0px 5px;
+}
+.footer-banner img {
+	max-width: 130px;
+}
+</style>
+<div class="container">
+	<div class="data">
+		<div>| <a href='https://www.goldenhorse.org.tw/sitemap/'>網站地圖</a> | <a href='https://www.goldenhorse.org.tw/aboutus/privacy/'>隱私權保護政策</a> |</div>
+		<div class="small">© Taipei Golden Horse Film Festival Executive Committee</div>
+			</div>
+</div>
+
+<SCRIPT LANGUAGE='JavaScript' type='text/javascript'>
+//===============================================================
+function resizefooter(){
+	var ns = $(window).width();
+
+		$(".col-6").css({'width' :'50%'});
+	$("#r_2 .wrap").css({
+		'margin-left' :'0px',
+		'margin-right' :'5px',
+	});
+	$("#r_3 .wrap").css({
+		'margin-left' :'5px',
+		'margin-right' :'0px',
+	});
+	$(".col-3").css({
+		'margin-left' :'5px',
+		'margin-right' :'5px',
+	});
+		$(".footer .container").css({'padding-left':'30px', 'padding-right':'30px'});
+	$(".footer-banner img").css({'max-width' :'128px'});
+
+		$(".nav .search .form-group input").css({width :'250px'});
+		$(".nav select").css({width :'300px'});
+		$(".nav .ui-state-default").css({width :'300px'});
+		$(".nav .ui-widget-content .ui-state-default").css({width :'300px'});
+		$(".nav .ui-widget-header .ui-state-default").css({width :'300px'});
+		$(".nav .ui-selectmenu-button span.ui-selectmenu-text").css({width :'300px'});
+            if( ns < 1869 && ns >= 1699 ){
+                $(".nav .search .form-group input").css({width :'210px'});
+                $(".nav select").css({width :'250px'});
+                $(".nav .ui-state-default").css({width :'250px'});
+                $(".nav .ui-widget-content .ui-state-default").css({width :'250px'});
+                $(".nav .ui-widget-header .ui-state-default").css({width :'250px'});
+                $(".nav .ui-selectmenu-button span.ui-selectmenu-text").css({width :'250px'});
+            }
+            if( ns < 1699 && ns >= 1400 ){
+                $(".nav .search .form-group input").css({width :'180px'});
+                $(".nav select").css({width :'210px'});
+                $(".nav .ui-state-default").css({width :'210px'});
+                $(".nav .ui-widget-content .ui-state-default").css({width :'210px'});
+                $(".nav .ui-widget-header .ui-state-default").css({width :'210px'});
+                $(".nav .ui-selectmenu-button span.ui-selectmenu-text").css({width :'210px'});
+            }
+            if( ns < 1399 ){
+                $(".nav .search .form-group input").css({width :'180px'});
+                $(".nav select").css({width :'175px'});
+                $(".nav .ui-state-default").css({width :'175px'});
+                $(".nav .ui-widget-content .ui-state-default").css({width :'175px'});
+                $(".nav .ui-widget-header .ui-state-default").css({width :'175px'});
+                $(".nav .ui-selectmenu-button span.ui-selectmenu-text").css({width :'175px'});
+            }
+       if( /ipad/i.test(navigator.userAgent.toLowerCase()) || /iphone|ipod|android|blackberry|mini|windows\sce|palm/i.test(navigator.userAgent.toLowerCase()) ){
+		        $("#wrapper").css('min-width','100%');
+        $(".container").css('min-width','500px');
+        $(".container").css('padding-right','20px');
+        $(".container").css('padding-left','20px');
+        $(".row").css('margin-right','-20px');
+        $(".row").css('margin-left','-20px');
+        $(".content .row").css('margin-right','-15px');
+        $(".content .row").css('margin-left','-15px');
+
+				$("#cover-menu-mask .cover-menu").css('width','calc((100% - 60px * 2))');
+		$("#cover-menu-mask .close").css({
+			'margin-top':'30px',
+			'font-size':'4em',
+		});
+				$("#cover-menu-mask .row").css('margin-bottom','240px');
+		$("#cover-menu-mask .row > div").css('flex-basis','100%');
+		$("#cover-menu-mask .row div").css('margin-top','30px');
+		$("#cover-menu-mask .row > div:first-child").css('margin-top','-10px');
+		$("#cover-menu-mask .row div div:last-child").css('margin-bottom','-50px');
+		$("#cover-menu-mask .row div div > a").css({
+			'display':'block',
+			'margin-bottom':'34px',
+			'font-size':'2.5em',
+		});
+		$("#cover-menu-mask .row div ul li").css({
+			'padding-top':'14px',
+			'padding-bottom':'14px',
+			'font-size':'2.5em',
+		});
+
+        $("#html img").css('width','100%');
+		            }
+       else{
+                if ( ns > 1920 ){
+            $(".container").css('max-width','1920px');
+        }
+    }
+}
+
+$(document).ready(function(){
+	
+	$('#reservation_expire_alert').html('');
+	$('input, textarea').placeholder();
+
+	resizefloat();
+	var $menuWrapper = $('#float'),
+		$subMenuWwrapper = $menuWrapper.find('.menu-tool'),
+		_width = $subMenuWwrapper.width(),
+		_animateSpeed = 200;
+
+	var $subMenu = $subMenuWwrapper.width(0).find('.menu-tool').css({
+		right: _width * -1
+	});
+	// 當滑鼠移入時
+	$('.main-menu').mouseover(function(){
+		// 展開寬度
+		$subMenuWwrapper.stop().animate({
+			width: _width
+		}, _animateSpeed);
+		return false;
+	});
+	// 寬度歸 0
+	$menuWrapper.mouseleave(function(){
+		$subMenuWwrapper.stop().animate({
+			width: 0
+		}, _animateSpeed);
+	});
+
+	resizefooter();
+
+	$(window).on("resize", function(){
+		
+		resizefloat();
+
+		resizefooter();
+			});
+		$('span.text-spot').each(function(){
+		var txt = $(this).html();
+			if(txt.search("碧") != -1 ){
+				$(this).html( txt.replace(/碧/g,"<span class='font-MS-Light'>碧</span>") );
+			}
+			else if(txt.search("筵") != -1 ){
+				$(this).html( txt.replace(/筵/g,"<span class='font-MS-Light'>筵</span>") );
+			}
+			else if(txt.search("綰") != -1 ){
+				$(this).html( txt.replace(/綰/g,"<span class='font-MS-Light'>綰</span>") );
+			}
+
+	});
+
+});
+</SCRIPT>
+</div>
+<!-- End: Footer -->
+
+<!-- Start: Float -->
+
+<div class='float-menu'>
+	<div id='float'>
+		<ul class='nav button main-menu'>
+			<li><img src='https://storage.googleapis.com/tghff_outland/image/icon_search.gif' /></li>
+			<li class='app'><a href='https://www.goldenhorse.org.tw/app'><img src='https://storage.googleapis.com/tghff_outland/image/icon_app.gif' /></a></li>
+			<li><a href='https://www.facebook.com/tghff' target='_blank'><img src='https://storage.googleapis.com/tghff_outland/image/icon_facebook.gif' /></a></li>
+			<li><a href='https://x.com/Golden_Horse' target='_blank'><img src='https://storage.googleapis.com/tghff_outland/image/icon_twitter.gif?t=2412191500' /></a></li>
+			<li><a href='https://www.youtube.com/user/TGHFF' target='_blank'><img src='https://storage.googleapis.com/tghff_outland/image/icon_youtube.gif' /></a></li>
+			<li><a href='https://instagram.com/goldenhorsefilmfestival' target='_blank'><img src='https://storage.googleapis.com/tghff_outland/image/icon_instagram.gif' /></a></li>
+			<li><img src='https://storage.googleapis.com/tghff_outland/image/icon_newsletter.gif' /></li>
+		</ul>
+		<div class='menu-tool' >
+			<ul>
+				<li id='searchs'>
+					<form id="float_Search" name="float_Search" class='form-horizontal' role='form' target='_self' action='https://www.goldenhorse.org.tw/search' method="get" >
+					<input type='text' id='search' name='search' placeholder='SEARCH' value='' size='17' maxlength='30' class='no-border font-bold' /><div><a type='submit' id='click_search' href='#'>OK</a></div>
+					</form>
+				</li>
+				<li id='app'><a href='https://www.goldenhorse.org.tw/app'>APP</a></li>
+				<li id='facebook'><a href='https://www.facebook.com/tghff' target='_blank'>FACEBOOK</a></li>
+				<li id='twitter'><a href='https://x.com/Golden_Horse' target='_blank'>X</a></li>
+				<li id='youtube'><a href='https://www.youtube.com/user/TGHFF' target='_blank'>YOUTUBE</a></li>
+				<li id='instagram'><a href='https://instagram.com/goldenhorsefilmfestival' target='_blank'>INSTAGRAM</a></li>
+				<li class='end' id='newsletter'>
+					<form id="float_epaper" name="float_epaper" class='form-horizontal' role='form' action='' method="post">
+						<input type='hidden' id='act_head' name='act_head' value='' />
+						<input type='text' id='epaper_user' name='epaper_user' placeholder='NEWSLETTER' value='' size='17' maxlength='30' class='no-border font-bold' /><div ><a href='#' onclick="epaper_submit();">OK</a></div>
+					</form>
+				</li>
+			</ul>
+		</div>
+		<div class='text-center' style='padding-top: 5px;'><a href='#top'><img src='https://storage.googleapis.com/tghff_outland/image/icon_top.gif' /></a></div>
+	</div>
+</div>
+<SCRIPT LANGUAGE='JavaScript' type='text/javascript'>
+function resizefloat(){
+	var ns = $(window).width();
+	$(".float-menu").css({'float': 'none','margin-right': '0px','display':'none'});
+	setTimeout('resizertest()',1);
+}
+function resizertest(){
+	var ns = $(window).width();
+	$(".float-menu").css({'float': 'right','display':'block'});
+	$(".float-menu").css('top', ns*0.18);
+}
+
+// 全站搜尋
+$(document).on('click', '#click_search', function(event){
+	var fObj = document.float_Search;
+	fObj.submit();
+});
+
+
+// 訂閱電子報功能
+function epaper_submit(){
+	var fObj = document.float_epaper;
+	if(fObj.epaper_user.value==''){
+		fancyAlert( '欄位不得為空白 ( 電子信箱 )', function(){});
+		return false;
+	}
+	if(!check_string(fObj.epaper_user.value, 'email')){
+		fancyAlert( '欄位格式不正確 ( 電子信箱 )', function(){});
+		return false;
+	}
+	fObj.act_head.value='epaper';
+	fObj.submit();
+}
+</SCRIPT>
+<!-- End: Float -->
+</div>
+</body>
+</html>

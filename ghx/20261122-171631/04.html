@@ -1,0 +1,75 @@
+<link href="https://storage.googleapis.com/tghff_outland/css/reset.css" media="screen" rel="stylesheet" type="text/css" /><link href="https://storage.googleapis.com/tghff_outland/css/style.css" media="screen" rel="stylesheet" type="text/css" /><link href="https://storage.googleapis.com/tghff_outland/css/style-theme.css" media="screen" rel="stylesheet" type="text/css" /><link href="https://storage.googleapis.com/tghff_outland/js/fancyBox-v2.1.5-0/jquery.fancybox.css" media="screen" rel="stylesheet" type="text/css" /><SCRIPT LANGUAGE='JavaScript' SRC='https://storage.googleapis.com/tghff_outland/js/system.js' type='text/javascript' charset='utf-8'></SCRIPT><SCRIPT LANGUAGE='JavaScript' SRC='https://storage.googleapis.com/tghff_outland/js/jquery-1.9.1.js' type='text/javascript' charset='utf-8'></SCRIPT><SCRIPT LANGUAGE='JavaScript' SRC='https://storage.googleapis.com/tghff_outland/js/fancyBox-v2.1.5-0/jquery.fancybox.pack.js' type='text/javascript' charset='utf-8'></SCRIPT><SCRIPT LANGUAGE='JavaScript' type='text/javascript'>
+
+function fancyAlert(msg,callbackYes){
+	var argLength = arguments.length;
+	if(argLength == 2){
+		jQuery.fancybox({
+			'modal' : true,
+			'helpers' : {
+				'overlay' : {
+					'locked' : false
+				}
+			},
+			'live' : false,
+			'content' : '<div style="margin:1px; width:500px;">'+msg+'<div style="text-align:right;margin-top:10px;"><input type="button" id="fancyConfirm_ok" class="btn btn-default" value="確定"></div></div>',
+			'beforeShow' : function(){
+				jQuery("#fancyConfirm_ok").click(function(){
+					callbackYes();
+					$.fancybox.close();
+				});
+			}
+		});
+	}else{
+		jQuery.fancybox({
+			'modal' : true,
+			'helpers' : {
+				'overlay' : {
+					'locked' : false
+				}
+			},
+			'content' : '<div style="margin:1px; width:500px;">'+msg+'<div style="text-align:right;margin-top:10px;"><input type="button" id="fancyConfirm_ok" class="btn btn-default" value="確定"></div></div>',
+			'beforeShow' : function(){
+				jQuery("#fancyConfirm_ok").click(function(){
+					$.fancybox.close();
+				});
+			}
+		});
+	}
+}
+
+function fancyConfirm(msg,callbackYes,callbackNo){
+	var argLength = arguments.length;
+	if(argLength == 3){
+		jQuery.fancybox({
+			'modal' : true,
+			'content' : '<div style="margin:1px; width:500px;">'+msg+'<div style="text-align:right;margin-top:10px;"><input type="button" id="fancyConfirm_ok" class="btn btn-default" value="確定"><input type="button" id="fancyconfirm_cancel" class="btn btn-default" value="取消"></div></div>',
+			'beforeShow' : function(){
+				jQuery("#fancyConfirm_ok").click(function(){
+					callbackYes();
+					$.fancybox.close();
+				});
+				jQuery("#fancyconfirm_cancel").click(function(){
+					callbackNo();
+					$.fancybox.close();
+				});
+			}
+		});
+	}else{
+		jQuery.fancybox({
+			'modal' : true,
+			'content' : '<div style="margin:1px; width:500px;">'+msg+'<div style="text-align:right;margin-top:10px;"><input type="button" id="fancyConfirm_ok" class="btn btn-default" value="確定"><input type="button" id="fancyconfirm_cancel" class="btn btn-default" value="取消"></div></div>',
+			'beforeShow' : function(){
+				jQuery("#fancyConfirm_ok").click(function(){
+					callbackYes();
+					$.fancybox.close();
+				});
+				jQuery("#fancyconfirm_cancel").click(function(){
+					$.fancybox.close();
+				});
+			}
+		});
+	}
+}
+
+</SCRIPT><script LANGUAGE='JavaScript' type='text/javascript'>$(document).ready(function(){fancyAlert('此為無效連結。', function(){document.location.href=('https://www.goldenhorse.org.tw/film/programme/schedule/');});});</script>
+<noscript><a href='https://www.goldenhorse.org.tw/film/programme/schedule/'>未自動轉跳，請按這裡。</a></noscript>
