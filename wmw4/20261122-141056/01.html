@@ -1,0 +1,179 @@
+//DayCalendar Object
+var DayCalendar = {
+	dayStart: new Date(null, null, null, 8, 0, 0),
+	dayEnd: new Date(null, null, null, 24, 0, 0),
+	events: [],
+	/**
+	 * I handle initializing the day calendar view.
+	 */
+	init: function(events) {
+		// console.log('Build times with', events);
+		this.events = events;
+		this.buildDay();
+		this.buildTimes();
+		return this;
+	},
+
+	/**
+	 * Take start time and end time and subtract the 2.
+	 */
+	buildDay: function() {
+		for (var i = 0; i < this.events.length; i++) {
+			this.addEvent(this.events[i]);
+		}
+	},
+
+	/**
+	 * I handle taking the number of hours between the start and end dates and adding
+	 * the times in 30min intervals to the display.
+	 */
+	buildTimes: function() {
+		var h = 16;
+		h = (h * 2);
+		var startDate = this.dayStart,
+			min = (30 * 60 * 1000);
+
+		//Setup the time based on number of intervals
+		for (var i = 0; i < h; i++) {
+
+			//Set the time in 30min jumps
+			startDate.setTime(startDate.getTime() + min);
+			// console.log('buildTime', startDate.getTime() + min);
+			//Add time to display
+			this.addDayTime(startDate);
+
+			// console.warn(startDate.getTime() > this.dayEnd.getTime());
+		}
+	},
+
+	/**
+	 * I handle adding a time element to the day time list
+	 */
+	addDayTime: function(date) {
+		var dt = this.normalizeDate(date);
+		if (dt.time.substr( dt.time.indexOf(':') + 1, 2 ) == '30'){
+			dt.time = '';
+		}
+		$('<div/>')
+			.height(32)
+			.attr('data-time', dt.time)
+			.attr('data-timestamp', date.getTime())
+			// .append('<span>' + dt.time + ' <small>' + dt.ampm + '</small>' + '</span>')
+			.append('<span>' + dt.time + '</span>')
+			.appendTo('.day-times');
+			
+	},
+
+	/**
+	 * Handle adding minutes to a date.
+	 */
+	addMinutes: function(date, minutes) {
+		return new Date(date.getTime() + minutes * 60000);
+	},
+
+	/*
+	 I handle adding an event to the event list for the day.
+	 
+	 Max height of 960.
+	 
+	 12 time entries from 9am to 9pm, with 30 min intervals
+	 
+	 960 / 16 = 60 height blocks
+	 
+	 960 / 30 min = 32 height
+
+	*/
+	addEvent: function(event) {
+		var $el = $('<div/>').append('<h4> ' + this.normalizeDate(this.addMinutes(this.dayStart, event.start)).time +
+			 ' </h4>');
+		var event_end = event.times + event.start;
+		var color = new Array('', '#8EC3A7','#5FB7E5','#DC5356','#F0CB69','#9b9b9b','#E9AD75');
+
+		$el.css('top', event.start - 15);
+		$el.addClass('event');
+		$el.css('position', 'absolute');
+		$el.css('height', event.times);
+		$el.css('border-left-color', color[event.rating]);
+
+		if(event.custom_title != ''){
+			$el.append('<ul class="custom-title">' + event.custom_title + event.film +'</ul>');
+		}else{
+			$el.append('<ul>' + event.film + '</ul>');
+		}
+		
+		$el.append('<p class="info">' + event.info + '</p>');
+		$el.attr('data-starttime', this.addMinutes(this.dayStart, event.start).getTime());
+		$el.attr('data-endtime', this.addMinutes(this.dayStart, event_end).getTime());
+		$el.attr('data-start', event.start);
+		$el.attr('data-end', event_end);
+		$el.appendTo('.schedule[data-date="'+ event.date +'"] .'+ event.site);
+	
+		if(event.state == false){
+			$el.css('display', 'none');
+		}
+		
+		var list = $el.find('ul');
+		list.css('height', (event.times - 50) + 'px')
+	},
+
+	/**
+	 * I handle creating the day-times li elements. Since this calendar is
+	 * from ranges 9am - 9am we need to add 12 elements that hold the hour
+	 */
+	buildEvents: function(start, end) {
+
+	},
+
+	doEventsCollide: function(event1, event2) {
+
+	},
+
+	normalizeDate: function(date) {
+		var ampm = 'AM';
+		var min = date.getMinutes();
+		var hours24 = date.getHours();
+		var hour = ((hours24 + 11) % 12) + 1;
+		if (hours24 >= 12) {
+			ampm = 'PM';
+		}
+		if (min === 0) {
+			min = '00';
+		}
+		var time = hours24 + ':' + min;
+		return {
+			time: time,
+			ampm: ampm,
+			date: date,
+			toString: function() {
+				return time + ' ' + ampm
+			}
+		};
+	}
+};
+
+$(function(){
+	var h;
+	var list_h;
+	$('.day-events div.event').mouseenter(function(){
+		h = $(this).height();
+    	
+    	var list = $(this).find('ul');
+    	list_h = list.height();
+
+    	list.css('height','auto');
+
+	    if(list_h < list.height()){
+	    	if(list_h < 20){
+	    		$(this).height(h + list.height() + 20);
+	    	}else{
+	    		$(this).height(h + list.height());
+	    	}
+	       
+	    }
+	});
+
+	$('.day-events div.event').mouseleave(function(){
+		$(this).height(h);
+		$(this).find('ul').height(list_h);
+	});
+})
