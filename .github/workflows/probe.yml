@@ -1,0 +1,24 @@
+# 診斷用（只能手動執行）：從 GitHub 的機器讀一個網址，看對方回什麼。評估新的資料來源時用，不會寫入任何東西。
+name: 測試來源網站
+on:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: 要測試的網址
+        required: true
+permissions: {}
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: 讀取並顯示回應
+        env:
+          TARGET: ${{ inputs.url }}
+        run: |
+          UA="Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1"
+          curl -sS -m 40 -L -A "$UA" -H "Accept-Language: zh-TW,zh;q=0.9" -D headers.txt -o body.bin -w "狀態 %{http_code}，大小 %{size_download}，最後網址 %{url_effective}\n" -- "$TARGET" || true
+          echo "── 標頭 ──"; head -25 headers.txt || true
+          echo "── 內容開頭 ──"; head -c 1500 body.bin || true
+          echo; echo "── 內容裡像是資料介面的網址 ──"
+          grep -aoiE "[\"'][^\"' ]*(api|ashx|json|GetShow|ShowTime|session)[^\"' ]*[\"']" body.bin | sort -u | head -40 || true
