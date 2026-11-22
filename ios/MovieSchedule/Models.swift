@@ -150,6 +150,9 @@ struct BoxOfficeBoard: Codable {
     var years: [String]?     // 年度排行可以選的年份（新的在前）
     var selYears: [String]?  // 實際採用的年份
     var total: Int?          // 符合條件的總數（比 rows 多的話還有下一批）
+    struct Week: Codable, Hashable, Identifiable { var id: String; var label: String; var note: String }
+    var weeks: [Week]?       // 週票房可以選的週次（新的在前）
+    var selWeek: String?     // 實際採用的那一週
     var rows: [BoxOfficeRow]
 }
 

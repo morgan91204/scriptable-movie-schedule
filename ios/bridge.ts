@@ -9,21 +9,25 @@ const native = (name: string, payload: Record<string, unknown> = {}): Promise<an
 let cache: Record<string, string> = {};
 
 /** 票房排行：連同對得到的場次通電影一起回傳 */
-async function boxOffice(by?: string, years?: string[], query?: string, limit?: number) {
-  // 年度排行的其他年份是另一個檔，切到「年度」才下載
-  const [b, all] = await Promise.all([by === "year" ? core.loadBoxOfficeFull() : core.loadBoxOffice(), core.loadMovies().catch(() => [])]);
+async function boxOffice(by?: string, years?: string[], query?: string, limit?: number, week?: string) {
+  // 年度排行的其他年份、過去的週票房各是另一個檔，用到才下載
+  const load = by === "year" ? core.loadBoxOfficeFull() : (by || "week") === "week" && week ? core.loadBoxOfficeWeeks() : core.loadBoxOffice();
+  const [b, all] = await Promise.all([load, core.loadMovies().catch(() => [])]);
   const sorts = core.boxSorts(b);
   const sort: core.BoxSort = sorts.some((x) => x.id === by) ? (by as core.BoxSort) : "week";
   const picked = core.boxYearsPicked(b, years || []);
+  const wk = core.boxWeekPicked(b, week || "");
+  const pastWeek = sort === "week" && wk.past;
   const match = core.boxMatcher(all);
   const k = (query || "").trim().toLowerCase();
-  const found = core.boxOfficeBy(b, sort, picked).map((x) => ({ x, m: match(x.name) || null })).filter(({ x, m }) => !k || `${x.name} ${m?.en || ""}`.toLowerCase().includes(k));
+  const found = core.boxOfficeBy(b, sort, picked, wk.id).map((x) => ({ x, m: match(x.name) || null })).filter(({ x, m }) => !k || `${x.name} ${m?.en || ""}`.toLowerCase().includes(k));
   // 年度排行有好幾千列：一次只回傳 limit 列（畫面上按「顯示更多」再要），並標記哪些列是已下檔的舊片（海報用輕量查法）
   const paged = sort === "year";
-  const rows = (paged ? found.slice(0, limit || core.BOX_PAGE) : found).map(({ x, m }) => ({ x, m, lines: core.boxOfficeLines(x, sort), light: paged && !m }));
+  const rows = (paged ? found.slice(0, limit || core.BOX_PAGE) : found).map(({ x, m }) => ({ x, m, lines: core.boxOfficeLines(x, sort, pastWeek), light: (paged || pastWeek) && !m }));
   return {
-    label: core.boxOfficeTitle(b, sort, picked), source: b.source, footer: core.boxOfficeFooter(b, sort, picked), sorts,
+    label: core.boxOfficeTitle(b, sort, picked, wk.id), source: b.source, footer: core.boxOfficeFooter(b, sort, picked, wk.id), sorts,
     sort, years: core.boxYears(b), selYears: picked, // 年度排行可以選的年份、實際採用的年份
+    weeks: core.boxWeekOptions(b), selWeek: wk.id, // 週票房可以選的週次、實際採用的那一週
     total: found.length, // 符合條件的總數（比 rows 多的話還有下一批）
     rows,
   };

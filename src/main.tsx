@@ -12,7 +12,7 @@ import {
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
   loadSettings, saveSettings, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, TW,
   FORMATS, formatsOf, filterVersions, filterVersionsAny, movieRows, movieDays, nearest, kmLabel, WINDOWS, findShowtimes, findShowtimesMulti, multiLabel, multiDetail, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText,
-  hallOf, tmdbTest, movieExtras, moviePoster, movieRuntime, posterSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityCached, communityVote, loadBoxOffice, loadBoxOfficeFull, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, ABOUT_URL, PRIVACY_URL, ADS_NOTE, movieRatings, ratingTier,
+  hallOf, tmdbTest, movieExtras, moviePoster, movieRuntime, posterSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityCached, communityVote, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, ABOUT_URL, PRIVACY_URL, ADS_NOTE, movieRatings, ratingTier,
 } from "./core";
 import type { MovieExtras, Ratings, Community, BoxOfficeItem, BoxSort } from "./core";
 import { setTabBar, setBackGuard, esc } from "./jsx";
@@ -923,21 +923,25 @@ class App {
 
   boxSort: BoxSort = "week"; // 票房排行的排法：本週／累計／年度
   boxYears: string[] = []; // 年度排行選了哪幾年（空 = 最新的一年）
+  boxWeek = ""; // 週票房看哪一週（空 = 最新）
   boxLimit = 100; // 年度排行目前顯示幾列
   boxPageKey = "";
   async boxOfficeView(): Promise<string> {
     // 年度排行的其他年份是另一個檔，切到「年度」才下載
-    const [b, all] = await Promise.all([this.boxSort === "year" ? loadBoxOfficeFull() : loadBoxOffice(), loadMovies().catch(() => [] as TwMovie[])]);
+    // 過去的週票房也是另一個檔，選了過去的週次才下載
+    const [b, all] = await Promise.all([this.boxSort === "year" ? loadBoxOfficeFull() : this.boxSort === "week" && this.boxWeek ? loadBoxOfficeWeeks() : loadBoxOffice(), loadMovies().catch(() => [] as TwMovie[])]);
     const k = this.movieQuery.trim().toLowerCase();
     const sorts = boxSorts(b);
     const by: BoxSort = sorts.some((x) => x.id === this.boxSort) ? this.boxSort : "week";
     const yearOptions = boxYears(b);
     const years = boxYearsPicked(b, this.boxYears); // 年度可以複選
+    const weekOptions = boxWeekOptions(b);
+    const week = boxWeekPicked(b, this.boxWeek); // 週票房看哪一週（預設最新）
     const match = boxMatcher(all);
-    const found = boxOfficeBy(b, by, years).map((x) => ({ x, m: match(x.name) })).filter(({ x, m }) => !k || `${x.name} ${m?.en || ""}`.toLowerCase().includes(k));
+    const found = boxOfficeBy(b, by, years, week.id).map((x) => ({ x, m: match(x.name) })).filter(({ x, m }) => !k || `${x.name} ${m?.en || ""}`.toLowerCase().includes(k));
     // 年度排行一年有六百部左右、全選是好幾千部：一次顯示 100 列，底下「顯示更多」。換了排法、年份或搜尋字就從頭開始
     const paged = by === "year";
-    const pageKey = `${by}|${years.join(",")}|${k}`;
+    const pageKey = `${by}|${years.join(",")}|${week.id}|${k}`;
     if (this.boxPageKey !== pageKey) {
       this.boxPageKey = pageKey;
       this.boxLimit = BOX_PAGE;
@@ -945,7 +949,8 @@ class App {
     const rows = paged ? found.slice(0, this.boxLimit) : found;
     // 海報：手機上記過的立刻有；沒記過的最多等 0.6 秒，其餘讀好後自動補畫。
     // 年度排行大多是已下檔的舊片：用輕量查法（一部片一個小請求），而且只查畫面上這一批；畫面不等它，好了再補畫
-    const jobs = rows.map(({ x, m }) => (paged && !m ? posterLight(x.name, x.release) : moviePoster(m ? m.title : x.name, m?.slug, m?.en)).catch(() => ""));
+    const old = paged || (by === "week" && week.past); // 年度排行、過去的週次：場次通沒有的片多半已經下檔
+    const jobs = rows.map(({ x, m }) => (old && !m ? posterLight(x.name, x.release) : moviePoster(m ? m.title : x.name, m?.slug, m?.en)).catch(() => ""));
     const wait = this.rerendering ? 0 : paged ? 150 : 600;
     const posters = await Promise.all(jobs.map((p) => Promise.race([p, sleep(wait).then(() => undefined)])));
     const late = jobs.filter((_, i) => posters[i] === undefined);
@@ -953,7 +958,7 @@ class App {
     const batches: Promise<unknown>[] = [];
     for (let i = 0; i < late.length; i += 8) batches.push(Promise.all(late.slice(i, i + 8)));
     if (batches.length) this.late = batches;
-    if (!paged) prefetchPosters(rows.map(({ x, m }) => ({ title: m ? m.title : x.name, slug: m?.slug, en: m?.en })), 300, 0, 0);
+    if (!old) prefetchPosters(rows.map(({ x, m }) => ({ title: m ? m.title : x.name, slug: m?.slug, en: m?.en })), 300, 0, 0);
     const thumb = (u: string | undefined) => {
       if (u === undefined) return { src: "" , pending: true };
       const src = posterSrc(u);
@@ -961,12 +966,19 @@ class App {
       return { src, url: u };
     };
     return (
-      <Page title="依電影找場次" subtitle={boxOfficeTitle(b, by, years)} onBack={() => this.back()}>
+      <Page title="依電影找場次" subtitle={boxOfficeTitle(b, by, years, week.id)} onBack={() => this.back()}>
         {this.movieModeChips()}
         {sorts.length > 1 ? (
           <Chips>
             {sorts.map((x) => <Chip label={x.label} sub={x.id === "year" ? "含已下檔" : "上映中"} muted={by !== x.id} onTap={() => { this.boxSort = x.id; }} />)}
           </Chips>
+        ) : null}
+        {by === "week" && weekOptions.length > 1 ? (
+          <Section title="週次" hint="可以回頭看過去幾週的排行。">
+            <Chips>
+              {weekOptions.map((o) => <Chip label={o.label} sub={o.note} muted={week.id !== o.id} onTap={() => { this.boxWeek = o.note === "最新" ? "" : o.id; }} />)}
+            </Chips>
+          </Section>
         ) : null}
         {by === "year" && yearOptions.length > 1 ? (
           <Section title="年份" hint="可以複選，選了幾年就合在一起排。">
@@ -982,7 +994,7 @@ class App {
         <input class="field" name="q" value={this.movieQuery} placeholder="搜尋片名" />
         <Button label="搜尋" kind="secondary" enter onTap={(v) => { this.movieQuery = v.q || ""; }} />
         {rows.length ? null : <Empty icon="🎞" text="排行上找不到相符的電影" />}
-        <Section title={boxOfficeTitle(b, by, years)} hint={boxOfficeFooter(b, by, years)}>
+        <Section title={boxOfficeTitle(b, by, years, week.id)} hint={boxOfficeFooter(b, by, years, week.id)}>
           {rows.map(({ x, m }, i) => {
             const t = thumb(posters[i] as string | undefined);
             return (
@@ -990,7 +1002,7 @@ class App {
                 rank={x.rank}
                 thumb={t}
                 title={x.name}
-                subtitle={boxOfficeLines(x, by).filter(Boolean).join("\n")}
+                subtitle={boxOfficeLines(x, by, by === "week" && week.past).filter(Boolean).join("\n")}
                 onTap={m ? () => this.go(() => this.movieView(m, ""), `讀取《${m.title}》的放映影城…`) : () => this.go(() => this.boxMovieView(x), `讀取《${x.name}》…`)}
               />
             );

@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.22-1438
+// @movie-schedule-app 電影行程 v2026.11.22-1451
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/parsers.gen.ts
@@ -1593,12 +1593,12 @@ function releaseOf(title) {
   const ck = communityKey(title);
   return (boxData?.list.find((x) => communityKey(x.name) === ck)?.release || "").slice(0, 10);
 }
-function boxOfficeLines(x, by = "week") {
-  const week = x.week !== null && !x.since ? `本週 ${money(x.week)}` : "";
+function boxOfficeLines(x, by = "week", past = false) {
+  const week = x.week !== null && !x.since ? `${past ? "當週" : "本週"} ${money(x.week)}` : "";
   const total = `累計 ${money(x.total)}`;
   return [
     // 排的是哪一種，就把那個數字放前面
-    by === "year" ? total : by === "total" ? [total, week].filter(Boolean).join("｜") : x.since ? `上映至今 ${money(x.total)}` : [week, total].filter(Boolean).join("｜"),
+    by === "year" ? total : by === "total" ? [total, week].filter(Boolean).join("｜") : x.since ? `上映至${past ? "當時" : "今"} ${money(x.total)}` : [week, total].filter(Boolean).join("｜"),
     // 年度排行混著已經下檔的片：還在上映的標出來
     [by === "year" && x.showing ? "上映中" : "", releaseLabel(x.release), x.theaters ? `${x.theaters} 間戲院` : ""].filter(Boolean).join("｜")
   ];
@@ -1620,7 +1620,11 @@ function boxYearsPicked(b, years) {
   return picked.length ? picked : all.slice(0, 1);
 }
 var yearText = (ys) => ys.length === 1 ? ys[0] : ys.every((y, i) => !i || Number(y) === Number(ys[i - 1]) + 1) ? `${ys[0]}–${ys[ys.length - 1]}` : ys.join("、");
-function boxOfficeBy(b, by, years) {
+function boxOfficeBy(b, by, years, week) {
+  if (by === "week") {
+    const w = boxWeekPicked(b, week);
+    return w.past ? b.weekLists && b.weekLists[w.id] || [] : b.list;
+  }
   if (by === "year") {
     const ys = boxYearsPicked(b, years);
     const of = (y) => b.years && b.years[y] || (y === b.end.slice(0, 4) ? b.year || [] : []);
@@ -1630,15 +1634,21 @@ function boxOfficeBy(b, by, years) {
   if (by !== "total") return b.list;
   return b.list.slice().sort((x, y) => y.total - x.total).map((x, i) => ({ ...x, rank: i + 1 }));
 }
-function boxOfficeTitle(b, by, years) {
+function boxOfficeTitle(b, by, years, week) {
   const md = (d) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`;
+  if (by === "week" && boxWeekPicked(b, week).past) {
+    const o = boxWeekOptions(b).find((x) => x.id === week);
+    return `${o ? o.label : ""} 週票房（${o ? o.note : "過去"}）`;
+  }
   if (by === "year") return `${yearText(boxYearsPicked(b, years))} 年度總排行（截至 ${md(b.end)}）`;
   if (by === "total") return `上映中｜累計票房（截至 ${md(b.end)}）`;
   return b.mode === "week" ? `上映中｜${md(b.start)}–${md(b.end)} 週票房` : boxOfficeLabel(b);
 }
 var BOX_PAGE = 100;
-function boxOfficeFooter(b, by, years) {
+function boxOfficeFooter(b, by, years, week) {
   const src = `資料來源：${b.source}。官方每週更新一次。`;
+  if (by === "week" && boxWeekPicked(b, week).past)
+    return `這是那一週的排行：「當週」是那七天的票房，「累計」算到那一週為止。那時候上映的片，現在可能已經下檔。標「上映至當時」的是官方那一週才第一次列入的新片，數字是上映以來的累計。${src}`;
   if (by === "year") {
     const ys = boxYearsPicked(b, years);
     return `${yearText(ys)} 年上映、有票房紀錄的電影依累計票房排序；已經下檔的也在裡面，標「上映中」的是這一週還有賣出票的。年度依上映日期歸屬，票房是上映以來的累計。一次顯示 100 部，舊片的海報會慢慢補上，找不到的用預設海報。${src}`;
@@ -2128,7 +2138,7 @@ var boxData = null;
 function loadBoxOffice() {
   return boxMem ||= (async () => {
     try {
-      const c = JSON.parse(cacheGet("boxoffice4.json") || "null");
+      const c = JSON.parse(cacheGet("boxoffice5.json") || "null");
       if (c && c.data && Date.now() - c.at < 6 * 36e5) return c.data;
     } catch (_) {
     }
@@ -2136,7 +2146,7 @@ function loadBoxOffice() {
     if (r.status !== 200) throw new Error("票房排行暫時讀不到");
     const data = JSON.parse(r.body);
     if (!data || !Array.isArray(data.list)) throw new Error("票房排行格式不對");
-    cacheSet("boxoffice4.json", JSON.stringify({ at: Date.now(), data }));
+    cacheSet("boxoffice5.json", JSON.stringify({ at: Date.now(), data }));
     return data;
   })().then((d) => boxData = d).catch((e) => {
     boxMem = null;
@@ -2169,6 +2179,47 @@ function loadBoxOfficeFull() {
     boxYearsMem = null;
     return loadBoxOffice();
   });
+}
+var BOXOFFICE_WEEKS_URL = "https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/main/dist/boxoffice-weeks.json";
+var boxWeeksMem = null;
+function loadBoxOfficeWeeks() {
+  return boxWeeksMem ||= (async () => {
+    const b = await loadBoxOffice();
+    let weeks = null;
+    try {
+      const c = JSON.parse(cacheGet("boxoffice-weeks.json") || "null");
+      if (c && c.weeks && c.end === b.end && Date.now() - c.at < 6 * 36e5) weeks = c.weeks;
+    } catch (_) {
+    }
+    if (!weeks) {
+      const r = await platform().fetchText(BOXOFFICE_WEEKS_URL + "?t=" + Math.floor(Date.now() / 36e5), { accept: "application/json" });
+      if (r.status !== 200) throw new Error("過去的週票房暫時讀不到");
+      const d = JSON.parse(r.body);
+      if (!d || !Array.isArray(d.weeks)) throw new Error("過去的週票房格式不對");
+      weeks = d.weeks;
+      cacheSet("boxoffice-weeks.json", JSON.stringify({ at: Date.now(), end: b.end, weeks }));
+    }
+    const weekLists = {};
+    for (const w of weeks) weekLists[w.end] = w.list.map((x) => ({ ...x, country: x.country || "" }));
+    return { ...b, weekLists };
+  })().catch(async () => {
+    boxWeeksMem = null;
+    return loadBoxOffice();
+  });
+}
+function boxWeekOptions(b) {
+  if (b.mode !== "week") return [];
+  const md = (d) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`;
+  const all = (b.weeks && b.weeks.length ? b.weeks : [{ start: b.start, end: b.end }]).slice().sort((x, y) => y.end.localeCompare(x.end));
+  return all.map((w) => {
+    const ago = Math.round((Date.parse(b.end) - Date.parse(w.end)) / (7 * 864e5));
+    return { id: w.end, label: `${md(w.start)}–${md(w.end)}`, note: ago <= 0 ? "最新" : ago === 1 ? "上週" : `${ago} 週前` };
+  });
+}
+function boxWeekPicked(b, week) {
+  const opts = boxWeekOptions(b);
+  const id = week && opts.some((o) => o.id === week) ? week : b.end;
+  return { id, past: id !== b.end };
 }
 function money(n) {
   if (n >= 1e8) return (n / 1e8).toFixed(2).replace(/\.?0+$/, "") + " 億";
@@ -2797,6 +2848,8 @@ var App = class {
     // 票房排行的排法：本週／累計／年度
     this.boxYears = [];
     // 年度排行選了哪幾年（空 = 最新的一年）
+    this.boxWeek = "";
+    // 週票房看哪一週（空 = 最新）
     this.boxLimit = 100;
     // 年度排行目前顯示幾列
     this.boxPageKey = "";
@@ -2845,14 +2898,14 @@ var App = class {
   }
   /** 最新版本是多少。網頁版問的是自己網站現在上線的版本（重新整理就會拿到的那一版），不是 GitHub 上的 */
   checkVersion() {
-    if (true) return checkLatest("2026.11.22-1438");
+    if (true) return checkLatest("2026.11.22-1451");
     return (async () => {
       try {
         const r = await globalThis.fetch("/api/version?t=" + Date.now(), { cache: "no-store" });
         const latest = String((await r.json()).version || "");
         if (!latest) return null;
         const num = (v) => Number(v.replace(/\D/g, "")) || 0;
-        return { latest, isLatest: num("2026.11.22-1438") >= num(latest) };
+        return { latest, isLatest: num("2026.11.22-1451") >= num(latest) };
       } catch (_) {
         return null;
       }
@@ -2948,11 +3001,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.22-1438"}`);
+          Pasteboard.copy(`版本 ${"2026.11.22-1451"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.22-1438"}`,
+      `版本 ${"2026.11.22-1451"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -3294,7 +3347,7 @@ var App = class {
     if (false) {
       if (!r) return /* @__PURE__ */ h(Note, { text: "（無法確認是否為最新版：連不到網站）" });
       if (r.isLatest) return /* @__PURE__ */ h(Note, { text: "✅ 已是最新版" });
-      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.22-1438"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
+      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.22-1451"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
         globalThis.location.reload();
       } }));
     }
@@ -3388,44 +3441,49 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
     } }));
   }
   async boxOfficeView() {
-    const [b, all] = await Promise.all([this.boxSort === "year" ? loadBoxOfficeFull() : loadBoxOffice(), loadMovies().catch(() => [])]);
+    const [b, all] = await Promise.all([this.boxSort === "year" ? loadBoxOfficeFull() : this.boxSort === "week" && this.boxWeek ? loadBoxOfficeWeeks() : loadBoxOffice(), loadMovies().catch(() => [])]);
     const k = this.movieQuery.trim().toLowerCase();
     const sorts = boxSorts(b);
     const by = sorts.some((x) => x.id === this.boxSort) ? this.boxSort : "week";
     const yearOptions = boxYears(b);
     const years = boxYearsPicked(b, this.boxYears);
+    const weekOptions = boxWeekOptions(b);
+    const week = boxWeekPicked(b, this.boxWeek);
     const match = boxMatcher(all);
-    const found = boxOfficeBy(b, by, years).map((x) => ({ x, m: match(x.name) })).filter(({ x, m }) => !k || `${x.name} ${m?.en || ""}`.toLowerCase().includes(k));
+    const found = boxOfficeBy(b, by, years, week.id).map((x) => ({ x, m: match(x.name) })).filter(({ x, m }) => !k || `${x.name} ${m?.en || ""}`.toLowerCase().includes(k));
     const paged = by === "year";
-    const pageKey = `${by}|${years.join(",")}|${k}`;
+    const pageKey = `${by}|${years.join(",")}|${week.id}|${k}`;
     if (this.boxPageKey !== pageKey) {
       this.boxPageKey = pageKey;
       this.boxLimit = BOX_PAGE;
     }
     const rows = paged ? found.slice(0, this.boxLimit) : found;
-    const jobs = rows.map(({ x, m }) => (paged && !m ? posterLight(x.name, x.release) : moviePoster(m ? m.title : x.name, m?.slug, m?.en)).catch(() => ""));
+    const old = paged || by === "week" && week.past;
+    const jobs = rows.map(({ x, m }) => (old && !m ? posterLight(x.name, x.release) : moviePoster(m ? m.title : x.name, m?.slug, m?.en)).catch(() => ""));
     const wait = this.rerendering ? 0 : paged ? 150 : 600;
     const posters = await Promise.all(jobs.map((p) => Promise.race([p, sleep(wait).then(() => void 0)])));
     const late = jobs.filter((_, i) => posters[i] === void 0);
     const batches = [];
     for (let i = 0; i < late.length; i += 8) batches.push(Promise.all(late.slice(i, i + 8)));
     if (batches.length) this.late = batches;
-    if (!paged) prefetchPosters(rows.map(({ x, m }) => ({ title: m ? m.title : x.name, slug: m?.slug, en: m?.en })), 300, 0, 0);
+    if (!old) prefetchPosters(rows.map(({ x, m }) => ({ title: m ? m.title : x.name, slug: m?.slug, en: m?.en })), 300, 0, 0);
     const thumb = (u) => {
       if (u === void 0) return { src: "", pending: true };
       const src = posterSrc(u);
       if (src && src === u) cachePoster(u);
       return { src, url: u };
     };
-    return /* @__PURE__ */ h(Page, { title: "依電影找場次", subtitle: boxOfficeTitle(b, by, years), onBack: () => this.back() }, this.movieModeChips(), sorts.length > 1 ? /* @__PURE__ */ h(Chips, null, sorts.map((x) => /* @__PURE__ */ h(Chip, { label: x.label, sub: x.id === "year" ? "含已下檔" : "上映中", muted: by !== x.id, onTap: () => {
+    return /* @__PURE__ */ h(Page, { title: "依電影找場次", subtitle: boxOfficeTitle(b, by, years, week.id), onBack: () => this.back() }, this.movieModeChips(), sorts.length > 1 ? /* @__PURE__ */ h(Chips, null, sorts.map((x) => /* @__PURE__ */ h(Chip, { label: x.label, sub: x.id === "year" ? "含已下檔" : "上映中", muted: by !== x.id, onTap: () => {
       this.boxSort = x.id;
-    } }))) : null, by === "year" && yearOptions.length > 1 ? /* @__PURE__ */ h(Section, { title: "年份", hint: "可以複選，選了幾年就合在一起排。" }, /* @__PURE__ */ h(Chips, null, /* @__PURE__ */ h(Chip, { label: "全選", muted: years.length !== yearOptions.length, onTap: () => {
+    } }))) : null, by === "week" && weekOptions.length > 1 ? /* @__PURE__ */ h(Section, { title: "週次", hint: "可以回頭看過去幾週的排行。" }, /* @__PURE__ */ h(Chips, null, weekOptions.map((o) => /* @__PURE__ */ h(Chip, { label: o.label, sub: o.note, muted: week.id !== o.id, onTap: () => {
+      this.boxWeek = o.note === "最新" ? "" : o.id;
+    } })))) : null, by === "year" && yearOptions.length > 1 ? /* @__PURE__ */ h(Section, { title: "年份", hint: "可以複選，選了幾年就合在一起排。" }, /* @__PURE__ */ h(Chips, null, /* @__PURE__ */ h(Chip, { label: "全選", muted: years.length !== yearOptions.length, onTap: () => {
       this.boxYears = years.length === yearOptions.length ? [] : yearOptions.slice();
     } }), yearOptions.map((y) => /* @__PURE__ */ h(Chip, { label: y, muted: years.indexOf(y) < 0, onTap: () => {
       this.boxYears = years.indexOf(y) < 0 ? [...years, y] : years.length > 1 ? years.filter((z) => z !== y) : years;
     } })))) : null, /* @__PURE__ */ h("input", { class: "field", name: "q", value: this.movieQuery, placeholder: "搜尋片名" }), /* @__PURE__ */ h(Button, { label: "搜尋", kind: "secondary", enter: true, onTap: (v) => {
       this.movieQuery = v.q || "";
-    } }), rows.length ? null : /* @__PURE__ */ h(Empty, { icon: "🎞", text: "排行上找不到相符的電影" }), /* @__PURE__ */ h(Section, { title: boxOfficeTitle(b, by, years), hint: boxOfficeFooter(b, by, years) }, rows.map(({ x, m }, i) => {
+    } }), rows.length ? null : /* @__PURE__ */ h(Empty, { icon: "🎞", text: "排行上找不到相符的電影" }), /* @__PURE__ */ h(Section, { title: boxOfficeTitle(b, by, years, week.id), hint: boxOfficeFooter(b, by, years, week.id) }, rows.map(({ x, m }, i) => {
       const t = thumb(posters[i]);
       return /* @__PURE__ */ h(
         Item,
@@ -3433,7 +3491,7 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
           rank: x.rank,
           thumb: t,
           title: x.name,
-          subtitle: boxOfficeLines(x, by).filter(Boolean).join("\n"),
+          subtitle: boxOfficeLines(x, by, by === "week" && week.past).filter(Boolean).join("\n"),
           onTap: m ? () => this.go(() => this.movieView(m, ""), `讀取《${m.title}》的放映影城…`) : () => this.go(() => this.boxMovieView(x), `讀取《${x.name}》…`)
         }
       );

@@ -109,6 +109,7 @@ struct BoxOfficeSection: View {
     @State private var sort = "week" // 排法：本週／累計／年度
     @State private var years: Set<String> = [] // 年度排行選了哪幾年（空 = 最新的一年）
     @State private var limit = 100 // 年度排行目前顯示幾列（一年六百部左右，分批顯示）
+    @State private var week = "" // 週票房看哪一週（空 = 最新）
 
     var body: some View {
         Group {
@@ -120,6 +121,18 @@ struct BoxOfficeSection: View {
                     .pickerStyle(.segmented)
                 } footer: {
                     Text("本週、累計只排上映中的電影；年度包含已經下檔的。")
+                }
+            }
+            if sort == "week", let options = board.value?.weeks, options.count > 1 {
+                Section {
+                    Picker("週次", selection: Binding(
+                        get: { week.isEmpty ? (options.first?.id ?? "") : week },
+                        set: { week = ($0 == options.first?.id) ? "" : $0 }
+                    )) {
+                        ForEach(options) { Text("\($0.label)（\($0.note)）").tag($0.id) }
+                    }
+                } footer: {
+                    Text("可以回頭看過去幾週的排行。")
                 }
             }
             if sort == "year", let options = board.value?.years, options.count > 1 {
@@ -186,7 +199,7 @@ struct BoxOfficeSection: View {
                 }
             }
         }
-        .task(id: [sort, years.sorted().joined(separator: ","), query, String(limit)].joined(separator: "|")) { await load() }
+        .task(id: [sort, years.sorted().joined(separator: ","), query, String(limit), week].joined(separator: "|")) { await load() }
         .onChange(of: sort) { _, _ in limit = 100 }
         .onChange(of: years) { _, _ in limit = 100 }
         .onChange(of: query) { _, _ in limit = 100 }
@@ -216,7 +229,7 @@ struct BoxOfficeSection: View {
 
     private func load() async {
         do {
-            board = .loaded(try await Bridge.shared.call("boxOffice", [sort, years.sorted(), query.trimmingCharacters(in: .whitespaces), limit]))
+            board = .loaded(try await Bridge.shared.call("boxOffice", [sort, years.sorted(), query.trimmingCharacters(in: .whitespaces), limit, week]))
         } catch {
             board = .failed(errorText(error))
         }

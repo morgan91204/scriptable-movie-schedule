@@ -1342,12 +1342,13 @@ export function releaseOf(title: string): string {
   return (boxData?.list.find((x) => communityKey(x.name) === ck)?.release || "").slice(0, 10);
 }
 /** 票房排行每一列的兩行說明：第一行金額，第二行上映日期與戲院數 */
-export function boxOfficeLines(x: BoxOfficeItem, by: BoxSort = "week"): [string, string] {
-  const week = x.week !== null && !x.since ? `本週 ${money(x.week)}` : "";
+/** past = 看的是過去某一週的排行：金額是「當週」，累計是到那一週為止 */
+export function boxOfficeLines(x: BoxOfficeItem, by: BoxSort = "week", past = false): [string, string] {
+  const week = x.week !== null && !x.since ? `${past ? "當週" : "本週"} ${money(x.week)}` : "";
   const total = `累計 ${money(x.total)}`;
   return [
     // 排的是哪一種，就把那個數字放前面
-    by === "year" ? total : by === "total" ? [total, week].filter(Boolean).join("｜") : x.since ? `上映至今 ${money(x.total)}` : [week, total].filter(Boolean).join("｜"),
+    by === "year" ? total : by === "total" ? [total, week].filter(Boolean).join("｜") : x.since ? `上映至${past ? "當時" : "今"} ${money(x.total)}` : [week, total].filter(Boolean).join("｜"),
     // 年度排行混著已經下檔的片：還在上映的標出來
     [by === "year" && x.showing ? "上映中" : "", releaseLabel(x.release), x.theaters ? `${x.theaters} 間戲院` : ""].filter(Boolean).join("｜"),
   ];
@@ -1376,7 +1377,11 @@ export function boxYearsPicked(b: BoxOffice, years?: string[]): string[] {
 }
 const yearText = (ys: string[]) => (ys.length === 1 ? ys[0] : ys.every((y, i) => !i || Number(y) === Number(ys[i - 1]) + 1) ? `${ys[0]}–${ys[ys.length - 1]}` : ys.join("、"));
 /** 依排法排好、重新編名次的清單。年度可以複選好幾年：合在一起依累計票房重排 */
-export function boxOfficeBy(b: BoxOffice, by: BoxSort, years?: string[]): BoxOfficeItem[] {
+export function boxOfficeBy(b: BoxOffice, by: BoxSort, years?: string[], week?: string): BoxOfficeItem[] {
+  if (by === "week") {
+    const w = boxWeekPicked(b, week);
+    return w.past ? (b.weekLists && b.weekLists[w.id]) || [] : b.list; // 過去的週次（要先用 loadBoxOfficeWeeks 讀進來）
+  }
   if (by === "year") {
     const ys = boxYearsPicked(b, years);
     const of = (y: string) => (b.years && b.years[y]) || (y === b.end.slice(0, 4) ? b.year || [] : []);
@@ -1387,8 +1392,12 @@ export function boxOfficeBy(b: BoxOffice, by: BoxSort, years?: string[]): BoxOff
   return b.list.slice().sort((x, y) => y.total - x.total).map((x, i) => ({ ...x, rank: i + 1 }));
 }
 /** 排行的標題：「上映中｜11/9–11/15 週票房」「上映中｜累計票房（截至 11/15）」「2025–2026 年度總排行（截至 11/15）」 */
-export function boxOfficeTitle(b: BoxOffice, by: BoxSort, years?: string[]): string {
+export function boxOfficeTitle(b: BoxOffice, by: BoxSort, years?: string[], week?: string): string {
   const md = (d: string) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`;
+  if (by === "week" && boxWeekPicked(b, week).past) {
+    const o = boxWeekOptions(b).find((x) => x.id === week);
+    return `${o ? o.label : ""} 週票房（${o ? o.note : "過去"}）`; // 過去的週次不標「上映中」：那時候的片現在可能已經下檔
+  }
   if (by === "year") return `${yearText(boxYearsPicked(b, years))} 年度總排行（截至 ${md(b.end)}）`;
   if (by === "total") return `上映中｜累計票房（截至 ${md(b.end)}）`;
   return b.mode === "week" ? `上映中｜${md(b.start)}–${md(b.end)} 週票房` : boxOfficeLabel(b);
@@ -1396,8 +1405,10 @@ export function boxOfficeTitle(b: BoxOffice, by: BoxSort, years?: string[]): str
 /** 年度排行一次顯示幾列（一年有六百部左右，全選是好幾千部：分批顯示，底下放「顯示更多」） */
 export const BOX_PAGE = 100;
 /** 排行下方的說明 */
-export function boxOfficeFooter(b: BoxOffice, by: BoxSort, years?: string[]): string {
+export function boxOfficeFooter(b: BoxOffice, by: BoxSort, years?: string[], week?: string): string {
   const src = `資料來源：${b.source}。官方每週更新一次。`;
+  if (by === "week" && boxWeekPicked(b, week).past)
+    return `這是那一週的排行：「當週」是那七天的票房，「累計」算到那一週為止。那時候上映的片，現在可能已經下檔。標「上映至當時」的是官方那一週才第一次列入的新片，數字是上映以來的累計。${src}`;
   if (by === "year") {
     const ys = boxYearsPicked(b, years);
     return `${yearText(ys)} 年上映、有票房紀錄的電影依累計票房排序；已經下檔的也在裡面，標「上映中」的是這一週還有賣出票的。年度依上映日期歸屬，票房是上映以來的累計。一次顯示 100 部，舊片的海報會慢慢補上，找不到的用預設海報。${src}`;
@@ -2072,7 +2083,9 @@ export interface BoxOffice {
   sourceUrl: string;
   list: BoxOfficeItem[];
   year?: BoxOfficeItem[]; // 年度總排行：今年上映的片依累計票房排，已經下檔的也在裡面（week 一律是 null）
-  years?: Record<string, BoxOfficeItem[]>; // 各年的年度排行：年份 → 排行（最近 5 年）
+  years?: Record<string, BoxOfficeItem[]>; // 各年的年度排行：年份 → 排行
+  weeks?: { start: string; end: string }[]; // 有哪幾週的週票房可以看（新的在前；第一筆就是這一週）
+  weekLists?: Record<string, BoxOfficeItem[]>; // 過去各週的排行：那一週的結束日 → 排行（選了才下載）
 }
 let boxMem: Promise<BoxOffice> | null = null;
 let boxData: BoxOffice | null = null; // 這次執行讀到的排行（releaseOf 同步查用）
@@ -2080,14 +2093,14 @@ let boxData: BoxOffice | null = null; // 這次執行讀到的排行（releaseOf
 export function loadBoxOffice(): Promise<BoxOffice> {
   return (boxMem ||= (async () => {
     try {
-      const c = JSON.parse(cacheGet("boxoffice4.json") || "null");
+      const c = JSON.parse(cacheGet("boxoffice5.json") || "null");
       if (c && c.data && Date.now() - c.at < 6 * 3600e3) return c.data as BoxOffice;
     } catch (_) {}
     const r = await platform().fetchText(BOXOFFICE_URL + "?t=" + Math.floor(Date.now() / 3600e3), { accept: "application/json" });
     if (r.status !== 200) throw new Error("票房排行暫時讀不到");
     const data = JSON.parse(r.body) as BoxOffice;
     if (!data || !Array.isArray(data.list)) throw new Error("票房排行格式不對");
-    cacheSet("boxoffice4.json", JSON.stringify({ at: Date.now(), data }));
+    cacheSet("boxoffice5.json", JSON.stringify({ at: Date.now(), data }));
     return data;
   })().then((d) => (boxData = d)).catch((e) => {
     boxMem = null;
@@ -2122,6 +2135,50 @@ export function loadBoxOfficeFull(): Promise<BoxOffice> {
     boxYearsMem = null; // 下次再試
     return loadBoxOffice(); // 至少有今年的
   }));
+}
+/** 過去各週的週票房排行，另外一個檔：選了過去的週次才下載 */
+export const BOXOFFICE_WEEKS_URL = "https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/main/dist/boxoffice-weeks.json";
+let boxWeeksMem: Promise<BoxOffice> | null = null;
+/** 票房排行＋過去各週的排行（手機上記 6 小時）。讀不到時回傳只有這一週的那份 */
+export function loadBoxOfficeWeeks(): Promise<BoxOffice> {
+  return (boxWeeksMem ||= (async () => {
+    const b = await loadBoxOffice();
+    let weeks: { start: string; end: string; list: BoxOfficeItem[] }[] | null = null;
+    try {
+      const c = JSON.parse(cacheGet("boxoffice-weeks.json") || "null");
+      if (c && c.weeks && c.end === b.end && Date.now() - c.at < 6 * 3600e3) weeks = c.weeks;
+    } catch (_) {}
+    if (!weeks) {
+      const r = await platform().fetchText(BOXOFFICE_WEEKS_URL + "?t=" + Math.floor(Date.now() / 3600e3), { accept: "application/json" });
+      if (r.status !== 200) throw new Error("過去的週票房暫時讀不到");
+      const d = JSON.parse(r.body);
+      if (!d || !Array.isArray(d.weeks)) throw new Error("過去的週票房格式不對");
+      weeks = d.weeks as { start: string; end: string; list: BoxOfficeItem[] }[];
+      cacheSet("boxoffice-weeks.json", JSON.stringify({ at: Date.now(), end: b.end, weeks }));
+    }
+    const weekLists: Record<string, BoxOfficeItem[]> = {};
+    for (const w of weeks) weekLists[w.end] = w.list.map((x) => ({ ...x, country: x.country || "" }));
+    return { ...b, weekLists };
+  })().catch(async () => {
+    boxWeeksMem = null; // 下次再試
+    return loadBoxOffice();
+  }));
+}
+/** 週票房可以選的週次（新的在前）。label 是日期區間，note 是「最新／上週／3 週前」 */
+export function boxWeekOptions(b: BoxOffice): { id: string; label: string; note: string }[] {
+  if (b.mode !== "week") return [];
+  const md = (d: string) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`;
+  const all = (b.weeks && b.weeks.length ? b.weeks : [{ start: b.start, end: b.end }]).slice().sort((x, y) => y.end.localeCompare(x.end));
+  return all.map((w) => {
+    const ago = Math.round((Date.parse(b.end) - Date.parse(w.end)) / (7 * 86400e3));
+    return { id: w.end, label: `${md(w.start)}–${md(w.end)}`, note: ago <= 0 ? "最新" : ago === 1 ? "上週" : `${ago} 週前` };
+  });
+}
+/** 實際採用的週次：選的那一週有效就用，否則是最新的一週。past = 不是最新的一週 */
+export function boxWeekPicked(b: BoxOffice, week?: string): { id: string; past: boolean } {
+  const opts = boxWeekOptions(b);
+  const id = week && opts.some((o) => o.id === week) ? week : b.end;
+  return { id, past: id !== b.end };
 }
 /** 金額：1.53 億、1,534 萬 */
 export function money(n: number): string {
