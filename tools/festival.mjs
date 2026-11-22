@@ -412,6 +412,57 @@ async function taoyuanFilmFestival() {
   return { id: `tyff-${got[0].slice(0, 4)}`, name: "桃園電影節", start: got[0], end: got[got.length - 1], site: TYFF, source: "桃園電影節官網", films: Object.values(films), sessions };
 }
 
+const WMW = "https://www.wmw.org.tw/tw/category/9";
+
+/** 台灣國際女性影展「場次資訊」頁：十天的場次都寫在頁面的程式裡（events=[…]），
+ *  start 是「早上 8 點起算的分鐘數」（官網自己的月曆程式就是這樣畫的），times 是片長 → 影片與場次。
+ *  一場可能是一部片，也可能是幾部短片合成的一個節目（有自訂的節目名稱） */
+export function parseWmwPage(html, year) {
+  const films = {};
+  const sessions = [];
+  const h = String(html);
+  let rows = [];
+  try { rows = JSON.parse((h.match(/var events\s*=\s*(\[[\s\S]*?\]);/) || [])[1]); } catch (_) {}
+  // 場地：每一天的表頭依序列出廳名，對到下面依序的 site 代碼
+  const names = Array.from(((h.match(/<div class="day-event-title">([\s\S]*?)<\/div>/) || [])[1] || "").matchAll(/<span>([^<]*)<\/span>/g)).map((m) => clean(m[1]));
+  const codes = Array.from(new Set(Array.from(((h.match(/<article class="day-calendar-wrap">([\s\S]*?)<\/article>/) || [])[1] || "").matchAll(/day-events (site\d+)/g)).map((m) => m[1])));
+  const y = Number(year) || Math.max(0, ...Array.from(h.matchAll(/>\s*(20\d\d)\s*<\/a>/g)).map((m) => Number(m[1]))) + 1; // 「歷屆影展」選單最新的一年 + 1 = 這一屆
+  for (const x of Array.isArray(rows) ? rows : []) {
+    const md = String(x.date || "").match(/^(\d{1,2})\/(\d{1,2})$/);
+    const start = Number(x.start);
+    if (!md || !Number.isFinite(start) || x.state === false || y < 2000) continue;
+    const list = Array.from(String(x.film || "").matchAll(/<a href="(https:\/\/[^"]+\/film\/(\d+))"[^>]*>([^<]*)<\/a>/g)).map((m) => ({ url: m[1], id: m[2], title: clean(m[3]) }));
+    const custom = clean(x.custom_title);
+    const title = custom || (list[0] && list[0].title) || "";
+    if (!title) continue;
+    const id = custom ? "p-" + list.map((f) => f.id).join("-") : list[0].id;
+    const t = 8 * 60 + start;
+    films[id] ||= { id, title, mins: Number(x.times) || 0, rating: clean(String(x.info || "").split("|")[0]), url: !custom && list[0] ? list[0].url : WMW, ...(list[0] ? { page: list[0].url } : {}) };
+    sessions.push({ film: id, date: `${y}-${md[1].padStart(2, "0")}-${md[2].padStart(2, "0")}`, time: `${String(Math.floor(t / 60) % 24).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`, ...splitVenue(names[codes.indexOf(x.site)] || ""), ticket: "" });
+  }
+  return { films, sessions };
+}
+/** 女性影展影片介紹頁上的劇照 */
+export const wmwStill = (html) => (String(html).match(/https:\/\/www\.wmw\.org\.tw\/public\/files\/stills\/[^"')\s]+\.(?:jpe?g|png|webp)/i) || [])[0] || "";
+/** 讀台灣國際女性影展的場次（官網目前放的那一屆） */
+async function womenMakeWaves() {
+  const { films, sessions } = parseWmwPage(await get(WMW));
+  if (!sessions.length) return null;
+  const got = sessions.map((x) => x.date).sort();
+  const id = `wmw-${got[0].slice(0, 4)}`;
+  const known = KNOWN_STILLS[id] || {};
+  for (const f of Object.values(films)) {
+    const page = f.page;
+    delete f.page;
+    if (known[f.id]) { f.poster = known[f.id]; continue; }
+    if (!page) continue;
+    await new Promise((r) => setTimeout(r, 400));
+    const img = wmwStill(await get(page).catch(() => ""));
+    if (img) f.poster = img;
+  }
+  return { id, name: "台灣國際女性影展", start: got[0], end: got[got.length - 1], site: WMW, source: "台灣國際女性影展官網", films: Object.values(films), sessions };
+}
+
 if (import.meta.url === `file://${process.argv[1]}`) {
   const [outPath = "festival.json", prevPath = ""] = process.argv.slice(2);
   let prev = [];
@@ -423,7 +474,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   } catch (_) {}
   for (const f of prev) { const m = (KNOWN_STILLS[f.id] = {}); for (const x of f.films || []) if (x.poster) m[x.id] = x.poster; }
   const got = [];
-  for (const [label, job] of [["金馬影展官網", goldenHorse], ["台北電影節官網", taipeiFilmFestival], ["高雄電影節官網", kaohsiungFilmFestival], ["南方影展官網", southFilmFestival], ["紀錄片影展官網", tidf], ["酷兒影展官網", queerFilmFestival], ["桃園電影節官網", taoyuanFilmFestival]]) {
+  for (const [label, job] of [["金馬影展官網", goldenHorse], ["台北電影節官網", taipeiFilmFestival], ["高雄電影節官網", kaohsiungFilmFestival], ["南方影展官網", southFilmFestival], ["紀錄片影展官網", tidf], ["酷兒影展官網", queerFilmFestival], ["桃園電影節官網", taoyuanFilmFestival], ["女性影展官網", womenMakeWaves]]) {
     try {
       const f = await job();
       if (f) { got.push(f); console.log(`${label}：${f.name} ${f.start}～${f.end}，${f.films.length} 部、${f.sessions.length} 場`); }
