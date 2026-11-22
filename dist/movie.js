@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.22-1418
+// @movie-schedule-app 電影行程 v2026.11.22-1421
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/parsers.gen.ts
@@ -2758,7 +2758,8 @@ var App = class {
     ];
     // ── 事件迴圈 ──
     // 背景查 GitHub 上的最新版本（首頁顯示是否為最新版）
-    this.latest = checkLatest("2026.11.22-1418");
+    this.latest = this.checkVersion();
+    this.latestAt = Date.now();
     // ── 搜尋 ──
     this.query = "";
     this.tmdbStatus = "";
@@ -2819,6 +2820,21 @@ var App = class {
   }
   home() {
     this.stack = [this.stack[0]];
+  }
+  /** 最新版本是多少。網頁版問的是自己網站現在上線的版本（重新整理就會拿到的那一版），不是 GitHub 上的 */
+  checkVersion() {
+    if (true) return checkLatest("2026.11.22-1421");
+    return (async () => {
+      try {
+        const r = await globalThis.fetch("/api/version?t=" + Date.now(), { cache: "no-store" });
+        const latest = String((await r.json()).version || "");
+        if (!latest) return null;
+        const num = (v) => Number(v.replace(/\D/g, "")) || 0;
+        return { latest, isLatest: num("2026.11.22-1421") >= num(latest) };
+      } catch (_) {
+        return null;
+      }
+    })();
   }
   async run() {
     this.settings = await loadSettings();
@@ -2910,11 +2926,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.22-1418"}`);
+          Pasteboard.copy(`版本 ${"2026.11.22-1421"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.22-1418"}`,
+      `版本 ${"2026.11.22-1421"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -3181,8 +3197,19 @@ var App = class {
   }
   /** 版本狀態：已是最新版／有新版（捷徑每次執行都會下載最新版，重新執行就會更新） */
   async versionNote() {
+    if (false) {
+      this.latest = this.checkVersion();
+      this.latestAt = Date.now();
+    }
     const r = await Promise.race([this.latest, sleep(1500).then(() => void 0)]);
     if (r === void 0) return "";
+    if (false) {
+      if (!r) return /* @__PURE__ */ h(Note, { text: "（無法確認是否為最新版：連不到網站）" });
+      if (r.isLatest) return /* @__PURE__ */ h(Note, { text: "✅ 已是最新版" });
+      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.22-1421"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
+        globalThis.location.reload();
+      } }));
+    }
     if (!r) return /* @__PURE__ */ h(Note, { text: "（無法確認是否為最新版：讀不到 GitHub）" });
     if (r.isLatest) return /* @__PURE__ */ h(Note, { text: "✅ 已是最新版" });
     return /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}：關閉後重新執行捷徑就會更新（GitHub 約有 5 分鐘延遲）。如果是匯入 .scriptable 檔安裝的，請改用捷徑才會自動更新。` });

@@ -92,7 +92,23 @@ class App {
 
   // ── 事件迴圈 ──
   // 背景查 GitHub 上的最新版本（首頁顯示是否為最新版）
-  latest: Promise<{ latest: string; isLatest: boolean } | null> = checkLatest(APP_VERSION);
+  latest: Promise<{ latest: string; isLatest: boolean } | null> = this.checkVersion();
+  latestAt = Date.now();
+  /** 最新版本是多少。網頁版問的是自己網站現在上線的版本（重新整理就會拿到的那一版），不是 GitHub 上的 */
+  checkVersion(): Promise<{ latest: string; isLatest: boolean } | null> {
+    if (!IS_WEB) return checkLatest(APP_VERSION);
+    return (async () => {
+      try {
+        const r = await (globalThis as any).fetch("/api/version?t=" + Date.now(), { cache: "no-store" });
+        const latest = String((await r.json()).version || "");
+        if (!latest) return null;
+        const num = (v: string) => Number(v.replace(/\D/g, "")) || 0;
+        return { latest, isLatest: num(APP_VERSION) >= num(latest) };
+      } catch (_) {
+        return null;
+      }
+    })();
+  }
 
   async run() {
     this.settings = await loadSettings();
@@ -661,8 +677,23 @@ class App {
 
   /** 版本狀態：已是最新版／有新版（捷徑每次執行都會下載最新版，重新執行就會更新） */
   async versionNote(): Promise<string> {
+    // 網頁版開著不關很常見：每次畫到這裡，超過一分鐘就重新問一次，顯示的才是現在的狀況
+    if (IS_WEB && Date.now() - this.latestAt > 60e3) {
+      this.latest = this.checkVersion();
+      this.latestAt = Date.now();
+    }
     const r = await Promise.race([this.latest, sleep(1500).then(() => undefined)]);
     if (r === undefined) return "";
+    if (IS_WEB) {
+      if (!r) return <Note text="（無法確認是否為最新版：連不到網站）" />;
+      if (r.isLatest) return <Note text="✅ 已是最新版" />;
+      return (
+        <>
+          <Note kind="warn" text={`🆕 有新版 ${r.latest}（你現在開的是 ${APP_VERSION}）`} />
+          <Button label="重新整理以更新" kind="secondary" onTap={() => { (globalThis as any).location.reload(); }} />
+        </>
+      );
+    }
     if (!r) return <Note text="（無法確認是否為最新版：讀不到 GitHub）" />;
     if (r.isLatest) return <Note text="✅ 已是最新版" />;
     return <Note kind="warn" text={`🆕 有新版 ${r.latest}：關閉後重新執行捷徑就會更新（GitHub 約有 5 分鐘延遲）。如果是匯入 .scriptable 檔安裝的，請改用捷徑才會自動更新。`} />;
