@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>關於｜電影行程</title>
+<meta name="description" content="電影行程的資料來源與說明，並感謝場次通整理全台連鎖影城的場次。">
+<meta name="theme-color" content="#f2f2f7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="/icon-192.png">
+<style>
+:root{--bg:#f2f2f7;--card:#fff;--fg:#1c1c1e;--fg2:#6e6e73;--line:rgba(60,60,67,.14);--accent:#0a84ff}
+@media(prefers-color-scheme:dark){:root{--bg:#000;--card:#1c1c1e;--fg:#f2f2f7;--fg2:#98989d;--line:rgba(84,84,88,.5)}}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--fg);font:17px/1.7 -apple-system,"PingFang TC","Noto Sans TC",system-ui,sans-serif;-webkit-text-size-adjust:100%}
+main{max-width:720px;margin:0 auto;padding:20px 18px 56px}
+nav{font-size:14px;color:var(--fg2);margin-bottom:8px}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+h1{font-size:28px;line-height:1.3;margin:6px 0 4px}
+h2{font-size:19px;margin:30px 0 8px}
+p,li{color:var(--fg)}
+p{margin:8px 0}
+ul{margin:8px 0;padding-left:22px}
+li{margin:5px 0}
+.meta{color:var(--fg2);font-size:14px}
+.card{background:var(--card);border-radius:14px;padding:14px 16px;margin:14px 0;border:1px solid var(--line)}
+.card p{margin:4px 0}
+footer{margin-top:36px;padding-top:14px;border-top:1px solid var(--line);font-size:14px;color:var(--fg2)}
+footer a{margin-right:14px}
+</style>
+</head>
+<body>
+<main>
+<nav><a href="/">電影行程</a> › 關於</nav>
+<h1>關於電影行程</h1>
+<p>「電影行程」是一個免費的台灣電影場次查詢工具。選一間影城或一部電影，挑好場次後，一鍵把它加入行事曆：會依片長與廣告時間算出散場時間，並附上影城地址與訂票連結。</p>
+<p>它有網頁版、iPhone App，以及在 Scriptable、Scripting 裡執行的腳本版，四個版本用的是同一套資料。</p>
+
+<h2>為什麼做這個</h2>
+<p>訂好電影之後，常常還要自己開行事曆、查片長、算幾點散場、找影城地址。這個工具想把這幾步合成一步，順便回答幾個常見的問題：現在出門還趕得上哪幾場？這部片哪裡有 IMAX？常去的那幾間今晚在演什麼？</p>
+
+<h2>感謝場次通</h2>
+<div class="card">
+<p>全台 66 間連鎖影城的場次，來自 <a href="https://twshowtimes.com/">場次通（twshowtimes.com）</a>。場次通由橫隔膜 Halami 獨立製作與維護，把威秀、國賓、美麗華、秀泰、喜樂時代、中影、新光、in89、百老匯等九大連鎖的場次整理在同一個地方，並把各家不同寫法的片名對齊成同一部片。</p>
+<p>沒有場次通的整理，這個工具做不出來。想比較各影城的場次、看上映場數排行與特殊廳統計，請直接造訪<a href="https://twshowtimes.com/">場次通</a>。</p>
+</div>
+<p>電影行程讀取的是場次通公開的網頁，與場次通沒有合作或隸屬關係，也不代表場次通的立場。</p>
+
+<h2>資料怎麼來</h2>
+<ul>
+<li><strong>連鎖影城的場次、片長、分級</strong>：<a href="https://twshowtimes.com/">場次通</a>，共 66 間。</li>
+<li><strong>其他戲院的場次，以及海報、預告、片長</strong>：<a href="https://www.atmovies.com.tw/">開眼電影網</a>，共 37 間；另外補上五間威秀的 Gold Class、MUCROWN、TITAN 等頂級影廳場次。</li>
+<li><strong>誠品電影院、光點華山、光點台北、樂聲影城</strong>：各自的官網時刻表。</li>
+<li><strong>票房排行</strong>：國家電影及視聽文化中心「<a href="https://boxofficetw.tfai.org.tw/">全國電影票房統計</a>」開放資料，依政府資料開放授權條款第 1 版使用。</li>
+<li><strong>評分</strong>：IMDb、爛番茄的公開頁面；「觀眾評分」是使用者在這裡自己點的星星。</li>
+<li><strong>預告</strong>：開眼電影網頁面上的預告，或 YouTube 上標題對得上台灣片名的影片；沒有把握時只提供搜尋連結。</li>
+<li><strong>海報與上映日期</strong>：依序取自場次通、開眼電影網、IMDb；填了自己的 TMDB 金鑰時也會用 TMDB。</li>
+</ul>
+
+<h2>資料多久更新</h2>
+<ul>
+<li>場次、海報、預告、評分由排程定期整理成檔案，實際上大約每幾個小時更新一次；太久沒更新時，App 會改成直接讀取來源網站。</li>
+<li>票房排行每天檢查一次，官方資料大約每週更新。</li>
+<li>觀眾評分的統計大約每幾個小時彙整一次。</li>
+</ul>
+
+<h2>使用前請知道</h2>
+<ul>
+<li>場次以各影城官網公告為準，可能因臨時加場、取消而變動。訂票前請點「訂票／官方」到影城官網再確認一次。</li>
+<li>片長有時來自原版或其他來源，散場時間是估算值。</li>
+<li>票房排行裡標「上映至今」的新片，是官方第一次列入的資料，數字是上映以來的累計，不是單週票房。</li>
+<li>電影行程不販售電影票，與各影城、上述網站都沒有合作或隸屬關係。各網站的名稱與標誌屬於其所有人。</li>
+<li>This product uses the TMDB API but is not endorsed or certified by TMDB.</li>
+</ul>
+
+<h2>製作與原始碼</h2>
+<p>電影行程是個人製作的開放原始碼專案，程式碼與安裝方式在 <a href="https://github.com/morgan91204/scriptable-movie-schedule">GitHub</a>。發現場次有誤或有建議，歡迎到 <a href="https://github.com/morgan91204/scriptable-movie-schedule/issues">GitHub 提出</a>。</p>
+<p>我們如何處理資料，請見<a href="/privacy/">隱私權政策</a>。</p>
+<footer><a href="/">回到電影行程</a><a href="/about/">關於</a><a href="/privacy/">隱私權政策</a></footer>
+</main>
+</body>
+</html>

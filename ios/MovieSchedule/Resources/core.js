@@ -9,6 +9,7 @@
   // src/core.ts
   var core_exports = {};
   __export(core_exports, {
+    ABOUT_URL: () => ABOUT_URL,
     AD_STEPS: () => AD_STEPS,
     AT_DATA_URL: () => AT_DATA_URL,
     AT_SUPPLEMENT: () => AT_SUPPLEMENT,
@@ -23,7 +24,9 @@
     META_URL: () => META_URL,
     OFFICIAL_URL: () => OFFICIAL_URL,
     POSTER_TINTS: () => POSTER_TINTS,
+    PRIVACY_URL: () => PRIVACY_URL,
     SCRIPTING_IMPORT_URL: () => SCRIPTING_IMPORT_URL,
+    SITE_URL: () => SITE_URL,
     TMDB_LINKS: () => TMDB_LINKS,
     TW: () => TW,
     TW_FAR_URL: () => TW_FAR_URL,
@@ -2083,6 +2086,9 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     const x = kind === "imdb" ? v * 10 : v;
     return x >= 75 ? "good" : x >= 60 ? "mid" : "bad";
   }
+  var SITE_URL = "https://movie-web.morgan91204.workers.dev";
+  var ABOUT_URL = SITE_URL + "/about/";
+  var PRIVACY_URL = SITE_URL + "/privacy/";
   var COMMUNITY_API = "https://movie-ratings.morgan91204.workers.dev";
   function deviceId() {
     const ok = (x) => !!x && /^[A-Za-z0-9_-]{16,64}$/.test(x);

@@ -1822,6 +1822,10 @@ export function ratingTier(kind: "imdb" | "pct", v: number): "good" | "mid" | "b
 // 後端是 Cloudflare Worker（worker/ 資料夾）：每部片一個計數器，一台手機一票，可以改票或取消。
 // 片名鍵用去掉裝飾字、重映字樣後的片名，所以兩個 App、同一部片的不同場次條目都算在一起。
 
+/** 網頁版的網址（「關於」與隱私權政策也放在這裡） */
+export const SITE_URL = "https://movie-web.morgan91204.workers.dev";
+export const ABOUT_URL = SITE_URL + "/about/";
+export const PRIVACY_URL = SITE_URL + "/privacy/";
 export const COMMUNITY_API = "https://movie-ratings.morgan91204.workers.dev";
 export interface Community {
   n: number; // 評分人數

@@ -20,7 +20,10 @@ enum ExternalScores {
     }
 }
 
-let privacyURL = URL(string: "https://github.com/morgan91204/scriptable-movie-schedule/blob/main/docs/privacy.md")!
+/// 網頁版的網址：「關於」與隱私權政策放在這裡（跟共用資料層的 SITE_URL 一致）
+let siteURL = "https://movie-web.morgan91204.workers.dev"
+let privacyURL = URL(string: siteURL + "/privacy/")!
+let aboutURL = URL(string: siteURL + "/about/")!
 
 /// 資料來源與授權
 struct AboutView: View {
@@ -50,6 +53,13 @@ struct AboutView: View {
     var body: some View {
         List {
             Section {
+                Link(destination: URL(string: "https://twshowtimes.com/")!) { Label("前往場次通", systemImage: "heart") }
+            } header: {
+                Text("感謝場次通")
+            } footer: {
+                Text("全台 66 間連鎖影城的場次來自場次通（twshowtimes.com），由橫隔膜 Halami 獨立製作與維護。沒有場次通的整理，這個 App 做不出來。本 App 讀取的是場次通公開的網頁，雙方沒有合作或隸屬關係。")
+            }
+            Section {
                 ForEach(showtimes) { row($0) }
             } header: {
                 Text("場次")
@@ -64,6 +74,7 @@ struct AboutView: View {
                 Text("This product uses the TMDB API but is not endorsed or certified by TMDB.\n\n各網站的名稱與標誌屬於其所有人。本 App 與上述網站、影城沒有合作或隸屬關係。")
             }
             Section {
+                Link(destination: aboutURL) { Label("關於與資料來源（網頁）", systemImage: "info.circle") }
                 Link(destination: privacyURL) { Label("隱私權政策", systemImage: "hand.raised") }
             } header: {
                 Text("隱私")

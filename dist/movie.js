@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.22-1108
+// @movie-schedule-app 電影行程 v2026.11.22-1130
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/parsers.gen.ts
@@ -1944,6 +1944,9 @@ function ratingTier(kind, v) {
   const x = kind === "imdb" ? v * 10 : v;
   return x >= 75 ? "good" : x >= 60 ? "mid" : "bad";
 }
+var SITE_URL = "https://movie-web.morgan91204.workers.dev";
+var ABOUT_URL = SITE_URL + "/about/";
+var PRIVACY_URL = SITE_URL + "/privacy/";
 var COMMUNITY_API = "https://movie-ratings.morgan91204.workers.dev";
 function deviceId() {
   const ok = (x) => !!x && /^[A-Za-z0-9_-]{16,64}$/.test(x);
@@ -2612,7 +2615,7 @@ var App = class {
     ];
     // ── 事件迴圈 ──
     // 背景查 GitHub 上的最新版本（首頁顯示是否為最新版）
-    this.latest = checkLatest("2026.11.22-1108");
+    this.latest = checkLatest("2026.11.22-1130");
     // ── 搜尋 ──
     this.query = "";
     this.tmdbStatus = "";
@@ -2752,16 +2755,16 @@ var App = class {
     return /* @__PURE__ */ h(Page, { title: "設定" }, /* @__PURE__ */ h(Section, { title: "加入行事曆時" }, /* @__PURE__ */ h(Item, { icon: "📅", title: "寫入的行事曆", subtitle: this.calendarName, onTap: () => this.go(() => this.calendarView()) }), /* @__PURE__ */ h(Item, { icon: "📺", title: "廣告預告", subtitle: `預計散場時間會加上 ${this.settings.ads} 分鐘`, right: "點一下切換", chevron: false, onTap: () => this.cycleAds() }), /* @__PURE__ */ h(Item, { icon: "🗺", title: "導航地圖", subtitle: "點地址、分享、行程備註的導航連結", right: MAPS_LABEL[this.settings.maps || "apple"], chevron: false, onTap: () => {
       this.settings.maps = this.settings.maps === "google" ? "apple" : "google";
       saveSettings(this.settings);
-    } }), /* @__PURE__ */ h(Item, { icon: "⏱", title: "補片長（TMDB）", subtitle: this.settings.tmdbToken ? "已設定：沒有片長的電影會自動補上" : "未設定", onTap: () => this.go(() => this.tmdbView()) })), /* @__PURE__ */ h(Note, { text: "場次資料來自場次通 twshowtimes.com、開眼電影網，以及誠品、光點、樂聲官網，實際場次以影城公告為準。" }), /* @__PURE__ */ h(
+    } }), /* @__PURE__ */ h(Item, { icon: "⏱", title: "補片長（TMDB）", subtitle: this.settings.tmdbToken ? "已設定：沒有片長的電影會自動補上" : "未設定", onTap: () => this.go(() => this.tmdbView()) })), /* @__PURE__ */ h(Section, { title: "關於", hint: "連鎖影城的場次來自場次通（twshowtimes.com），感謝場次通的整理；其他來自開眼電影網，以及誠品、光點、樂聲官網。實際場次以影城公告為準。" }, /* @__PURE__ */ h(Item, { icon: "ℹ️", title: "關於與資料來源", accent: true, chevron: false, onTap: () => Safari.open(ABOUT_URL) }), /* @__PURE__ */ h(Item, { icon: "🔒", title: "隱私權政策", accent: true, chevron: false, onTap: () => Safari.open(PRIVACY_URL) }), /* @__PURE__ */ h(Item, { icon: "🙏", title: "前往場次通", subtitle: "比較各影城場次、看上映場數排行", accent: true, chevron: false, onTap: () => Safari.open("https://twshowtimes.com/") })), /* @__PURE__ */ h(
       "p",
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.22-1108"}`);
+          Pasteboard.copy(`版本 ${"2026.11.22-1130"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.22-1108"}`,
+      `版本 ${"2026.11.22-1130"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }

@@ -14,7 +14,7 @@ import {
   Cinema, Movie, Settings, Version, TwMovie, TwMovieCinema, CITY_ORDER, TW,
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
   loadSettings, saveSettings, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, cinemaAddress,
-  FORMATS, formatsOf, filterVersions, filterVersionsAny, movieRows, movieDays, nearest, kmLabel, WINDOWS, findShowtimes, findShowtimesMulti, multiLabel, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText, hallOf, tmdbTest, movieExtras, moviePoster, posterReady, posterTint, POSTER_TINTS, normImageUrl, movieRuntime, posterSrc, isLocalSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, foregroundTask, communityStats, communityVote, loadBoxOffice, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, SCRIPTING_IMPORT_URL, movieRatings, ratingTier,
+  FORMATS, formatsOf, filterVersions, filterVersionsAny, movieRows, movieDays, nearest, kmLabel, WINDOWS, findShowtimes, findShowtimesMulti, multiLabel, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText, hallOf, tmdbTest, movieExtras, moviePoster, posterReady, posterTint, POSTER_TINTS, normImageUrl, movieRuntime, posterSrc, isLocalSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, foregroundTask, communityStats, communityVote, loadBoxOffice, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, SCRIPTING_IMPORT_URL, ABOUT_URL, PRIVACY_URL, movieRatings, ratingTier,
 } from "./core"
 import type { Format, LatLng, Hit, Community, BoxOfficeItem } from "./core"
 
@@ -193,7 +193,12 @@ function SettingsPage() {
         <Row title={"補片長（TMDB）"} trailing={settings.tmdbToken ? "已設定" : "未設定"} />
       </NavigationLink>
     </Section>
-    <Section footer={<Text>場次資料來自場次通、開眼電影網，以及誠品、光點、樂聲官網，實際場次以影城公告為準。</Text>}>
+    <Section header={<Text>關於</Text>} footer={<Text>連鎖影城的場次來自場次通（twshowtimes.com），感謝場次通的整理；其他來自開眼電影網，以及誠品、光點、樂聲官網。實際場次以影城公告為準。</Text>}>
+      <Button title={"關於與資料來源"} systemImage={"info.circle"} action={() => Safari.openURL(ABOUT_URL)} />
+      <Button title={"隱私權政策"} systemImage={"hand.raised"} action={() => Safari.openURL(PRIVACY_URL)} />
+      <Button title={"前往場次通"} systemImage={"heart"} action={() => Safari.openURL("https://twshowtimes.com/")} />
+    </Section>
+    <Section>
       <VersionRow />
     </Section>
   </List>
