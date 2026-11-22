@@ -118,61 +118,111 @@ struct MovieHero: View {
     }
 }
 
-/// 一部電影：選日期、縣市，看哪些影城有放
+/// 一部電影：選日期、縣市、特殊廳（都可以複選），看哪些影城有放
 struct MovieDetailView: View {
     let movie: TwMovie
 
-    @State private var day: Loadable<TwMovieDay> = .loading
-    @State private var date = ""
-    @State private var city = "全部"
+    @ObservedObject private var settings = SettingsStore.shared
+    @State private var board: Loadable<MovieBoard> = .loading
+    @State private var dates: Set<String> = []     // 空 = 來源預設的那一天
+    @State private var cities: Set<String> = []    // 空 = 全部
+    @State private var formats: Set<String> = []   // 空 = 全部
+    @State private var onlyFav = false
     @State private var filledRuntime: RuntimeInfo?
+
+    private func short(_ d: String) -> String {
+        let p = d.split(separator: "-").compactMap { Int($0) }
+        return p.count == 3 ? "\(p[1])/\(p[2])" : d
+    }
+    /// 一組可以複選的選項：點開選單，每個選項點一下打勾、再點一下取消（選單不會關掉）
+    private func multiMenu(_ title: String, summary: String, @ViewBuilder content: () -> some View) -> some View {
+        Menu {
+            content()
+        } label: {
+            HStack {
+                Text(title).foregroundStyle(Color.primary)
+                Spacer()
+                Text(summary).foregroundStyle(.secondary).lineLimit(1)
+                Image(systemName: "chevron.up.chevron.down").font(.caption).foregroundStyle(.tertiary)
+            }
+        }
+        .menuActionDismissBehavior(.disabled)
+    }
+    private func option(_ label: String, on: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            if on { Label(label, systemImage: "checkmark") } else { Text(label) }
+        }
+    }
 
     var body: some View {
         List {
-            let data = day.value
+            let data = board.value
             let runtime = (data?.runtime ?? 0) > 0 ? (data?.runtime ?? 0) : (movie.runtime ?? 0) > 0 ? (movie.runtime ?? 0) : (filledRuntime?.runtime ?? 0)
             Section {
                 MovieHero(title: movie.title, slug: movie.slug, en: movie.en, lines: [
                     movie.en ?? "",
                     [movie.rating ?? data?.rating ?? "", runtime > 0 ? "\(runtime) 分鐘" : ""].filter { !$0.isEmpty }.joined(separator: "｜"),
-                    Fmt.release(data?.release ?? movie.release),
-                    data.map { "\($0.cinemas.count) 間影城有放映" } ?? "",
+                    Fmt.release((data?.release ?? "").isEmpty ? movie.release : data?.release),
+                    data.map { "\($0.total) 間影城有放映" } ?? "",
                 ])
             }
             CommunitySection(title: movie.title)
-            switch day {
+            switch board {
             case .loading:
                 Section { LoadingRow(text: "讀取放映影城…") }
             case .failed(let message):
-                Section { ErrorRow(message: message) { Task { await load() } } }
-            case .loaded(let d):
-                let dates = d.dates.filter { $0 >= Fmt.today() }
-                let cities = Fmt.sortCities(Array(Set(d.cinemas.map { $0.city })))
+                Section { ErrorRow(message: message) { Task { await load(fill: false) } } }
+            case .loaded(let b):
+                let selCities = b.cities.filter { cities.contains($0) }
+                let selFormats = b.formats.filter { formats.contains($0) }
                 Section {
-                    Picker("日期", selection: $date) {
-                        // 目前顯示的那天一定要在選項裡（剛過午夜時，來源的「今天」可能還是前一天）
-                        ForEach(dates.contains(d.date) ? dates : [d.date] + dates, id: \.self) { Text(Fmt.dateLabel($0)).tag($0) }
+                    multiMenu("日期", summary: b.selDates.map(short).joined(separator: "、")) {
+                        ForEach(b.dates, id: \.self) { d in
+                            option(Fmt.dateLabel(d), on: b.selDates.contains(d)) {
+                                var next = Set(b.selDates)
+                                if next.contains(d) { if next.count > 1 { next.remove(d) } } else { next.insert(d) }
+                                dates = next
+                            }
+                        }
                     }
-                    Picker("縣市", selection: $city) {
-                        Text("全部").tag("全部")
-                        ForEach(cities, id: \.self) { Text($0).tag($0) }
+                    multiMenu("縣市", summary: selCities.isEmpty ? "全部" : selCities.joined(separator: "、")) {
+                        option("全部", on: selCities.isEmpty) { cities = [] }
+                        ForEach(b.cities, id: \.self) { c in
+                            option(c, on: cities.contains(c)) { if cities.contains(c) { cities.remove(c) } else { cities.insert(c) } }
+                        }
                     }
+                    if !b.formats.isEmpty {
+                        multiMenu("特殊廳", summary: selFormats.isEmpty ? "全部" : selFormats.joined(separator: "、")) {
+                            option("全部", on: selFormats.isEmpty) { formats = [] }
+                            ForEach(b.formats, id: \.self) { f in
+                                option(f, on: formats.contains(f)) { if formats.contains(f) { formats.remove(f) } else { formats.insert(f) } }
+                            }
+                        }
+                    }
+                    Toggle("只看常去影城（\(settings.favorites.count)）", isOn: $onlyFav)
+                } footer: {
+                    Text("日期、縣市、特殊廳都可以複選。")
                 }
-                let shown = d.cinemas.filter { city == "全部" || $0.city == city }
-                if shown.isEmpty {
-                    Section { Text("這天沒有場次").foregroundStyle(.secondary) }
+                if b.rows.isEmpty {
+                    Section { Text(onlyFav && settings.favorites.isEmpty ? "還沒有常去影城，先到影城頁加入。" : "沒有符合條件的影城，換個日期或條件試試。").foregroundStyle(.secondary) }
                 }
-                ForEach(Fmt.sortCities(Array(Set(shown.map { $0.city }))), id: \.self) { c in
-                    let rows = shown.filter { $0.city == c }
-                    Section("\(c)（\(rows.count) 間）") {
-                        ForEach(rows) { cinema in
+                let many = b.selDates.count > 1 // 複選多天：每一列標日期
+                ForEach(b.cities.filter { c in b.rows.contains { $0.cinema.city == c } }, id: \.self) { c in
+                    let rows = b.rows.filter { $0.cinema.city == c }
+                    Section("\(c)（\(Set(rows.map { $0.cinema.id }).count) 間）") {
+                        ForEach(rows) { r in
+                            let cinema = r.cinema
                             NavigationLink {
-                                TimesView(title: d.title, runtime: runtime, cinemaName: cinema.name, address: cinema.address ?? "", date: d.date, versions: cinema.versions, bookingUrl: "",
+                                TimesView(title: b.title, runtime: runtime, cinemaName: cinema.name, address: cinema.address ?? "", date: r.date, versions: cinema.versions, bookingUrl: "",
                                           cinema: Cinema(id: cinema.id, name: cinema.name, city: cinema.city, district: cinema.district, source: "tw", url: "https://twshowtimes.com/cinemas/\(cinema.id)/", address: (cinema.address ?? "").isEmpty ? nil : cinema.address, aliases: nil),
                                           complete: true)
                             } label: {
                                 VStack(alignment: .leading, spacing: 3) {
-                                    Text(cinema.name)
+                                    HStack(spacing: 6) {
+                                        if settings.isFavorite(cinema.id) { Image(systemName: "star.fill").font(.caption).foregroundStyle(.orange) }
+                                        Text(cinema.name)
+                                        if many { Text(short(r.date)).font(.subheadline).foregroundStyle(.secondary) }
+                                    }
                                     ForEach(cinema.versions, id: \.self) { v in
                                         Text("\(v.label) \(v.times.joined(separator: " "))").font(.subheadline).foregroundStyle(.secondary).lineLimit(2)
                                     }
@@ -186,38 +236,28 @@ struct MovieDetailView: View {
         }
         .navigationTitle(movie.title)
         .navigationBarTitleDisplayMode(.inline)
-        .task { if day.value == nil { await load() } }
-        .onChange(of: date) { _, new in
-            if let d = day.value, new != d.date, !new.isEmpty { Task { await load(new) } }
-        }
-        .task(id: "\(day.value?.date ?? "")|\(city)") { await fill() }
-    }
-
-    /// 電影頁每間影城只列一種版本：把目前顯示的影城從影城頁補齊（一次 12 間，補好一批就更新畫面）
-    private func fill() async {
-        guard let d = day.value else { return }
-        let ids = d.cinemas.filter { (city == "全部" || $0.city == city) && !($0.full ?? false) }.map { $0.id }
-        var start = 0
-        while start < ids.count {
+        .task(id: [dates.sorted().joined(separator: ","), cities.sorted().joined(separator: ","), formats.sorted().joined(separator: ","), onlyFav ? "fav" : "all"].joined(separator: "|")) {
+            if board.value != nil {
+                try? await Task.sleep(nanoseconds: 500_000_000) // 連續勾選時等一下再查
+                if Task.isCancelled { return }
+            }
+            await load(fill: false) // 先用電影頁的資料畫出來
             if Task.isCancelled { return }
-            let chunk = Array(ids[start..<min(start + 12, ids.count)])
-            start += 12
-            guard let updated: TwMovieDay = try? await Bridge.shared.call("fillMovie", [movie.slug, d.date, chunk]) else { continue }
-            if Task.isCancelled { return }
-            if day.value?.date == updated.date { day = .loaded(updated) }
+            await load(fill: true)  // 再把每間影城的版本補齊（電影頁每間只列一種）
         }
     }
 
-    private func load(_ target: String? = nil) async {
+    private func load(fill: Bool) async {
         do {
-            let d: TwMovieDay = try await Bridge.shared.call("movieDay", [movie.slug, js(target)])
-            day = .loaded(d)
-            date = d.date
-            if (d.runtime ?? 0) == 0 && (movie.runtime ?? 0) == 0 && filledRuntime == nil {
+            let fav: Any = onlyFav ? (settings.favorites as Any) : (NSNull() as Any)
+            let b: MovieBoard = try await Bridge.shared.call("movieBoard", [movie.slug, dates.sorted(), cities.sorted(), formats.sorted(), fav, fill])
+            if Task.isCancelled { return }
+            board = .loaded(b)
+            if (b.runtime ?? 0) == 0 && (movie.runtime ?? 0) == 0 && filledRuntime == nil {
                 filledRuntime = try? await Bridge.shared.callOptional("movieRuntime", [movie.title, movie.slug, js(movie.en)])
             }
         } catch {
-            if day.value == nil { day = .failed(errorText(error)) }
+            if board.value == nil { board = .failed(errorText(error)) }
         }
     }
 }

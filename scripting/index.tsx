@@ -14,7 +14,7 @@ import {
   Cinema, Movie, Settings, Version, TwMovie, TwMovieCinema, CITY_ORDER, TW,
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
   loadSettings, saveSettings, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, cinemaAddress,
-  FORMATS, formatsOf, filterVersions, nearest, kmLabel, WINDOWS, findShowtimes, findShowtimesMulti, multiLabel, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText, hallOf, tmdbTest, movieExtras, moviePoster, posterReady, posterTint, POSTER_TINTS, normImageUrl, movieRuntime, posterSrc, isLocalSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, foregroundTask, communityStats, communityVote, loadBoxOffice, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, SCRIPTING_IMPORT_URL, movieRatings, ratingTier,
+  FORMATS, formatsOf, filterVersions, filterVersionsAny, movieRows, movieDays, nearest, kmLabel, WINDOWS, findShowtimes, findShowtimesMulti, multiLabel, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText, hallOf, tmdbTest, movieExtras, moviePoster, posterReady, posterTint, POSTER_TINTS, normImageUrl, movieRuntime, posterSrc, isLocalSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, foregroundTask, communityStats, communityVote, loadBoxOffice, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, SCRIPTING_IMPORT_URL, movieRatings, ratingTier,
 } from "./core"
 import type { Format, LatLng, Hit, Community, BoxOfficeItem } from "./core"
 
@@ -975,30 +975,40 @@ function MoviesPage() {
 
 function MoviePage({ movie }: { movie: TwMovie }) {
   const [settings] = useSettings()
-  const [date, setDate] = useState("")
-  const [city, setCity] = useState("全部")
+  // 日期、縣市、特殊廳都可以複選；空的 = 預設（日期是來源預設那天，其餘是全部）
+  const [selDatesRaw, setSelDates] = useState<string[]>([])
+  const [selCitiesRaw, setSelCities] = useState<string[]>([])
+  const [selFormatsRaw, setSelFormats] = useState<string[]>([])
   const [onlyFav, setOnlyFav] = useState(false)
-  const [format, setFormat] = useState<string>("")
-  const day = useLoad(() => movieDay(movie.slug, date || undefined), [movie.slug, date])
+  const [open, setOpen] = useState("") // 目前展開哪一組選項
+  const base = useLoad(() => movieDay(movie.slug, undefined), [movie.slug]) // 預設那一天：片名、可選日期從這裡來
   const [, setFilled] = useState(0)
 
-  const data = day.data
+  const data = base.data
+  const future = (data?.dates || []).filter((d) => d >= todayTPE())
+  const allDates = future.length ? future : data ? [data.date] : []
+  const picked = selDatesRaw.filter((d) => allDates.indexOf(d) >= 0)
+  const selDates = picked.length ? picked.slice().sort() : data ? [allDates.indexOf(data.date) >= 0 ? data.date : allDates[0]] : []
+  const more = useLoad(() => (selDates.length ? movieDays(movie.slug, selDates) : Promise.resolve([])), [movie.slug, selDates.join(",")])
+  const days = more.data || []
+  const cities = useMemo(() => sortCities(Array.from(new Set(days.flatMap((x) => x.cinemas.map((c) => c.city))))), [more.data])
+  const selCities = selCitiesRaw.filter((c) => cities.indexOf(c) >= 0)
+  const favIds = onlyFav ? settings.favorites : null
   // 電影頁每間影城只列一種版本：把目前顯示的影城從影城頁補齊，補好後重畫
   useEffect(() => {
-    if (!data) return
+    if (!days.length) return
     let alive = true
-    const ids = data.cinemas.filter((c) => city === "全部" || c.city === city).map((c) => c.id)
-    if (!movieDayFilled(data, ids)) fillMovieDay(data, ids).then(() => { if (alive) setFilled((n) => n + 1) }).catch(() => {})
+    for (const day of days) {
+      const ids = day.cinemas.filter((c) => (!selCities.length || selCities.indexOf(c.city) >= 0) && (!favIds || favIds.indexOf(c.id) >= 0)).map((c) => c.id)
+      if (!movieDayFilled(day, ids)) fillMovieDay(day, ids).then(() => { if (alive) setFilled((n) => n + 1) }).catch(() => {})
+    }
     return () => { alive = false }
-  }, [data, city])
-  const dates = (data?.dates || []).filter((d) => d >= todayTPE())
-  const cities = useMemo(() => sortCities(Array.from(new Set((data?.cinemas || []).map((c) => c.city)))), [data])
-  const formats = FORMATS.filter((f) => (data?.cinemas || []).some((c) => c.versions.some((v) => formatsOf(v.label).indexOf(f) >= 0)))
-  const fmtSel = (formats as string[]).indexOf(format) >= 0 ? (format as Format) : ""
-  const shown = (data?.cinemas || [])
-    .map((c) => ({ ...c, versions: filterVersions(c.versions, fmtSel) }))
-    .filter((c) => c.versions.length && (city === "全部" || c.city === city) && (!onlyFav || settings.favorites.indexOf(c.id) >= 0))
-  const byCity = sortCities(Array.from(new Set(shown.map((c) => c.city))))
+  }, [more.data, selCities.join(","), onlyFav])
+  const formats = FORMATS.filter((f) => days.some((x) => x.cinemas.some((c) => c.versions.some((v) => formatsOf(v.label).indexOf(f) >= 0))))
+  const selFormats = (selFormatsRaw as Format[]).filter((f) => formats.indexOf(f) >= 0)
+  const rows = movieRows(days, { cities: selCities, formats: selFormats, favIds })
+  const byCity = sortCities(Array.from(new Set(rows.map((r) => r.cinema.city))))
+  const many = selDates.length > 1 // 複選多天：每一列標日期
   const rt = useLoad(() => (data?.runtime || movie.runtime ? Promise.resolve(null) : movieRuntime(movie.title, movie.slug, movie.en)), [movie.slug, data ? 1 : 0]) // 來源沒給片長：查 TMDB／開眼補上
   const runtime = data?.runtime || movie.runtime || rt.data?.runtime || 0
   if (rt.data && !movie.runtime) { movie.runtime = rt.data.runtime; movie.runtimeFrom = rt.data.from }
@@ -1006,46 +1016,66 @@ function MoviePage({ movie }: { movie: TwMovie }) {
   const toCinema = (c: TwMovieCinema): Cinema =>
     store.cinemas.find((x) => x.id === c.id) ||
     { id: c.id, name: c.name, city: c.city, district: c.district, source: "tw", url: `${TW}/cinemas/${c.id}/`, address: c.address }
+  const toggle = (list: string[], id: string, min1 = false) => {
+    const i = list.indexOf(id)
+    if (i < 0) return [...list, id]
+    return min1 && list.length === 1 ? list : list.filter((x) => x !== id)
+  }
+  const md = (d: string) => dateLabel(d).replace(/（.*$/, "")
+  const flip = (k: string) => () => setOpen(open === k ? "" : k)
+  const reload = () => { base.reload(); more.reload() }
+  const error = base.error || more.error
 
-  return <List navigationTitle={movie.title} navigationBarTitleDisplayMode={"inline"} refreshable={day.reload}>
+  return <List navigationTitle={movie.title} navigationBarTitleDisplayMode={"inline"} refreshable={reload}>
     <MovieHero title={movie.title} slug={movie.slug} en={movie.en} lines={[
       movie.en,
       [movie.rating || data?.rating, runtime ? `${runtime} 分鐘` : ""].filter(Boolean).join("｜"),
       releaseLabel(data?.release || movie.release || releaseOf(movie.title)),
       data ? `${data.cinemas.length} 間影城有放映` : "",
     ]} />
-    <Section>
-      <Picker title={"日期"} value={date || data?.date || ""} onChanged={setDate}>
-        {(dates.length ? dates : [data?.date || todayTPE()]).map((d) => <Text key={d} tag={d}>{dateLabel(d)}</Text>)}
-      </Picker>
-      <Picker title={"縣市"} value={city} onChanged={setCity}>
-        {["全部", ...cities].map((c) => <Text key={c} tag={c}>{c}</Text>)}
-      </Picker>
-      {formats.length ? <Picker title={"特殊廳"} value={fmtSel} onChanged={setFormat}>
-        {["", ...formats].map((f) => <Text key={f || "all"} tag={f}>{f || "全部"}</Text>)}
-      </Picker> : null}
-      <Toggle title={"只看常去影城"} value={onlyFav} onChanged={setOnlyFav} />
+    {multiPick({
+      title: "日期", open: open === "date", onOpen: flip("date"),
+      summary: selDates.map(md).join("、"),
+      options: allDates.map((d) => ({ id: d, label: dateLabel(d) })), selected: selDates,
+      onToggle: (d) => setSelDates(toggle(selDates, d, true)),
+    })}
+    {multiPick({
+      title: "縣市", open: open === "city", onOpen: flip("city"),
+      summary: selCities.length ? selCities.join("、") : "全部",
+      options: cities.map((c) => ({ id: c, label: c })), selected: selCities,
+      onToggle: (c) => setSelCities(toggle(selCities, c)),
+      footer: "都不選就是全部縣市。",
+    })}
+    {formats.length ? multiPick({
+      title: "特殊廳", open: open === "format", onOpen: flip("format"),
+      summary: selFormats.length ? selFormats.join("、") : "全部",
+      options: formats.map((f) => ({ id: f as string, label: f as string })), selected: selFormats,
+      onToggle: (f) => setSelFormats(toggle(selFormats, f)),
+      footer: "都不選就是全部；選了幾種，就找其中任一種。",
+    }) : null}
+    <Section footer={<Text>日期、縣市、特殊廳都可以複選：點標題展開，再點選項打勾。</Text>}>
+      <Toggle title={`只看常去影城（${settings.favorites.length}）`} value={onlyFav} onChanged={setOnlyFav} />
     </Section>
 
-    {day.error ? <ErrorRow error={day.error} retry={day.reload} /> : null}
-    {!data && !day.error ? <Section><Loading text={"讀取放映影城…"} /></Section> : null}
-    {data && !shown.length ? <Section><Text foregroundStyle={"secondaryLabel"}>這天沒有符合條件的影城</Text></Section> : null}
+    {error ? <ErrorRow error={error} retry={reload} /> : null}
+    {!more.data && !error ? <Section><Loading text={"讀取放映影城…"} /></Section> : null}
+    {more.data && !rows.length ? <Section><Text foregroundStyle={"secondaryLabel"}>{onlyFav && !settings.favorites.length ? "還沒有常去影城，先到影城頁加入。" : "沒有符合條件的影城，換個日期或條件試試。"}</Text></Section> : null}
 
-    {byCity.map((ct) =>
-      <Section key={ct} header={<Text>{`${ct}（${shown.filter((c) => c.city === ct).length} 間）`}</Text>}>
-        {shown.filter((c) => c.city === ct).map((c) => {
-          const m: Movie = { title: data!.title || movie.title, runtime, rating: data!.rating || movie.rating, versions: c.versions, runtimeFrom: data?.runtime ? data.runtimeFrom : movie.runtimeFrom }
-          const d = data!.date
+    {byCity.map((ct) => {
+      const list = rows.filter((r) => r.cinema.city === ct)
+      return <Section key={ct} header={<Text>{`${ct}（${new Set(list.map((r) => r.cinema.id)).size} 間）`}</Text>}>
+        {list.map(({ date: d, cinema: c }) => {
+          const m: Movie = { title: data?.title || movie.title, runtime, rating: data?.rating || movie.rating, versions: c.versions, runtimeFrom: data?.runtime ? data.runtimeFrom : movie.runtimeFrom }
           const summary = c.versions.map((v) => `${v.label} ${[...v.times].sort(byShowtime).join(" ")}`).join("／")
-          return <NavigationLink key={c.id} destination={
+          return <NavigationLink key={c.id + "|" + d} destination={
             <ShowtimesPage cinema={toCinema(c)} date={d} movie={m} complete
               ctx={{ booking: "", sourceUrl: `${TW}/cinemas/${c.id}/${d}/`, address: c.address }} />
           }>
-            <Row title={(settings.favorites.indexOf(c.id) >= 0 ? "★ " : "") + c.name} subtitle={summary} />
+            <Row title={(settings.favorites.indexOf(c.id) >= 0 ? "★ " : "") + c.name + (many ? `　${md(d)}` : "")} subtitle={summary} />
           </NavigationLink>
         })}
       </Section>
-    )}
+    })}
   </List>
 }
 

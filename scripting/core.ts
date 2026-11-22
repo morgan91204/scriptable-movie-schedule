@@ -3,7 +3,7 @@ import { PARSERS_JS } from "./parsers.gen";
 import { platform } from "./platform";
 import { GEO } from "./geo";
 import { AT_BUILTIN, AT_COVERED, AT_SKIP, AT_REGIONS } from "./at-list";
-import type { Movie, Version, TwCinema, TwDay, MultiDay, SpotMovie, LuxFilm, AtTheater, AtDay, TwMovie, TwMovieDay } from "./parsers";
+import type { Movie, Version, TwCinema, TwDay, MultiDay, SpotMovie, LuxFilm, AtTheater, AtDay, TwMovie, TwMovieDay, TwMovieCinema } from "./parsers";
 export type { TwMovie, TwMovieDay, TwMovieCinema } from "./parsers";
 export type { Movie, Version } from "./parsers";
 
@@ -1388,6 +1388,35 @@ export function formatsOf(label: string): Format[] {
 /** 只留下符合特殊廳的版本；format 為空時原樣回傳 */
 export function filterVersions(versions: Version[], format: Format | "" | undefined): Version[] {
   return format ? versions.filter((v) => formatsOf(v.label).indexOf(format) >= 0) : versions;
+}
+
+/** 複選版：留下屬於「其中任一種」特殊廳的版本；一種都沒選就原樣回傳 */
+export function filterVersionsAny(versions: Version[], formats: Format[]): Version[] {
+  return formats.length ? versions.filter((v) => formatsOf(v.label).some((f) => formats.indexOf(f) >= 0)) : versions;
+}
+/** 「依電影找場次」的一列：某一天、某間影城（版本已經照特殊廳篩過） */
+export interface MovieRow { day: TwMovieDay; date: string; cinema: TwMovieCinema }
+/** 把幾天的資料攤平成一列一列，照條件篩選：縣市、特殊廳都可以複選（空的 = 不限），favIds 有給就只留常去影城。
+ *  排序：縣市（北到南）→ 影城 → 日期 */
+export function movieRows(days: TwMovieDay[], opt: { cities: string[]; formats: Format[]; favIds?: string[] | null }): MovieRow[] {
+  const rows: MovieRow[] = [];
+  const order: string[] = []; // 影城第一次出現的順序
+  for (const day of days.slice().sort((a, b) => a.date.localeCompare(b.date)))
+    for (const c of day.cinemas) {
+      if (opt.cities.length && opt.cities.indexOf(c.city) < 0) continue;
+      if (opt.favIds && opt.favIds.indexOf(c.id) < 0) continue;
+      const versions = filterVersionsAny(c.versions, opt.formats);
+      if (!versions.length) continue;
+      if (order.indexOf(c.id) < 0) order.push(c.id);
+      rows.push({ day, date: day.date, cinema: { ...c, versions } });
+    }
+  const cityRank = (x: string) => CITY_ORDER.indexOf(x) + 1 || 99;
+  return rows.sort((a, b) => cityRank(a.cinema.city) - cityRank(b.cinema.city) || order.indexOf(a.cinema.id) - order.indexOf(b.cinema.id) || a.date.localeCompare(b.date));
+}
+/** 一次讀這部片好幾天的放映影城（讀不到的那一天略過） */
+export async function movieDays(slug: string, dates: string[]): Promise<TwMovieDay[]> {
+  const got = await Promise.all(dates.map((d) => movieDay(slug, d).catch(() => null)));
+  return got.filter((d): d is TwMovieDay => !!d);
 }
 
 // ───────────────────────── 距離 ─────────────────────────

@@ -54,6 +54,7 @@
     fillMovieDay: () => fillMovieDay,
     fillRuntimes: () => fillRuntimes,
     filterVersions: () => filterVersions,
+    filterVersionsAny: () => filterVersionsAny,
     findShowtimes: () => findShowtimes,
     findShowtimesMulti: () => findShowtimesMulti,
     fmt: () => fmt,
@@ -78,10 +79,12 @@
     movieCinemaVersions: () => movieCinemaVersions,
     movieDay: () => movieDay,
     movieDayFilled: () => movieDayFilled,
+    movieDays: () => movieDays,
     movieExtras: () => movieExtras,
     movieLines: () => movieLines,
     moviePoster: () => moviePoster,
     movieRatings: () => movieRatings,
+    movieRows: () => movieRows,
     movieRuntime: () => movieRuntime,
     moviesOf: () => moviesOf,
     multiDayLive: () => multiDayLive,
@@ -1766,6 +1769,28 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   function filterVersions(versions, format) {
     return format ? versions.filter((v) => formatsOf(v.label).indexOf(format) >= 0) : versions;
   }
+  function filterVersionsAny(versions, formats) {
+    return formats.length ? versions.filter((v) => formatsOf(v.label).some((f) => formats.indexOf(f) >= 0)) : versions;
+  }
+  function movieRows(days, opt) {
+    const rows = [];
+    const order = [];
+    for (const day of days.slice().sort((a, b) => a.date.localeCompare(b.date)))
+      for (const c of day.cinemas) {
+        if (opt.cities.length && opt.cities.indexOf(c.city) < 0) continue;
+        if (opt.favIds && opt.favIds.indexOf(c.id) < 0) continue;
+        const versions = filterVersionsAny(c.versions, opt.formats);
+        if (!versions.length) continue;
+        if (order.indexOf(c.id) < 0) order.push(c.id);
+        rows.push({ day, date: day.date, cinema: { ...c, versions } });
+      }
+    const cityRank = (x) => CITY_ORDER.indexOf(x) + 1 || 99;
+    return rows.sort((a, b) => cityRank(a.cinema.city) - cityRank(b.cinema.city) || order.indexOf(a.cinema.id) - order.indexOf(b.cinema.id) || a.date.localeCompare(b.date));
+  }
+  async function movieDays(slug, dates) {
+    const got = await Promise.all(dates.map((d) => movieDay(slug, d).catch(() => null)));
+    return got.filter((d) => !!d);
+  }
   function distanceKm(a, b) {
     const R = 6371, rad = Math.PI / 180;
     const dLat = (b.lat - a.lat) * rad, dLng = (b.lng - a.lng) * rad;
@@ -2256,8 +2281,29 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   async function fillMovie(slug, date, ids) {
     return fillMovieDay(await movieDay(slug, date || void 0), ids);
   }
+  async function movieBoard(slug, dates, cities, formats, favIds, fill) {
+    const base = await movieDay(slug, void 0);
+    const today = todayTPE();
+    const future = base.dates.filter((d) => d >= today);
+    const allDates = future.length ? future : [base.date];
+    const picked = dates.filter((d) => allDates.indexOf(d) >= 0);
+    const selDates = picked.length ? picked.slice().sort() : [allDates.indexOf(base.date) >= 0 ? base.date : allDates[0]];
+    const days = await movieDays(slug, selDates);
+    const rank = (c) => CITY_ORDER.indexOf(c) + 1 || 99;
+    const allCities = Array.from(new Set(days.flatMap((x) => x.cinemas.map((c) => c.city)))).sort((a, b) => rank(a) - rank(b));
+    const selCities = cities.filter((c) => allCities.indexOf(c) >= 0);
+    if (fill)
+      for (const day of days) {
+        const ids = day.cinemas.filter((c) => (!selCities.length || selCities.indexOf(c.city) >= 0) && (!favIds || favIds.indexOf(c.id) >= 0)).map((c) => c.id);
+        if (!movieDayFilled(day, ids)) await fillMovieDay(day, ids).catch(() => day);
+      }
+    const available = FORMATS.filter((f) => days.some((x) => x.cinemas.some((c) => c.versions.some((v) => formatsOf(v.label).indexOf(f) >= 0))));
+    const selFormats = formats.filter((f) => available.indexOf(f) >= 0);
+    const rows = movieRows(days, { cities: selCities, formats: selFormats, favIds }).map((r) => ({ date: r.date, cinema: r.cinema }));
+    return { title: base.title, rating: base.rating, runtime: base.runtime, release: base.release || "", total: base.cinemas.length, dates: allDates, selDates, cities: allCities, formats: available, rows };
+  }
   var formatList = () => FORMATS;
-  var extra = { boxOffice, nowShowing, nowShowingMulti, nearby, patchSettings, fillMovie, formatList };
+  var extra = { boxOffice, nowShowing, nowShowingMulti, movieBoard, nearby, patchSettings, fillMovie, formatList };
   globalThis.MS = {
     init(saved) {
       cache = saved || {};

@@ -52,6 +52,26 @@ struct TwMovieCinema: Codable, Hashable, Identifiable {
     var full: Bool? // 已經從影城頁補齊所有版本（電影頁每間影城只列一種）
 }
 
+/// 「依電影找場次」的一列：某一天、某間影城
+struct MovieBoardRow: Codable, Hashable, Identifiable {
+    var date: String
+    var cinema: TwMovieCinema
+    var id: String { cinema.id + "|" + date }
+}
+/// 「依電影找場次」整頁的資料（條件複選後由共用資料層算好）
+struct MovieBoard: Codable {
+    var title: String
+    var rating: String?
+    var runtime: Int?
+    var release: String?
+    var total: Int
+    var dates: [String]     // 可以選的日期
+    var selDates: [String]  // 實際採用的日期
+    var cities: [String]    // 這幾天有放映的縣市
+    var formats: [String]   // 這幾天有的特殊廳
+    var rows: [MovieBoardRow]
+}
+
 struct TwMovieDay: Codable {
     var title: String
     var en: String?

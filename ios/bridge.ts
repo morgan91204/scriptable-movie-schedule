@@ -37,9 +37,32 @@ async function patchSettings(patch: Record<string, unknown>) {
 async function fillMovie(slug: string, date: string | null, ids: string[]) {
   return core.fillMovieDay(await core.movieDay(slug, date || undefined), ids);
 }
+/** 「依電影找場次」整頁要的資料：日期、縣市、特殊廳都可以複選（空的 = 預設／全部），favIds 有給就只留常去影城。
+ *  fill = 把目前要顯示的影城補齊所有版本（電影頁每間影城只列一種），比較慢，畫面先用沒補的畫一次再補 */
+async function movieBoard(slug: string, dates: string[], cities: string[], formats: string[], favIds: string[] | null, fill: boolean) {
+  const base = await core.movieDay(slug, undefined);
+  const today = core.todayTPE();
+  const future = base.dates.filter((d) => d >= today);
+  const allDates = future.length ? future : [base.date];
+  const picked = dates.filter((d) => allDates.indexOf(d) >= 0);
+  const selDates = picked.length ? picked.slice().sort() : [allDates.indexOf(base.date) >= 0 ? base.date : allDates[0]];
+  const days = await core.movieDays(slug, selDates);
+  const rank = (c: string) => core.CITY_ORDER.indexOf(c) + 1 || 99;
+  const allCities = Array.from(new Set(days.flatMap((x) => x.cinemas.map((c) => c.city)))).sort((a, b) => rank(a) - rank(b));
+  const selCities = cities.filter((c) => allCities.indexOf(c) >= 0);
+  if (fill)
+    for (const day of days) {
+      const ids = day.cinemas.filter((c) => (!selCities.length || selCities.indexOf(c.city) >= 0) && (!favIds || favIds.indexOf(c.id) >= 0)).map((c) => c.id);
+      if (!core.movieDayFilled(day, ids)) await core.fillMovieDay(day, ids).catch(() => day);
+    }
+  const available = core.FORMATS.filter((f) => days.some((x) => x.cinemas.some((c) => c.versions.some((v) => core.formatsOf(v.label).indexOf(f) >= 0))));
+  const selFormats = (formats as core.Format[]).filter((f) => available.indexOf(f) >= 0);
+  const rows = core.movieRows(days, { cities: selCities, formats: selFormats, favIds }).map((r) => ({ date: r.date, cinema: r.cinema }));
+  return { title: base.title, rating: base.rating, runtime: base.runtime, release: base.release || "", total: base.cinemas.length, dates: allDates, selDates, cities: allCities, formats: available, rows };
+}
 /** 特殊廳清單（跟其他版本同一份） */
 const formatList = () => core.FORMATS;
-const extra: Record<string, (...a: any[]) => any> = { boxOffice, nowShowing, nowShowingMulti, nearby, patchSettings, fillMovie, formatList };
+const extra: Record<string, (...a: any[]) => any> = { boxOffice, nowShowing, nowShowingMulti, movieBoard, nearby, patchSettings, fillMovie, formatList };
 
 (globalThis as any).MS = {
   init(saved: Record<string, string>) {

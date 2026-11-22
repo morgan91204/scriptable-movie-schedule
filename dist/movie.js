@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.22-1056
+// @movie-schedule-app 電影行程 v2026.11.22-1108
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/parsers.gen.ts
@@ -1630,6 +1630,28 @@ function formatsOf(label) {
 function filterVersions(versions, format) {
   return format ? versions.filter((v) => formatsOf(v.label).indexOf(format) >= 0) : versions;
 }
+function filterVersionsAny(versions, formats) {
+  return formats.length ? versions.filter((v) => formatsOf(v.label).some((f) => formats.indexOf(f) >= 0)) : versions;
+}
+function movieRows(days, opt) {
+  const rows = [];
+  const order = [];
+  for (const day of days.slice().sort((a, b) => a.date.localeCompare(b.date)))
+    for (const c of day.cinemas) {
+      if (opt.cities.length && opt.cities.indexOf(c.city) < 0) continue;
+      if (opt.favIds && opt.favIds.indexOf(c.id) < 0) continue;
+      const versions = filterVersionsAny(c.versions, opt.formats);
+      if (!versions.length) continue;
+      if (order.indexOf(c.id) < 0) order.push(c.id);
+      rows.push({ day, date: day.date, cinema: { ...c, versions } });
+    }
+  const cityRank = (x) => CITY_ORDER.indexOf(x) + 1 || 99;
+  return rows.sort((a, b) => cityRank(a.cinema.city) - cityRank(b.cinema.city) || order.indexOf(a.cinema.id) - order.indexOf(b.cinema.id) || a.date.localeCompare(b.date));
+}
+async function movieDays(slug, dates) {
+  const got = await Promise.all(dates.map((d) => movieDay(slug, d).catch(() => null)));
+  return got.filter((d) => !!d);
+}
 function distanceKm(a, b) {
   const R = 6371, rad = Math.PI / 180;
   const dLat = (b.lat - a.lat) * rad, dLng = (b.lng - a.lng) * rad;
@@ -2590,7 +2612,7 @@ var App = class {
     ];
     // ── 事件迴圈 ──
     // 背景查 GitHub 上的最新版本（首頁顯示是否為最新版）
-    this.latest = checkLatest("2026.11.22-1056");
+    this.latest = checkLatest("2026.11.22-1108");
     // ── 搜尋 ──
     this.query = "";
     this.tmdbStatus = "";
@@ -2602,8 +2624,15 @@ var App = class {
     this.movieQuery = "";
     /** 電影分頁上方的切換：上映中／票房排行 */
     this.movieMode = "now";
-    this.movieCity = "全部";
-    this.movieFormat = "";
+    // 日期、縣市、特殊廳都可以複選（點一下選、再點一下取消）；換一部片時日期重來
+    this.movieFor = "";
+    this.movieDates = [];
+    // 空 = 來源預設的那一天（通常是今天）
+    this.movieCities = [];
+    // 空 = 全部
+    this.movieFormats = [];
+    // 空 = 全部
+    this.movieFavOnly = false;
     // ── 位置 ──
     this.me = null;
     // ── 現在有什麼可以看 ──
@@ -2728,11 +2757,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.22-1056"}`);
+          Pasteboard.copy(`版本 ${"2026.11.22-1108"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.22-1056"}`,
+      `版本 ${"2026.11.22-1108"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -3166,51 +3195,80 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
       this.movieQuery = v.q || "";
     } }), now.length ? /* @__PURE__ */ h(Section, { title: `上映中（${now.length}）`, hint: "依今天放映的影城數排序；今天沒有場次、過幾天才有的排在最後。資料來自場次通。" }, now.map(item)) : null, soon.length ? /* @__PURE__ */ h(Section, { title: `即將上映（${soon.length}）`, hint: "還沒上映、但已經可以查到場次的片，依上映日期排序。" }, soon.map(item)) : null, list.length ? null : /* @__PURE__ */ h(Empty, { icon: "🎞", text: "找不到相符的電影" }));
   }
+  // 只看常去影城
   async movieView(m, date) {
-    const d = await movieDay(m.slug, date || void 0);
-    const fillIds = d.cinemas.filter((c) => this.movieCity === "全部" || c.city === this.movieCity).map((c) => c.id);
-    if (!movieDayFilled(d, fillIds)) {
-      const job = foregroundTask(fillMovieDay(d, fillIds).catch(() => d));
-      await Promise.race([job, sleep(this.rerendering ? 0 : 1500)]);
-      if (!movieDayFilled(d, fillIds)) this.late.push(job);
+    if (this.movieFor !== m.slug) {
+      this.movieFor = m.slug;
+      this.movieDates = date ? [date] : [];
     }
+    const d = await movieDay(m.slug, void 0);
     const dates = d.dates.filter((x2) => x2 >= todayTPE());
-    let runtime = d.runtime || m.runtime;
-    const cities = Array.from(new Set(d.cinemas.map((c) => c.city))).sort(
+    const allDates = dates.length ? dates : [d.date];
+    const picked = this.movieDates.filter((x2) => allDates.indexOf(x2) >= 0);
+    const selDates = picked.length ? picked.slice().sort() : [allDates.indexOf(d.date) >= 0 ? d.date : allDates[0]];
+    const days = await movieDays(m.slug, selDates);
+    const cities = Array.from(new Set(days.flatMap((x2) => x2.cinemas.map((c) => c.city)))).sort(
       (a, b) => (CITY_ORDER.indexOf(a) + 1 || 99) - (CITY_ORDER.indexOf(b) + 1 || 99)
     );
-    const city = cities.indexOf(this.movieCity) >= 0 ? this.movieCity : "全部";
-    const formats = FORMATS.filter((f) => d.cinemas.some((c) => c.versions.some((v) => formatsOf(v.label).indexOf(f) >= 0)));
-    const fmtSel = formats.indexOf(this.movieFormat) >= 0 ? this.movieFormat : "";
-    const shown = d.cinemas.map((c) => ({ ...c, versions: filterVersions(c.versions, fmtSel) })).filter((c) => (city === "全部" || c.city === city) && c.versions.length);
+    const selCities = this.movieCities.filter((c) => cities.indexOf(c) >= 0);
+    const favIds = this.movieFavOnly ? this.settings.favorites : null;
+    for (const day of days) {
+      const fillIds = day.cinemas.filter((c) => (!selCities.length || selCities.indexOf(c.city) >= 0) && (!favIds || favIds.indexOf(c.id) >= 0)).map((c) => c.id);
+      if (!movieDayFilled(day, fillIds)) {
+        const job = foregroundTask(fillMovieDay(day, fillIds).catch(() => day));
+        await Promise.race([job, sleep(this.rerendering ? 0 : 1500)]);
+        if (!movieDayFilled(day, fillIds)) this.late.push(job);
+      }
+    }
+    let runtime = d.runtime || m.runtime;
+    const formats = FORMATS.filter((f) => days.some((x2) => x2.cinemas.some((c) => c.versions.some((v) => formatsOf(v.label).indexOf(f) >= 0))));
+    const selFormats = this.movieFormats.filter((f) => formats.indexOf(f) >= 0);
+    const rows = movieRows(days, { cities: selCities, formats: selFormats, favIds });
+    const many = selDates.length > 1;
     const toCinema = (c) => this.cinemas.find((x2) => x2.id === c.id) || { id: c.id, name: c.name, city: c.city, district: c.district, source: "tw", url: `${TW}/cinemas/${c.id}/`, address: c.address };
-    const replace = (nd) => {
-      this.stack[this.stack.length - 1] = () => this.movieView(m, nd);
+    const toggle = (list, id, min1 = false) => {
+      const i = list.indexOf(id);
+      if (i < 0) return [...list, id];
+      return min1 && list.length === 1 ? list : list.filter((x2) => x2 !== id);
     };
     const x = await this.extras(m.title, m.slug, m.en);
     if (!runtime) runtime = await this.fillRuntime(m, 1500);
-    return /* @__PURE__ */ h(Page, { title: m.title, subtitle: [m.rating || d.rating, runtime ? `${runtime} 分鐘` : "", `${d.cinemas.length} 間影城`].filter(Boolean).join("｜"), onBack: () => this.back() }, this.hero(x, m.title, [m.en, [m.rating || d.rating, runtime ? `${runtime} 分鐘` : ""].filter(Boolean).join("｜"), releaseLabel(d.release || m.release || releaseOf(m.title)), `${d.cinemas.length} 間影城有放映`]), /* @__PURE__ */ h(Section, { title: "日期" }, /* @__PURE__ */ h(Chips, null, (dates.length ? dates : [d.date]).map((x2) => /* @__PURE__ */ h(Chip, { label: dateLabel(x2).replace(/（.）.*$/, ""), sub: x2 === d.date ? "目前" : dateLabel(x2).match(/（(.)）/)?.[1] || "", muted: x2 !== d.date, onTap: () => replace(x2) })))), /* @__PURE__ */ h(Section, { title: "縣市" }, /* @__PURE__ */ h(Chips, null, ["全部", ...cities].map((c) => /* @__PURE__ */ h(Chip, { label: c, muted: c !== city, onTap: () => {
-      this.movieCity = c;
-    } })))), formats.length ? /* @__PURE__ */ h(Section, { title: "特殊廳" }, /* @__PURE__ */ h(Chips, null, ["", ...formats].map((f) => /* @__PURE__ */ h(Chip, { label: f || "全部", muted: f !== fmtSel, onTap: () => {
-      this.movieFormat = f;
-    } })))) : null, cities.filter((ct) => shown.some((c) => c.city === ct)).map((ct) => /* @__PURE__ */ h(Section, { title: `${ct}（${shown.filter((c) => c.city === ct).length} 間）` }, shown.filter((c) => c.city === ct).map((c) => {
-      const movie = { title: d.title || m.title, runtime, rating: d.rating || m.rating, versions: c.versions, runtimeFrom: d.runtime ? d.runtimeFrom : m.runtimeFrom };
-      const summary = c.versions.map((v) => `${v.label} ${[...v.times].sort(byShowtime).join(" ")}`).join("／");
-      return /* @__PURE__ */ h(
-        Item,
-        {
-          icon: this.settings.favorites.indexOf(c.id) >= 0 ? "★" : void 0,
-          title: c.name,
-          subtitle: summary,
-          onTap: async () => {
-            await fillMovieDay(d, [c.id]).catch(() => d);
-            const fresh = d.cinemas.find((x2) => x2.id === c.id);
-            const mv = { ...movie, versions: fresh ? filterVersions(fresh.versions, fmtSel) : movie.versions };
-            this.go(() => this.timesView(toCinema(c), d.date, mv, { booking: "", sourceUrl: `${TW}/cinemas/${c.id}/${d.date}/`, address: c.address }));
+    const shownCities = cities.filter((ct) => rows.some((r) => r.cinema.city === ct));
+    return /* @__PURE__ */ h(Page, { title: m.title, subtitle: [m.rating || d.rating, runtime ? `${runtime} 分鐘` : "", `${d.cinemas.length} 間影城`].filter(Boolean).join("｜"), onBack: () => this.back() }, this.hero(x, m.title, [m.en, [m.rating || d.rating, runtime ? `${runtime} 分鐘` : ""].filter(Boolean).join("｜"), releaseLabel(d.release || m.release || releaseOf(m.title)), `${d.cinemas.length} 間影城有放映`]), /* @__PURE__ */ h(Section, { title: "日期", hint: "日期、縣市、特殊廳都可以複選。" }, /* @__PURE__ */ h(Chips, null, allDates.map((dt) => /* @__PURE__ */ h(Chip, { label: dateLabel(dt).replace(/（.）.*$/, ""), sub: dt === todayTPE() ? "今天" : dateLabel(dt).match(/（(.)）/)?.[1] || "", muted: selDates.indexOf(dt) < 0, onTap: () => {
+      this.movieDates = toggle(selDates, dt, true);
+    } })))), /* @__PURE__ */ h(Section, { title: "縣市" }, /* @__PURE__ */ h(Chips, null, /* @__PURE__ */ h(Chip, { label: "全部", muted: selCities.length > 0, onTap: () => {
+      this.movieCities = [];
+    } }), cities.map((c) => /* @__PURE__ */ h(Chip, { label: c, muted: selCities.indexOf(c) < 0, onTap: () => {
+      this.movieCities = toggle(selCities, c);
+    } })))), formats.length ? /* @__PURE__ */ h(Section, { title: "特殊廳" }, /* @__PURE__ */ h(Chips, null, /* @__PURE__ */ h(Chip, { label: "全部", muted: selFormats.length > 0, onTap: () => {
+      this.movieFormats = [];
+    } }), formats.map((f) => /* @__PURE__ */ h(Chip, { label: f, muted: selFormats.indexOf(f) < 0, onTap: () => {
+      this.movieFormats = toggle(selFormats, f);
+    } })))) : null, /* @__PURE__ */ h(Section, { title: "影城" }, /* @__PURE__ */ h(Chips, null, /* @__PURE__ */ h(Chip, { label: "所有影城", muted: this.movieFavOnly, onTap: () => {
+      this.movieFavOnly = false;
+    } }), /* @__PURE__ */ h(Chip, { label: `只看常去影城（${this.settings.favorites.length}）`, muted: !this.movieFavOnly, onTap: () => {
+      this.movieFavOnly = true;
+    } }))), shownCities.map((ct) => {
+      const list = rows.filter((r) => r.cinema.city === ct);
+      return /* @__PURE__ */ h(Section, { title: `${ct}（${new Set(list.map((r) => r.cinema.id)).size} 間）` }, list.map(({ day, date: dt, cinema: c }) => {
+        const movie = { title: d.title || m.title, runtime, rating: d.rating || m.rating, versions: c.versions, runtimeFrom: d.runtime ? d.runtimeFrom : m.runtimeFrom };
+        const summary = c.versions.map((v) => `${v.label} ${[...v.times].sort(byShowtime).join(" ")}`).join("／");
+        return /* @__PURE__ */ h(
+          Item,
+          {
+            icon: this.settings.favorites.indexOf(c.id) >= 0 ? "★" : void 0,
+            title: many ? `${c.name}　${dateLabel(dt).replace(/ .*$/, "")}` : c.name,
+            subtitle: summary,
+            onTap: async () => {
+              await fillMovieDay(day, [c.id]).catch(() => day);
+              const fresh = day.cinemas.find((y) => y.id === c.id);
+              const mv = { ...movie, versions: fresh ? filterVersionsAny(fresh.versions, selFormats) : movie.versions };
+              this.go(() => this.timesView(toCinema(c), dt, mv, { booking: "", sourceUrl: `${TW}/cinemas/${c.id}/${dt}/`, address: c.address }));
+            }
           }
-        }
-      );
-    }))), shown.length ? null : /* @__PURE__ */ h(Empty, { icon: "🎞", text: "這天沒有影城放映" }));
+        );
+      }));
+    }), rows.length ? null : /* @__PURE__ */ h(Empty, { icon: "🎞", text: this.movieFavOnly && !this.settings.favorites.length ? "還沒有常去影城，先到影城頁加入。" : "沒有符合條件的影城，換個日期或條件試試。" }));
   }
   // ── 分享 ──
   async share(p) {
