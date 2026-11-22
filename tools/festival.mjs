@@ -643,13 +643,16 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   } catch (_) {}
   for (const f of prev) { const m = (KNOWN_STILLS[f.id] = {}); for (const x of f.films || []) m[x.id] = { poster: x.poster, trailer: x.trailer, intro: x.intro, credits: x.credits }; }
   const got = [];
+  const status = {}; // 各來源這次的讀取結果（另外發佈成 festival-status.json，給每週的檢查看）
   for (const [label, job] of [["金馬影展官網", goldenHorse], ["台北電影節官網", taipeiFilmFestival], ["高雄電影節官網", kaohsiungFilmFestival], ["南方影展官網", southFilmFestival], ["紀錄片影展官網", tidf], ["酷兒影展官網", queerFilmFestival], ["桃園電影節官網", taoyuanFilmFestival], ["女性影展官網", womenMakeWaves], ["兒童影展官網", ticffJob("tp")], ["兒童影展高雄場", ticffJob("ks")], ["臺中動畫影展官網", taichungAnimation], ["人權電影節 KKTIX", humanRights]]) {
     try {
       const list = [].concat(await job()).filter(Boolean); // 一個來源可能是好幾個影展（分台北、高雄場）
       for (const f of list) { got.push(f); console.log(`${label}：${f.name} ${f.start}～${f.end}，${f.films.length} 部、${f.sessions.length} 場`); }
       if (!list.length) console.log(`${label}：官網目前沒有場次表`);
+      status[label] = list.length ? { result: "ok", festivals: list.map((f) => ({ id: f.id, start: f.start, end: f.end, sessions: f.sessions.length })) } : { result: "empty" };
     } catch (e) {
       console.log(`${label}：讀取失敗（${String(e.message || e)}），這次略過`);
+      status[label] = { result: "error", error: String(e.message || e).slice(0, 200) };
     }
   }
   // 這次讀到的蓋掉舊的；沒讀到的（官網換屆了、或暫時讀不到）沿用上一次存的。
@@ -694,5 +697,19 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const years = Array.from(new Set([...prevYears, ...archYears, ...(festivals.length ? [Number(year)] : [])])).sort((a, b) => b - a);
   fs.writeFileSync(outPath, JSON.stringify({ updated: Date.now(), years, festivals }) + "\n");
   if (festivals.length) fs.writeFileSync(outPath.replace(/\.json$/, `-${year}.json`), JSON.stringify({ updated: Date.now(), festivals }) + "\n");
+  // 讀取狀態：result = ok（讀到場次）／empty（官網讀得到但沒有場次，或被擋）／error（連不上）；
+  // lastOk = 最近一次讀到場次的時間、since = 目前這個結果從什麼時候開始（連續失敗多久就看這個）
+  let oldStatus = {};
+  try {
+    if (process.env.FESTIVAL_BASE) { const r = await fetch(`${process.env.FESTIVAL_BASE}/festival-status.json?t=${Date.now()}`, { signal: AbortSignal.timeout(30000) }); if (r.ok) oldStatus = (await r.json()).sources || {}; }
+  } catch (_) {}
+  const stamp = new Date().toISOString();
+  for (const [label, st] of Object.entries(status)) {
+    const o = oldStatus[label] || {};
+    st.at = stamp;
+    st.since = o.result === st.result && o.since ? o.since : stamp;
+    st.lastOk = st.result === "ok" ? stamp : o.lastOk || "";
+  }
+  fs.writeFileSync(outPath.replace(/festival\.json$/, "festival-status.json"), JSON.stringify({ updated: Date.now(), sources: status }, null, 1) + "\n");
   console.log(`已寫出 ${festivals.length} 個影展（${festivals.map((f) => f.name + " " + f.start.slice(0, 4)).join("、") || "無"}）；檔案 ${Math.round(fs.statSync(outPath).size / 1024)}KB`);
 }
