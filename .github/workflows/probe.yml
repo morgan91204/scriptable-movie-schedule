@@ -30,7 +30,7 @@ jobs:
             echo; echo "── 內容裡的連結（片單、場次、資料介面）──"
             grep -aoiE "(href|src|action|url)[=:] ?[\"'][^\"' ]*(film|programme|schedule|session|ticket|api|json|ashx|activity|game)[^\"' ]*[\"']" body.bin | sort -u | head -40 || true
             if [ -n "$PATTERN" ]; then
-              echo "── 含「$PATTERN」的片段（共 $(grep -aoE -- "$PATTERN" body.bin | wc -l) 處）──"
-              tr '\n\r\t' '   ' < body.bin | grep -aoE -- ".{0,300}($PATTERN).{0,700}" | head -4 || true
+              echo "── 含「$PATTERN」的片段 ──"
+              perl -0777 -ne 'my $n=0; while(/$ENV{PATTERN}/g){ $n++; if($n<=4){ my $s=pos()-250; $s=0 if $s<0; my $t=substr($_,$s,900); $t=~s/\s+/ /g; print "[$n] $t\n"; } } print "共 $n 處\n";' body.bin || true
             fi
           done
