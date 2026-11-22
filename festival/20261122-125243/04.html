@@ -1,0 +1,310 @@
+<html>
+<head>
+<title>台北金馬影展 Taipei Golden Horse Film Festival </title>
+<SCRIPT SRC="https://storage.googleapis.com/tghff_outland/js/jquery-1.11.2.min.js"></SCRIPT>
+<style>
+body{
+		margin: 0px 0px;
+	background-color: #ffffff;
+}
+#page {
+	margin: 0px 0px;
+	background-image: url(https://storage.googleapis.com/tghff_outland/image/tempHomeBG241118T.png?t2411181042),
+	                  url(https://storage.googleapis.com/tghff_outland/image/tempHomeBG231114B.png?t2311161023);
+	background-repeat: no-repeat, no-repeat;
+	background-position: top center, bottom center;
+	background-attachment: fixed, fixed; 
+	background-size: 4% auto, 5% auto;
+}
+#ticket {
+	font-size: 18px; line-height: 28px;
+}
+#GHACHome {
+	margin: 30px auto; width: 65%; background: #fff;
+	/*min-width: 750px;*/
+}
+#GHACHome .data {
+	text-align: left; font-size:20px; color:#B37642; font-weight: bold;
+}
+#GHACHome .data > span {
+	display: block; margin-left: 111px;
+}
+#GHACHome .data.venue > span {
+	margin-left: 126px;
+}
+#GHACHome .type {
+	text-align:center;color:#000;
+}
+.broadcast {
+	margin-top:20px;padding:10px 20px 0px;width:calc(100%-20px*2);text-align:left;color:#B37642;font-weight:bold;border:1px solid #666;border-radius:10px;
+}
+.broadcast div.from {
+	clear:both; 
+	*margin: 30px 0px 0px;
+}
+.broadcast div.who {
+	display: inline-block; margin: 0px 0px 30px;
+}
+.broadcast div.who div {
+	float: left;
+	*margin: 0px 0px 30px;
+}
+.broadcast div.who div:first-child {
+	clear: both;
+}
+.broadcast div.who div img {
+	margin: 10px 10px 0px 30px; width: 200px; vertical-align: middle;
+}
+.broadcast div.who div img.zoomin {
+	width: auto; height: 40px;
+}
+.broadcast span {
+	line-height: 50px;
+}
+.broadcast span.hand {
+	line-height: 40px;
+}
+.broadcast a, .broadcast a:hover {
+	color:#B37642; text-decoration:none;
+}
+.broadcast a:hover {
+	text-decoration:underline;
+}
+.broadcast div.who div .zone {
+	float: left; margin: 20px 0px 0px 5px; font-size:13px;
+}
+.broadcast div#linetoday {
+	line-height: 40px;
+}
+#header { 
+	position: relative;
+	left:0; top:0; right:0;
+	padding: 15px 0px;
+	text-align: center;
+	z-index: 1000;
+	background-color: #fff;
+	-webkit-transition: all .800s;
+	-moz-transition: all .800s;
+		-o-transition: all .800s;
+			transition: all .800s;
+}
+#header img {
+	width: 200px;
+}
+#footer {
+	position: absolute;
+	left:0; bottom:0; right:0;
+	padding-top: 10px;
+	text-align: center;
+	z-index: 1000;
+	background-color: #fff;
+	-webkit-transition: all .800s;
+	-moz-transition: all .800s;
+		-o-transition: all .800s;
+			transition: all .800s;
+}
+#footer img {
+	width: 85px;
+}
+#header.fixed, #footer.fixed {
+	position: fixed;
+}
+#content{
+	margin: 10px 10% 75px;
+	text-align: center;
+}
+.clearfix:before,
+.clearfix:after {
+	clear: both;
+}
+@media only screen and (max-width: 980px) {
+	body {
+			}
+	#ticket, #ceremony {
+		font-size: 0.8em;
+	}
+	#ticket div, #ceremony div {
+		font-size: 90%;
+		*line-height: 90%;
+	}
+	#GHACHome {
+		width: 90%;
+		font-size: 0.9em;
+	}
+	#GHACHome .data {
+		text-align: left; font-size: 26px; line-height: 40px;
+	}
+	#GHACHome .data > span {
+		*display: block;
+		margin-left: 164px;
+	}
+	#GHACHome .data.venue > span {
+		margin-left: 182px;
+	}
+	#GHACHome .type {
+		padding: 20px 0px; font-size: 1.5em;
+	}
+	.broadcast {
+		padding:10px 10px;
+	}
+	.broadcast div.from {
+		font-size: 24px;
+	}
+	.broadcast div.who.clear > div {
+		clear:both; margin: 0px 0px 15px;
+	}
+	.broadcast div.who div:first-child {
+		*background: #ff00ff;
+	}
+	.broadcast div.who div img {
+		margin: 15px 0px 0px 30px; width: 280px;
+	}
+	.broadcast div.who div img.zoomin {
+		clear: both; margin: 15px 10px 0px 30px; width: auto; height: 50px;
+	}
+	.broadcast div.who div .zone {
+		margin-top: 30px;#c9c5c5font-size:20px;
+	}
+	.broadcast span {
+		padding-left: 10px;
+		line-height: 70px;
+	}
+	.broadcast span.hand {
+		padding-left: 10px;
+		line-height: 60px;
+	}
+	
+	#content {
+		margin: 10px 5% 56px;
+	}
+}
+</style>
+</head>
+
+<body>
+	<div id="header" class="sticky clearfix"><img src="https://storage.googleapis.com/tghff_outland/image/tempHomeBG2611191011T.png"></div>
+	<div id="content">
+		<div id="ticket">
+			金馬影展會員&nbsp;&nbsp;<a href="https://www.goldenhorse.org.tw/bridge/signup?r=ch">註冊</a>&nbsp;（<a href="https://www.goldenhorse.org.tw/bridge/signin?response_type=code&client_id=tixCraft&scope=all&state=login&r=ch">登入</a>｜<a href="" >登出</a>）
+			<br />
+			<a href="https://www.goldenhorse.org.tw/bridge/signup?r=en">Sign-up</a> as a Golden Horse Film Festival member. (<a href="https://www.goldenhorse.org.tw/bridge/signin?response_type=code&client_id=tixCraft&scope=all&state=login&r=en">Sign In</a> | <a href="" >Sign Out</a>)
+			
+			<div style="margin-top:20px;font-size:1.6em;font-weight:bold;line-height:1.2em;">台北金馬影展<br />Taipei Golden Horse Film Festival</div>
+			<div style="margin-top:10px;">
+				影展購票請由此<a href="https://tghff.tixcraft.com">連結</a>進入
+				<br />To purchase tickets of Taipei Golden Horse Film Festival. <a href="https://tghff.tixcraft.com">TGHFF.tixcraft.com</a>
+				<br />APP下載：<a href="https://itunes.apple.com/us/app/jin-ma-ying-zhan/id473164995?l=zh&ls=1&mt=8" target="_blank">IOS</a>&nbsp;&nbsp;<a href="https://play.google.com/store/apps/details?id=tw.org.goldenhorse.goldenhorse" target="_blank">ANDROID</a>
+			</div>
+		</div>
+		<div id="ceremony" style="margin-top:25px;font-size:18px; line-height:24px;">
+			<div style="font-weight:bold;font-size:1.6em;line-height:45px;color:#B37642;">第63屆金馬獎頒獎典禮<br />The 63<sup>rd</sup> Golden Horse Awards Ceremony</div>
+			<div style="margin-top:20px;">日期｜2026年11月22日（日）17:00 星光大道 · 18:30 頒獎典禮</div>
+			<div style="margin-top:5px;">地點｜臺北流行音樂中心</div>
+			<div style="margin-top:5px;">Time  | 2026.11.22(Sun.)  17:00 Red Carpet  ·  18:30 Awards Ceremony</div>
+			<div style="margin-top:5px;">Venue | Taipei Music Center</div>
+						<div style="margin-top:8px;"><a href="https://www.goldenhorse.org.tw/awards/nw/">入圍得獎名單 Nominees & Winners</a></div>
+		</div>
+		
+		<div id="GHACHome" class="broadcast">
+			<div class="type">轉播 Live Broadcast<hr style="border:0px;border-top:1px solid #c9c5c5;"></div>
+			<div class="from">｜台灣 Taiwan</div>
+			<div class="who clear">
+				<div><a href="https://www.ttv.com.tw/" target="_blank"><img src="https://storage.googleapis.com/tghff_outland/image/logo_TTV.png" title="臺灣電視公司 TTV"/></a></div>
+			</div>
+			<div class="from">｜海外 Oversea</div>
+			<div class="who clear">
+				<div>
+					<div style="float: left;"><a href="https://www.starhubtvplus.com/home" target="_blank"><img src="https://storage.googleapis.com/tghff_outland/image/photo/2021/GHAC/huge/photo_f5dfdd0f3cc4dedcf4c570b92a7a76b7.png" class="zoomin" title="StarHub"/></a></div>
+					<div class="zone">(新加坡 Singapore)</div>
+				</div>
+				<div>
+					<div style="float: left;"><a href="https://content.astro.com.my/" target="_blank"><img src="https://storage.googleapis.com/tghff_outland/image/photo/2021/GHAC/huge/photo_dd8eb603161477cfca7b0c3e3bd1a3b5.png" class="zoomin" title="astro"/></a></div>
+					<div class="zone">(馬來西亞、汶萊 Malaysia, Brunei)</div>
+				</div>
+			</div>
+			<div class="type" style="clear: both;"><hr style="border:0px;border-top:1px solid #c9c5c5;">網路轉播 Live Streaming<hr style="border:0px;border-top:1px solid #c9c5c5;"></div>
+			<div class="from">｜台灣 Taiwan</div>
+			<div class="who">
+				<div>
+					<a href="https://www.myvideo.net.tw/event/GHFF/?utm_source=others&utm_medium=others&utm_campaign=others_others_apppush_event_GHFF_2026" target="_blank"><img src="https://storage.googleapis.com/tghff_outland/image/photo/2022/GHAC/huge/photo_330c0918ea9c302bb9c24dbf2fb70e86.png" style="width:auto;height:40px;" title="myVideo" /></a>
+				</div>
+				<div><span>網路直播</span></div>
+				<div>
+					<a href="https://today.line.me/tw/v3/article/Kw77Y5R" target="_blank"><img src="https://storage.googleapis.com/tghff_outland/image/photo/2023/GHAC/huge/photo_b42b20ce9030c1c96eb85b37dc057fa2.png" style="width:auto;height:23px;padding-top:2px;" title="LINE TODAY"/></a>
+				</div>
+				<div><span>共同轉播</span></div>
+			</div>
+			<div class="from">｜其他地區網路直播 Oversea <small>(不含台灣、新加坡、馬來西亞、汶萊 Excluding Taiwan, Singapore, Malasia, Brunei)</small></div>
+			<div class="who clear">
+				<div>
+					<div style="margin: 10px 0px 0px 30px; color: #000;">金馬官方TGHFF-YouTube　<a href="https://youtube.com/live/2UMKQd1VIvI?feature=share" target="_blank" style="color:#000;"><u>星光大道 Red Carpet</u></a>　<a href="https://youtube.com/live/O9ZIqI6btSQ?feature=share" target="_blank" style="color:#000;"><u>頒獎典禮 Ceremony</u></a>
+					</div>
+				</div>
+							</div>
+			<div class="from">｜手語翻譯及同步聽打服務</div>
+			<div class="who">
+				<div>
+					<a href="https://www.myvideo.net.tw/LiveChannel/" target="_blank"><img src="https://storage.googleapis.com/tghff_outland/image/photo/2022/GHAC/huge/photo_330c0918ea9c302bb9c24dbf2fb70e86.png" style="width:auto;height:25px;" title="myVideo" /></a>
+				</div>
+				<div><span class="hand">手語翻譯及同步聽打頻道</span></div>
+			</div>
+		</div>
+	</div>
+	</div>
+
+<script>
+jQuery(window).scroll(function() {
+	var _header_el	= jQuery("#header.sticky");
+		_scrollTop 	= jQuery(document).scrollTop();
+		_topBar_H 	= jQuery("#topBar").outerHeight() || 0;
+		_footer_el	= jQuery("#footer.sticky");
+
+	if(_scrollTop > _topBar_H) {
+		_header_el.addClass('fixed');
+		_footer_el.addClass('fixed');
+		_header_H = _header_el.outerHeight() || 0;
+		if(!_header_el.hasClass('transparent') && !_header_el.hasClass('translucent')) {
+			jQuery('body').css({"padding-top":_header_H+"px"});
+		}
+	} 
+	else {
+		_header_el.removeClass('fixed');
+		_footer_el.removeClass('fixed');
+		if(!_header_el.hasClass('transparent') && !_header_el.hasClass('translucent')) {
+			jQuery('body').css({"padding-top":"0px"});
+		}
+	}
+});
+</script>
+
+<script type="text/javascript">
+var time_counter = 1;
+function Flash(){
+	time_counter++;
+	if(time_counter > 14400){
+		signout("timeout");
+	}
+	timeIDs = setTimeout("Flash()", 1000);
+}
+Flash();
+
+function signout(stauts){
+	if(stauts == "timeout"){
+		set_yellow_message("您已超過四小時沒有動作，為確保安全，系統將自動登出，請重新再登入操作，謝謝！");
+		setTimeout("signout()", 4900);
+	}else{
+		$.ajax({type:"post", async: true,
+			url:"https://www.goldenhorse.org.tw/api/signout",
+			success: function(data){
+				alert("您已登出 You\"ve signed out already.");
+				location.href="https://www.goldenhorse.org.tw";
+			},
+			error:function(request,error){
+				console.log(arguments);
+			}
+		});
+	}
+}
+</script>
+</body>
+</html>

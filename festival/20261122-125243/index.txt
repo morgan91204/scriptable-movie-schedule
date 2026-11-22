@@ -1,0 +1,6 @@
+01.html 200 80955 https://www.goldenhorse.org.tw/film/programme/schedule/
+02.html 200 46550 https://www.goldenhorse.org.tw/film/programme/films/
+03.html 200 63676 https://www.goldenhorse.org.tw/film/programme/films/detail/4428?search_year=2026&search_category=FF
+04.html 200 11082 https://www.goldenhorse.org.tw/film/tickets_venues/ticketing/
+05.html 200 115499 https://www.goldenhorse.org.tw/film/programme/schedule/?search_date=2026-11-21
+06.html 200 80978 https://www.goldenhorse.org.tw/film/programme/schedule/?search_date=2026-11-06
