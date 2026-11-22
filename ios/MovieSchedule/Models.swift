@@ -234,6 +234,7 @@ struct FestivalFilm: Codable, Hashable, Identifiable {
     var poster: String? // 官網給的劇照（有的才有）
     var trailer: String?
     var intro: String?  // 官網的影片介紹（有的才有）
+    var credits: String? // 導演、主演（官網有給的才有）
 }
 /// 影展分類的一列：一部片在那一天的場次摘要
 struct FestivalDayRow: Codable, Hashable, Identifiable {

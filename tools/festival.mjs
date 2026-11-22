@@ -134,7 +134,8 @@ export function parseTffDay(json) {
     if (!id || !x.startdate || !/^\d{1,2}:\d{2}/.test(x.starttime || "")) continue;
     const opt = x.film && typeof x.film.options === "object" ? x.film.options : {};
     const poster = x.film?.filename?.url || "";
-    films[id] ||= { id, title: clean(x.title), mins: mins(x.starttime, x.offtime), rating: clean(x.level_obj?.text), url: x.film_url || TFF, ...(/^https:\/\//.test(poster) ? { poster } : {}) };
+    const crew = (Array.isArray(opt.crew) ? opt.crew : []).filter((c) => /^(導演|主演|演員)$/.test(clean(c.title))).map((c) => `${clean(c.title)}：${String(c.subtitle || "").split(/<br\s*\/?>/i).map(clean).filter(Boolean).slice(0, 8).join("、")}`).join("\n");
+    films[id] ||= { id, title: clean(x.title), mins: mins(x.starttime, x.offtime), rating: clean(x.level_obj?.text), url: x.film_url || TFF, ...(/^https:\/\//.test(poster) ? { poster } : {}), ...(crew ? { credits: crew } : {}) };
     const { venue, room } = splitVenue(x.areaTxt);
     sessions.push({ film: id, date: x.startdate, time: x.starttime.slice(0, 5).padStart(5, "0"), venue, room, ticket: /^https:\/\//.test(opt.link || "") ? opt.link : "" });
   }
@@ -189,7 +190,8 @@ export function parseKffDay(json) {
           const first = Array.isArray(b.film_row) ? b.film_row[0] : null;
           const img = first && typeof first.share_image === "string" && first.share_image.startsWith("/") ? "https://www.kff.tw" + encodeURI(first.share_image) : "";
           const lvl = b.rating_level || {};
-          films[id] ||= { id, title: clean(b.title), mins: Number(b.time_length) || 0, rating: clean(lvl.txt) + (lvl.year && lvl.year !== "0" ? lvl.year + "+" : ""), url: KFF, ...(img ? { poster: img } : {}), ...(first && /^[\w-]{11}$/.test(first.trailer_id || "") ? { trailer: `https://www.youtube.com/watch?v=${first.trailer_id}` } : {}), ...(first && first.content ? { intro: blurb(first.content) } : {}) };
+          const dirs = ((first && Array.isArray(first.team_row) ? first.team_row : []).filter((t) => clean(t.title) === "導演").map((t) => clean(t.name)).filter(Boolean)).slice(0, 4).join("、");
+          films[id] ||= { id, title: clean(b.title), mins: Number(b.time_length) || 0, rating: clean(lvl.txt) + (lvl.year && lvl.year !== "0" ? lvl.year + "+" : ""), url: KFF, ...(img ? { poster: img } : {}), ...(first && /^[\w-]{11}$/.test(first.trailer_id || "") ? { trailer: `https://www.youtube.com/watch?v=${first.trailer_id}` } : {}), ...(first && first.content ? { intro: blurb(first.content) } : {}), ...(dirs && Array.isArray(b.film_row) && b.film_row.length === 1 ? { credits: `導演：${dirs}` } : {}) };
           sessions.push({ film: id, date: p.date, time: p.start_time.slice(0, 5).padStart(5, "0"), venue: clean(c.title), room: clean(a.title), ticket: /^https:\/\//.test(b.link || "") ? b.link : "" });
         }
       }
@@ -255,7 +257,7 @@ export function parseSouthPage(html, url = SOUTH) {
 /** 南方影展各單元的片單頁：每部片一張劇照、片名、介紹頁 → [{ title, img, url }] */
 export function parseSouthStills(html) {
   return Array.from(String(html).matchAll(/<a href="(https:\/\/festival\.south\.org\.tw\/film\/[^"]+)"[^>]*>\s*<img[^>]+src="(https:\/\/[^"]+)"[\s\S]{0,600}?<a href="\1"[^>]*>([^<]+)<\/a>/g))
-    .map((m) => ({ url: m[1], img: encodeURI(decodeURI(m[2])), title: clean(m[3]) }));
+    .map((m) => ({ url: m[1], img: encodeURI(decodeURI(m[2])), title: clean(m[3]), by: clean((String(html).slice(m.index + m[0].length, m.index + m[0].length + 400).match(/class="ue_post_blocks_text">([^<｜|]*)/) || [])[1]) }));
 }
 /** 場次表上的片名（或短片單元裡的片名）對到片單頁的劇照：片單頁的片名後面常接英文，所以比「開頭相同」 */
 export function southStillFor(stills, title, unit = []) {
@@ -284,7 +286,7 @@ async function southFilmFestival() {
   }
   for (const f of Object.values(films)) {
     const hit = southStillFor(stills, f.title, units[f.id]);
-    if (hit) { f.poster = hit.img; if (!units[f.id]) f.url = hit.url; }
+    if (hit) { f.poster = hit.img; if (!units[f.id]) { f.url = hit.url; if (hit.by) f.credits = `導演：${hit.by}`; } }
   }
   const got = sessions.map((x) => x.date).sort();
   return { id: `stff-${got[0].slice(0, 4)}`, name: "南方影展", start: got[0], end: got[got.length - 1], site: url, source: "南方影展官網", films: Object.values(films), sessions };
@@ -469,12 +471,14 @@ async function womenMakeWaves() {
     const page = f.page;
     delete f.page;
     const k = known[f.id];
-    if (k && k.poster && k.trailer !== undefined && k.intro !== undefined) { f.poster = k.poster; f.trailer = k.trailer; f.intro = k.intro; continue; }
+    if (k && k.poster && k.trailer !== undefined && k.intro !== undefined && (k.credits || f.id.startsWith("p-"))) { f.poster = k.poster; f.trailer = k.trailer; f.intro = k.intro; if (k.credits) f.credits = k.credits; continue; }
     if (!page) continue;
     await new Promise((r) => setTimeout(r, 400));
     const html = await get(page).catch(() => "");
     const img = wmwStill(html) || (k && k.poster) || "";
     if (img) f.poster = img;
+    const dir = clean((html.match(/<h2>[^<]*<\/h2>\s*<span class="sep_line">([\s\S]*?)<\/span>/) || [])[1]);
+    if (dir && !f.id.startsWith("p-")) f.credits = `導演：${dir}`; // 短片合輯不標（只會是第一部的導演）
     if (html) { f.trailer = youtubeIn(html); f.intro = blurb((html.match(/<div class="film-intro-text">([\s\S]*?)<\/div>/) || [])[1]); }
   }
   return { id, name: "台灣國際女性影展", start: got[0], end: got[got.length - 1], site: WMW, source: "台灣國際女性影展官網", films: Object.values(films), sessions };
@@ -560,7 +564,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     prev = old.festivals || [];
     prevYears = Array.isArray(old.years) ? old.years.filter((y) => Number.isInteger(y)) : [];
   } catch (_) {}
-  for (const f of prev) { const m = (KNOWN_STILLS[f.id] = {}); for (const x of f.films || []) if (x.poster) m[x.id] = { poster: x.poster, trailer: x.trailer, intro: x.intro }; }
+  for (const f of prev) { const m = (KNOWN_STILLS[f.id] = {}); for (const x of f.films || []) if (x.poster) m[x.id] = { poster: x.poster, trailer: x.trailer, intro: x.intro, credits: x.credits }; }
   const got = [];
   for (const [label, job] of [["金馬影展官網", goldenHorse], ["台北電影節官網", taipeiFilmFestival], ["高雄電影節官網", kaohsiungFilmFestival], ["南方影展官網", southFilmFestival], ["紀錄片影展官網", tidf], ["酷兒影展官網", queerFilmFestival], ["桃園電影節官網", taoyuanFilmFestival], ["女性影展官網", womenMakeWaves], ["兒童影展官網", ticffJob("tp")], ["兒童影展高雄場", ticffJob("ks")], ["臺中動畫影展官網", taichungAnimation]]) {
     try {

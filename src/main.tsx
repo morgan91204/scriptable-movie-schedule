@@ -1015,9 +1015,9 @@ class App {
     return (
       <Page title={film.title} subtitle={f.name} onBack={() => this.back()}>
         <Hero title={film.title} poster={film.poster || undefined} lines={[[film.rating, film.mins ? `${film.mins} 分鐘` : ""].filter(Boolean).join("｜"), `${f.name}（${festivalStateLabel(f)}）`, "影展片名，院線上映時可能不同"]} trailerLabel={festivalTrailer(film).label} onTrailer={() => Safari.open(festivalTrailer(film).url)} />
-        {film.intro ? (
+        {film.intro || film.credits ? (
           <Section title="介紹" hint={`介紹來自${f.source}。`}>
-            <Para text={film.intro} />
+            <Para text={film.intro || film.credits || ""} dim={film.intro ? film.credits : ""} />
           </Section>
         ) : null}
         <Section title="場次" hint={festivalState(f) === "past" ? "這個影展已經結束，場次僅供回顧。" : "點一場加入行事曆。散場時間是依片長和你設定的廣告預告時間估的。"}>

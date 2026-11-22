@@ -1097,8 +1097,9 @@ function FestivalFilmPage({ festival: f, film }: { festival: Festival; film: Fes
         </VStack>
       </HStack>
     </Section>
-    {film.intro ? <Section header={<Text>介紹</Text>} footer={<Text>{`介紹來自${f.source}。`}</Text>}>
-      <Text font={"subheadline"}>{film.intro}</Text>
+    {film.intro || film.credits ? <Section header={<Text>介紹</Text>} footer={<Text>{`介紹來自${f.source}。`}</Text>}>
+      {film.intro ? <Text font={"subheadline"}>{film.intro}</Text> : null}
+      {film.credits ? <Text font={"footnote"} foregroundStyle={"secondaryLabel"}>{film.credits}</Text> : null}
     </Section> : null}
     <Section header={<Text>場次</Text>} footer={<Text>{festivalState(f) === "past" ? "這個影展已經結束，場次僅供回顧。" : "點一場加入行事曆。散場時間是依片長和你設定的廣告預告時間估的。"}</Text>}>
       {sessions.map((x) => {

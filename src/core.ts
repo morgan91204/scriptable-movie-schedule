@@ -1542,7 +1542,7 @@ export async function movieDays(slug: string, dates: string[]): Promise<TwMovieD
 // 整理成 data 分支的 festival.json；裡面有還沒演的場次，App 就多出「影展」分類，影展結束就自動消失。
 // 這一類只讀伺服器整理好的檔，手機不會自己去讀影展官網。
 export const FESTIVAL_URL = "https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/data/festival.json";
-export interface FestivalFilm { id: string; title: string; mins: number; rating: string; url: string; poster?: string; trailer?: string; intro?: string }
+export interface FestivalFilm { id: string; title: string; mins: number; rating: string; url: string; poster?: string; trailer?: string; intro?: string; credits?: string }
 /** 電影頁的「劇情簡介」：簡介本文，加上導演、演員（各一行）；都沒有就是空的 */
 export function movieAbout(d: { intro?: string; director?: string; cast?: string } | null | undefined): { text: string; credits: string } {
   return { text: (d && d.intro) || "", credits: [d && d.director ? `導演：${d.director}` : "", d && d.cast ? `演員：${d.cast}` : ""].filter(Boolean).join("\n") };

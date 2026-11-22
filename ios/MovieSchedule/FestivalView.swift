@@ -190,9 +190,12 @@ struct FestivalFilmView: View {
                     }
                     .listRowBackground(Color.clear)
                 }
-                if let intro = d.film.intro, !intro.isEmpty {
+                let intro = d.film.intro ?? ""
+                let credits = d.film.credits ?? ""
+                if !(intro.isEmpty && credits.isEmpty) {
                     Section {
-                        Text(intro).font(.subheadline)
+                        if !intro.isEmpty { Text(intro).font(.subheadline) }
+                        if !credits.isEmpty { Text(credits).font(.footnote).foregroundStyle(.secondary) }
                     } header: {
                         Text("介紹")
                     } footer: {
