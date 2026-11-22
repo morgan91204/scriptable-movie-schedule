@@ -555,6 +555,55 @@ async function taichungAnimation() {
   return { id: `tiaf-${year}`, name: "臺中國際動畫影展", start: got[0], end: got[got.length - 1], site: url, source: "臺中國際動畫影展官網", ticketing: "OPENTIX", films: Object.values(films), sessions };
 }
 
+/** 臺灣國際人權電影節：官網的場次表是圖片，改讀主辦單位在 KKTIX 活動頁貼的文字場次表（一個表格：場地、日期各一列，底下每場一列）。
+ *  fallbackVenue：表格裡沒有寫場地時用的（高雄場只有一個場地） */
+export function parseTihrffPage(html, year, fallbackVenue = "", url = "") {
+  const films = {};
+  const sessions = [];
+  const h = String(html);
+  const at = h.indexOf("場次表");
+  const table = (h.slice(at < 0 ? 0 : at).match(/<table[\s\S]*?<\/table>/) || [])[0] || "";
+  let venue = fallbackVenue, date = "";
+  for (const row of table.split(/<tr[\s>]/).slice(1)) {
+    const cells = Array.from(row.matchAll(/<td[^>]*>([\s\S]*?)<\/td>/g)).map((m) => clean(m[1]));
+    if (cells.length === 1) {
+      const md = cells[0].match(/^(\d{1,2})月(\d{1,2})日/);
+      if (md) date = `${year}-${md[1].padStart(2, "0")}-${md[2].padStart(2, "0")}`;
+      else if (cells[0] && cells[0].length <= 20) venue = cells[0];
+      continue;
+    }
+    const time = (cells[0] || "").match(/^(\d{1,2}:\d{2})$/);
+    const text = (cells[1] || "").split("▲")[0].trim(); // ▲ 後面是備註
+    if (!time || !date || !text) continue;
+    const names = Array.from(text.matchAll(/《([^》]+)》/g)).map((m) => m[1]);
+    const film = names.length === 1 && !/講座/.test(text); // 一格只有一部片：同一部片的各場歸在一起；講座、典禮照原文
+    const title = film ? names[0] : text;
+    const mins = (String(cells[2] || "").match(/\d+/g) || []).reduce((n, x) => n + Number(x), 0);
+    films[title] ||= { id: title, title, mins: film ? Number((String(cells[2] || "").match(/(\d+)\D*$/) || [])[1]) || mins : mins, rating: "", url };
+    sessions.push({ film: title, date, time: time[1].padStart(5, "0"), ...splitVenue(venue.replace(/電影院$/, "電影館")), ticket: url });
+  }
+  return { films, sessions };
+}
+/** 讀人權電影節今年的 KKTIX 活動頁（台北場、高雄場各一頁，各算一個影展） */
+async function humanRights() {
+  const year = todayTPE().slice(0, 4);
+  const org = `https://${year}tihrff.kktix.cc/`;
+  const links = Array.from(new Set(Array.from((await get(org)).matchAll(/href="(https:\/\/[^"]*kktix\.cc\/events\/[^"]+)"/g)).map((m) => m[1]))).slice(0, 6);
+  const out = [];
+  for (const url of links) {
+    await new Promise((r) => setTimeout(r, 800));
+    const html = await get(url).catch(() => "");
+    const name = clean((html.match(/<title>([\s\S]*?)<\/title>/) || [])[1]);
+    const city = /高雄/.test(name) ? "高雄" : /[臺台]北/.test(name) ? "台北" : "";
+    if (!city) continue;
+    const { films, sessions } = parseTihrffPage(html, year, city === "高雄" ? "高雄市電影館" : "", url);
+    if (!sessions.length) continue;
+    const got = sessions.map((x) => x.date).sort();
+    out.push({ id: `tihrff${city === "高雄" ? "ks" : "tp"}-${year}`, name: `人權電影節（${city}）`, start: got[0], end: got[got.length - 1], site: url, source: "臺灣國際人權電影節的 KKTIX 活動頁", ticketing: "KKTIX", films: Object.values(films), sessions });
+  }
+  return out;
+}
+
 if (import.meta.url === `file://${process.argv[1]}`) {
   const [outPath = "festival.json", prevPath = ""] = process.argv.slice(2);
   let prev = [];
@@ -566,11 +615,11 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   } catch (_) {}
   for (const f of prev) { const m = (KNOWN_STILLS[f.id] = {}); for (const x of f.films || []) if (x.poster) m[x.id] = { poster: x.poster, trailer: x.trailer, intro: x.intro, credits: x.credits }; }
   const got = [];
-  for (const [label, job] of [["金馬影展官網", goldenHorse], ["台北電影節官網", taipeiFilmFestival], ["高雄電影節官網", kaohsiungFilmFestival], ["南方影展官網", southFilmFestival], ["紀錄片影展官網", tidf], ["酷兒影展官網", queerFilmFestival], ["桃園電影節官網", taoyuanFilmFestival], ["女性影展官網", womenMakeWaves], ["兒童影展官網", ticffJob("tp")], ["兒童影展高雄場", ticffJob("ks")], ["臺中動畫影展官網", taichungAnimation]]) {
+  for (const [label, job] of [["金馬影展官網", goldenHorse], ["台北電影節官網", taipeiFilmFestival], ["高雄電影節官網", kaohsiungFilmFestival], ["南方影展官網", southFilmFestival], ["紀錄片影展官網", tidf], ["酷兒影展官網", queerFilmFestival], ["桃園電影節官網", taoyuanFilmFestival], ["女性影展官網", womenMakeWaves], ["兒童影展官網", ticffJob("tp")], ["兒童影展高雄場", ticffJob("ks")], ["臺中動畫影展官網", taichungAnimation], ["人權電影節 KKTIX", humanRights]]) {
     try {
-      const f = await job();
-      if (f) { got.push(f); console.log(`${label}：${f.name} ${f.start}～${f.end}，${f.films.length} 部、${f.sessions.length} 場`); }
-      else console.log(`${label}：官網目前沒有場次表`);
+      const list = [].concat(await job()).filter(Boolean); // 一個來源可能是好幾個影展（分台北、高雄場）
+      for (const f of list) { got.push(f); console.log(`${label}：${f.name} ${f.start}～${f.end}，${f.films.length} 部、${f.sessions.length} 場`); }
+      if (!list.length) console.log(`${label}：官網目前沒有場次表`);
     } catch (e) {
       console.log(`${label}：讀取失敗（${String(e.message || e)}），這次略過`);
     }
