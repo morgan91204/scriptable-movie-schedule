@@ -77,6 +77,24 @@ const todayTPE = () => new Date(Date.now() + 8 * 3600e3).toISOString().slice(0, 
 const KNOWN_STILLS = {};
 /** 金馬影片介紹頁上的劇照（小張的） */
 export const goldenHorseStill = (html) => (String(html).match(/https:\/\/storage\.googleapis\.com\/tghff_outland\/image\/photo\/[^"'\s)]+\.(?:jpe?g|png|webp)/i) || [])[0] || "";
+/** 從每部片自己的介紹頁補上簡介（和官網嵌的預告）。pageOf(f) 回傳那部片的介紹頁網址（沒有就不查）。
+ *  查過的記在上一次的存檔裡（沒有簡介的存成空字串），不會每次重讀；一次最多讀 max 頁，慢慢讀 */
+async function fillFromPages(festId, films, pageOf, max = 260) {
+  const known = KNOWN_STILLS[festId] || {};
+  let asked = 0;
+  for (const f of films) {
+    const k = known[f.id];
+    if (k && k.intro !== undefined) { if (f.intro === undefined) f.intro = k.intro; if (!f.trailer && k.trailer) f.trailer = k.trailer; continue; }
+    const page = pageOf(f);
+    if (!page || f.intro || asked >= max) continue;
+    asked++;
+    await new Promise((r) => setTimeout(r, 400));
+    const html = await get(page).catch(() => "");
+    if (!html) continue; // 讀不到：下次再試
+    f.intro = firstParagraph(html);
+    if (!f.trailer) { const t = youtubeIn(html); if (t) f.trailer = t; }
+  }
+}
 async function goldenHorse() {
   const first = await get(GH);
   const dates = goldenHorseDates(first);
@@ -170,6 +188,7 @@ async function taipeiFilmFestival() {
   }
   if (!sessions.length) return null;
   const dates = sessions.map((x) => x.date).sort();
+  await fillFromPages(`tff-${dates[0].slice(0, 4)}`, Object.values(films), (f) => (/\/movies\/[0-9A-Za-z]+$/.test(f.url) ? f.url : ""));
   return { id: `tff-${dates[0].slice(0, 4)}`, name: "台北電影節", start: dates[0], end: dates[dates.length - 1], site: TFF, source: "台北電影節官網", ticketing: "OPENTIX", films: Object.values(films), sessions };
 }
 
@@ -289,6 +308,7 @@ async function southFilmFestival() {
     if (hit) { f.poster = hit.img; if (!units[f.id]) { f.url = hit.url; if (hit.by) f.credits = `導演：${hit.by}`; } }
   }
   const got = sessions.map((x) => x.date).sort();
+  await fillFromPages(`stff-${got[0].slice(0, 4)}`, Object.values(films), (f) => (/\/film\//.test(f.url) ? f.url : "")); // 對得到片單頁的長片才有自己的介紹頁
   return { id: `stff-${got[0].slice(0, 4)}`, name: "南方影展", start: got[0], end: got[got.length - 1], site: url, source: "南方影展官網", films: Object.values(films), sessions };
 }
 
@@ -425,6 +445,7 @@ async function taoyuanFilmFestival() {
   }
   if (!sessions.length) return null;
   const got = sessions.map((x) => x.date).sort();
+  await fillFromPages(`tyff-${got[0].slice(0, 4)}`, Object.values(films), (f) => (/\/film\//.test(f.url) ? f.url : ""));
   return { id: `tyff-${got[0].slice(0, 4)}`, name: "桃園電影節", start: got[0], end: got[got.length - 1], site: TYFF, source: "桃園電影節官網", films: Object.values(films), sessions };
 }
 
@@ -503,7 +524,8 @@ export function parseTicffPage(html, year, url = TICFF) {
     const age = clean((clean(head).match(/Age\s*([^\s｜|]+)/) || [])[1]);
     const first = (box.match(/<a href="([^"#]+)"[^>]*title="[^"]*在本視窗開啟/) || [])[1] || "";
     const m = place.match(/^(.+?)\s*(\d+)\s*廳/);
-    films[title] ||= { id: title, title, mins, rating: /^\d/.test(age) ? `${age} 歲` : /[\u4e00-\u9fff]/.test(age) ? age : "", url: first ? new URL(first, TICFF).href : url };
+    const count = (box.match(/<li[\s>]/g) || []).length; // 這一場放幾部片（短片合輯不只一部）
+    films[title] ||= { id: title, title, mins, ...(first && count <= 1 ? { page: new URL(first, TICFF).href } : {}), rating: /^\d/.test(age) ? `${age} 歲` : /[\u4e00-\u9fff]/.test(age) ? age : "", url: first ? new URL(first, TICFF).href : url };
     sessions.push({ film: title, date: `${year}-${md[1].padStart(2, "0")}-${md[2].padStart(2, "0")}`, time: time[1].padStart(5, "0"), venue: m ? m[1] : place, room: m ? m[2] : "", ticket: "" });
   }
   return { films, sessions };
@@ -516,6 +538,9 @@ const ticffJob = (kind) => async () => {
   const { films, sessions } = parseTicffPage(await get(url), year, url);
   if (!sessions.length) return null;
   const got = sessions.map((x) => x.date).sort();
+  const pages = {};
+  for (const f of Object.values(films)) { pages[f.id] = f.page || ""; delete f.page; }
+  await fillFromPages(`${kind === "ks" ? "ticffks" : "ticff"}-${year}`, Object.values(films), (f) => pages[f.id]);
   return { id: `${kind === "ks" ? "ticffks" : "ticff"}-${year}`, name: kind === "ks" ? "兒童影展（高雄）" : "兒童影展（台北）", start: got[0], end: got[got.length - 1], site: url, source: "台灣國際兒童影展官網", films: Object.values(films), sessions };
 };
 
@@ -532,13 +557,14 @@ export function parseTiafPage(html, year, url) {
       const room = clean(th[3]).replace(/^(\d+)\s*廳$/, "$1"); // 「2廳」只留數字（畫面會補「廳」），其他廳名原樣
       for (const td of row.split(/<div class="td showTime/).slice(1)) {
         const title = clean((td.match(/<b>([\s\S]*?)<\/b>/) || [])[1]);
+        const fid = (td.match(/data-films="(\d+)"/) || [])[1] || "";
         const time = (td.match(/<div class="time">\s*(\d{1,2}:\d{2})/) || [])[1];
         if (!title || !time) continue;
         const date = `${year}-${th[1].padStart(2, "0")}-${th[2].padStart(2, "0")}`;
         const key = [venue, room, date, time, title].join("|");
         if (seen.has(key)) continue; // 同一份表有兩種排法，各列一次
         seen.add(key);
-        films[title] ||= { id: title, title, mins: Number((td.match(/class="runtime">\s*(\d+)/) || [])[1]) || 0, rating: "", url };
+        films[title] ||= { id: title, title, mins: Number((td.match(/class="runtime">\s*(\d+)/) || [])[1]) || 0, rating: "", url: fid && /schedule_list/.test(url || "") ? url.replace(/schedule_list\.php.*$/, `film.php?id=${fid}`) : url };
         sessions.push({ film: title, date, time: time.padStart(5, "0"), venue, room, ticket: "" });
       }
     }
@@ -552,6 +578,7 @@ async function taichungAnimation() {
   const { films, sessions } = parseTiafPage(await get(url), year, url);
   if (!sessions.length) return null;
   const got = sessions.map((x) => x.date).sort();
+  await fillFromPages(`tiaf-${year}`, Object.values(films), (f) => (/film\.php\?id=/.test(f.url) ? f.url : ""));
   return { id: `tiaf-${year}`, name: "臺中國際動畫影展", start: got[0], end: got[got.length - 1], site: url, source: "臺中國際動畫影展官網", ticketing: "OPENTIX", films: Object.values(films), sessions };
 }
 
@@ -613,7 +640,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     prev = old.festivals || [];
     prevYears = Array.isArray(old.years) ? old.years.filter((y) => Number.isInteger(y)) : [];
   } catch (_) {}
-  for (const f of prev) { const m = (KNOWN_STILLS[f.id] = {}); for (const x of f.films || []) if (x.poster) m[x.id] = { poster: x.poster, trailer: x.trailer, intro: x.intro, credits: x.credits }; }
+  for (const f of prev) { const m = (KNOWN_STILLS[f.id] = {}); for (const x of f.films || []) m[x.id] = { poster: x.poster, trailer: x.trailer, intro: x.intro, credits: x.credits }; }
   const got = [];
   for (const [label, job] of [["金馬影展官網", goldenHorse], ["台北電影節官網", taipeiFilmFestival], ["高雄電影節官網", kaohsiungFilmFestival], ["南方影展官網", southFilmFestival], ["紀錄片影展官網", tidf], ["酷兒影展官網", queerFilmFestival], ["桃園電影節官網", taoyuanFilmFestival], ["女性影展官網", womenMakeWaves], ["兒童影展官網", ticffJob("tp")], ["兒童影展高雄場", ticffJob("ks")], ["臺中動畫影展官網", taichungAnimation], ["人權電影節 KKTIX", humanRights]]) {
     try {
