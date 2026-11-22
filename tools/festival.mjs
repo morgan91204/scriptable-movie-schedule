@@ -522,7 +522,7 @@ export function parseTicffPage(html, year, url = TICFF) {
     const head = box.split(/<ul[\s>]/)[0];
     const mins = Number((head.match(/(\d+)\s*min/i) || [])[1]) || 0;
     const age = clean((clean(head).match(/Age\s*([^\s｜|]+)/) || [])[1]);
-    const first = (box.match(/<a href="([^"#]+)"[^>]*title="[^"]*在本視窗開啟/) || [])[1] || "";
+    const first = (box.match(/<a href="([^"#]+)"[^>]*title="[^"]*在本視窗開啟/) || box.match(/<h6>\s*<a href="([^"#]+)"/) || [])[1] || ""; // 高雄場的連結掛在節目名稱上
     const m = place.match(/^(.+?)\s*(\d+)\s*廳/);
     const count = (box.match(/<li[\s>]/g) || []).length; // 這一場放幾部片（短片合輯不只一部）
     films[title] ||= { id: title, title, mins, ...(first && count <= 1 ? { page: new URL(first, TICFF).href } : {}), rating: /^\d/.test(age) ? `${age} 歲` : /[\u4e00-\u9fff]/.test(age) ? age : "", url: first ? new URL(first, TICFF).href : url };
