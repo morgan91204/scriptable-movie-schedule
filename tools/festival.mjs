@@ -234,6 +234,53 @@ async function southFilmFestival() {
   return { id: `stff-${got[0].slice(0, 4)}`, name: "南方影展", start: got[0], end: got[got.length - 1], site: url, source: "南方影展官網", films: Object.values(films), sessions };
 }
 
+const TIDF = "https://www.tidf.org.tw/zh-hant/shows/schedule";
+
+/** 台灣國際紀錄片影展的總場次表（整頁一次給完，含時間軸與清單兩種排法，這裡讀時間軸那一份：有起訖時間）→ 影片與場次 */
+export function parseTidfPage(html) {
+  const films = {};
+  const sessions = [];
+  const h = String(html);
+  const days = Array.from(new Set(Array.from(h.matchAll(/<option value="(\d{4}-\d{2}-\d{2})"/g)).map((m) => m[1]))); // 有場次的日期（帶年份）
+  const t24 = (x) => { const m = String(x).match(/(\d{1,2}):(\d{2})\s*([ap])m/i); if (!m) return -1; return ((Number(m[1]) % 12) + (m[3].toLowerCase() === "p" ? 12 : 0)) * 60 + Number(m[2]); };
+  for (const block of h.split(/<div class="schedule-container schedule-type-timeline">/).slice(1)) {
+    const body = block.split(/<div class="schedule-container schedule-type-table">/)[0];
+    const md = body.match(/<h2 class="schedule-day-title">\s*(\d{1,2})<span[^>]*>\/<\/span>(\d{1,2})/);
+    if (!md) continue;
+    const date = days.find((d) => d.slice(5) === `${md[1].padStart(2, "0")}-${md[2].padStart(2, "0")}`);
+    if (!date) continue;
+    for (const loc of body.split(/<div class="tl_location">/).slice(1)) {
+      const venue = clean((loc.match(/<h3>([\s\S]*?)<\/h3>/) || [])[1]);
+      const range = {}; // 節目編號 → 片長（分）
+      for (const m of loc.matchAll(/class="tl_event tl_event_film"[^>]*data-event="(\d+)"[\s\S]*?<div class="tl-schedule-time">([^<]+)<\/div>/g)) {
+        const [a, b] = m[2].split(/\s+-\s+/).map(t24);
+        if (a >= 0 && b >= 0) range[m[1]] = (b - a + 1440) % 1440;
+      }
+      for (const part of loc.split(/<div class="tl_event_details /).slice(1)) {
+        const start = (part.match(/data-start="(\d{1,2}:\d{2})"/) || [])[1];
+        const ev = (part.match(/data-event="(\d+)"/) || [])[1] || "";
+        const title = clean((part.match(/<h4 class="tl-film-name-ch">([\s\S]*?)<\/h4>/) || [])[1]);
+        const more = (part.match(/class="tl-link-more" href="(\/[^"]+)"/) || [])[1] || "";
+        const id = (more.match(/node\/(\d+)/) || [])[1] || title;
+        if (!start || !title) continue;
+        const yt = (part.match(/img\.youtube\.com\/vi\/([\w-]{6,})\//) || [])[1];
+        const ticket = (part.match(/class="tl-ticket-link[^"]*" href="(https:\/\/[^"]+)"/) || [])[1] || "";
+        films[id] ||= { id, title, mins: range[ev] || 0, rating: clean((part.match(/class="tl-film-level[^"]*"[^>]*>([^<]*)</) || [])[1]), url: more ? "https://www.tidf.org.tw" + more.replace(/&amp;/g, "&").replace(/[?&]schedule_id=\d+/, "") : TIDF, ...(yt ? { poster: `https://img.youtube.com/vi/${yt}/mqdefault.jpg` } : {}) };
+        sessions.push({ film: id, date, time: start.padStart(5, "0"), venue, room: "", ticket: ticket.replace(/&amp;/g, "&") });
+      }
+    }
+  }
+  return { films, sessions };
+}
+/** 讀台灣國際紀錄片影展官網目前的總場次表。影展本身兩年一次在 5 月；下半年官網放的是巡迴展，分開算一個 */
+async function tidf() {
+  const { films, sessions } = parseTidfPage(await get(TIDF));
+  if (!sessions.length) return null;
+  const got = sessions.map((x) => x.date).sort();
+  const tour = Number(got[0].slice(5, 7)) >= 7;
+  return { id: `${tour ? "tidftour" : "tidf"}-${got[0].slice(0, 4)}`, name: tour ? "TIDF 巡迴展" : "台灣國際紀錄片影展", start: got[0], end: got[got.length - 1], site: TIDF, source: "台灣國際紀錄片影展官網", films: Object.values(films), sessions };
+}
+
 if (import.meta.url === `file://${process.argv[1]}`) {
   const [outPath = "festival.json", prevPath = ""] = process.argv.slice(2);
   let prev = [];
@@ -244,7 +291,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     prevYears = Array.isArray(old.years) ? old.years.filter((y) => Number.isInteger(y)) : [];
   } catch (_) {}
   const got = [];
-  for (const [label, job] of [["金馬影展官網", goldenHorse], ["台北電影節官網", taipeiFilmFestival], ["高雄電影節官網", kaohsiungFilmFestival], ["南方影展官網", southFilmFestival]]) {
+  for (const [label, job] of [["金馬影展官網", goldenHorse], ["台北電影節官網", taipeiFilmFestival], ["高雄電影節官網", kaohsiungFilmFestival], ["南方影展官網", southFilmFestival], ["紀錄片影展官網", tidf]]) {
     try {
       const f = await job();
       if (f) { got.push(f); console.log(`${label}：${f.name} ${f.start}～${f.end}，${f.films.length} 部、${f.sessions.length} 場`); }
