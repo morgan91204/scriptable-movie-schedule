@@ -927,10 +927,12 @@ function BoxOfficeSections({ movies, query }: { movies: TwMovie[]; query: string
   </Section> : null}
   {sort === "year" && yearOptions.length > 1 ? multiPick({
     title: "年份", open: yearOpen, onOpen: () => setYearOpen(!yearOpen),
-    summary: years.join("、"),
-    options: yearOptions.map((y) => ({ id: y, label: `${y} 年` })), selected: years,
-    onToggle: (y) => setPickedYears(years.indexOf(y) < 0 ? [...years, y] : years.length > 1 ? years.filter((z) => z !== y) : years),
-    footer: "可以複選，選了幾年就合在一起排。",
+    summary: years.length === yearOptions.length ? `全部（${yearOptions[yearOptions.length - 1]}–${yearOptions[0]}）` : years.join("、"),
+    // 第一個選項是「全選」：再點一次回到只看最新的一年
+    options: [{ id: "all", label: "全選" }, ...yearOptions.map((y) => ({ id: y, label: `${y} 年` }))],
+    selected: years.length === yearOptions.length ? ["all", ...years] : years,
+    onToggle: (y) => setPickedYears(y === "all" ? (years.length === yearOptions.length ? [] : yearOptions.slice()) : years.indexOf(y) < 0 ? [...years, y] : years.length > 1 ? years.filter((z) => z !== y) : years),
+    footer: "可以複選，選了幾年就合在一起排。點「全選」一次選完，再點一次回到最新的一年。",
   }) : null}
   <Section header={<Text>{boxOfficeTitle(b, sort, years)}</Text>} footer={<Text>{`${shown.length ? "" : "排行上找不到相符的電影。\n"}${boxOfficeFooter(b, sort, years)}${failNote}`}</Text>}>
     {shown.map((x, i) => {

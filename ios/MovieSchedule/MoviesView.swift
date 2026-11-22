@@ -126,6 +126,12 @@ struct BoxOfficeSection: View {
                 Section {
                     // 年份可以複選：選單點了不會關，可以連續勾
                     Menu {
+                        // 全選：再點一次回到只看最新的一年
+                        Button {
+                            years = picked.count == options.count ? [] : Set(options)
+                        } label: {
+                            if picked.count == options.count { Label("全選", systemImage: "checkmark") } else { Text("全選") }
+                        }
                         ForEach(options, id: \.self) { y in
                             Button {
                                 var next = Set(picked)
@@ -139,13 +145,13 @@ struct BoxOfficeSection: View {
                         HStack {
                             Text("年份").foregroundStyle(Color.primary)
                             Spacer()
-                            Text(picked.joined(separator: "、")).foregroundStyle(.secondary).lineLimit(1)
+                            Text(picked.count == options.count ? "全部（\(options.last ?? "")–\(options.first ?? "")）" : picked.joined(separator: "、")).foregroundStyle(.secondary).lineLimit(1)
                             Image(systemName: "chevron.up.chevron.down").font(.caption).foregroundStyle(.tertiary)
                         }
                     }
                     .menuActionDismissBehavior(.disabled)
                 } footer: {
-                    Text("可以複選，選了幾年就合在一起排。")
+                    Text("可以複選，選了幾年就合在一起排。點「全選」一次選完，再點一次回到最新的一年。")
                 }
             }
             switch board {

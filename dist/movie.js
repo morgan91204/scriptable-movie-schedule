@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.22-1335
+// @movie-schedule-app 電影行程 v2026.11.22-1337
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/parsers.gen.ts
@@ -2721,7 +2721,7 @@ var App = class {
     ];
     // ── 事件迴圈 ──
     // 背景查 GitHub 上的最新版本（首頁顯示是否為最新版）
-    this.latest = checkLatest("2026.11.22-1335");
+    this.latest = checkLatest("2026.11.22-1337");
     // ── 搜尋 ──
     this.query = "";
     this.tmdbStatus = "";
@@ -2869,11 +2869,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.22-1335"}`);
+          Pasteboard.copy(`版本 ${"2026.11.22-1337"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.22-1335"}`,
+      `版本 ${"2026.11.22-1337"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -3256,7 +3256,9 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
     };
     return /* @__PURE__ */ h(Page, { title: "依電影找場次", subtitle: boxOfficeTitle(b, by, years), onBack: () => this.back() }, this.movieModeChips(), sorts.length > 1 ? /* @__PURE__ */ h(Chips, null, sorts.map((x) => /* @__PURE__ */ h(Chip, { label: x.label, sub: x.id === "year" ? "含已下檔" : "上映中", muted: by !== x.id, onTap: () => {
       this.boxSort = x.id;
-    } }))) : null, by === "year" && yearOptions.length > 1 ? /* @__PURE__ */ h(Section, { title: "年份", hint: "可以複選，選了幾年就合在一起排。" }, /* @__PURE__ */ h(Chips, null, yearOptions.map((y) => /* @__PURE__ */ h(Chip, { label: y, muted: years.indexOf(y) < 0, onTap: () => {
+    } }))) : null, by === "year" && yearOptions.length > 1 ? /* @__PURE__ */ h(Section, { title: "年份", hint: "可以複選，選了幾年就合在一起排。" }, /* @__PURE__ */ h(Chips, null, /* @__PURE__ */ h(Chip, { label: "全選", muted: years.length !== yearOptions.length, onTap: () => {
+      this.boxYears = years.length === yearOptions.length ? [] : yearOptions.slice();
+    } }), yearOptions.map((y) => /* @__PURE__ */ h(Chip, { label: y, muted: years.indexOf(y) < 0, onTap: () => {
       this.boxYears = years.indexOf(y) < 0 ? [...years, y] : years.length > 1 ? years.filter((z) => z !== y) : years;
     } })))) : null, /* @__PURE__ */ h("input", { class: "field", name: "q", value: this.movieQuery, placeholder: "搜尋片名" }), /* @__PURE__ */ h(Button, { label: "搜尋", kind: "secondary", enter: true, onTap: (v) => {
       this.movieQuery = v.q || "";

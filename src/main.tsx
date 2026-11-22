@@ -833,6 +833,8 @@ class App {
         {by === "year" && yearOptions.length > 1 ? (
           <Section title="年份" hint="可以複選，選了幾年就合在一起排。">
             <Chips>
+              {/* 全選：再點一次回到只看最新的一年 */}
+              <Chip label="全選" muted={years.length !== yearOptions.length} onTap={() => { this.boxYears = years.length === yearOptions.length ? [] : yearOptions.slice(); }} />
               {yearOptions.map((y) => (
                 <Chip label={y} muted={years.indexOf(y) < 0} onTap={() => { this.boxYears = years.indexOf(y) < 0 ? [...years, y] : years.length > 1 ? years.filter((z) => z !== y) : years; }} />
               ))}
