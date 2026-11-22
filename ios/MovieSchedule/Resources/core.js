@@ -10,6 +10,7 @@
   var core_exports = {};
   __export(core_exports, {
     ABOUT_URL: () => ABOUT_URL,
+    ADS_NOTE: () => ADS_NOTE,
     AD_STEPS: () => AD_STEPS,
     AT_DATA_URL: () => AT_DATA_URL,
     AT_SUPPLEMENT: () => AT_SUPPLEMENT,
@@ -742,6 +743,7 @@ function parseTwMovieDay(doc) {
     "連江縣"
   ];
   var AD_STEPS = [0, 10, 15, 20];
+  var ADS_NOTE = "依《電影法施行細則》，戲院每場正片前的廣告與預告合計原則上是 9 分鐘（預告片可以再多放），所以預設預留 10 分鐘。各戲院實際長度不同，可以自己調整。";
   var WEEK = ["日", "一", "二", "三", "四", "五", "六"];
   var todayTPE = () => new Date(Date.now() + 8 * 36e5).toISOString().slice(0, 10);
   var nowHM = () => new Date(Date.now() + 8 * 36e5).toISOString().slice(11, 16);

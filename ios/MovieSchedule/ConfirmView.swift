@@ -9,7 +9,7 @@ struct ConfirmView: View {
     @ObservedObject private var settings = SettingsStore.shared
     @State private var address: String
     @State private var appInfo: CinemaAppInfo?
-    @AppStorage("ads") private var ads = 15
+    @AppStorage("ads") private var ads = 10
     @AppStorage("alarm") private var alarm = 60
     @State private var runtimeText: String
     @State private var seat = ""
