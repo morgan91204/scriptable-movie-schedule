@@ -3,6 +3,18 @@
 import type { Platform } from "../src/platform";
 
 const g = globalThis as any;
+
+// 「加到主畫面」：Android／電腦的 Chrome、Edge 會給一個可以直接跳出安裝視窗的事件，先收起來，等使用者按按鈕再用。
+// iPhone 的 Safari 沒有這個事件，只能教使用者從分享選單加（見 main.tsx 的 installView）
+g.__installPrompt = null;
+window.addEventListener("beforeinstallprompt", (e) => {
+  e.preventDefault();
+  g.__installPrompt = e;
+});
+window.addEventListener("appinstalled", () => {
+  g.__installPrompt = null;
+  g.__installed = true;
+});
 const LS = "movie-schedule:";
 
 function store(key: string): string | null {

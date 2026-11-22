@@ -1,9 +1,10 @@
 {
   "name": "電影行程",
   "short_name": "電影行程",
-  "description": "全台 105 間影城場次，一鍵加入行事曆",
+  "description": "全台 100 多間影城場次，一鍵加入行事曆",
   "lang": "zh-Hant",
-  "start_url": "./",
+  "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#000000",
   "theme_color": "#000000",

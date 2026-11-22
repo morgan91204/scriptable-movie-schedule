@@ -79,6 +79,16 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .btn.danger{background:var(--card);color:var(--red)}
 .btn:active{opacity:.7}
 .note{margin:10px 12px 0;font-size:13px;color:var(--fg2);white-space:pre-line}
+.steps{background:var(--card);border-radius:14px;margin:8px 0;overflow:hidden}
+.step{display:flex;align-items:center;gap:12px;padding:14px 14px;border-bottom:1px solid var(--line)}
+.step:last-child{border-bottom:0}
+.step-n{flex:none;width:24px;height:24px;border-radius:12px;background:var(--accent);color:#fff;font-size:14px;font-weight:700;display:flex;align-items:center;justify-content:center}
+.step-ico{flex:none;width:44px;height:44px;border-radius:11px;background:var(--chip);display:flex;align-items:center;justify-content:center;color:var(--accent)}
+.step-ico svg{width:26px;height:26px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.step-ico svg circle{fill:currentColor;stroke:none}
+.step-body{flex:1;min-width:0}
+.step-t{font-size:16px;font-weight:600}
+.step-s{font-size:13px;color:var(--fg2);margin-top:2px}
 .note.version{padding:6px 0;-webkit-user-select:none;user-select:none}
 .note.version:active{opacity:.5}
 .note.warn{color:var(--orange)}

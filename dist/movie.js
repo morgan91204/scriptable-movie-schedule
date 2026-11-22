@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.22-1421
+// @movie-schedule-app 電影行程 v2026.11.22-1431
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/parsers.gen.ts
@@ -2298,6 +2298,17 @@ var TAB_ICONS = {
   building: '<svg viewBox="0 0 24 24"><path d="M3 21h18"/><path d="M5 21V7l5-3v17"/><path d="M10 21V11l9-3v13"/><path d="M14 13h2M14 17h2"/></svg>',
   gear: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>'
 };
+var GUIDE_ICONS = {
+  share: '<svg viewBox="0 0 24 24"><path d="M12 15V3"/><path d="M8 7l4-4 4 4"/><path d="M6 11H5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-1"/></svg>',
+  plus: '<svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="4"/><path d="M12 8v8M8 12h8"/></svg>',
+  dots: '<svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>',
+  vdots: '<svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="19" r="1.6"/></svg>',
+  check: '<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
+  home: '<svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></svg>'
+};
+function Steps(props) {
+  return /* @__PURE__ */ h("div", { class: "steps" }, props.items.map((it, i) => /* @__PURE__ */ h("div", { class: "step" }, /* @__PURE__ */ h("span", { class: "step-n" }, i + 1), /* @__PURE__ */ h("span", { class: "step-ico" }, GUIDE_ICONS[it.icon] || ""), /* @__PURE__ */ h("div", { class: "step-body" }, /* @__PURE__ */ h("div", { class: "step-t" }, esc(it.title)), it.text ? /* @__PURE__ */ h("div", { class: "step-s" }, esc(it.text)) : null))));
+}
 function TabBarView() {
   const t = tabBarProvider ? tabBarProvider() : null;
   if (!t) return "";
@@ -2424,6 +2435,16 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .btn.danger{background:var(--card);color:var(--red)}
 .btn:active{opacity:.7}
 .note{margin:10px 12px 0;font-size:13px;color:var(--fg2);white-space:pre-line}
+.steps{background:var(--card);border-radius:14px;margin:8px 0;overflow:hidden}
+.step{display:flex;align-items:center;gap:12px;padding:14px 14px;border-bottom:1px solid var(--line)}
+.step:last-child{border-bottom:0}
+.step-n{flex:none;width:24px;height:24px;border-radius:12px;background:var(--accent);color:#fff;font-size:14px;font-weight:700;display:flex;align-items:center;justify-content:center}
+.step-ico{flex:none;width:44px;height:44px;border-radius:11px;background:var(--chip);display:flex;align-items:center;justify-content:center;color:var(--accent)}
+.step-ico svg{width:26px;height:26px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.step-ico svg circle{fill:currentColor;stroke:none}
+.step-body{flex:1;min-width:0}
+.step-t{font-size:16px;font-weight:600}
+.step-s{font-size:13px;color:var(--fg2);margin-top:2px}
 .note.version{padding:6px 0;-webkit-user-select:none;user-select:none}
 .note.version:active{opacity:.5}
 .note.warn{color:var(--orange)}
@@ -2823,14 +2844,14 @@ var App = class {
   }
   /** 最新版本是多少。網頁版問的是自己網站現在上線的版本（重新整理就會拿到的那一版），不是 GitHub 上的 */
   checkVersion() {
-    if (true) return checkLatest("2026.11.22-1421");
+    if (true) return checkLatest("2026.11.22-1431");
     return (async () => {
       try {
         const r = await globalThis.fetch("/api/version?t=" + Date.now(), { cache: "no-store" });
         const latest = String((await r.json()).version || "");
         if (!latest) return null;
         const num = (v) => Number(v.replace(/\D/g, "")) || 0;
-        return { latest, isLatest: num("2026.11.22-1421") >= num(latest) };
+        return { latest, isLatest: num("2026.11.22-1431") >= num(latest) };
       } catch (_) {
         return null;
       }
@@ -2913,7 +2934,7 @@ var App = class {
     if (!this.cinemas.length) this.cinemas = await loadCinemas();
     this.calendarName = (await currentCalendar(this.settings)).title;
     const favs = this.settings.favorites.map((id) => this.cinemas.find((c) => c.id === id)).filter(Boolean);
-    return /* @__PURE__ */ h(Page, { title: "🎬 電影行程", subtitle: `${this.cinemas.length} 間影城｜選影城 → 日期 → 電影 → 場次` }, /* @__PURE__ */ h(Section, null, /* @__PURE__ */ h(Item, { icon: "🕘", title: "現在有什麼可以看", subtitle: "依時段找常去、附近或各縣市的場次", onTap: () => this.go(() => this.nowView()) }), /* @__PURE__ */ h(Item, { icon: "🎞️", title: "依電影找場次", subtitle: "先選電影，再看哪些影城有放映", onTap: () => this.go(() => this.movieListView(), "讀取電影清單…") }), /* @__PURE__ */ h(Item, { icon: "🧭", title: "附近的影城", subtitle: "依目前位置排序", onTap: () => this.go(() => this.nearbyView(), "取得目前位置…") }), /* @__PURE__ */ h(Item, { icon: "🎦", title: "依縣市找影院", subtitle: `全台 ${this.cinemas.length} 間，也可以搜尋影城`, onTap: () => this.go(() => this.citiesView()) })), favs.length ? /* @__PURE__ */ h(Section, { title: "常去影城", hint: "影城搜尋在「影城」分頁，行事曆與提醒在「設定」分頁。" }, favs.map((c) => /* @__PURE__ */ h(Item, { icon: "★", title: c.name, subtitle: `${c.city} ${c.district}`, onTap: () => this.go(() => this.cinemaView(c), `讀取 ${c.name} 的場次…`) }))) : null, await this.versionNote());
+    return /* @__PURE__ */ h(Page, { title: "🎬 電影行程", subtitle: `${this.cinemas.length} 間影城｜選影城 → 日期 → 電影 → 場次` }, /* @__PURE__ */ h(Section, null, /* @__PURE__ */ h(Item, { icon: "🕘", title: "現在有什麼可以看", subtitle: "依時段找常去、附近或各縣市的場次", onTap: () => this.go(() => this.nowView()) }), /* @__PURE__ */ h(Item, { icon: "🎞️", title: "依電影找場次", subtitle: "先選電影，再看哪些影城有放映", onTap: () => this.go(() => this.movieListView(), "讀取電影清單…") }), /* @__PURE__ */ h(Item, { icon: "🧭", title: "附近的影城", subtitle: "依目前位置排序", onTap: () => this.go(() => this.nearbyView(), "取得目前位置…") }), /* @__PURE__ */ h(Item, { icon: "🎦", title: "依縣市找影院", subtitle: `全台 ${this.cinemas.length} 間，也可以搜尋影城`, onTap: () => this.go(() => this.citiesView()) })), favs.length ? /* @__PURE__ */ h(Section, { title: "常去影城", hint: "影城搜尋在「影城」分頁，行事曆與提醒在「設定」分頁。" }, favs.map((c) => /* @__PURE__ */ h(Item, { icon: "★", title: c.name, subtitle: `${c.city} ${c.district}`, onTap: () => this.go(() => this.cinemaView(c), `讀取 ${c.name} 的場次…`) }))) : null, this.installEntry(), await this.versionNote());
   }
   // ── 設定 ──
   async settingsView() {
@@ -2921,16 +2942,16 @@ var App = class {
     return /* @__PURE__ */ h(Page, { title: "設定" }, /* @__PURE__ */ h(Section, { title: "加入行事曆時" }, /* @__PURE__ */ h(Item, { icon: "📅", title: "寫入的行事曆", subtitle: this.calendarName, onTap: () => this.go(() => this.calendarView()) }), /* @__PURE__ */ h(Item, { icon: "📺", title: "廣告預告", subtitle: `預計散場時間會加上 ${this.settings.ads} 分鐘`, right: "點一下切換", chevron: false, onTap: () => this.cycleAds() }), /* @__PURE__ */ h(Item, { icon: "🗺", title: "導航地圖", subtitle: "點地址、分享、行程備註的導航連結", right: MAPS_LABEL[this.settings.maps || "apple"], chevron: false, onTap: () => {
       this.settings.maps = this.settings.maps === "google" ? "apple" : "google";
       saveSettings(this.settings);
-    } }), /* @__PURE__ */ h(Item, { icon: "⏱", title: "補片長（TMDB）", subtitle: this.settings.tmdbToken ? "已設定：沒有片長的電影會自動補上" : "未設定", onTap: () => this.go(() => this.tmdbView()) })), /* @__PURE__ */ h(Section, { title: "關於", hint: "連鎖影城的場次來自場次通（twshowtimes.com），感謝場次通的整理；其他來自開眼電影網，以及誠品、光點、樂聲官網。實際場次以影城公告為準。" }, /* @__PURE__ */ h(Item, { icon: "ℹ️", title: "關於與資料來源", accent: true, chevron: false, onTap: () => Safari.open(ABOUT_URL) }), /* @__PURE__ */ h(Item, { icon: "🔒", title: "隱私權政策", accent: true, chevron: false, onTap: () => Safari.open(PRIVACY_URL) }), /* @__PURE__ */ h(Item, { icon: "🙏", title: "前往場次通", subtitle: "比較各影城場次、看上映場數排行", accent: true, chevron: false, onTap: () => Safari.open("https://twshowtimes.com/") })), /* @__PURE__ */ h(
+    } }), /* @__PURE__ */ h(Item, { icon: "⏱", title: "補片長（TMDB）", subtitle: this.settings.tmdbToken ? "已設定：沒有片長的電影會自動補上" : "未設定", onTap: () => this.go(() => this.tmdbView()) })), /* @__PURE__ */ h(Section, { title: "關於", hint: "連鎖影城的場次來自場次通（twshowtimes.com），感謝場次通的整理；其他來自開眼電影網，以及誠品、光點、樂聲官網。實際場次以影城公告為準。" }, false ? /* @__PURE__ */ h(Item, { icon: "📲", title: "加到主畫面", subtitle: "像 App 一樣從主畫面開啟，看圖示教學", onTap: () => this.go(() => this.installView()) }) : null, /* @__PURE__ */ h(Item, { icon: "ℹ️", title: "關於與資料來源", accent: true, chevron: false, onTap: () => Safari.open(ABOUT_URL) }), /* @__PURE__ */ h(Item, { icon: "🔒", title: "隱私權政策", accent: true, chevron: false, onTap: () => Safari.open(PRIVACY_URL) }), /* @__PURE__ */ h(Item, { icon: "🙏", title: "前往場次通", subtitle: "比較各影城場次、看上映場數排行", accent: true, chevron: false, onTap: () => Safari.open("https://twshowtimes.com/") })), /* @__PURE__ */ h(
       "p",
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.22-1421"}`);
+          Pasteboard.copy(`版本 ${"2026.11.22-1431"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.22-1421"}`,
+      `版本 ${"2026.11.22-1431"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -3195,6 +3216,72 @@ var App = class {
       }
     ), /* @__PURE__ */ h(Item, { icon: "📺", title: "廣告預告", subtitle: `${this.settings.ads} 分鐘`, right: "點一下切換", chevron: false, onTap: () => this.cycleAds() }), /* @__PURE__ */ h(Item, { icon: "💺", title: "影廳／座位", subtitle: this.seat || "未填（選填）", right: "修改", onTap: () => this.go(() => this.seatView()) }), /* @__PURE__ */ h(Item, { icon: "📅", title: "行事曆", subtitle: this.calendarName, right: "更換", onTap: () => this.go(() => this.calendarView()) })), /* @__PURE__ */ h(Button, { label: "✓ 加入行事曆", onTap: () => this.save(p) }), this.bookingButtons(p), /* @__PURE__ */ h(Button, { label: "分享這場給朋友", kind: "secondary", onTap: () => this.share(p) }));
   }
+  // ── 網頁版：加到主畫面 ──
+  /** 已經是從主畫面開啟的（獨立視窗，沒有瀏覽器的網址列） */
+  isStandalone() {
+    if (true) return false;
+    const w = globalThis;
+    try {
+      return !!(w.navigator?.standalone || w.matchMedia?.("(display-mode: standalone)").matches);
+    } catch (_) {
+      return false;
+    }
+  }
+  /** 首頁最下面的入口：已經從主畫面開啟就不顯示 */
+  installEntry() {
+    if (true) return "";
+    return /* @__PURE__ */ h(Section, null, /* @__PURE__ */ h(Item, { icon: "📲", title: "加到主畫面", subtitle: "像 App 一樣從主畫面開啟，看圖示教學", onTap: () => this.go(() => this.installView()) }));
+  }
+  /** 圖示教學：依瀏覽器給對應的步驟。Android／電腦的 Chrome 有安裝事件時，直接給一顆安裝按鈕 */
+  installView() {
+    const w = globalThis;
+    const ua = String(w.navigator?.userAgent || "");
+    const ios = /iPhone|iPad|iPod/.test(ua) || /Macintosh/.test(ua) && (w.navigator?.maxTouchPoints || 0) > 1;
+    const iosOther = ios && /CriOS|FxiOS|EdgiOS|Line\/|FBAN|FBAV|Instagram/.test(ua);
+    const android = /Android/.test(ua);
+    const prompt = w.__installPrompt;
+    const done = this.isStandalone() || w.__installed;
+    const install = async () => {
+      try {
+        await prompt.prompt();
+        const r = await prompt.userChoice;
+        w.__installPrompt = null;
+        if (r && r.outcome === "accepted") w.__installed = true;
+      } catch (_) {
+      }
+    };
+    let body;
+    if (done) {
+      body = /* @__PURE__ */ h(Note, { text: "✅ 已經加到主畫面了。之後從主畫面的「電影行程」圖示開啟就可以。" });
+    } else if (prompt) {
+      body = /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Button, { label: "📲 安裝到主畫面", onTap: install }), /* @__PURE__ */ h(Note, { text: "按下後瀏覽器會跳出確認視窗，選「安裝」。裝好後會多一個「電影行程」圖示，開起來沒有網址列，像一般的 App。" }));
+    } else if (ios && !iosOther) {
+      body = /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Steps, { items: [
+        { icon: "share", title: "點「分享」按鈕", text: "Safari 下方工具列上，方框加向上箭頭的圖示。找不到的話先點「⋯」，再點「分享」。" },
+        { icon: "plus", title: "往下滑，點「加入主畫面」", text: "選單裡方框加一個加號的那一項。" },
+        { icon: "check", title: "點右上角的「加入」", text: "名稱可以維持「電影行程」。" },
+        { icon: "home", title: "從主畫面開啟", text: "主畫面會多一個「電影行程」圖示，開起來沒有網址列，像一般的 App。" }
+      ] }), /* @__PURE__ */ h(Note, { text: "要用 Safari 才能加到主畫面。常去影城等設定存在瀏覽器裡：從主畫面開啟的版本是另一份，設定要重新設一次。" }));
+    } else if (ios) {
+      body = /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Steps, { items: [
+        { icon: "share", title: "點「分享」按鈕", text: "網址列旁邊，方框加向上箭頭的圖示。" },
+        { icon: "plus", title: "點「加入主畫面」", text: "選單裡沒有這一項的話，請改用 Safari 開啟這個網址再加。" },
+        { icon: "check", title: "點「加入」" }
+      ] }), /* @__PURE__ */ h(Note, { text: "你現在用的不是 Safari。在 LINE、Facebook 這類 App 裡打開的網頁通常不能加到主畫面，請先點「用瀏覽器開啟」。" }));
+    } else if (android) {
+      body = /* @__PURE__ */ h(Steps, { items: [
+        { icon: "vdots", title: "點右上角的「⋮」", text: "瀏覽器的選單。" },
+        { icon: "plus", title: "點「加到主畫面」或「安裝應用程式」", text: "各家瀏覽器的說法略有不同。" },
+        { icon: "check", title: "點「安裝」或「新增」" }
+      ] });
+    } else {
+      body = /* @__PURE__ */ h(Steps, { items: [
+        { icon: "plus", title: "在網址列右邊找「安裝」圖示", text: "Chrome、Edge 會在網址列右邊出現一個安裝圖示；沒有的話從瀏覽器選單裡找「安裝電影行程」。" },
+        { icon: "check", title: "點「安裝」", text: "Safari（macOS）則是從「檔案」選單選「加入 Dock」。" }
+      ] });
+    }
+    return /* @__PURE__ */ h(Page, { title: "加到主畫面", subtitle: "像 App 一樣從主畫面開啟", onBack: () => this.back() }, body);
+  }
   /** 版本狀態：已是最新版／有新版（捷徑每次執行都會下載最新版，重新執行就會更新） */
   async versionNote() {
     if (false) {
@@ -3206,7 +3293,7 @@ var App = class {
     if (false) {
       if (!r) return /* @__PURE__ */ h(Note, { text: "（無法確認是否為最新版：連不到網站）" });
       if (r.isLatest) return /* @__PURE__ */ h(Note, { text: "✅ 已是最新版" });
-      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.22-1421"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
+      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.22-1431"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
         globalThis.location.reload();
       } }));
     }

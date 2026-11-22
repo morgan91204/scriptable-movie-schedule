@@ -2,7 +2,7 @@
 // 執行環境：Scriptable（iOS）。原始碼用 TSX 撰寫，編譯後的 .js 放進 Scriptable 執行。
 // 畫面：WebView（HTML/CSS），事件迴圈在 run()。資料層在 core.ts，網頁解析在 parsers.ts。
 
-import { h, Fragment, Page, Section, Item, Chips, Chip, Button, Note, Loading, Empty, Hero } from "./jsx";
+import { h, Fragment, Page, Section, Item, Chips, Chip, Button, Note, Loading, Empty, Hero, Steps } from "./jsx";
 import type { RatingBadge } from "./jsx";
 import { UI } from "./ui";
 import { setPlatform } from "./platform";
@@ -211,6 +211,7 @@ class App {
             ))}
           </Section>
         ) : null}
+        {this.installEntry()}
         {await this.versionNote()}
       </Page>
     );
@@ -231,6 +232,7 @@ class App {
           <Item icon="⏱" title="補片長（TMDB）" subtitle={this.settings.tmdbToken ? "已設定：沒有片長的電影會自動補上" : "未設定"} onTap={() => this.go(() => this.tmdbView())} />
         </Section>
         <Section title="關於" hint="連鎖影城的場次來自場次通（twshowtimes.com），感謝場次通的整理；其他來自開眼電影網，以及誠品、光點、樂聲官網。實際場次以影城公告為準。">
+          {IS_WEB && !this.isStandalone() ? <Item icon="📲" title="加到主畫面" subtitle="像 App 一樣從主畫面開啟，看圖示教學" onTap={() => this.go(() => this.installView())} /> : null}
           <Item icon="ℹ️" title="關於與資料來源" accent chevron={false} onTap={() => Safari.open(ABOUT_URL)} />
           <Item icon="🔒" title="隱私權政策" accent chevron={false} onTap={() => Safari.open(PRIVACY_URL)} />
           <Item icon="🙏" title="前往場次通" subtitle="比較各影城場次、看上映場數排行" accent chevron={false} onTap={() => Safari.open("https://twshowtimes.com/")} />
@@ -671,6 +673,99 @@ class App {
         <Button label="✓ 加入行事曆" onTap={() => this.save(p)} />
         {this.bookingButtons(p)}
         <Button label="分享這場給朋友" kind="secondary" onTap={() => this.share(p)} />
+      </Page>
+    );
+  }
+
+  // ── 網頁版：加到主畫面 ──
+  /** 已經是從主畫面開啟的（獨立視窗，沒有瀏覽器的網址列） */
+  isStandalone(): boolean {
+    if (!IS_WEB) return false;
+    const w = globalThis as any;
+    try {
+      return !!(w.navigator?.standalone || w.matchMedia?.("(display-mode: standalone)").matches);
+    } catch (_) {
+      return false;
+    }
+  }
+  /** 首頁最下面的入口：已經從主畫面開啟就不顯示 */
+  installEntry(): string {
+    if (!IS_WEB || this.isStandalone()) return "";
+    return (
+      <Section>
+        <Item icon="📲" title="加到主畫面" subtitle="像 App 一樣從主畫面開啟，看圖示教學" onTap={() => this.go(() => this.installView())} />
+      </Section>
+    );
+  }
+  /** 圖示教學：依瀏覽器給對應的步驟。Android／電腦的 Chrome 有安裝事件時，直接給一顆安裝按鈕 */
+  installView(): string {
+    const w = globalThis as any;
+    const ua = String(w.navigator?.userAgent || "");
+    const ios = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && (w.navigator?.maxTouchPoints || 0) > 1); // iPadOS 會自稱 Mac
+    const iosOther = ios && /CriOS|FxiOS|EdgiOS|Line\/|FBAN|FBAV|Instagram/.test(ua); // iPhone 上的 Chrome、Firefox、App 內建瀏覽器
+    const android = /Android/.test(ua);
+    const prompt = w.__installPrompt;
+    const done = this.isStandalone() || w.__installed;
+    const install = async () => {
+      try {
+        await prompt.prompt();
+        const r = await prompt.userChoice;
+        w.__installPrompt = null;
+        if (r && r.outcome === "accepted") w.__installed = true;
+      } catch (_) {}
+    };
+    let body: string;
+    if (done) {
+      body = <Note text="✅ 已經加到主畫面了。之後從主畫面的「電影行程」圖示開啟就可以。" />;
+    } else if (prompt) {
+      body = (
+        <>
+          <Button label="📲 安裝到主畫面" onTap={install} />
+          <Note text="按下後瀏覽器會跳出確認視窗，選「安裝」。裝好後會多一個「電影行程」圖示，開起來沒有網址列，像一般的 App。" />
+        </>
+      );
+    } else if (ios && !iosOther) {
+      body = (
+        <>
+          <Steps items={[
+            { icon: "share", title: "點「分享」按鈕", text: "Safari 下方工具列上，方框加向上箭頭的圖示。找不到的話先點「⋯」，再點「分享」。" },
+            { icon: "plus", title: "往下滑，點「加入主畫面」", text: "選單裡方框加一個加號的那一項。" },
+            { icon: "check", title: "點右上角的「加入」", text: "名稱可以維持「電影行程」。" },
+            { icon: "home", title: "從主畫面開啟", text: "主畫面會多一個「電影行程」圖示，開起來沒有網址列，像一般的 App。" },
+          ]} />
+          <Note text="要用 Safari 才能加到主畫面。常去影城等設定存在瀏覽器裡：從主畫面開啟的版本是另一份，設定要重新設一次。" />
+        </>
+      );
+    } else if (ios) {
+      body = (
+        <>
+          <Steps items={[
+            { icon: "share", title: "點「分享」按鈕", text: "網址列旁邊，方框加向上箭頭的圖示。" },
+            { icon: "plus", title: "點「加入主畫面」", text: "選單裡沒有這一項的話，請改用 Safari 開啟這個網址再加。" },
+            { icon: "check", title: "點「加入」" },
+          ]} />
+          <Note text="你現在用的不是 Safari。在 LINE、Facebook 這類 App 裡打開的網頁通常不能加到主畫面，請先點「用瀏覽器開啟」。" />
+        </>
+      );
+    } else if (android) {
+      body = (
+        <Steps items={[
+          { icon: "vdots", title: "點右上角的「⋮」", text: "瀏覽器的選單。" },
+          { icon: "plus", title: "點「加到主畫面」或「安裝應用程式」", text: "各家瀏覽器的說法略有不同。" },
+          { icon: "check", title: "點「安裝」或「新增」" },
+        ]} />
+      );
+    } else {
+      body = (
+        <Steps items={[
+          { icon: "plus", title: "在網址列右邊找「安裝」圖示", text: "Chrome、Edge 會在網址列右邊出現一個安裝圖示；沒有的話從瀏覽器選單裡找「安裝電影行程」。" },
+          { icon: "check", title: "點「安裝」", text: "Safari（macOS）則是從「檔案」選單選「加入 Dock」。" },
+        ]} />
+      );
+    }
+    return (
+      <Page title="加到主畫面" subtitle="像 App 一樣從主畫面開啟" onBack={() => this.back()}>
+        {body}
       </Page>
     );
   }
