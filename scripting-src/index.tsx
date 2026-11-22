@@ -14,7 +14,7 @@ import {
   Cinema, Movie, Settings, Version, TwMovie, TwMovieCinema, CITY_ORDER, TW,
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
   loadSettings, saveSettings, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, cinemaAddress,
-  FORMATS, formatsOf, filterVersions, filterVersionsAny, movieRows, movieDays, nearest, kmLabel, WINDOWS, findShowtimes, findShowtimesMulti, multiLabel, multiDetail, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText, hallOf, tmdbTest, movieExtras, moviePoster, posterReady, posterTint, POSTER_TINTS, normImageUrl, movieRuntime, posterSrc, isLocalSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityVote, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, SCRIPTING_IMPORT_URL, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, festivalDefaultDate, festivalStateLabel, festivalState, festivalFooter, festivalSearch, festivalSearchLines, festivalTrailer, festivalYears, festivalGroups, festivalChipNote, festivalStatusLine, movieRatings, ratingTier,
+  FORMATS, formatsOf, filterVersions, filterVersionsAny, movieRows, movieDays, nearest, kmLabel, WINDOWS, findShowtimes, findShowtimesMulti, multiLabel, multiDetail, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText, hallOf, tmdbTest, movieExtras, moviePoster, posterReady, posterTint, POSTER_TINTS, normImageUrl, movieRuntime, posterSrc, isLocalSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityVote, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, SCRIPTING_IMPORT_URL, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, festivalDefaultDate, festivalStateLabel, festivalState, festivalFooter, movieAbout, festivalSearch, festivalSearchLines, festivalTrailer, festivalYears, festivalGroups, festivalChipNote, festivalStatusLine, movieRatings, ratingTier,
 } from "./core"
 import type { Format, LatLng, Hit, Community, BoxOfficeItem, BoxSort, Festival, FestivalFilm, FestivalSession } from "./core"
 
@@ -1097,6 +1097,9 @@ function FestivalFilmPage({ festival: f, film }: { festival: Festival; film: Fes
         </VStack>
       </HStack>
     </Section>
+    {film.intro ? <Section header={<Text>介紹</Text>} footer={<Text>{`介紹來自${f.source}。`}</Text>}>
+      <Text font={"subheadline"}>{film.intro}</Text>
+    </Section> : null}
     <Section header={<Text>場次</Text>} footer={<Text>{festivalState(f) === "past" ? "這個影展已經結束，場次僅供回顧。" : "點一場加入行事曆。散場時間是依片長和你設定的廣告預告時間估的。"}</Text>}>
       {sessions.map((x) => {
         const cinema = festivalCinema(x, store.cinemas, f)
@@ -1218,6 +1221,7 @@ function MoviePage({ movie }: { movie: TwMovie }) {
   const flip = (k: string) => () => setOpen(open === k ? "" : k)
   const reload = () => { base.reload(); more.reload() }
   const error = base.error || more.error
+  const about = movieAbout(base.data)
 
   return <List navigationTitle={movie.title} navigationBarTitleDisplayMode={"inline"} refreshable={reload}>
     <MovieHero title={movie.title} slug={movie.slug} en={movie.en} lines={[
@@ -1226,6 +1230,10 @@ function MoviePage({ movie }: { movie: TwMovie }) {
       releaseLabel(data?.release || movie.release || releaseOf(movie.title)),
       data ? `${data.cinemas.length} 間影城有放映` : "",
     ]} />
+    {about.text || about.credits ? <Section header={<Text>劇情簡介</Text>} footer={<Text>簡介來自場次通。</Text>}>
+      {about.text ? <Text font={"subheadline"}>{about.text}</Text> : null}
+      {about.credits ? <Text font={"footnote"} foregroundStyle={"secondaryLabel"}>{about.credits}</Text> : null}
+    </Section> : null}
     {multiPick({
       title: "日期", open: open === "date", onOpen: flip("date"),
       summary: selDates.map(md).join("、"),

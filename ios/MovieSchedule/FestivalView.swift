@@ -190,6 +190,15 @@ struct FestivalFilmView: View {
                     }
                     .listRowBackground(Color.clear)
                 }
+                if let intro = d.film.intro, !intro.isEmpty {
+                    Section {
+                        Text(intro).font(.subheadline)
+                    } header: {
+                        Text("介紹")
+                    } footer: {
+                        Text("介紹來自\(d.source ?? "影展官網")。")
+                    }
+                }
                 Section {
                     ForEach(d.sessions) { s in
                         NavigationLink {

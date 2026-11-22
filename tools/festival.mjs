@@ -11,6 +11,14 @@ const unescape = (s) => String(s || "").replace(/&nbsp;/g, " ").replace(/&amp;/g
 const clean = (s) => unescape(String(s || "").replace(/<[^>]+>/g, " ")).replace(/\s+/g, " ").trim();
 const pad = (d) => d.replace(/^(\d{4})-(\d{1,2})-(\d{1,2})$/, (_, y, m, x) => `${y}-${m.padStart(2, "0")}-${x.padStart(2, "0")}`);
 
+/** 介紹文字：去掉標籤、整理空白，太長的截到 420 字（存檔才不會太大） */
+export const blurb = (html) => { const t = clean(String(html || "").replace(/<br\s*\/?>(\s*<br\s*\/?>)*/gi, " ")); return t.length > 420 ? t.slice(0, 419) + "…" : t; };
+/** 頁面上第一段夠長的中文內文（影片介紹頁的劇情簡介） */
+export const firstParagraph = (html) => {
+  const body = String(html).replace(/<(script|style)[^>]*>[\s\S]*?<\/\1>/gi, " ");
+  for (const m of body.matchAll(/>([^<]{80,})</g)) { const t = clean(m[1]); if ((t.match(/[\u4e00-\u9fff]/g) || []).length >= 50) return blurb(t); }
+  return "";
+};
 /** 頁面上嵌的 YouTube 影片（官網放的預告）→ 觀看網址；頻道連結不算 */
 export const youtubeIn = (html) => { const m = String(html).match(/(?:youtube(?:-nocookie)?\.com\/(?:embed\/|watch\?v=)|youtu\.be\/)([\w-]{11})(?![\w-])/); return m ? `https://www.youtube.com/watch?v=${m[1]}` : ""; };
 const GH = "https://www.goldenhorse.org.tw/film/programme/schedule/";
@@ -95,14 +103,14 @@ async function goldenHorse() {
   let asked = 0;
   for (const f of Object.values(films)) {
     const k = known[f.id];
-    if (k && k.poster && k.trailer !== undefined) { f.poster = k.poster; f.trailer = k.trailer; continue; } // trailer 查過沒有會存成空字串
+    if (k && k.poster && k.trailer !== undefined && k.intro !== undefined) { f.poster = k.poster; f.trailer = k.trailer; f.intro = k.intro; continue; } // 查過沒有的會存成空字串
     if (asked >= 200) continue;
     asked++;
     await new Promise((r) => setTimeout(r, 400));
     const page = await get(f.url).catch(() => "");
     const img = goldenHorseStill(page) || (k && k.poster) || "";
     if (img) f.poster = img;
-    if (page) f.trailer = youtubeIn(page);
+    if (page) { f.trailer = youtubeIn(page); f.intro = firstParagraph(page); }
   }
   return { id: `${id}-${dates[0].slice(0, 4)}`, name, start: dates[0], end: dates[dates.length - 1], site: GH, source: "金馬影展官網", ticketing: "拓元售票", films: Object.values(films), sessions };
 }
@@ -181,7 +189,7 @@ export function parseKffDay(json) {
           const first = Array.isArray(b.film_row) ? b.film_row[0] : null;
           const img = first && typeof first.share_image === "string" && first.share_image.startsWith("/") ? "https://www.kff.tw" + encodeURI(first.share_image) : "";
           const lvl = b.rating_level || {};
-          films[id] ||= { id, title: clean(b.title), mins: Number(b.time_length) || 0, rating: clean(lvl.txt) + (lvl.year && lvl.year !== "0" ? lvl.year + "+" : ""), url: KFF, ...(img ? { poster: img } : {}), ...(first && /^[\w-]{11}$/.test(first.trailer_id || "") ? { trailer: `https://www.youtube.com/watch?v=${first.trailer_id}` } : {}) };
+          films[id] ||= { id, title: clean(b.title), mins: Number(b.time_length) || 0, rating: clean(lvl.txt) + (lvl.year && lvl.year !== "0" ? lvl.year + "+" : ""), url: KFF, ...(img ? { poster: img } : {}), ...(first && /^[\w-]{11}$/.test(first.trailer_id || "") ? { trailer: `https://www.youtube.com/watch?v=${first.trailer_id}` } : {}), ...(first && first.content ? { intro: blurb(first.content) } : {}) };
           sessions.push({ film: id, date: p.date, time: p.start_time.slice(0, 5).padStart(5, "0"), venue: clean(c.title), room: clean(a.title), ticket: /^https:\/\//.test(b.link || "") ? b.link : "" });
         }
       }
@@ -313,7 +321,7 @@ export function parseTidfPage(html) {
         if (!start || !title) continue;
         const yt = (part.match(/img\.youtube\.com\/vi\/([\w-]{6,})\//) || [])[1];
         const ticket = (part.match(/class="tl-ticket-link[^"]*" href="(https:\/\/[^"]+)"/) || [])[1] || "";
-        films[id] ||= { id, title, mins: range[ev] || 0, rating: clean((part.match(/class="tl-film-level[^"]*"[^>]*>([^<]*)</) || [])[1]), url: more ? "https://www.tidf.org.tw" + more.replace(/&amp;/g, "&").replace(/[?&]schedule_id=\d+/, "") : TIDF, ...(yt ? { poster: `https://img.youtube.com/vi/${yt}/mqdefault.jpg`, trailer: `https://www.youtube.com/watch?v=${yt}` } : {}) };
+        films[id] ||= { id, title, mins: range[ev] || 0, rating: clean((part.match(/class="tl-film-level[^"]*"[^>]*>([^<]*)</) || [])[1]), url: more ? "https://www.tidf.org.tw" + more.replace(/&amp;/g, "&").replace(/[?&]schedule_id=\d+/, "") : TIDF, ...(yt ? { poster: `https://img.youtube.com/vi/${yt}/mqdefault.jpg`, trailer: `https://www.youtube.com/watch?v=${yt}` } : {}), intro: blurb((part.match(/<p class="tl-film-description">([\s\S]*?)<\/p>/) || [])[1]) };
         sessions.push({ film: id, date, time: start.padStart(5, "0"), venue, room: "", ticket: ticket.replace(/&amp;/g, "&") });
       }
     }
@@ -344,7 +352,8 @@ export function parseTiqffTable(html) {
     const time = cell("time");
     if (!title || !/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^\d{1,2}:\d{2}$/.test(time)) continue;
     const img = (row.match(/ImId=(\d+)/) || [])[1] || "";
-    films[title] ||= { id: title, title, mins: 0, rating: "", url: TIQFF, ...(img && used[img] <= 4 ? { poster: `https://tiqff.org.tw/admin/ImageHandler.ashx?ImId=${img}&t=filelist&c=fileimage` } : {}) };
+    const about = blurb(((row.match(/簡述：([\s\S]*?)<\/p>/) || [])[1] || "").split(/<br[^>]*>\s*<br[^>]*>\s*(?:<div>)?\s*[A-Za-z]/)[0]); // 只留中文那一段
+    films[title] ||= { id: title, title, mins: 0, rating: "", url: TIQFF, ...(about ? { intro: about } : {}), ...(img && used[img] <= 4 ? { poster: `https://tiqff.org.tw/admin/ImageHandler.ashx?ImId=${img}&t=filelist&c=fileimage` } : {}) };
     sessions.push({ film: title, date, time: time.padStart(5, "0"), venue: cell("place"), room: "", ticket: "" });
   }
   return { films, sessions };
@@ -460,13 +469,13 @@ async function womenMakeWaves() {
     const page = f.page;
     delete f.page;
     const k = known[f.id];
-    if (k && k.poster && k.trailer !== undefined) { f.poster = k.poster; f.trailer = k.trailer; continue; }
+    if (k && k.poster && k.trailer !== undefined && k.intro !== undefined) { f.poster = k.poster; f.trailer = k.trailer; f.intro = k.intro; continue; }
     if (!page) continue;
     await new Promise((r) => setTimeout(r, 400));
     const html = await get(page).catch(() => "");
     const img = wmwStill(html) || (k && k.poster) || "";
     if (img) f.poster = img;
-    if (html) f.trailer = youtubeIn(html);
+    if (html) { f.trailer = youtubeIn(html); f.intro = blurb((html.match(/<div class="film-intro-text">([\s\S]*?)<\/div>/) || [])[1]); }
   }
   return { id, name: "台灣國際女性影展", start: got[0], end: got[got.length - 1], site: WMW, source: "台灣國際女性影展官網", films: Object.values(films), sessions };
 }
@@ -551,7 +560,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     prev = old.festivals || [];
     prevYears = Array.isArray(old.years) ? old.years.filter((y) => Number.isInteger(y)) : [];
   } catch (_) {}
-  for (const f of prev) { const m = (KNOWN_STILLS[f.id] = {}); for (const x of f.films || []) if (x.poster) m[x.id] = { poster: x.poster, trailer: x.trailer }; }
+  for (const f of prev) { const m = (KNOWN_STILLS[f.id] = {}); for (const x of f.films || []) if (x.poster) m[x.id] = { poster: x.poster, trailer: x.trailer, intro: x.intro }; }
   const got = [];
   for (const [label, job] of [["金馬影展官網", goldenHorse], ["台北電影節官網", taipeiFilmFestival], ["高雄電影節官網", kaohsiungFilmFestival], ["南方影展官網", southFilmFestival], ["紀錄片影展官網", tidf], ["酷兒影展官網", queerFilmFestival], ["桃園電影節官網", taoyuanFilmFestival], ["女性影展官網", womenMakeWaves], ["兒童影展官網", ticffJob("tp")], ["兒童影展高雄場", ticffJob("ks")], ["臺中動畫影展官網", taichungAnimation]]) {
     try {
@@ -591,7 +600,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     let changed = false;
     for (const f of got.filter((x) => String(x.end).slice(0, 4) === y)) {
       const i = list.findIndex((x) => x.id === f.id);
-      const pics = (x) => (x.films || []).filter((m) => m.poster).length;
+      const pics = (x) => (x.films || []).reduce((n, m) => n + (m.poster ? 1 : 0) + (m.intro ? 1 : 0), 0); // 有圖、有介紹的越多越完整
       if (i >= 0 && f.sessions.length <= list[i].sessions.length && !(f.sessions.length === list[i].sessions.length && pics(f) > pics(list[i]))) continue; // 已經有、而且沒有比較完整（場次沒變多、圖也沒變多）
       if (i >= 0) list[i] = f; else list.push(f);
       changed = true;

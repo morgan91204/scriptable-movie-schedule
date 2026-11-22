@@ -314,6 +314,16 @@ export function Hero(props: { title?: string; poster?: string; posterUrl?: strin
   );
 }
 
+/** 一段內文（劇情簡介）；dim 是底下顏色較淡的補充（導演、演員） */
+export function Para(props: { text: string; dim?: string }): string {
+  return (
+    <div class="para">
+      {esc(props.text)}
+      {props.dim ? <div class="dim">{esc(props.dim)}</div> : null}
+    </div>
+  );
+}
+
 export function Note(props: { text: string; kind?: "info" | "warn" | "error" }): string {
   return <p class={"note " + (props.kind || "info")}>{esc(props.text)}</p>;
 }

@@ -118,6 +118,7 @@
     mapsUrl: () => mapsUrl,
     matchBoxOffice: () => matchBoxOffice,
     money: () => money,
+    movieAbout: () => movieAbout,
     movieCinemaVersions: () => movieCinemaVersions,
     movieDay: () => movieDay,
     movieDayFilled: () => movieDayFilled,
@@ -434,7 +435,8 @@ function parseTwMovies(doc) {
 }
 function parseTwMovieDay(doc) {
   const clean = (s) => String(s || "").replace(/\\s+/g, " ").trim();
-  let title = "", en = "", rating = "", runtime = 0, image = "", release = "";
+  let title = "", en = "", rating = "", runtime = 0, image = "", release = "", intro = "", director = "", cast = "";
+  const names = (v) => (Array.isArray(v) ? v : v ? [v] : []).map((p) => clean(p && typeof p === "object" ? p.name : p)).filter(Boolean).slice(0, 8).join("、");
   const address = {};
   for (const el of Array.from(doc.querySelectorAll('script[type="application/ld+json"]'))) {
     try {
@@ -446,6 +448,9 @@ function parseTwMovieDay(doc) {
       runtime = Number((String(o.duration || "").match(/(\\d+)M/) || [])[1] || 0);
       release = (String(o.datePublished || "").match(/^\\d{4}-\\d{2}-\\d{2}/) || [""])[0];
       image = clean(typeof o.image === "string" ? o.image : o.image && (o.image.url || o.image[0]));
+      intro = clean(o.description);
+      director = names(o.director);
+      cast = names(o.actor);
       for (const ev of o.subjectOf || []) {
         const loc = ev && ev.location;
         if (loc && loc.name && loc.address && loc.address.streetAddress) address[clean(loc.name)] = clean(loc.address.streetAddress);
@@ -495,7 +500,7 @@ function parseTwMovieDay(doc) {
       });
     }
   }
-  return { title, en, rating, runtime, image, release, date, dates, cinemas };
+  return { title, en, rating, runtime, image, release, intro, director, cast, date, dates, cinemas };
 }
 {
   parseAtDay,
@@ -1938,6 +1943,9 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     return got.filter((d) => !!d);
   }
   var FESTIVAL_URL = "https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/data/festival.json";
+  function movieAbout(d) {
+    return { text: d && d.intro || "", credits: [d && d.director ? `導演：${d.director}` : "", d && d.cast ? `演員：${d.cast}` : ""].filter(Boolean).join("\n") };
+  }
   function festivalTrailer(film) {
     return /^https:\/\//.test(film.trailer || "") ? { url: film.trailer, label: "觀看預告" } : { url: `https://www.youtube.com/results?search_query=${encodeURIComponent(film.title + " 預告")}`, label: "搜尋預告" };
   }
@@ -2665,7 +2673,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     const available = FORMATS.filter((f) => days.some((x) => x.cinemas.some((c) => c.versions.some((v) => formatsOf(v.label).indexOf(f) >= 0))));
     const selFormats = formats.filter((f) => available.indexOf(f) >= 0);
     const rows = movieRows(days, { cities: selCities, formats: selFormats, favIds }).map((r) => ({ date: r.date, cinema: r.cinema }));
-    return { title: base.title, rating: base.rating, runtime: base.runtime, release: base.release || "", total: base.cinemas.length, dates: allDates, selDates, cities: allCities, formats: available, rows };
+    return { title: base.title, rating: base.rating, runtime: base.runtime, release: base.release || "", intro: movieAbout(base).text, credits: movieAbout(base).credits, total: base.cinemas.length, dates: allDates, selDates, cities: allCities, formats: available, rows };
   }
   async function festivalBoard(festId, date, year = 0, query = "") {
     const list = await loadFestivals(year || void 0);
@@ -2703,6 +2711,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
       past: festivalState(f) === "past",
       trailerUrl: festivalTrailer(film).url,
       trailerLabel: festivalTrailer(film).label,
+      source: f.source,
       sessions: festivalFilmSessions(f, filmId).map((x) => ({ date: x.date, time: x.time, place: festivalPlace(x), room: x.room, ticket: x.ticket || film.url, cinema: festivalCinema(x, cinemas, f) }))
     };
   }

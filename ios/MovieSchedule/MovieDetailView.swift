@@ -166,6 +166,16 @@ struct MovieDetailView: View {
                     data.map { "\($0.total) 間影城有放映" } ?? "",
                 ])
             }
+            if let intro = data?.intro, let credits = data?.credits, !(intro.isEmpty && credits.isEmpty) {
+                Section {
+                    if !intro.isEmpty { Text(intro).font(.subheadline) }
+                    if !credits.isEmpty { Text(credits).font(.footnote).foregroundStyle(.secondary) }
+                } header: {
+                    Text("劇情簡介")
+                } footer: {
+                    Text("簡介來自場次通。")
+                }
+            }
             CommunitySection(title: movie.title)
             switch board {
             case .loading:

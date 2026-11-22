@@ -94,6 +94,8 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .step-s{font-size:13px;color:var(--fg2);margin-top:2px}
 .note.version{padding:6px 0;-webkit-user-select:none;user-select:none}
 .note.version:active{opacity:.5}
+.para{padding:12px 14px;font-size:15px;line-height:1.6;white-space:pre-line}
+.para .dim{margin-top:8px;font-size:13px;color:var(--fg2)}
 .note.warn{color:var(--orange)}
 .note.error{color:var(--red)}
 .field{display:block;width:100%;padding:12px 14px;border:0;border-radius:12px;background:var(--card);color:var(--fg);font-size:17px;margin-top:8px;outline:none}

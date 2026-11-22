@@ -64,6 +64,8 @@ struct MovieBoard: Codable {
     var rating: String?
     var runtime: Int?
     var release: String?
+    var intro: String?      // 劇情簡介（場次通電影頁附的）
+    var credits: String?    // 導演、演員（各一行）
     var total: Int
     var dates: [String]     // 可以選的日期
     var selDates: [String]  // 實際採用的日期
@@ -230,6 +232,8 @@ struct FestivalFilm: Codable, Hashable, Identifiable {
     var rating: String?
     var url: String?
     var poster: String? // 官網給的劇照（有的才有）
+    var trailer: String?
+    var intro: String?  // 官網的影片介紹（有的才有）
 }
 /// 影展分類的一列：一部片在那一天的場次摘要
 struct FestivalDayRow: Codable, Hashable, Identifiable {
@@ -273,5 +277,6 @@ struct FestivalFilmDetail: Codable {
     var past: Bool? // 影展已經結束（場次僅供回顧）
     var trailerUrl: String?   // 官網放的預告，沒有就是 YouTube 搜尋結果
     var trailerLabel: String? // 「觀看預告」或「搜尋預告」
+    var source: String?       // 資料來源的名稱（介紹的出處）
     var sessions: [FestivalSessionRow]
 }

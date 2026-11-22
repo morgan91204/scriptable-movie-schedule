@@ -77,7 +77,7 @@ async function movieBoard(slug: string, dates: string[], cities: string[], forma
   const available = core.FORMATS.filter((f) => days.some((x) => x.cinemas.some((c) => c.versions.some((v) => core.formatsOf(v.label).indexOf(f) >= 0))));
   const selFormats = (formats as core.Format[]).filter((f) => available.indexOf(f) >= 0);
   const rows = core.movieRows(days, { cities: selCities, formats: selFormats, favIds }).map((r) => ({ date: r.date, cinema: r.cinema }));
-  return { title: base.title, rating: base.rating, runtime: base.runtime, release: base.release || "", total: base.cinemas.length, dates: allDates, selDates, cities: allCities, formats: available, rows };
+  return { title: base.title, rating: base.rating, runtime: base.runtime, release: base.release || "", intro: core.movieAbout(base).text, credits: core.movieAbout(base).credits, total: base.cinemas.length, dates: allDates, selDates, cities: allCities, formats: available, rows };
 }
 /** 影展分類要的資料：有哪些影展、選中的那一個、可選的日期、那一天的片單 */
 async function festivalBoard(festId: string, date: string, year = 0, query = "") {
@@ -105,7 +105,7 @@ async function festivalFilm(festId: string, filmId: string) {
   const film = f.films.find((x) => x.id === filmId);
   if (!film) return null;
   return {
-    name: `${f.name}（${core.festivalStateLabel(f)}）`, film, past: core.festivalState(f) === "past", trailerUrl: core.festivalTrailer(film).url, trailerLabel: core.festivalTrailer(film).label,
+    name: `${f.name}（${core.festivalStateLabel(f)}）`, film, past: core.festivalState(f) === "past", trailerUrl: core.festivalTrailer(film).url, trailerLabel: core.festivalTrailer(film).label, source: f.source,
     sessions: core.festivalFilmSessions(f, filmId).map((x) => ({ date: x.date, time: x.time, place: core.festivalPlace(x), room: x.room, ticket: x.ticket || film.url, cinema: core.festivalCinema(x, cinemas, f) })),
   };
 }
