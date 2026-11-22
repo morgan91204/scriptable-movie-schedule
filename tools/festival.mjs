@@ -471,6 +471,77 @@ async function womenMakeWaves() {
   return { id, name: "台灣國際女性影展", start: got[0], end: got[got.length - 1], site: WMW, source: "台灣國際女性影展官網", films: Object.values(films), sessions };
 }
 
+const TICFF = "https://www.ticff.org.tw";
+
+/** 台灣國際兒童影展的場次表（一格一場：日期、場地、起訖時間、節目名稱、片長與適合年齡）→ 影片與場次 */
+export function parseTicffPage(html, year, url = TICFF) {
+  const films = {};
+  const sessions = [];
+  for (const box of String(html).split(/<div class="timebox[^"]*">/).slice(1)) {
+    const md = box.match(/<div class="date">\s*(\d{1,2})\/(\d{1,2})/);
+    const place = clean((box.match(/<div class="location">([\s\S]*?)<\/div>/) || [])[1]);
+    const heads = Array.from(box.split(/<ul[\s>]/)[0].matchAll(/<h6[^>]*>([\s\S]*?)<\/h6>/g)).map((m) => clean(m[1]));
+    const time = (heads.find((t) => /^\d{1,2}:\d{2}/.test(t)) || "").match(/^(\d{1,2}:\d{2})\s*[-－–~～]\s*(\d{1,2}:\d{2})?/);
+    const name = heads.find((t) => t && !/^\d{1,2}:\d{2}/.test(t)) || "";
+    if (!md || !time || !name) continue;
+    const title = name.replace(/^(?:觀摩單元|國際競賽|台灣競賽|臺灣競賽|開幕片|閉幕片|特別放映|焦點單元)\s*[-－–]\s*/, "") || name;
+    const head = box.split(/<ul[\s>]/)[0];
+    const mins = Number((head.match(/(\d+)\s*min/i) || [])[1]) || 0;
+    const age = clean((clean(head).match(/Age\s*([^\s｜|]+)/) || [])[1]);
+    const first = (box.match(/<a href="([^"#]+)"[^>]*title="[^"]*在本視窗開啟/) || [])[1] || "";
+    const m = place.match(/^(.+?)\s*(\d+)\s*廳/);
+    films[title] ||= { id: title, title, mins, rating: age ? (/^\d/.test(age) ? `${age.replace(/\s+/g, "")} 歲` : age) : "", url: first ? new URL(first, TICFF).href : url };
+    sessions.push({ film: title, date: `${year}-${md[1].padStart(2, "0")}-${md[2].padStart(2, "0")}`, time: time[1].padStart(5, "0"), venue: m ? m[1] : place, room: m ? m[2] : "", ticket: "" });
+  }
+  return { films, sessions };
+}
+/** 兒童影展：台北主場（春天）與高雄場（秋天）各算一個影展；場次頁的網址帶西元年後兩碼 */
+const ticffJob = (kind) => async () => {
+  const year = todayTPE().slice(0, 4);
+  const yy = year.slice(2);
+  const url = kind === "ks" ? `${TICFF}/zh_tw/${yy}tiffi_p/tiffischedule${yy}` : `${TICFF}/${yy}schedule`;
+  const { films, sessions } = parseTicffPage(await get(url), year, url);
+  if (!sessions.length) return null;
+  const got = sessions.map((x) => x.date).sort();
+  return { id: `${kind === "ks" ? "ticffks" : "ticff"}-${year}`, name: kind === "ks" ? "兒童影展 高雄場" : "台灣國際兒童影展", start: got[0], end: got[got.length - 1], site: url, source: "台灣國際兒童影展官網", films: Object.values(films), sessions };
+};
+
+/** 臺中國際動畫影展的場次表（依戲院、日期與影廳排的表格）→ 影片與場次 */
+export function parseTiafPage(html, year, url) {
+  const films = {};
+  const sessions = [];
+  const seen = new Set();
+  for (const block of String(html).split(/<h2 class="theaterName">/).slice(1)) {
+    const venue = clean(block.split("</h2>")[0]).replace(/\s+[A-Za-z][\s\S]*$/, ""); // 中文館名後面接的英文名不要
+    for (const row of block.split(/<div class="tr">/).slice(1)) {
+      const th = row.match(/<div class="date">\s*(\d{1,2})\.(\d{1,2})[^<]*<\/div>\s*([^<]*)</);
+      if (!th) continue;
+      const room = clean(th[3]).replace(/^(\d+)\s*廳$/, "$1"); // 「2廳」只留數字（畫面會補「廳」），其他廳名原樣
+      for (const td of row.split(/<div class="td showTime/).slice(1)) {
+        const title = clean((td.match(/<b>([\s\S]*?)<\/b>/) || [])[1]);
+        const time = (td.match(/<div class="time">\s*(\d{1,2}:\d{2})/) || [])[1];
+        if (!title || !time) continue;
+        const date = `${year}-${th[1].padStart(2, "0")}-${th[2].padStart(2, "0")}`;
+        const key = [venue, room, date, time, title].join("|");
+        if (seen.has(key)) continue; // 同一份表有兩種排法，各列一次
+        seen.add(key);
+        films[title] ||= { id: title, title, mins: Number((td.match(/class="runtime">\s*(\d+)/) || [])[1]) || 0, rating: "", url };
+        sessions.push({ film: title, date, time: time.padStart(5, "0"), venue, room, ticket: "" });
+      }
+    }
+  }
+  return { films, sessions };
+}
+/** 讀臺中國際動畫影展今年的場次表（網址帶年份） */
+async function taichungAnimation() {
+  const year = todayTPE().slice(0, 4);
+  const url = `https://twtiaf.com/${year}/schedule_list.php?cate=0`;
+  const { films, sessions } = parseTiafPage(await get(url), year, url);
+  if (!sessions.length) return null;
+  const got = sessions.map((x) => x.date).sort();
+  return { id: `tiaf-${year}`, name: "臺中國際動畫影展", start: got[0], end: got[got.length - 1], site: url, source: "臺中國際動畫影展官網", ticketing: "OPENTIX", films: Object.values(films), sessions };
+}
+
 if (import.meta.url === `file://${process.argv[1]}`) {
   const [outPath = "festival.json", prevPath = ""] = process.argv.slice(2);
   let prev = [];
@@ -482,7 +553,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   } catch (_) {}
   for (const f of prev) { const m = (KNOWN_STILLS[f.id] = {}); for (const x of f.films || []) if (x.poster) m[x.id] = { poster: x.poster, trailer: x.trailer }; }
   const got = [];
-  for (const [label, job] of [["金馬影展官網", goldenHorse], ["台北電影節官網", taipeiFilmFestival], ["高雄電影節官網", kaohsiungFilmFestival], ["南方影展官網", southFilmFestival], ["紀錄片影展官網", tidf], ["酷兒影展官網", queerFilmFestival], ["桃園電影節官網", taoyuanFilmFestival], ["女性影展官網", womenMakeWaves]]) {
+  for (const [label, job] of [["金馬影展官網", goldenHorse], ["台北電影節官網", taipeiFilmFestival], ["高雄電影節官網", kaohsiungFilmFestival], ["南方影展官網", southFilmFestival], ["紀錄片影展官網", tidf], ["酷兒影展官網", queerFilmFestival], ["桃園電影節官網", taoyuanFilmFestival], ["女性影展官網", womenMakeWaves], ["兒童影展官網", ticffJob("tp")], ["兒童影展高雄場", ticffJob("ks")], ["臺中動畫影展官網", taichungAnimation]]) {
     try {
       const f = await job();
       if (f) { got.push(f); console.log(`${label}：${f.name} ${f.start}～${f.end}，${f.films.length} 部、${f.sessions.length} 場`); }
