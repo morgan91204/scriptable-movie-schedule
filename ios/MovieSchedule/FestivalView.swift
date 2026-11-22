@@ -8,6 +8,9 @@ struct FestivalSection: View {
     @State private var date = ""
     @State private var year = 0 // 0 = 今年（今年還沒有就是最近有資料的那一年）
 
+    /// 選的東西有變就重讀（用陣列接起來：一長串字串相加編譯器會算不出型別）
+    private var loadKey: String { [festId, date, String(year), query].joined(separator: "|") }
+
     var body: some View {
         Group {
             switch board {
@@ -19,7 +22,7 @@ struct FestivalSection: View {
                 loaded(b)
             }
         }
-        .task(id: festId + "|" + date + "|" + String(year) + "|" + query) { await load() }
+        .task(id: loadKey) { await load() }
     }
 
     // 畫面拆成幾段各自一個函式：全部寫在 body 裡編譯器會算不出型別
