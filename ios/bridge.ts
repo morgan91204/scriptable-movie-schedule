@@ -80,7 +80,7 @@ async function movieBoard(slug: string, dates: string[], cities: string[], forma
   return { title: base.title, rating: base.rating, runtime: base.runtime, release: base.release || "", total: base.cinemas.length, dates: allDates, selDates, cities: allCities, formats: available, rows };
 }
 /** 影展分類要的資料：有哪些影展、選中的那一個、可選的日期、那一天的片單 */
-async function festivalBoard(festId: string, date: string, year = 0) {
+async function festivalBoard(festId: string, date: string, year = 0, query = "") {
   const list = await core.loadFestivals(year || undefined);
   const years = core.festivalYears();
   const f = list.find((x) => x.id === festId) || list[0];
@@ -94,6 +94,7 @@ async function festivalBoard(festId: string, date: string, year = 0) {
     id: f.id, name: f.name, range: core.festivalStatusLine(f), past: core.festivalState(f) === "past",
     footer: core.festivalFooter(f),
     dates, date: d,
+    hits: query.trim() ? core.festivalSearch(list, query).map((x) => ({ festId: x.f.id, film: x.film, lines: core.festivalSearchLines(x.f, x.film, x.sessions) })) : [],
     day: core.festivalDay(f, d).map(({ film, sessions }) => ({ film, count: sessions.length, lines: core.festivalLines(film, sessions) })),
   };
 }

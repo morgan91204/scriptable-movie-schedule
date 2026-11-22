@@ -73,6 +73,9 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .chip .s{font-size:11px;color:var(--fg2);margin-top:2px}
 .chip.muted{opacity:.45}
 .chip.warn{outline:1.5px solid var(--orange)}
+.chips.tabs{flex-wrap:nowrap;gap:6px}
+.chips.tabs .chip{flex:1 1 0;min-width:0;padding:9px 2px}
+.chips.tabs .chip .l{font-size:15px;white-space:nowrap}
 .btn{display:block;width:100%;padding:14px;border-radius:14px;text-align:center;font-size:17px;font-weight:600;margin-top:16px}
 .btn.primary{background:var(--accent);color:#fff}
 .btn.secondary{background:var(--card);color:var(--accent)}

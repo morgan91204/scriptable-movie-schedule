@@ -1660,6 +1660,22 @@ export function festivalLines(film: FestivalFilm, sessions: FestivalSession[]): 
     sessions.map((x) => `${x.time} ${festivalPlace(x)}`).join("、"),
   ];
 }
+/** 在這一年的所有影展裡用片名找片（不分日期）：每部片一筆，附它在那個影展的所有場次 */
+export function festivalSearch(list: Festival[], query: string): { f: Festival; film: FestivalFilm; sessions: FestivalSession[] }[] {
+  const k = query.trim().toLowerCase().replace(/臺/g, "台");
+  if (!k) return [];
+  const out: { f: Festival; film: FestivalFilm; sessions: FestivalSession[] }[] = [];
+  for (const f of list) for (const film of f.films) if (film.title.toLowerCase().replace(/臺/g, "台").indexOf(k) >= 0) out.push({ f, film, sessions: festivalFilmSessions(f, film.id) });
+  return out;
+}
+/** 搜尋結果每一列的兩行說明：分級｜片長｜共幾場；哪個影展、哪幾天 */
+export function festivalSearchLines(f: Festival, film: FestivalFilm, sessions: FestivalSession[]): [string, string] {
+  const days = Array.from(new Set(sessions.map((x) => `${Number(x.date.slice(5, 7))}/${Number(x.date.slice(8, 10))}`)));
+  return [
+    [film.rating, film.mins ? `${film.mins} 分` : "", `共 ${sessions.length} 場`].filter(Boolean).join("｜"),
+    [f.name, days.slice(0, 4).join("、") + (days.length > 4 ? " 等" : "")].filter(Boolean).join("｜"),
+  ];
+}
 /** 影展場地對應到 App 裡的影城（地址、導航用）；對不到就給一個只有名字的 */
 export function festivalCinema(x: { venue: string; room: string }, cinemas: Cinema[], f: Festival): Cinema {
   const v = x.venue.replace(/影城$/, "");

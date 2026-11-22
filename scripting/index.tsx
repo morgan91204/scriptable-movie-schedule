@@ -14,7 +14,7 @@ import {
   Cinema, Movie, Settings, Version, TwMovie, TwMovieCinema, CITY_ORDER, TW,
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
   loadSettings, saveSettings, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, cinemaAddress,
-  FORMATS, formatsOf, filterVersions, filterVersionsAny, movieRows, movieDays, nearest, kmLabel, WINDOWS, findShowtimes, findShowtimesMulti, multiLabel, multiDetail, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText, hallOf, tmdbTest, movieExtras, moviePoster, posterReady, posterTint, POSTER_TINTS, normImageUrl, movieRuntime, posterSrc, isLocalSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityVote, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, SCRIPTING_IMPORT_URL, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, festivalDefaultDate, festivalStateLabel, festivalState, festivalFooter, festivalTrailer, festivalYears, festivalGroups, festivalChipNote, festivalStatusLine, movieRatings, ratingTier,
+  FORMATS, formatsOf, filterVersions, filterVersionsAny, movieRows, movieDays, nearest, kmLabel, WINDOWS, findShowtimes, findShowtimesMulti, multiLabel, multiDetail, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText, hallOf, tmdbTest, movieExtras, moviePoster, posterReady, posterTint, POSTER_TINTS, normImageUrl, movieRuntime, posterSrc, isLocalSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityVote, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, SCRIPTING_IMPORT_URL, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, festivalDefaultDate, festivalStateLabel, festivalState, festivalFooter, festivalSearch, festivalSearchLines, festivalTrailer, festivalYears, festivalGroups, festivalChipNote, festivalStatusLine, movieRatings, ratingTier,
 } from "./core"
 import type { Format, LatLng, Hit, Community, BoxOfficeItem, BoxSort, Festival, FestivalFilm, FestivalSession } from "./core"
 
@@ -1000,7 +1000,7 @@ function useDirectImages(urls: string[], key: string): (url: string) => any {
 }
 
 /** 影展分類：選影展（同時有兩個以上時）、選日期，列出那一天的片 */
-function FestivalSections({ list: first }: { list: Festival[] }) {
+function FestivalSections({ list: first, query }: { list: Festival[]; query: string }) {
   const [festId, setFestId] = useState("")
   const [pickedDate, setPickedDate] = useState("")
   const [pickedYear, setPickedYear] = useState(0) // 0 = 今年（今年還沒有就是最近有資料的那一年）
@@ -1013,8 +1013,24 @@ function FestivalSections({ list: first }: { list: Festival[] }) {
   const dates = festivalDates(f)
   const date = dates.indexOf(pickedDate) >= 0 ? pickedDate : festivalDefaultDate(f)
   const day = festivalDay(f, date)
-  const imgOf = useDirectImages(day.map((x) => x.film.poster || ""), f.id + date) // 官網有給圖的片，直接用它的圖
+  const hits = query ? festivalSearch(list, query) : [] // 搜尋：這一年所有影展的片名，不分日期
+  const imgOf = useDirectImages(query ? hits.map((x) => x.film.poster || "") : day.map((x) => x.film.poster || ""), f.id + date + "|" + query) // 官網有給圖的片，直接用它的圖
   const past = festivalState(f) === "past"
+  const filmRow = (hf: Festival, film: FestivalFilm, lines: string[]) => <NavigationLink key={hf.id + film.id} destination={<FestivalFilmPage festival={hf} film={film} />}>
+    <HStack spacing={10}>
+      {PosterBox({ w: 44, h: 66, r: 6, img: imgOf(film.poster || ""), ver: 0, pending: false, title: film.title })}
+      <VStack alignment={"leading"} spacing={2}>
+        <Text foregroundStyle={"label"} lineLimit={2}>{film.title}</Text>
+        {lines[0] ? <Text font={"subheadline"} foregroundStyle={"secondaryLabel"} lineLimit={1} minScaleFactor={0.8}>{lines[0]}</Text> : null}
+        {lines[1] ? <Text font={"caption"} foregroundStyle={"tertiaryLabel"} lineLimit={2}>{lines[1]}</Text> : null}
+      </VStack>
+      <Spacer />
+    </HStack>
+  </NavigationLink>
+  if (query) return <Section header={<Text>{`「${query}」｜${hits.length} 部`}</Text>} footer={<Text>搜尋這一年所有影展的片名，不分日期。清空搜尋就回到每天的片單。</Text>}>
+    {hits.map((x) => filmRow(x.f, x.film, festivalSearchLines(x.f, x.film, x.sessions)))}
+    {hits.length ? null : <Text foregroundStyle={"secondaryLabel"}>這一年的影展裡找不到這個片名</Text>}
+  </Section>
   return <>
     {years.length > 1 ? <Section>
       <Picker title={"年份"} value={String(year)} onChanged={(v: string) => { setPickedYear(Number(v)); setFestId(""); setPickedDate("") }}>
@@ -1141,7 +1157,7 @@ function MoviesPage() {
         {festList.length ? <Text tag={"fest"}>影展</Text> : null}
       </Picker>
     </Section>
-    {mode === "fest" ? <FestivalSections list={festList} /> : mode === "box" ? <BoxOfficeSections movies={movies.data || []} query={k} /> : <>
+    {mode === "fest" ? <FestivalSections list={festList} query={k} /> : mode === "box" ? <BoxOfficeSections movies={movies.data || []} query={k} /> : <>
       {movies.error ? <ErrorRow error={movies.error} retry={movies.reload} /> : null}
       {!movies.data && !movies.error ? <Section><Loading text={"讀取電影清單…"} /></Section> : null}
       {now.length ? <Section header={<Text>{`上映中（${now.length}）`}</Text>} footer={<Text>依今天放映的影城數排序；今天沒有場次、過幾天才有的排在最後。資料來自場次通。</Text>}>{now.map(row)}</Section> : null}

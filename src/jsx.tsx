@@ -227,8 +227,8 @@ export function Item(props: {
   );
 }
 
-export function Chips(props: { children?: Children }): string {
-  return <div class="chips">{props.children}</div>;
+export function Chips(props: { children?: Children; tabs?: boolean }): string {
+  return <div class={props.tabs ? "chips tabs" : "chips"}>{props.children}</div>; // tabs：分類列，平分寬度排成一行不換行
 }
 
 export function Chip(props: { label: string; sub?: string; onTap?: Handler; muted?: boolean; warn?: boolean }): string {

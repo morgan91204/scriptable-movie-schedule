@@ -2,6 +2,7 @@ import SwiftUI
 
 /// 「電影」分頁的影展分類：選影展（同時有兩個以上時）、選日期，列出那一天的片
 struct FestivalSection: View {
+    var query: String = "" // 搜尋片名（這一年所有影展，不分日期）
     @State private var board: Loadable<FestivalBoard> = .loading
     @State private var festId = ""
     @State private var date = ""
@@ -15,7 +16,35 @@ struct FestivalSection: View {
             case .failed(let message):
                 Section { ErrorRow(message: message) { Task { await load() } } }
             case .loaded(let b):
-                if b.festivals.isEmpty {
+                let k = query.trimmingCharacters(in: .whitespaces)
+                if !k.isEmpty {
+                    Section {
+                        ForEach(b.hits ?? []) { row in
+                            NavigationLink {
+                                FestivalFilmView(festId: row.festId, filmId: row.film.id, title: row.film.title)
+                            } label: {
+                                HStack(spacing: 10) {
+                                    FestivalPoster(film: row.film, width: 44)
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(row.film.title).lineLimit(2)
+                                        if let first = row.lines.first, !first.isEmpty {
+                                            Text(first).font(.subheadline).foregroundStyle(.secondary).lineLimit(1).minimumScaleFactor(0.8)
+                                        }
+                                        if row.lines.count > 1, !row.lines[1].isEmpty {
+                                            Text(row.lines[1]).font(.caption).foregroundStyle(.tertiary).lineLimit(2)
+                                        }
+                                    }
+                                    Spacer(minLength: 4)
+                                }
+                            }
+                        }
+                        if (b.hits ?? []).isEmpty { Text("這一年的影展裡找不到這個片名").foregroundStyle(.secondary) }
+                    } header: {
+                        Text("「\(k)」｜\((b.hits ?? []).count) 部")
+                    } footer: {
+                        Text("搜尋這一年所有影展的片名，不分日期。清空搜尋就回到每天的片單。")
+                    }
+                } else if b.festivals.isEmpty {
                     Section { Text("目前沒有影展資料").foregroundStyle(.secondary) }
                 } else {
                     if let years = b.years, years.count > 1 {
@@ -82,12 +111,12 @@ struct FestivalSection: View {
                 }
             }
         }
-        .task(id: festId + "|" + date + "|" + String(year)) { await load() }
+        .task(id: festId + "|" + date + "|" + String(year) + "|" + query) { await load() }
     }
 
     private func load() async {
         do {
-            board = .loaded(try await Bridge.shared.call("festivalBoard", [festId, date, year]))
+            board = .loaded(try await Bridge.shared.call("festivalBoard", [festId, date, year, query]))
         } catch {
             if board.value == nil { board = .failed(errorText(error)) }
         }

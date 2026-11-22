@@ -247,6 +247,8 @@ struct FestivalBoard: Codable {
     var years: [Int]?       // 有影展資料的年份，新的在前
     var year: Int?          // 現在看的是哪一年
     var past: Bool?         // 選中的影展已經結束
+    struct Hit: Codable, Hashable, Identifiable { var festId: String; var film: FestivalFilm; var lines: [String]; var id: String { festId + "|" + film.id } }
+    var hits: [Hit]?        // 搜尋片名的結果（這一年所有影展，不分日期）
     var note: String        // 「進行中」或「幾月幾日開始」
     var id: String
     var name: String

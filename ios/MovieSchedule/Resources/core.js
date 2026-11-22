@@ -81,6 +81,8 @@
     festivalNote: () => festivalNote,
     festivalPeriod: () => festivalPeriod,
     festivalPlace: () => festivalPlace,
+    festivalSearch: () => festivalSearch,
+    festivalSearchLines: () => festivalSearchLines,
     festivalState: () => festivalState,
     festivalStateLabel: () => festivalStateLabel,
     festivalStatusLine: () => festivalStatusLine,
@@ -2014,6 +2016,20 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
       sessions.map((x) => `${x.time} ${festivalPlace(x)}`).join("、")
     ];
   }
+  function festivalSearch(list, query) {
+    const k = query.trim().toLowerCase().replace(/臺/g, "台");
+    if (!k) return [];
+    const out = [];
+    for (const f of list) for (const film of f.films) if (film.title.toLowerCase().replace(/臺/g, "台").indexOf(k) >= 0) out.push({ f, film, sessions: festivalFilmSessions(f, film.id) });
+    return out;
+  }
+  function festivalSearchLines(f, film, sessions) {
+    const days = Array.from(new Set(sessions.map((x) => `${Number(x.date.slice(5, 7))}/${Number(x.date.slice(8, 10))}`)));
+    return [
+      [film.rating, film.mins ? `${film.mins} 分` : "", `共 ${sessions.length} 場`].filter(Boolean).join("｜"),
+      [f.name, days.slice(0, 4).join("、") + (days.length > 4 ? " 等" : "")].filter(Boolean).join("｜")
+    ];
+  }
   function festivalCinema(x, cinemas, f) {
     const v = x.venue.replace(/影城$/, "");
     const hit = /^MUVIE$/i.test(v) ? cinemas.find((c) => /MUVIE/i.test(c.name) && /台北|松仁/.test(c.name + c.district)) || cinemas.find((c) => /MUVIE/i.test(c.name)) : cinemas.find((c) => c.name.replace(/影城$/, "") === v) || cinemas.find((c) => v.length >= 4 && c.name.indexOf(v) >= 0);
@@ -2651,7 +2667,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     const rows = movieRows(days, { cities: selCities, formats: selFormats, favIds }).map((r) => ({ date: r.date, cinema: r.cinema }));
     return { title: base.title, rating: base.rating, runtime: base.runtime, release: base.release || "", total: base.cinemas.length, dates: allDates, selDates, cities: allCities, formats: available, rows };
   }
-  async function festivalBoard(festId, date, year = 0) {
+  async function festivalBoard(festId, date, year = 0, query = "") {
     const list = await loadFestivals(year || void 0);
     const years = festivalYears();
     const f = list.find((x) => x.id === festId) || list[0];
@@ -2672,6 +2688,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
       footer: festivalFooter(f),
       dates,
       date: d,
+      hits: query.trim() ? festivalSearch(list, query).map((x) => ({ festId: x.f.id, film: x.film, lines: festivalSearchLines(x.f, x.film, x.sessions) })) : [],
       day: festivalDay(f, d).map(({ film, sessions }) => ({ film, count: sessions.length, lines: festivalLines(film, sessions) }))
     };
   }

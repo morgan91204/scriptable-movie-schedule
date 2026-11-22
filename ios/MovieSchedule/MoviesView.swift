@@ -20,7 +20,7 @@ struct MoviesView: View {
                     .pickerStyle(.segmented)
                 }
                 if mode == "fest" {
-                    FestivalSection()
+                    FestivalSection(query: query)
                 } else if mode == "box" {
                     BoxOfficeSection(query: query)
                 } else {
