@@ -1,0 +1,540 @@
+// 讀取目前通訊協定
+var protocol = document.location.protocol;
+
+// Burger Menu
+var burgerMenu = function() {
+
+	$('body').on('click', '.js-wmwtp-nav-toggle', function(event){
+
+		var $this = $(this);
+
+		if ( $this.hasClass('active') && $('#offcanvas').hasClass('animated fadeInLeft') ) {
+			$('#offcanvas').addClass('animated fadeOutLeft');
+				setTimeout(function(){
+					$('#offcanvas').css('display', 'none');	
+					$('#offcanvas').removeClass('animated fadeOutLeft fadeInLeft');
+				}, 1000);
+			
+    	}else{
+    		$('#offcanvas').css('display', 'block');
+			setTimeout(function(){
+				$('#offcanvas').addClass('animated fadeInLeft');
+			}, 100);
+    	}
+		
+		// $('body').toggleClass('wmwtp-overflow offcanvas-visible');
+		$this.toggleClass('active');
+		event.preventDefault();
+
+	});
+
+};
+
+var showlistSlide = function(){
+
+	$('.showlist-carousel.owl-carousel').owlCarousel({
+	    loop: $('.showlist-carousel .custom-panel').length > 4 ? true : false,
+	    margin: 10,
+	    dots: false,
+	    nav: true,
+	    // autoWidth:true,
+	    // startPosition: choose_unit_index,
+	    navText: [
+	        "<i class='fa fa-caret-left'></i>",
+	        "<i class='fa fa-caret-right'></i>"
+	    ],
+	    responsive: {
+	        0: {
+	            items: 1
+	        },
+	        600: {
+	            items: 3
+	        },
+	        1000: {
+	            items: 5
+	        }
+	    }
+	})
+
+}
+
+var archiveUnit = function(){
+
+	/**
+     * 歷屆影展節目單元操作
+     */
+    $(document).on('click','.archive_unit', function(event){
+    	var unit_id = $(this).data('unit');
+    	var archive_id = $(this).data('archive');
+    	var position = $(this).closest('.showlist-carousel').parent();
+
+        $.ajax({
+		    url: protocol+'//'+ location.hostname +'/archive/changeUnit',
+		    type: 'POST',
+		    data: {
+		      unit : unit_id,
+		      archive : archive_id
+		    },
+		    async: false,
+		    error: function(xhr) {
+		      console.log(xhr)
+		    },
+		    success: function(response) {
+		    	position.html(response);
+		    	showlistSlide();
+		    }
+		});
+
+        // event.preventDefault();
+    });
+}
+
+var tagTitleList = function(){
+
+	$('div.tag > a').click(function(){
+		var $this = $(this);
+		var tag = $this.attr('href').replace('#','');
+		var url = window.location.pathname.split('/');
+
+		$('div.tag').each(function(){
+			$(this).removeClass('tag-choose');
+		});
+		
+		$this.parent().addClass('tag-choose');
+
+		$.ajax({
+		    url: protocol+'//'+ location.hostname +'/info/showTagInfo',
+		    type: 'POST',
+		    data: {
+		      category: url[3],
+		      tag : tag
+		    },
+		    async: false, 
+		    success: function(data) {
+		    	$('#infos_content').remove();
+		    	$('.wmw-pagination').remove();
+		    	$('.page_content').append(data);
+		    	shortContent();
+		    }
+		});
+	});
+
+}
+
+var shortContent = function(){
+		var len = 150; // 超過50個字以"..."取代
+	    $(".list-content .justify").each(function(i){
+	        if($(this).text().length>len){
+	            var text=$(this).text().substring(0,len-1)+"...";
+	            $(this).text(text);
+	        }
+	    });
+	}
+
+$(document).ready( function (){
+	
+	$('.bullet').first().addClass('active');
+	$('.slider-item').first().addClass('active');
+	$(".sep_line").each(function(){
+		if ($(this).html()=="") {
+			$(this).css("display", "none");
+		}
+	})
+
+	burgerMenu();
+	tagTitleList();
+
+	//切換語系
+	$('#mobile-languages, #web_language').change(function(){
+		var $this = $(this);
+		var lang = $this.val();
+	
+		$.ajax({
+			url: $this.data('src')  + lang,
+			type: 'GET',
+			success: function(data){
+	
+				var newURL = window.location.protocol + "//" + window.location.host + "/"
+				var pathArray = window.location.pathname.split( '/' );
+				var newPathname = data;
+				for (i = 2; i < pathArray.length; i++) {
+				  newPathname += "/";
+				  newPathname += pathArray[i];
+				}
+				location.href = newURL + newPathname;
+			}
+		});
+	});
+
+	//button 切換英語系
+	$('#btn_language').click(function(){
+		var $this = $(this);
+		var lang = $this.val();
+	
+		$.ajax({
+			url: $this.data('src')  + lang,
+			type: 'GET',
+			success: function(data){
+	
+				var newURL = window.location.protocol + "//" + window.location.host + "/"
+				var pathArray = window.location.pathname.split( '/' );
+				var newPathname = data;
+				for (i = 2; i < pathArray.length; i++) {
+				  newPathname += "/";
+				  newPathname += pathArray[i];
+				}
+				location.href = newURL + newPathname;
+			}
+		});
+	});
+
+	$('.bullet').click( function(){
+		var $this = $(this);
+		var $siblings = $this.parent().children();
+		var position = $siblings.index($this);
+
+		$('.slider-item').removeClass('active').eq(position).addClass('active');
+		$('.bullet').removeClass('active').eq(position).addClass('active');
+	});
+
+	$('.next, .prev').click( function(){
+		var $this = $(this);
+		var current = $('.slider-items').find('.active');
+		var position = $('.slider-items').children().index(current);
+		var numItems = $('.slider-item').length;
+
+		if($this.hasClass('next'))
+		{
+			if(position < numItems-1 )
+			{ 
+				$('.active').removeClass('active').next().addClass('active');
+			} else 
+			{ 
+				$('.slider-item').removeClass('active').first().addClass('active'); 
+				$('.bullet').removeClass('active').first().addClass('active'); 
+			}//else
+		} else 
+		{
+			if(position === 0)
+			{  
+				$('.slider-item').removeClass('active').last().addClass('active');
+				$('.bullet').removeClass('active').last().addClass('active'); 
+			} else 
+			{
+				$('.active').removeClass('active').prev().addClass('active');
+			}        
+		}
+
+	}); // click function
+
+	//自動輪播
+	function autoShow(){
+		if($('.slider-items').children().index($('.slider-items').find('.active')) < $('.slider-item').length -1 )
+		{ 
+			$('.slider-item.active').removeClass('active').next().addClass('active');
+		} else 
+		{ 
+			$('.slider-item').removeClass('active').first().addClass('active'); 
+			$('.bullet').removeClass('active').first().addClass('active'); 
+		}//else
+		timer = setTimeout(autoShow, 5000); //設定切換時間
+	}
+	
+	if($('#slider-wrapper').length > 0){
+		autoShow();	//啟動自動輪播
+	}
+	
+
+	$('.wmwff#accordion > ul > li > a').click(function(){
+		console.log($(this).parent().children('ul').length);
+		if($(this).parent().children('ul').length > 0){
+
+			event.preventDefault();
+			if($(this).parent().hasClass('active')){
+				$(this).parent().removeClass('active');
+				return;
+			}
+			$('.wmwff#accordion > ul > li').each(function(i){
+				$(this).removeClass('active');
+			});
+			$(this).parent().toggleClass('active');
+		}
+		
+	});
+
+	$('#tabs').tabs();
+
+	//片單介紹頁的劇照
+	var film = $('.film-carousel .owl-carousel');
+	film.owlCarousel({
+		items:1,
+        merge:true,
+        loop:true,
+        video:true,
+        videoHeight: $(window).width() > 500 ? 500 : 200,
+        // videoWidth: '100%',
+        lazyLoad:true,
+        center:true,
+        dots:false,
+        // autoplay:true,
+        responsive: true,
+     	responsiveRefreshRate : 200,
+     	responsiveBaseWidth: window,  
+	    thumbs: true,
+	    thumbsPrerendered: true
+	})
+
+	//當圖片載入完畢時，影片預覽圖給thumb icon
+	film.on('loaded.owl.lazy', function(event) {
+
+	   var bg = $('.owl-video-tn.owl-lazy').eq(0).data('src');	//影片預覽圖
+
+	   if( bg != ''){
+	   		$('.owl-thumb-item.owl-video img').attr('src', bg);
+	   }
+	})
+
+	showlistSlide();
+
+	archiveUnit();
+
+	$('.sponsor-carousel.owl-carousel').owlCarousel({
+        merge:true,
+        loop:true,
+        margin:40,
+        nav:false,
+        dots:false,
+        slideBy: 3,
+        autoplay:true,
+        autoplayTimeout: 3000,
+	    responsiveClass:true,
+	    responsive:{
+	        0:{
+	            items:3
+	        },
+	        600:{
+	            items:3
+	        },
+	        1000:{
+	            items:6
+	        }
+	    }
+	})
+
+	$('.product-carousel.owl-carousel').owlCarousel({
+        merge:true,
+        loop:false,
+        margin:40,
+        nav:true,
+		navText: [
+			"<i class='fa fa-caret-left'></i>",
+			"<i class='fa fa-caret-right'></i>"
+		],
+        dots:false,
+	    responsiveClass:true,
+	    responsive:{
+	        0:{
+	            items:1
+	        },
+	        600:{
+	            items:3
+	        },
+	        1000:{
+	            items:4
+	        }
+	    }
+	})
+
+	$('.schedule-carousel.owl-carousel').owlCarousel({
+        merge:true,
+        loop:false,
+        margin:20,
+        nav:true,
+        navText: [
+			"<i class='fa fa-caret-left'></i>",
+			"<i class='fa fa-caret-right'></i>"
+		],
+        dots:false,
+	    responsiveClass:true,
+	    responsive:{
+	        0:{
+	            items:1
+	        },
+	        600:{
+	            items:1
+	        },
+	        1000:{
+	            items:2
+	        }
+	    }
+	})
+
+	
+
+	$('.filmlist-carousel.owl-carousel').owlCarousel({
+	    loop: $('.filmlist-carousel .custom-panel').length > 4 ? true : false,
+	    margin: 10,
+	    dots: false,
+	    nav: true,
+	    // autoWidth:true,
+	    navText: [
+	        "<i class='fa fa-caret-left'></i>",
+	        "<i class='fa fa-caret-right'></i>"
+	    ],
+	    responsive: {
+	        0: {
+	            items: 1
+	        },
+	        600: {
+	            items: 2
+	        },
+	        1000: {
+	            items: 3
+	        }
+	    }
+	}) 
+	
+	$('.archive-carousel.owl-carousel').owlCarousel({
+	    loop: $('.archive-carousel .custom-panel').length > 4 ? true : false,
+	    margin: 10,
+	    dots: false,
+	    nav: true,
+	    // autoWidth:true,
+	    navText: [
+	        "<i class='fa fa-caret-left'></i>",
+	        "<i class='fa fa-caret-right'></i>"
+	    ],
+	    responsive: {
+	        0: {
+	            items: 1
+	        },
+	        600: {
+	            items: 3
+	        },
+	        1000: {
+	            items: 5
+	        }
+	    }
+	}) 
+
+	$('.active-carousel.owl-carousel').owlCarousel({
+		items: 1,
+	    loop: $('.custom-panel.activity').length > 1 ? true : false,
+	    dots: false,
+	    nav: false,
+	    autoplay: true,
+	    navText: [
+	        "<i class='fa fa-caret-left'></i>",
+	        "<i class='fa fa-caret-right'></i>"
+	    ]
+	})
+
+
+	//導覽列有下拉的項目不得連結
+	$('#mainav .drop').click(function(){
+		event.preventDefault();
+	});
+
+	$("[class^='drop_']").click(function(){
+		var drop = $(this).attr('class');
+		console.log(drop);
+		$('#'+ drop.replace('_','_content_')).toggleClass("active");
+	});
+
+    $('#section04 a[href*=#]').on('click', function(e) {
+	    e.preventDefault();
+	    $('html, body').animate({ scrollTop: $($(this).attr('href')).offset().top}, 500, 'linear');
+	});
+
+    shortContent();
+
+    //訂閱電子報
+    $('#subscription_link').click(function(e){
+    	$this = $(this); 
+    	var sub_mail = $('input[name="subscription_mail"]').val();
+
+    	emailRule = /^\w+((-\w+)|(\.\w+))*\@[A-Za-z0-9]+((\.|-)[A-Za-z0-9]+)*\.[A-Za-z]+$/;
+ 
+		//validate ok or not
+		if(!sub_mail.match(/^[0-9a-zA-Z]([-._]*[0-9a-zA-Z])*@[0-9a-zA-Z]([-._]*[0-9a-zA-Z])*\.+[a-zA-Z]+$/)){
+			alert('信箱格式錯誤，請重新輸入');
+			$('input[name="subscription_mail"]').val('').focus();
+			return false;
+		}
+
+		$this.prop('disabled', true);
+
+    	if(sub_mail == ''){ //沒輸入郵件
+    		e.preventDefault();
+    	}else{
+    		var root_path = document.location.hostname;
+    		$this.html('<img src="' + protocol +'//' + root_path + '/assets/images/loading.gif" width="17" height="17">');
+
+    		$.ajax({
+    			url: protocol+'//' + root_path + '/epaper/subscription/', //路徑要隨資料夾修改
+    			type: 'POST',
+    			data: {
+    				mail: sub_mail
+    			},
+    			async: true,
+    			error: function(xhr){console.log(xhr)},
+    			success: function(data){
+    				if(data == true){
+    					location.href = protocol+'//' + root_path + '/epaper/subscription/success';
+    				}else{
+    					alert(data);
+    					$('input[name="subscription_mail"]').val('').focus();
+    					$this.prop('disabled', false);
+    					$this.html('<img src="'+ protocol +'://' + root_path + '/assets/images/icon_mail.png">');
+    				}
+    				
+    			}
+    		});
+   
+    	}
+    });
+
+    //取消電子報
+    $('#cancel_subscription').click(function(e){
+    	$this = $(this); 
+    	var sub_mail = $('input[name="cancel_mail"]').val();
+
+    	emailRule = /^\w+((-\w+)|(\.\w+))*\@[A-Za-z0-9]+((\.|-)[A-Za-z0-9]+)*\.[A-Za-z]+$/;
+ 
+		//validate ok or not
+		if(!sub_mail.match(/^[0-9a-zA-Z]([-._]*[0-9a-zA-Z])*@[0-9a-zA-Z]([-._]*[0-9a-zA-Z])*\.+[a-zA-Z]+$/)){
+			alert('信箱格式錯誤，請重新輸入');
+			$('input[name="cancel_mail"]').val('').focus();
+			return false;
+		}
+
+    	if(sub_mail == ''){ //沒輸入郵件
+    		e.preventDefault();
+    	}else{
+    		var root_path = document.location.hostname;
+    		$this.html('<img src="'+protocol+'//' + root_path + '/assets/images/loading.gif" width="17" height="17">');
+    		$this.prop('disabled', true);
+
+    		$.ajax({
+    			url: protocol+'//' + root_path + '/epaper/cancel_subscription/', 
+    			type: 'POST',
+    			data: {
+    				mail: sub_mail
+    			},
+    			async: true,
+    			error: function(xhr){console.log(xhr)},
+    			success: function(data){
+    				alert(data);
+    				$this.prop('disabled', false);
+    				$this.html('送出');
+    				$('input[name="cancel_mail"]').val('');
+    			}
+    		});
+    		
+    		
+    	}
+    });
+
+    $('#paper_modal').modal('show');
+
+});// document ready
