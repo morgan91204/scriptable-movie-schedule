@@ -516,7 +516,7 @@ const ticffJob = (kind) => async () => {
   const { films, sessions } = parseTicffPage(await get(url), year, url);
   if (!sessions.length) return null;
   const got = sessions.map((x) => x.date).sort();
-  return { id: `${kind === "ks" ? "ticffks" : "ticff"}-${year}`, name: kind === "ks" ? "兒童影展 高雄場" : "台灣國際兒童影展", start: got[0], end: got[got.length - 1], site: url, source: "台灣國際兒童影展官網", films: Object.values(films), sessions };
+  return { id: `${kind === "ks" ? "ticffks" : "ticff"}-${year}`, name: kind === "ks" ? "兒童影展（高雄）" : "兒童影展（台北）", start: got[0], end: got[got.length - 1], site: url, source: "台灣國際兒童影展官網", films: Object.values(films), sessions };
 };
 
 /** 臺中國際動畫影展的場次表（依戲院、日期與影廳排的表格）→ 影片與場次 */
