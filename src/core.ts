@@ -288,14 +288,66 @@ async function atDay(c: Cinema, date?: string): Promise<AtDay> {
   return atDayLive(c.url, date);
 }
 
+// ── 伺服器先抓好的場次通場次 ──
+// 「現在有什麼可以看」查一個縣市要讀幾十間影城、每間一兩頁，手機一頁一頁讀又要各自解析，是它慢的主因。
+// GitHub Actions 每小時把場次通所有影城的片單抓好，分成兩個檔：近期（今天、明天）和遠期（後天起 5 天）。
+// App 先讀這兩個檔（一兩個請求），沒有、超過 3／9 小時沒更新或讀不到，才自己去讀場次通。
+export const TW_NEAR_URL = "https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/data/tw-near.json";
+export const TW_FAR_URL = "https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/data/tw-far.json";
+interface TwServed { date: string; dates: string[]; address: string; booking: string; movies: Movie[] }
+interface TwData { updated: number; days: Record<string, Record<string, TwServed>> } // 影城代碼 → 日期 → 片單
+const twDataMem: Record<string, { at: number; job: Promise<TwData | null> }> = {};
+function loadTwData(far: boolean): Promise<TwData | null> {
+  if (!metaOn) return Promise.resolve(null);
+  const name = far ? "tw-far" : "tw-near";
+  const hit = twDataMem[name];
+  if (hit && Date.now() - hit.at < 20 * 60e3) return hit.job;
+  const maxAge = (far ? 9 : 3) * 3600e3;
+  const fresh = (d: TwData | null) => (d && d.days && Date.now() - d.updated < maxAge ? d : null);
+  const job = (async (): Promise<TwData | null> => {
+    let disk: { at: number; data: TwData } | null = null;
+    try {
+      disk = JSON.parse(cacheGet(name + ".json") || "null");
+    } catch (_) {}
+    if (disk && Date.now() - disk.at < 30 * 60e3) return fresh(disk.data);
+    const net = (async () => {
+      const r = await platform().fetchText((far ? TW_FAR_URL : TW_NEAR_URL) + "?t=" + Math.floor(Date.now() / (20 * 60e3)), { accept: "application/json" });
+      if (r.status !== 200) return null;
+      const data = JSON.parse(r.body) as TwData;
+      if (!data || typeof data.days !== "object") return null;
+      cacheSet(name + ".json", JSON.stringify({ at: Date.now(), data }));
+      return data;
+    })().catch(() => null);
+    const got = await Promise.race([net, delay(6000).then(() => null)]);
+    return fresh(got || (disk ? disk.data : null));
+  })();
+  twDataMem[name] = { at: Date.now(), job };
+  return job;
+}
+
 const twDayCache: Record<string, TwDay> = {};
-async function twDay(c: Cinema, date?: string): Promise<TwDay> {
+/** 直接讀場次通的影城頁（不經過伺服器資料；伺服器產生資料時也用這個） */
+export async function twDayLive(c: Cinema, date?: string): Promise<TwDay> {
   const key = c.id + "|" + (date || "");
   if (!twDayCache[key]) {
     const url = date ? `${TW}/cinemas/${c.id}/${date}/` : c.url;
     twDayCache[key] = await parse<TwDay>("parseTwDay", await getText(url));
   }
   return twDayCache[key];
+}
+async function twDay(c: Cinema, date?: string): Promise<TwDay> {
+  const today = todayTPE();
+  const day = date || today;
+  const key = c.id + "|" + (date || "");
+  if (twDayCache[key]) return twDayCache[key];
+  // 先看伺服器抓好的：今天、明天在近期檔，後天起在遠期檔
+  const off = Math.round((Date.parse(day + "T00:00:00Z") - Date.parse(today + "T00:00:00Z")) / 86400e3);
+  if (off >= 0 && off <= 6) {
+    const data = await loadTwData(off >= 2);
+    const hit = data?.days[c.id]?.[day];
+    if (hit && hit.date === day) return (twDayCache[key] = { cinema: c.name, ...hit });
+  }
+  return twDayLive(c, date);
 }
 
 const multiCache: Record<string, MultiDay> = {};

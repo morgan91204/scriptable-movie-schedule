@@ -25,6 +25,8 @@
     SCRIPTING_IMPORT_URL: () => SCRIPTING_IMPORT_URL,
     TMDB_LINKS: () => TMDB_LINKS,
     TW: () => TW,
+    TW_FAR_URL: () => TW_FAR_URL,
+    TW_NEAR_URL: () => TW_NEAR_URL,
     WEEK: () => WEEK,
     WINDOWS: () => WINDOWS,
     addDays: () => addDays,
@@ -102,6 +104,7 @@
     tmdbTest: () => tmdbTest,
     todayTPE: () => todayTPE,
     tpeDate: () => tpeDate,
+    twDayLive: () => twDayLive,
     twReleaseDate: () => twReleaseDate,
     weekday: () => weekday,
     ytScore: () => ytScore
@@ -859,14 +862,58 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     if (hit && hit.date) return hit;
     return atDayLive(c.url, date);
   }
+  var TW_NEAR_URL = "https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/data/tw-near.json";
+  var TW_FAR_URL = "https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/data/tw-far.json";
+  var twDataMem = {};
+  function loadTwData(far) {
+    if (!metaOn) return Promise.resolve(null);
+    const name = far ? "tw-far" : "tw-near";
+    const hit = twDataMem[name];
+    if (hit && Date.now() - hit.at < 20 * 6e4) return hit.job;
+    const maxAge = (far ? 9 : 3) * 36e5;
+    const fresh = (d) => d && d.days && Date.now() - d.updated < maxAge ? d : null;
+    const job = (async () => {
+      let disk = null;
+      try {
+        disk = JSON.parse(cacheGet(name + ".json") || "null");
+      } catch (_) {
+      }
+      if (disk && Date.now() - disk.at < 30 * 6e4) return fresh(disk.data);
+      const net = (async () => {
+        const r = await platform().fetchText((far ? TW_FAR_URL : TW_NEAR_URL) + "?t=" + Math.floor(Date.now() / (20 * 6e4)), { accept: "application/json" });
+        if (r.status !== 200) return null;
+        const data = JSON.parse(r.body);
+        if (!data || typeof data.days !== "object") return null;
+        cacheSet(name + ".json", JSON.stringify({ at: Date.now(), data }));
+        return data;
+      })().catch(() => null);
+      const got = await Promise.race([net, delay(6e3).then(() => null)]);
+      return fresh(got || (disk ? disk.data : null));
+    })();
+    twDataMem[name] = { at: Date.now(), job };
+    return job;
+  }
   var twDayCache = {};
-  async function twDay(c, date) {
+  async function twDayLive(c, date) {
     const key = c.id + "|" + (date || "");
     if (!twDayCache[key]) {
       const url = date ? `${TW}/cinemas/${c.id}/${date}/` : c.url;
       twDayCache[key] = await parse("parseTwDay", await getText(url));
     }
     return twDayCache[key];
+  }
+  async function twDay(c, date) {
+    const today = todayTPE();
+    const day = date || today;
+    const key = c.id + "|" + (date || "");
+    if (twDayCache[key]) return twDayCache[key];
+    const off = Math.round((Date.parse(day + "T00:00:00Z") - Date.parse(today + "T00:00:00Z")) / 864e5);
+    if (off >= 0 && off <= 6) {
+      const data = await loadTwData(off >= 2);
+      const hit = data?.days[c.id]?.[day];
+      if (hit && hit.date === day) return twDayCache[key] = { cinema: c.name, ...hit };
+    }
+    return twDayLive(c, date);
   }
   var multiCache = {};
   async function multiDay(c) {
