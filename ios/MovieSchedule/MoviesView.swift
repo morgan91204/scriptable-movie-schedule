@@ -4,6 +4,7 @@ import SwiftUI
 struct MoviesView: View {
     @State private var movies: Loadable<[TwMovie]> = .loading
     @State private var mode = "now"
+    @State private var hasFestival = false // 有進行中或即將開始的影展
     @State private var query = ""
 
     var body: some View {
@@ -14,10 +15,13 @@ struct MoviesView: View {
                         Text("上映中").tag("now")
                         Text("票房排行").tag("box")
                         Text("即將上映").tag("soon")
+                        if hasFestival { Text("影展").tag("fest") } // 有進行中或即將開始的影展才出現
                     }
                     .pickerStyle(.segmented)
                 }
-                if mode == "box" {
+                if mode == "fest" {
+                    FestivalSection()
+                } else if mode == "box" {
                     BoxOfficeSection(query: query)
                 } else {
                     nowSections
@@ -27,6 +31,9 @@ struct MoviesView: View {
             .searchable(text: $query, prompt: "搜尋片名")
             .refreshable { await load() }
             .task { if movies.value == nil { await load() } }
+            .task {
+                if let b = try? await Bridge.shared.call("festivalBoard", ["", ""], as: FestivalBoard.self) { hasFestival = !b.festivals.isEmpty }
+            }
         }
     }
 

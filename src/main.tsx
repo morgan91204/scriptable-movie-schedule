@@ -12,9 +12,9 @@ import {
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
   loadSettings, saveSettings, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, TW,
   FORMATS, formatsOf, filterVersions, filterVersionsAny, movieRows, movieDays, nearest, kmLabel, WINDOWS, findShowtimes, findShowtimesMulti, multiLabel, multiDetail, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText,
-  hallOf, tmdbTest, movieExtras, moviePoster, movieRuntime, posterSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityCached, communityVote, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, ABOUT_URL, PRIVACY_URL, ADS_NOTE, movieRatings, ratingTier,
+  hallOf, tmdbTest, movieExtras, moviePoster, movieRuntime, posterSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityCached, communityVote, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalsReady, festivalNote, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, movieRatings, ratingTier,
 } from "./core";
-import type { MovieExtras, Ratings, Community, BoxOfficeItem, BoxSort } from "./core";
+import type { MovieExtras, Ratings, Community, BoxOfficeItem, BoxSort, Festival, FestivalFilm, FestivalSession } from "./core";
 import { setTabBar, setBackGuard, esc } from "./jsx";
 import type { TwMovie, TwMovieCinema, Format, LatLng, Hit } from "./core";
 
@@ -115,6 +115,7 @@ class App {
     setTabBar(() => ({ active: this.tab, items: this.TABS, onTap: (id) => this.switchTab(id) }));
     setBackGuard(() => this.stack.length > 1);
     this.go(() => this.homeView(), "讀取影城清單…");
+    loadFestivals().catch(() => []); // 背景先看有沒有影展（有才會在電影分頁多出「影展」）
     const input = String(args.shortcutParameter || (args.urls && args.urls[0]) || (args.plainTexts && args.plainTexts[0]) || "");
     let pendingUrl = input;
 
@@ -910,14 +911,91 @@ class App {
   // ── 依電影找 ──
   movieQuery = "";
   /** 電影分頁上方的切換：上映中／票房排行 */
-  movieMode: "now" | "box" | "soon" = "now";
+  movieMode: "now" | "box" | "soon" | "fest" = "now";
   movieModeChips(): string {
     return (
       <Chips>
         <Chip label="上映中" muted={this.movieMode !== "now"} onTap={() => { this.movieMode = "now"; }} />
         <Chip label="票房排行" muted={this.movieMode !== "box"} onTap={() => { this.movieMode = "box"; }} />
         <Chip label="即將上映" muted={this.movieMode !== "soon"} onTap={() => { this.movieMode = "soon"; }} />
+        {/* 有進行中或即將開始的影展才會出現 */}
+        {festivalsReady().length ? <Chip label="影展" sub={festivalNote(festivalsReady())} muted={this.movieMode !== "fest"} onTap={() => { this.movieMode = "fest"; }} /> : null}
       </Chips>
+    );
+  }
+
+  // ── 影展 ──
+  festId = ""; // 看哪一個影展（同時有兩個以上時可以切換）
+  festDate = ""; // 看哪一天（空 = 今天或影展第一天）
+  async festivalListView(): Promise<string> {
+    const list = await loadFestivals();
+    if (!list.length) {
+      this.movieMode = "now";
+      return this.movieListView();
+    }
+    const f = list.find((x) => x.id === this.festId) || list[0];
+    const dates = festivalDates(f);
+    const date = dates.indexOf(this.festDate) >= 0 ? this.festDate : dates[0];
+    const day = festivalDay(f, date);
+    const md = (d: string) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`;
+    return (
+      <Page title="依電影找場次" subtitle={`${f.name}｜${md(f.start)}–${md(f.end)}`} onBack={() => this.back()}>
+        {this.movieModeChips()}
+        {list.length > 1 ? (
+          <Section title="影展">
+            <Chips>
+              {list.map((x) => <Chip label={x.name} muted={x.id !== f.id} onTap={() => { this.festId = x.id; this.festDate = ""; }} />)}
+            </Chips>
+          </Section>
+        ) : null}
+        <Section title="日期">
+          <Chips>
+            {dates.map((d) => (
+              <Chip label={dateLabel(d).replace(/（.）.*$/, "")} sub={d === todayTPE() ? "今天" : dateLabel(d).match(/（(.)）/)?.[1] || ""} muted={d !== date} onTap={() => { this.festDate = d; }} />
+            ))}
+          </Chips>
+        </Section>
+        <Section title={`${f.name}｜${dateLabel(date).replace(/ .*$/, "")}｜${day.length} 部、${day.reduce((n, x) => n + x.sessions.length, 0)} 場`} hint={`場次來自${f.source}，${f.ticketing ? `購票會開啟${f.ticketing}` : "購票請到官網"}。是否售完請以售票頁為準。影展的片名在院線上映時可能不同。`}>
+          {day.map(({ film, sessions }) => (
+            <Item
+              thumb={{ src: "" }}
+              title={film.title}
+              subtitle={festivalLines(film, sessions).filter(Boolean).join("\n")}
+              onTap={() => this.go(() => this.festivalFilmView(f, film))}
+            />
+          ))}
+        </Section>
+        {day.length ? null : <Empty icon="🎞" text="這一天沒有場次" />}
+      </Page>
+    );
+  }
+  /** 影展的一部片：列出還沒演的所有場次，點一場加入行事曆 */
+  festivalFilmView(f: Festival, film: FestivalFilm): string {
+    const sessions = festivalFilmSessions(f, film.id);
+    const pick = (x: FestivalSession) => {
+      const cinema = festivalCinema(x, this.cinemas, f);
+      const version: Version = { label: festivalPlace(x), times: [x.time] };
+      const movie: Movie = { title: film.title, runtime: film.mins, rating: film.rating, versions: [version] };
+      this.runtime = film.mins;
+      this.seat = x.room;
+      this.go(() => this.confirmView({ cinema, address: cinema.address || "", booking: x.ticket || film.url, sourceUrl: film.url, date: x.date, movie, version, time: x.time }));
+    };
+    const end = (x: FestivalSession) => (film.mins ? fmt(new Date(tpeDate(x.date, x.time).getTime() + (film.mins + this.settings.ads) * 6e4)).slice(-5) : "");
+    return (
+      <Page title={film.title} subtitle={f.name} onBack={() => this.back()}>
+        <Hero title={film.title} lines={[[film.rating, film.mins ? `${film.mins} 分鐘` : ""].filter(Boolean).join("｜"), f.name, "影展片名，院線上映時可能不同"]} />
+        <Section title="場次" hint="點一場加入行事曆。散場時間是依片長和你設定的廣告預告時間估的。">
+          {sessions.map((x) => (
+            <Item
+              title={`${dateLabel(x.date).replace(/ .*$/, "")}　${x.time}`}
+              subtitle={[festivalPlace(x), end(x) ? `預計 ${end(x)} 散場` : ""].filter(Boolean).join("\n")}
+              onTap={() => pick(x)}
+            />
+          ))}
+        </Section>
+        {sessions.length ? null : <Empty icon="🎞" text="這部片的場次都演完了" />}
+        <Button label="🌐 官網的影片介紹" kind="secondary" onTap={() => Safari.open(film.url)} />
+      </Page>
     );
   }
 
@@ -1034,6 +1112,7 @@ class App {
   }
 
   async movieListView(): Promise<string> {
+    if (this.movieMode === "fest") return this.festivalListView();
     if (this.movieMode === "box") return this.boxOfficeView();
     const all = await loadMovies();
     const k = this.movieQuery.trim().toLowerCase();

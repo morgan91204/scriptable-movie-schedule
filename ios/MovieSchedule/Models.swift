@@ -220,3 +220,47 @@ struct CinemaAppInfo: Codable {
     var url: String
     var schemes: [String]
 }
+
+// MARK: 影展
+
+struct FestivalFilm: Codable, Hashable, Identifiable {
+    var id: String
+    var title: String
+    var mins: Int?
+    var rating: String?
+    var url: String?
+}
+/// 影展分類的一列：一部片在那一天的場次摘要
+struct FestivalDayRow: Codable, Hashable, Identifiable {
+    var film: FestivalFilm
+    var count: Int
+    var lines: [String]
+    var id: String { film.id }
+}
+/// 影展分類整頁的資料（由共用資料層算好）
+struct FestivalBoard: Codable {
+    struct Item: Codable, Hashable, Identifiable { var id: String; var name: String }
+    var festivals: [Item]   // 進行中或即將開始的影展（空的 = 不顯示影展分類）
+    var note: String        // 「進行中」或「幾月幾日開始」
+    var id: String
+    var name: String
+    var range: String
+    var footer: String
+    var dates: [String]
+    var date: String
+    var day: [FestivalDayRow]
+}
+struct FestivalSessionRow: Codable, Hashable, Identifiable {
+    var date: String
+    var time: String
+    var place: String
+    var room: String?
+    var ticket: String?
+    var cinema: Cinema
+    var id: String { date + time + place }
+}
+struct FestivalFilmDetail: Codable {
+    var name: String
+    var film: FestivalFilm
+    var sessions: [FestivalSessionRow]
+}

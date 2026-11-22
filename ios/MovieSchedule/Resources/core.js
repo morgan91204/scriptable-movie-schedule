@@ -23,6 +23,7 @@
     COMMUNITY_API: () => COMMUNITY_API,
     COMMUNITY_SUMMARY_URL: () => COMMUNITY_SUMMARY_URL,
     EXTRA: () => EXTRA,
+    FESTIVAL_URL: () => FESTIVAL_URL,
     FORMATS: () => FORMATS,
     MAPS_LABEL: () => MAPS_LABEL,
     META_URL: () => META_URL,
@@ -67,6 +68,14 @@
     datesOf: () => datesOf,
     distanceKm: () => distanceKm,
     extractTmdbKey: () => extractTmdbKey,
+    festivalCinema: () => festivalCinema,
+    festivalDates: () => festivalDates,
+    festivalDay: () => festivalDay,
+    festivalFilmSessions: () => festivalFilmSessions,
+    festivalLines: () => festivalLines,
+    festivalNote: () => festivalNote,
+    festivalPlace: () => festivalPlace,
+    festivalsReady: () => festivalsReady,
     fillMovieDay: () => fillMovieDay,
     fillRuntimes: () => fillRuntimes,
     filterVersions: () => filterVersions,
@@ -88,6 +97,7 @@
     loadBoxOfficeFull: () => loadBoxOfficeFull,
     loadBoxOfficeWeeks: () => loadBoxOfficeWeeks,
     loadCinemas: () => loadCinemas,
+    loadFestivals: () => loadFestivals,
     loadMovies: () => loadMovies,
     loadSettings: () => loadSettings,
     looseTitle: () => looseTitle,
@@ -1913,6 +1923,49 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     const got = await Promise.all(dates.map((d) => movieDay(slug, d).catch(() => null)));
     return got.filter((d) => !!d);
   }
+  var FESTIVAL_URL = "https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/data/festival.json";
+  var festivalsNow = [];
+  async function loadFestivals() {
+    const data = await loadServed("festival", FESTIVAL_URL, 72, (d) => Array.isArray(d.festivals)).catch(() => null);
+    const today = todayTPE();
+    festivalsNow = (data ? data.festivals : []).map((f) => ({ ...f, sessions: (f.sessions || []).filter((x) => x.date >= today) })).filter((f) => f.end >= today && f.sessions.length > 0);
+    return festivalsNow;
+  }
+  var festivalsReady = () => festivalsNow;
+  function festivalDates(f) {
+    return Array.from(new Set(f.sessions.map((x) => x.date))).sort();
+  }
+  function festivalPlace(x) {
+    const v = /^MUVIE$/i.test(x.venue) ? "MUVIE CINEMAS" : x.venue;
+    const room = /廳$/.test(x.room) || !x.room ? x.room : `${x.room} 廳`;
+    return [v, room].filter(Boolean).join(" ");
+  }
+  function festivalDay(f, date) {
+    const by = {};
+    for (const x of f.sessions) if (x.date === date) (by[x.film] ||= []).push(x);
+    const film = (id) => f.films.find((m) => m.id === id) || { id, title: "（片名未提供）", mins: 0, rating: "", url: f.site };
+    return Object.keys(by).map((id) => ({ film: film(id), sessions: by[id].sort((a, b) => a.time.localeCompare(b.time)) })).sort((a, b) => a.sessions[0].time.localeCompare(b.sessions[0].time) || a.film.title.localeCompare(b.film.title));
+  }
+  function festivalFilmSessions(f, filmId) {
+    return f.sessions.filter((x) => x.film === filmId).sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
+  }
+  function festivalLines(film, sessions) {
+    return [
+      [film.rating, film.mins ? `${film.mins} 分` : "", `這天 ${sessions.length} 場`].filter(Boolean).join("｜"),
+      sessions.map((x) => `${x.time} ${festivalPlace(x)}`).join("、")
+    ];
+  }
+  function festivalCinema(x, cinemas, f) {
+    const v = x.venue.replace(/影城$/, "");
+    const hit = /^MUVIE$/i.test(v) ? cinemas.find((c) => /MUVIE/i.test(c.name) && /台北|松仁/.test(c.name + c.district)) || cinemas.find((c) => /MUVIE/i.test(c.name)) : cinemas.find((c) => c.name.replace(/影城$/, "") === v) || cinemas.find((c) => v.length >= 4 && c.name.indexOf(v) >= 0);
+    return hit || { id: "fest-" + x.venue, name: festivalPlace({ venue: x.venue, room: "" }) || f.name, city: "", district: "", source: "tw", url: f.site };
+  }
+  function festivalNote(list) {
+    const today = todayTPE();
+    if (list.some((f) => f.start <= today)) return "進行中";
+    const next = list.map((f) => f.start).sort()[0] || "";
+    return next ? `${Number(next.slice(5, 7))}/${Number(next.slice(8, 10))} 開始` : "";
+  }
   function distanceKm(a, b) {
     const R = 6371, rad = Math.PI / 180;
     const dLat = (b.lat - a.lat) * rad, dLng = (b.lng - a.lng) * rad;
@@ -2536,8 +2589,39 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     const rows = movieRows(days, { cities: selCities, formats: selFormats, favIds }).map((r) => ({ date: r.date, cinema: r.cinema }));
     return { title: base.title, rating: base.rating, runtime: base.runtime, release: base.release || "", total: base.cinemas.length, dates: allDates, selDates, cities: allCities, formats: available, rows };
   }
+  async function festivalBoard(festId, date) {
+    const list = await loadFestivals();
+    const f = list.find((x) => x.id === festId) || list[0];
+    if (!f) return { festivals: [], note: "", id: "", name: "", range: "", footer: "", dates: [], date: "", day: [] };
+    const dates = festivalDates(f);
+    const d = dates.indexOf(date) >= 0 ? date : dates[0];
+    const md = (x) => `${Number(x.slice(5, 7))}/${Number(x.slice(8, 10))}`;
+    return {
+      festivals: list.map((x) => ({ id: x.id, name: x.name })),
+      note: festivalNote(list),
+      id: f.id,
+      name: f.name,
+      range: `${md(f.start)}–${md(f.end)}`,
+      footer: `場次來自${f.source}，${f.ticketing ? `購票會開啟${f.ticketing}` : "購票請到官網"}。是否售完請以售票頁為準。影展的片名在院線上映時可能不同。`,
+      dates,
+      date: d,
+      day: festivalDay(f, d).map(({ film, sessions }) => ({ film, count: sessions.length, lines: festivalLines(film, sessions) }))
+    };
+  }
+  async function festivalFilm(festId, filmId) {
+    const [list, cinemas] = await Promise.all([loadFestivals(), loadCinemas().catch(() => [])]);
+    const f = list.find((x) => x.id === festId);
+    if (!f) return null;
+    const film = f.films.find((x) => x.id === filmId);
+    if (!film) return null;
+    return {
+      name: f.name,
+      film,
+      sessions: festivalFilmSessions(f, filmId).map((x) => ({ date: x.date, time: x.time, place: festivalPlace(x), room: x.room, ticket: x.ticket || film.url, cinema: festivalCinema(x, cinemas, f) }))
+    };
+  }
   var formatList = () => FORMATS;
-  var extra = { boxOffice, nowShowing, nowShowingMulti, movieBoard, nearby, patchSettings, fillMovie, formatList };
+  var extra = { boxOffice, nowShowing, nowShowingMulti, movieBoard, festivalBoard, festivalFilm, nearby, patchSettings, fillMovie, formatList };
   globalThis.MS = {
     init(saved) {
       cache = saved || {};

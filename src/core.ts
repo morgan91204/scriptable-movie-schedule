@@ -1537,6 +1537,82 @@ export async function movieDays(slug: string, dates: string[]): Promise<TwMovieD
   return got.filter((d): d is TwMovieDay => !!d);
 }
 
+// ───────────────────────── 影展 ─────────────────────────
+// 影展場次由另外的售票系統販售，影城的一般時刻表不會列。伺服器定期讀影展官網公開的場次表（tools/festival.mjs），
+// 整理成 data 分支的 festival.json；裡面有還沒演的場次，App 就多出「影展」分類，影展結束就自動消失。
+// 這一類只讀伺服器整理好的檔，手機不會自己去讀影展官網。
+export const FESTIVAL_URL = "https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/data/festival.json";
+export interface FestivalFilm { id: string; title: string; mins: number; rating: string; url: string }
+export interface FestivalSession { film: string; date: string; time: string; venue: string; room: string; ticket: string }
+export interface Festival {
+  id: string;
+  name: string;
+  start: string; // 影展期間 YYYY-MM-DD
+  end: string;
+  site: string; // 官網場次表
+  source: string; // 資料來源的名稱
+  ticketing?: string; // 售票系統的名稱
+  films: FestivalFilm[];
+  sessions: FestivalSession[];
+}
+let festivalsNow: Festival[] = []; // 這次執行讀到的（同步拿，給分頁列判斷要不要顯示「影展」）
+/** 進行中或即將開始、而且還有場次沒演的影展（演過的日期已經去掉）。讀不到就是空的 */
+export async function loadFestivals(): Promise<Festival[]> {
+  const data = await loadServed<{ updated: number; festivals: Festival[] }>("festival", FESTIVAL_URL, 72, (d) => Array.isArray(d.festivals)).catch(() => null);
+  const today = todayTPE();
+  festivalsNow = (data ? data.festivals : [])
+    .map((f) => ({ ...f, sessions: (f.sessions || []).filter((x) => x.date >= today) }))
+    .filter((f) => f.end >= today && f.sessions.length > 0);
+  return festivalsNow;
+}
+/** 這次執行已經讀到的影展（沒讀過是空的） */
+export const festivalsReady = (): Festival[] => festivalsNow;
+/** 影展還有場次的日期 */
+export function festivalDates(f: Festival): string[] {
+  return Array.from(new Set(f.sessions.map((x) => x.date))).sort();
+}
+/** 場地的顯示名稱：官網只寫「MUVIE」「台北信義威秀」，補成看得懂的；影廳接在後面 */
+export function festivalPlace(x: { venue: string; room: string }): string {
+  const v = /^MUVIE$/i.test(x.venue) ? "MUVIE CINEMAS" : x.venue;
+  const room = /廳$/.test(x.room) || !x.room ? x.room : `${x.room} 廳`;
+  return [v, room].filter(Boolean).join(" ");
+}
+/** 影展的某一天：每部片一筆，附當天的場次（依第一場的時間排） */
+export function festivalDay(f: Festival, date: string): { film: FestivalFilm; sessions: FestivalSession[] }[] {
+  const by: Record<string, FestivalSession[]> = {};
+  for (const x of f.sessions) if (x.date === date) (by[x.film] ||= []).push(x);
+  const film = (id: string) => f.films.find((m) => m.id === id) || { id, title: "（片名未提供）", mins: 0, rating: "", url: f.site };
+  return Object.keys(by)
+    .map((id) => ({ film: film(id), sessions: by[id].sort((a, b) => a.time.localeCompare(b.time)) }))
+    .sort((a, b) => a.sessions[0].time.localeCompare(b.sessions[0].time) || a.film.title.localeCompare(b.film.title));
+}
+/** 一部片在影展期間還沒演的所有場次 */
+export function festivalFilmSessions(f: Festival, filmId: string): FestivalSession[] {
+  return f.sessions.filter((x) => x.film === filmId).sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
+}
+/** 清單上每一列的兩行說明：分級｜片長｜這天幾場；時間與影廳 */
+export function festivalLines(film: FestivalFilm, sessions: FestivalSession[]): [string, string] {
+  return [
+    [film.rating, film.mins ? `${film.mins} 分` : "", `這天 ${sessions.length} 場`].filter(Boolean).join("｜"),
+    sessions.map((x) => `${x.time} ${festivalPlace(x)}`).join("、"),
+  ];
+}
+/** 影展場地對應到 App 裡的影城（地址、導航用）；對不到就給一個只有名字的 */
+export function festivalCinema(x: { venue: string; room: string }, cinemas: Cinema[], f: Festival): Cinema {
+  const v = x.venue.replace(/影城$/, "");
+  const hit = /^MUVIE$/i.test(v)
+    ? cinemas.find((c) => /MUVIE/i.test(c.name) && /台北|松仁/.test(c.name + c.district)) || cinemas.find((c) => /MUVIE/i.test(c.name))
+    : cinemas.find((c) => c.name.replace(/影城$/, "") === v) || cinemas.find((c) => v.length >= 4 && c.name.indexOf(v) >= 0);
+  return hit || { id: "fest-" + x.venue, name: festivalPlace({ venue: x.venue, room: "" }) || f.name, city: "", district: "", source: "tw", url: f.site };
+}
+/** 分頁列上「影展」那一顆的小字：進行中／幾月幾日開始 */
+export function festivalNote(list: Festival[]): string {
+  const today = todayTPE();
+  if (list.some((f) => f.start <= today)) return "進行中";
+  const next = list.map((f) => f.start).sort()[0] || "";
+  return next ? `${Number(next.slice(5, 7))}/${Number(next.slice(8, 10))} 開始` : "";
+}
+
 // ───────────────────────── 距離 ─────────────────────────
 
 export interface LatLng {

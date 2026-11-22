@@ -79,9 +79,37 @@ async function movieBoard(slug: string, dates: string[], cities: string[], forma
   const rows = core.movieRows(days, { cities: selCities, formats: selFormats, favIds }).map((r) => ({ date: r.date, cinema: r.cinema }));
   return { title: base.title, rating: base.rating, runtime: base.runtime, release: base.release || "", total: base.cinemas.length, dates: allDates, selDates, cities: allCities, formats: available, rows };
 }
+/** 影展分類要的資料：有哪些影展、選中的那一個、可選的日期、那一天的片單 */
+async function festivalBoard(festId: string, date: string) {
+  const list = await core.loadFestivals();
+  const f = list.find((x) => x.id === festId) || list[0];
+  if (!f) return { festivals: [], note: "", id: "", name: "", range: "", footer: "", dates: [], date: "", day: [] };
+  const dates = core.festivalDates(f);
+  const d = dates.indexOf(date) >= 0 ? date : dates[0];
+  const md = (x: string) => `${Number(x.slice(5, 7))}/${Number(x.slice(8, 10))}`;
+  return {
+    festivals: list.map((x) => ({ id: x.id, name: x.name })), note: core.festivalNote(list),
+    id: f.id, name: f.name, range: `${md(f.start)}–${md(f.end)}`,
+    footer: `場次來自${f.source}，${f.ticketing ? `購票會開啟${f.ticketing}` : "購票請到官網"}。是否售完請以售票頁為準。影展的片名在院線上映時可能不同。`,
+    dates, date: d,
+    day: core.festivalDay(f, d).map(({ film, sessions }) => ({ film, count: sessions.length, lines: core.festivalLines(film, sessions) })),
+  };
+}
+/** 影展的一部片：還沒演的所有場次（附對應的影城，確認頁和導航用） */
+async function festivalFilm(festId: string, filmId: string) {
+  const [list, cinemas] = await Promise.all([core.loadFestivals(), core.loadCinemas().catch(() => [])]);
+  const f = list.find((x) => x.id === festId);
+  if (!f) return null;
+  const film = f.films.find((x) => x.id === filmId);
+  if (!film) return null;
+  return {
+    name: f.name, film,
+    sessions: core.festivalFilmSessions(f, filmId).map((x) => ({ date: x.date, time: x.time, place: core.festivalPlace(x), room: x.room, ticket: x.ticket || film.url, cinema: core.festivalCinema(x, cinemas, f) })),
+  };
+}
 /** 特殊廳清單（跟其他版本同一份） */
 const formatList = () => core.FORMATS;
-const extra: Record<string, (...a: any[]) => any> = { boxOffice, nowShowing, nowShowingMulti, movieBoard, nearby, patchSettings, fillMovie, formatList };
+const extra: Record<string, (...a: any[]) => any> = { boxOffice, nowShowing, nowShowingMulti, movieBoard, festivalBoard, festivalFilm, nearby, patchSettings, fillMovie, formatList };
 
 (globalThis as any).MS = {
   init(saved: Record<string, string>) {

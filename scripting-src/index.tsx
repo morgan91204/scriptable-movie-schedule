@@ -14,9 +14,9 @@ import {
   Cinema, Movie, Settings, Version, TwMovie, TwMovieCinema, CITY_ORDER, TW,
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
   loadSettings, saveSettings, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, cinemaAddress,
-  FORMATS, formatsOf, filterVersions, filterVersionsAny, movieRows, movieDays, nearest, kmLabel, WINDOWS, findShowtimes, findShowtimesMulti, multiLabel, multiDetail, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText, hallOf, tmdbTest, movieExtras, moviePoster, posterReady, posterTint, POSTER_TINTS, normImageUrl, movieRuntime, posterSrc, isLocalSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityVote, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, SCRIPTING_IMPORT_URL, ABOUT_URL, PRIVACY_URL, ADS_NOTE, movieRatings, ratingTier,
+  FORMATS, formatsOf, filterVersions, filterVersionsAny, movieRows, movieDays, nearest, kmLabel, WINDOWS, findShowtimes, findShowtimesMulti, multiLabel, multiDetail, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText, hallOf, tmdbTest, movieExtras, moviePoster, posterReady, posterTint, POSTER_TINTS, normImageUrl, movieRuntime, posterSrc, isLocalSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityVote, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, SCRIPTING_IMPORT_URL, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, movieRatings, ratingTier,
 } from "./core"
-import type { Format, LatLng, Hit, Community, BoxOfficeItem, BoxSort } from "./core"
+import type { Format, LatLng, Hit, Community, BoxOfficeItem, BoxSort, Festival, FestivalFilm, FestivalSession } from "./core"
 
 declare const Safari: any
 declare const Dialog: any
@@ -978,8 +978,85 @@ function BoxOfficeSections({ movies, query }: { movies: TwMovie[]; query: string
   </>
 }
 
+/** 影展分類：選影展（同時有兩個以上時）、選日期，列出那一天的片 */
+function FestivalSections({ list }: { list: Festival[] }) {
+  const [festId, setFestId] = useState("")
+  const [pickedDate, setPickedDate] = useState("")
+  const f = list.find((x) => x.id === festId) || list[0]
+  if (!f) return <Section><Text foregroundStyle={"secondaryLabel"}>目前沒有進行中的影展</Text></Section>
+  const dates = festivalDates(f)
+  const date = dates.indexOf(pickedDate) >= 0 ? pickedDate : dates[0]
+  const day = festivalDay(f, date)
+  const md = (d: string) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`
+  return <>
+    <Section footer={<Text>{`${f.name}｜${md(f.start)}–${md(f.end)}`}</Text>}>
+      {list.length > 1 ? <Picker title={"影展"} value={f.id} onChanged={(v: string) => { setFestId(v); setPickedDate("") }}>
+        {list.map((x) => <Text key={x.id} tag={x.id}>{x.name}</Text>)}
+      </Picker> : null}
+      <Picker title={"日期"} value={date} onChanged={(v: string) => setPickedDate(v)}>
+        {dates.map((d) => <Text key={d} tag={d}>{dateLabel(d)}</Text>)}
+      </Picker>
+    </Section>
+    <Section header={<Text>{`${day.length} 部、${day.reduce((n, x) => n + x.sessions.length, 0)} 場`}</Text>}
+      footer={<Text>{`場次來自${f.source}，${f.ticketing ? `購票會開啟${f.ticketing}` : "購票請到官網"}。是否售完請以售票頁為準。影展的片名在院線上映時可能不同。`}</Text>}>
+      {day.map(({ film, sessions }) => {
+        const lines = festivalLines(film, sessions)
+        return <NavigationLink key={film.id} destination={<FestivalFilmPage festival={f} film={film} />}>
+          <HStack spacing={10}>
+            {GenPoster({ w: 44, h: 66, r: 6, title: film.title })}
+            <VStack alignment={"leading"} spacing={2}>
+              <Text foregroundStyle={"label"} lineLimit={2}>{film.title}</Text>
+              {lines[0] ? <Text font={"subheadline"} foregroundStyle={"secondaryLabel"} lineLimit={1} minScaleFactor={0.8}>{lines[0]}</Text> : null}
+              {lines[1] ? <Text font={"caption"} foregroundStyle={"tertiaryLabel"} lineLimit={2}>{lines[1]}</Text> : null}
+            </VStack>
+            <Spacer />
+          </HStack>
+        </NavigationLink>
+      })}
+      {day.length ? null : <Text foregroundStyle={"secondaryLabel"}>這一天沒有場次</Text>}
+    </Section>
+  </>
+}
+
+/** 影展的一部片：列出還沒演的所有場次，點一場進確認頁加入行事曆 */
+function FestivalFilmPage({ festival: f, film }: { festival: Festival; film: FestivalFilm }) {
+  const [settings] = useSettings()
+  const sessions = festivalFilmSessions(f, film.id)
+  const end = (x: FestivalSession) => (film.mins ? fmt(new Date(tpeDate(x.date, x.time).getTime() + (film.mins + settings.ads) * 6e4)).slice(-5) : "")
+  return <List navigationTitle={film.title} navigationBarTitleDisplayMode={"inline"}>
+    <Section>
+      <HStack alignment={"bottom"} spacing={12} listRowBackground={"clear"}>
+        {GenPoster({ w: 104, h: 156, r: 12, title: film.title })}
+        <VStack alignment={"leading"} spacing={4}>
+          <Text font={"subheadline"} foregroundStyle={"secondaryLabel"}>{[film.rating, film.mins ? `${film.mins} 分鐘` : ""].filter(Boolean).join("｜")}</Text>
+          <Text font={"subheadline"} foregroundStyle={"secondaryLabel"}>{f.name}</Text>
+          <Text font={"footnote"} foregroundStyle={"tertiaryLabel"}>影展片名，院線上映時可能不同</Text>
+        </VStack>
+      </HStack>
+    </Section>
+    <Section header={<Text>場次</Text>} footer={<Text>點一場加入行事曆。散場時間是依片長和你設定的廣告預告時間估的。</Text>}>
+      {sessions.map((x) => {
+        const cinema = festivalCinema(x, store.cinemas, f)
+        const version: Version = { label: festivalPlace(x), times: [x.time] }
+        const movie: Movie = { title: film.title, runtime: film.mins, rating: film.rating, versions: [version] }
+        return <NavigationLink key={x.date + x.time + x.venue + x.room} destination={
+          <ConfirmPage pick={{ cinema, date: x.date, movie, version, time: x.time, booking: x.ticket || film.url, sourceUrl: film.url, address: cinema.address || "" }} />
+        }>
+          <Row title={`${dateLabel(x.date).replace(/ .*$/, "")}　${x.time}`} subtitle={[festivalPlace(x), end(x) ? `預計 ${end(x)} 散場` : ""].filter(Boolean).join("｜")} />
+        </NavigationLink>
+      })}
+      {sessions.length ? null : <Text foregroundStyle={"secondaryLabel"}>這部片的場次都演完了</Text>}
+    </Section>
+    <Section>
+      <Button title={"官網的影片介紹"} systemImage={"safari"} action={() => Safari.openURL(film.url)} />
+    </Section>
+  </List>
+}
+
 function MoviesPage() {
   const movies = useLoad(() => loadMovies(), [])
+  const fests = useLoad(() => loadFestivals(), []) // 有進行中或即將開始的影展，才多出「影展」分類
+  const festList = fests.data || []
   const [mode, setMode] = useState<string>("now")
   const [query, setQuery] = useState("")
   const k = query.trim().toLowerCase()
@@ -987,7 +1064,7 @@ function MoviesPage() {
   useEffect(() => { if (movies.data) prefetchPosters(list) }, [movies.data, k, mode]) // 背景先抓海報，進電影頁就不用等
   const now = list.filter((m) => !m.comingSoon)
   const soon = list.filter((m) => m.comingSoon)
-  const thumbOf = useThumbs(mode === "box" ? [] : list, `${(movies.data || []).length}|${k}|${mode}`) // 每一列的小海報
+  const thumbOf = useThumbs(mode === "box" || mode === "fest" ? [] : list, `${(movies.data || []).length}|${k}|${mode}`) // 每一列的小海報
   const row = (m: TwMovie) => {
     const t = thumbOf(m)
     const lines = movieLines(m)
@@ -1014,9 +1091,10 @@ function MoviesPage() {
         <Text tag={"now"}>上映中</Text>
         <Text tag={"box"}>票房排行</Text>
         <Text tag={"soon"}>即將上映</Text>
+        {festList.length ? <Text tag={"fest"}>影展</Text> : null}
       </Picker>
     </Section>
-    {mode === "box" ? <BoxOfficeSections movies={movies.data || []} query={k} /> : <>
+    {mode === "fest" ? <FestivalSections list={festList} /> : mode === "box" ? <BoxOfficeSections movies={movies.data || []} query={k} /> : <>
       {movies.error ? <ErrorRow error={movies.error} retry={movies.reload} /> : null}
       {!movies.data && !movies.error ? <Section><Loading text={"讀取電影清單…"} /></Section> : null}
       {now.length ? <Section header={<Text>{`上映中（${now.length}）`}</Text>} footer={<Text>依今天放映的影城數排序；今天沒有場次、過幾天才有的排在最後。資料來自場次通。</Text>}>{now.map(row)}</Section> : null}
