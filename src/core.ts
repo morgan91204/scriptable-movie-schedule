@@ -1722,7 +1722,7 @@ export function movieBoard(b: BoxOffice | null, movies: TwMovie[], opt: { scope?
   if (yearOptions.length) scopes.push({ id: "year", label: "年度", sub: "含已下檔" });
   const scope: MovieScope = (opt.scope === "year" || opt.sort === "year") && yearOptions.length ? "year" : "now"; // 舊版畫面把「年度排行」放在排序裡：sort 是 year 也算範圍是年度
   // 範圍是年度（那幾年上映的片，含已下檔）時的排法：票房只有累計；影城數是官方資料的「上映院數」
-  const yearSorts: MovieBoard["sorts"] = [{ id: "total", label: "票房" }, { id: "date", label: "上映日期" }, { id: "rating", label: "評分" }, { id: "cinemas", label: "上映院數" }];
+  const yearSorts: MovieBoard["sorts"] = [{ id: "total", label: "票房" }, { id: "date", label: "上映日期" }, { id: "rating", label: "評分" }, { id: "cinemas", label: "累計院數" }];
   const sortsAll: MovieBoard["sorts"] = [];
   if (b) sortsAll.push({ id: "week", label: b.mode === "week" ? "本週票房" : "近期票房" });
   if (b && b.mode === "week") sortsAll.push({ id: "total", label: "累計票房" });
@@ -1765,9 +1765,13 @@ export function movieBoard(b: BoxOffice | null, movies: TwMovie[], opt: { scope?
     const pool = boxByCountry(everyone, land); // 名次已經依累計票房排好
     const yr = opt.yearRatings ? opt.yearRatings.ratings : {};
     const noneHi = (kind: EntryHi["kind"], note?: string): EntryHi => ({ kind, text: "–", tier: "none", ...(note ? { note } : {}) });
+    // 累計院數：官方票房資料的戲院數是「上映以來累計放映過的戲院數」，但官方資料慢一到兩週（只算到 b.end 那一天）。
+    // 還在上映的片，如果今天有場次的影城已經比官方的數字多（剛擴大上映、或上週只有少數戲院搶先場），就用今天的數字，
+    // 這樣上映中和已下檔的片都是「放映過的戲院數」，可以放在一起比（《善男信女》：官方到 11/15 只有 1 間，現在是 22 間）
+    const theatersOf = (x: BoxOfficeItem, m: TwMovie | null): number => Math.max(x.theaters || 0, m && !m.comingSoon ? m.cinemaCount || 0 : 0);
     const keyOf = (x: BoxOfficeItem, m: TwMovie | null): { tier: number; v: number; hi: EntryHi } => {
       if (sort === "date") return x.release ? { tier: 1, v: Number(x.release.slice(0, 10).replace(/-/g, "")) || 0, hi: { kind: "date", text: mdOf(x.release), tier: "none", note: x.release.slice(0, 4) } } : { tier: 0, v: 0, hi: noneHi("date", "日期不明") };
-      if (sort === "cinemas") return x.theaters ? { tier: 1, v: x.theaters, hi: { kind: "cinemas", text: String(x.theaters), tier: "none", note: "上映院數" } } : { tier: 0, v: 0, hi: noneHi("cinemas") };
+      if (sort === "cinemas") { const th = theatersOf(x, m); return th ? { tier: 1, v: th, hi: { kind: "cinemas", text: String(th), tier: "none", note: "累計院數" } } : { tier: 0, v: 0, hi: noneHi("cinemas") }; }
       if (sort === "rating") {
         if (rate === "community") {
           const c = opt.community && opt.community[communityKey(x.name)] ? fromDist(opt.community[communityKey(x.name)], 0) : null;
@@ -1788,7 +1792,7 @@ export function movieBoard(b: BoxOffice | null, movies: TwMovie[], opt: { scope?
     if (sort === "rating" || sort === "cinemas") keyed.slice().sort((a, c) => c.k.tier - a.k.tier || c.k.v - a.k.v).forEach((e, i) => { if (e.k.tier > 0) e.rank = i + 1; });
     keyed.sort((a, c) => c.k.tier - a.k.tier || (asc ? a.k.v - c.k.v : c.k.v - a.k.v));
     const entries = keyed.map(({ x, m, k: kk, rank }): MovieEntry => {
-      const info = [x.showing ? "上映中" : "", boxMainCountry(x.country), sort === "date" ? "" : releaseLabel(x.release), x.theaters && sort !== "cinemas" ? `${x.theaters} 間戲院` : ""].filter(Boolean).join("｜");
+      const info = [x.showing ? "上映中" : "", boxMainCountry(x.country), sort === "date" ? "" : releaseLabel(x.release), theatersOf(x, m) && sort !== "cinemas" ? `${theatersOf(x, m)} 間戲院` : ""].filter(Boolean).join("｜");
       return { key: `${x.name}|${x.release}`, rank, name: x.name, x, m, lines: sort === "total" ? [info, ""] : [`票房 ${money(x.total)}`, info], light: !m, hi: kk.hi };
     });
     const rateName = rates.find((r) => r.id === rate)!.label;
@@ -1799,9 +1803,9 @@ export function movieBoard(b: BoxOffice | null, movies: TwMovie[], opt: { scope?
     return {
       ...base, sorts: yearSorts, weeks: [], weekSummary: "",
       countries, selCountries: land, everyone: everyone.length, countrySummary: landText(land, everyone.length), entries, rest: [],
-      title: (sort === "total" ? `${yt} 年票房排行（截至 ${md(b.end)}）${dirTag}` : `${yt} 年上映 ${entries.length} 部｜${sort === "date" ? (asc ? "最早上映在前" : "最新上映在前") : sort === "rating" ? `${rateName}${asc ? "低到高" : "高到低"}` : `上映院數${asc ? "少到多" : "多到少"}`}`) + boxCountryTag(land),
+      title: (sort === "total" ? `${yt} 年票房排行（截至 ${md(b.end)}）${dirTag}` : `${yt} 年上映 ${entries.length} 部｜${sort === "date" ? (asc ? "最早上映在前" : "最新上映在前") : sort === "rating" ? `${rateName}${asc ? "低到高" : "高到低"}` : `累計院數${asc ? "少到多" : "多到少"}`}`) + boxCountryTag(land),
       footer: sort === "total" ? boxOfficeFooter(b, "year", selYears, wk.id)
-        : `${yt} 年上映、有票房紀錄的電影（已經下檔的也在裡面）${sort === "date" ? "依上映日期排序" : sort === "rating" ? `依${rateName}排序。${rate === "community" ? `評分不到 ${COMMUNITY_MIN} 人的不列入。` : cov}` : "依上映院數排序（官方票房資料裡的戲院數，不是今天有場次的影城數）"}。${src}`.replace("。。", "。"),
+        : `${yt} 年上映、有票房紀錄的電影（已經下檔的也在裡面）${sort === "date" ? "依上映日期排序" : sort === "rating" ? `依${rateName}排序。${rate === "community" ? `評分不到 ${COMMUNITY_MIN} 人的不列入。` : cov}` : `依累計院數排序：上映以來放映過的戲院數（官方票房資料，算到 ${md(b.end)}）。還在上映的片，今天有場次的影城如果比官方的數字多，就用今天的數字，所以上映中和已下檔的片算法相同`}。${src}`.replace("。。", "。"),
       restTitle: "", restFooter: "", paged: true,
     };
   }
