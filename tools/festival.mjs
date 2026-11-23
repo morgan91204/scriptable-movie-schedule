@@ -80,21 +80,51 @@ const KNOWN_STILLS = {};
 export const goldenHorseStill = (html) => (String(html).match(/https:\/\/storage\.googleapis\.com\/tghff_outland\/image\/photo\/[^"'\s)]+\.(?:jpe?g|png|webp)/i) || [])[0] || "";
 /** 從每部片自己的介紹頁補上簡介（和官網嵌的預告）。pageOf(f) 回傳那部片的介紹頁網址（沒有就不查）。
  *  查過的記在上一次的存檔裡（沒有簡介的存成空字串），不會每次重讀；一次最多讀 max 頁，慢慢讀 */
-async function fillFromPages(festId, films, pageOf, max = 260) {
+/** 影片介紹頁上代表這部片的圖：先用頁面的分享圖（og:image）；整個網站共用同一張分享圖的（檔名像 share、logo、default）不算。
+ *  imageRe：分享圖不能用時，改找頁面上第一張符合這個樣式的圖（各影展的劇照放在固定的資料夾） */
+export function pagePoster(html, pageUrl, imageRe) {
+  const h = String(html);
+  const og = unescape((h.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i) || h.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i) || [])[1] || "");
+  const ok = (u) => /^https:\/\//.test(u) && /\.(?:jpe?g|png|webp)(?:\?|$)/i.test(u) && !/share|logo|default|favicon|banner/i.test(u.split("/").pop() || "");
+  let abs = "";
+  try { abs = og ? new URL(og, pageUrl).href : ""; } catch (_) {}
+  if (!imageRe && ok(abs)) return abs;
+  if (imageRe) {
+    const m = h.match(imageRe);
+    try { const u = m ? new URL(unescape(m[1] || m[0]), pageUrl).href : ""; if (/^https:\/\//.test(u)) return u; } catch (_) {}
+    if (ok(abs)) return abs;
+  }
+  return "";
+}
+/** 從每部片自己的介紹頁補上簡介、劇照（和官網嵌的預告）。pageOf(f) 回傳那部片的介紹頁網址（沒有就不查）。
+ *  查過的記在上一次的存檔裡（沒有的存成空字串），不會每次重讀；一次最多讀 max 頁，慢慢讀。
+ *  劇照：片單本身已經有圖的不動；沒有的才從介紹頁找（找不到存空字串，表示查過了） */
+async function fillFromPages(festId, films, pageOf, max = 260, imageRe = null) {
   const known = KNOWN_STILLS[festId] || {};
+  const fromPage = new Set(); // 這一次從介紹頁拿到圖的片
   let asked = 0;
   for (const f of films) {
     const k = known[f.id];
-    if (k && k.intro !== undefined) { if (f.intro === undefined) f.intro = k.intro; if (!f.trailer && k.trailer) f.trailer = k.trailer; continue; }
+    if (k) {
+      if (f.intro === undefined && k.intro !== undefined) f.intro = k.intro;
+      if (!f.trailer && k.trailer) f.trailer = k.trailer;
+      if (!f.poster && k.poster !== undefined) f.poster = k.poster;
+    }
+    if (f.intro !== undefined && f.poster !== undefined) continue; // 簡介、劇照都查過了
     const page = pageOf(f);
-    if (!page || f.intro || asked >= max) continue;
+    if (!page || asked >= max) continue;
     asked++;
     await new Promise((r) => setTimeout(r, 400));
     const html = await get(page).catch(() => "");
     if (!html) continue; // 讀不到：下次再試
-    f.intro = firstParagraph(html);
+    if (f.intro === undefined || !f.intro) f.intro = firstParagraph(html);
     if (!f.trailer) { const t = youtubeIn(html); if (t) f.trailer = t; }
+    if (!f.poster) { f.poster = pagePoster(html, page, imageRe); if (f.poster) fromPage.add(f); }
   }
+  // 同一張圖被三部以上的片用到：那是網站共用的圖，不是劇照
+  const used = {};
+  for (const f of films) if (f.poster) used[f.poster] = (used[f.poster] || 0) + 1;
+  for (const f of films) if (fromPage.has(f) && used[f.poster] >= 3) f.poster = "";
 }
 async function goldenHorse() {
   const first = await get(GH);
@@ -579,7 +609,8 @@ async function taichungAnimation() {
   const { films, sessions } = parseTiafPage(await get(url), year, url);
   if (!sessions.length) return null;
   const got = sessions.map((x) => x.date).sort();
-  await fillFromPages(`tiaf-${year}`, Object.values(films), (f) => (/film\.php\?id=/.test(f.url) ? f.url : ""));
+  // 劇照放在 assets/upload2/<年份>/ 底下（分享圖是全站共用的，不能用）
+  await fillFromPages(`tiaf-${year}`, Object.values(films), (f) => (/film\.php\?id=/.test(f.url) ? f.url : ""), 260, /<img[^>]+src=["']([^"']*\/assets\/upload2\/[^"']+\.(?:png|jpe?g|webp))["']/i);
   return { id: `tiaf-${year}`, name: "臺中國際動畫影展", start: got[0], end: got[got.length - 1], site: url, source: "臺中國際動畫影展官網", ticketing: "OPENTIX", films: Object.values(films), sessions };
 }
 
@@ -636,10 +667,12 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const [outPath = "festival.json", prevPath = ""] = process.argv.slice(2);
   let prev = [];
   let prevYears = [];
+  let prevTmdb = {}; // 用 TMDB 補劇照查過的片（片名鍵 → { p: 海報路徑, at: 查詢時間 }）
   try {
     const old = JSON.parse(fs.readFileSync(prevPath, "utf8"));
     prev = old.festivals || [];
     prevYears = Array.isArray(old.years) ? old.years.filter((y) => Number.isInteger(y)) : [];
+    if (old.tmdbPosters && typeof old.tmdbPosters === "object") prevTmdb = old.tmdbPosters;
   } catch (_) {}
   for (const f of prev) { const m = (KNOWN_STILLS[f.id] = {}); for (const x of f.films || []) m[x.id] = { poster: x.poster, trailer: x.trailer, intro: x.intro, credits: x.credits }; }
   const got = [];
@@ -654,6 +687,44 @@ if (import.meta.url === `file://${process.argv[1]}`) {
       console.log(`${label}：讀取失敗（${String(e.message || e)}），這次略過`);
       status[label] = { result: "error", error: String(e.message || e).slice(0, 200) };
     }
+  }
+  // 官網怎麼找都沒有圖的片（人權電影節的來源是售票頁，沒有個別影片的圖）：用 TMDB 補。
+  // 中文片名要完全相同才算（影展片常是冷門片，寧可沒有也不要配錯）；查過的記在 tmdbPosters，找不到的 30 天後再試
+  const tmdbPosters = prevTmdb;
+  const TOKEN = (process.env.TMDB_TOKEN || "").trim();
+  if (TOKEN) {
+    const key = (t) => String(t || "").toLowerCase().replace(/[\s\p{P}\p{S}]/gu, "").replace(/臺/g, "台");
+    const NOT_FILM = /典禮|講座|座談|論壇|工作坊|合輯|短片輯|精選|競賽|得獎|放映\s*\d|＋|\+|｜|單元|首獎|開幕|閉幕|Program|[ⅠⅡⅢIVX]{1,3}$/;
+    let asked = 0, found = 0;
+    for (const f of got) for (const film of f.films) {
+      if (film.poster || NOT_FILM.test(film.title)) continue;
+      const k = key(film.title);
+      if (!k) continue;
+      const old = tmdbPosters[k];
+      if (!old || (!old.p && Date.now() - old.at > 30 * 86400e3)) {
+        if (asked >= 150) continue; // 一次最多查 150 部，剩下的下一輪
+        asked++;
+        try {
+          const r = await fetch(`https://api.themoviedb.org/3/search/movie?language=zh-TW&query=${encodeURIComponent(film.title)}`, { headers: { accept: "application/json", Authorization: "Bearer " + TOKEN }, signal: AbortSignal.timeout(20000) });
+          if (!r.ok) throw new Error(String(r.status));
+          const hits = ((await r.json()).results || []).filter((x) => x.poster_path && /^\/[\w.-]+$/.test(x.poster_path) && (key(x.title) === k || key(x.original_title) === k));
+          // 同名多部：挑離影展那一年最近的（影展放的多半是近一兩年的新片），再來是評分人數多的
+          const fy = Number(String(f.end).slice(0, 4));
+          const dist = (x) => { const y = Number(String(x.release_date || "").slice(0, 4)); return y ? Math.abs(fy - y) : 99; };
+          const hit = hits.sort((a, b) => Math.min(dist(a), 3) - Math.min(dist(b), 3) || (b.vote_count || 0) - (a.vote_count || 0))[0];
+          tmdbPosters[k] = { p: hit ? hit.poster_path : "", at: Date.now() };
+        } catch (_) { continue; }
+        await new Promise((r) => setTimeout(r, 60));
+      }
+      if (tmdbPosters[k] && tmdbPosters[k].p) { film.poster = "https://image.tmdb.org/t/p/w342" + tmdbPosters[k].p; found++; }
+    }
+    console.log(`沒有劇照的片用 TMDB 補：這次問了 ${asked} 次，補上 ${found} 部`);
+  }
+  // 各影展有圖的比例（一張都沒有的要注意：官網改版，或這個來源本來就沒有圖）
+  for (const f of got) {
+    const n = f.films.filter((x) => x.poster).length;
+    console.log(`  劇照 ${f.name}：${n}／${f.films.length}${n ? "" : "　← 一張都沒有"}`);
+    for (const st of Object.values(status)) for (const x of st.festivals || []) if (x.id === f.id) { x.films = f.films.length; x.posters = n; } // 每週的檢查會看：有圖的比例突然掉下來＝官網改版
   }
   // 這次讀到的蓋掉舊的；沒讀到的（官網換屆了、或暫時讀不到）沿用上一次存的。
   // 只留「今年」的影展（結束日在今年），跨年後舊的自動清掉
@@ -695,7 +766,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   }
   // years = 有存檔的年份（新的在前），App 用它列出可以選的年份
   const years = Array.from(new Set([...prevYears, ...archYears, ...(festivals.length ? [Number(year)] : [])])).sort((a, b) => b - a);
-  fs.writeFileSync(outPath, JSON.stringify({ updated: Date.now(), years, festivals }) + "\n");
+  fs.writeFileSync(outPath, JSON.stringify({ updated: Date.now(), years, festivals, tmdbPosters }) + "\n");
   if (festivals.length) fs.writeFileSync(outPath.replace(/\.json$/, `-${year}.json`), JSON.stringify({ updated: Date.now(), festivals }) + "\n");
   // 讀取狀態：result = ok（讀到場次）／empty（官網讀得到但沒有場次，或被擋）／error（連不上）；
   // lastOk = 最近一次讀到場次的時間、since = 目前這個結果從什麼時候開始（連續失敗多久就看這個）

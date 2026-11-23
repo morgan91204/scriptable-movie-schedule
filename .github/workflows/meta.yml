@@ -47,6 +47,8 @@ jobs:
         run: |
           curl -fsSL "https://raw.githubusercontent.com/${{ github.repository }}/data/festival.json?t=$(date +%s)" -o "$RUNNER_TEMP/prev-festival.json" || echo "還沒有影展檔"
           FESTIVAL_BASE="https://raw.githubusercontent.com/${{ github.repository }}/data" node tools/festival.mjs "$RUNNER_TEMP/festival.json" "$RUNNER_TEMP/prev-festival.json" || echo "影展場次這次略過"
+        env:
+          TMDB_TOKEN: ${{ secrets.TMDB_TOKEN }} # 官網沒有劇照的片用 TMDB 補（查過的不再查）
       - name: 年度票房排行的海報（TMDB；查過的不再查，一次最多 3000 部）
         run: |
           curl -fsSL "https://raw.githubusercontent.com/${{ github.repository }}/data/posters.json?t=$(date +%s)" -o "$RUNNER_TEMP/prev-posters.json" || echo "還沒有海報對照表"
