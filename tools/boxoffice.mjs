@@ -1,7 +1,9 @@
 // 全台票房排行：讀國家電影及視聽文化中心「全國電影票房統計」開放資料（政府資料開放授權條款第 1 版），
 // 產生 dist/boxoffice.json 給兩個 App 用。官方只提供 2016 年以來的累計票房，
 // 所以每週存一份快照（data/boxoffice-snapshot.json），用「這週累計 − 上週累計」算出週票房。
-// 用法：node tools/boxoffice.mjs（GitHub Actions 每天跑一次，資料有更新才會改檔）
+// 用法：node tools/boxoffice.mjs（GitHub Actions 每小時跑一次，資料有更新才會改檔）
+// 每一週的起訖是官方資料自己的截止日（End）決定的，跟我們幾點去讀無關：晚幾個小時讀，數字和週次都一樣。
+// 只有連續七天以上都沒讀到（漏掉一整週）時，相減出來的才會是兩週合計；那時 start 會是上一份快照的隔天，畫面照實顯示那段期間
 import fs from "node:fs";
 
 const SRC = "https://boxofficetw.tfai.org.tw/OpenData/statistic/since2016";
