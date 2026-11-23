@@ -570,7 +570,8 @@ const ticffJob = (kind) => async () => {
   if (!sessions.length) return null;
   const got = sessions.map((x) => x.date).sort();
   const pages = {};
-  for (const f of Object.values(films)) { pages[f.id] = f.page || ""; delete f.page; }
+  // 單一影片有自己的介紹頁；短片合輯沒有個別的頁，用那個單元的介紹頁（有單元的封面圖與說明）
+  for (const f of Object.values(films)) { pages[f.id] = f.page || (f.url && f.url !== url ? f.url : ""); delete f.page; }
   await fillFromPages(`${kind === "ks" ? "ticffks" : "ticff"}-${year}`, Object.values(films), (f) => pages[f.id]);
   return { id: `${kind === "ks" ? "ticffks" : "ticff"}-${year}`, name: kind === "ks" ? "兒童影展（高雄）" : "兒童影展（台北）", start: got[0], end: got[got.length - 1], site: url, source: "台灣國際兒童影展官網", films: Object.values(films), sessions };
 };
@@ -587,7 +588,7 @@ export function parseTiafPage(html, year, url) {
       if (!th) continue;
       const room = clean(th[3]).replace(/^(\d+)\s*廳$/, "$1"); // 「2廳」只留數字（畫面會補「廳」），其他廳名原樣
       for (const td of row.split(/<div class="td showTime/).slice(1)) {
-        const title = clean((td.match(/<b>([\s\S]*?)<\/b>/) || [])[1]);
+        const title = clean((td.match(/<b>([\s\S]*?)<\/b>/) || [])[1]).replace(/\s*([：:])\s*/g, "$1"); // 同一個單元有時冒號後面多一個空白：統一掉，才不會變成兩筆
         const fid = (td.match(/data-films="(\d+)"/) || [])[1] || "";
         const time = (td.match(/<div class="time">\s*(\d{1,2}:\d{2})/) || [])[1];
         if (!title || !time) continue;
