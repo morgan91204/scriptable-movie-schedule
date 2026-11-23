@@ -1001,13 +1001,13 @@ export function posterLight(title: string, release?: string): Promise<string> {
     if (me && me.p) return normImageUrl(me.p);
     const own = all["l|" + nk] as (MovieExtras & { at: number; v?: number }) | undefined;
     // 找到的記 30 天；沒找到的記 3 天，但舊規則（重映片也比年份）記下的「沒找到」一律重查
-    if (own && Date.now() - own.at < (own.poster ? 30 : own.v === 2 ? 3 : 0) * 86400e3) return own.poster || thumb;
+    if (own && Date.now() - own.at < (own.poster ? 30 : own.v === 3 ? 3 : 0) * 86400e3) return own.poster || thumb;
     // 年份用來擋同名的別部片；重映、修復版的上映日期是重映日，跟原片年份對不上，所以不比
     //（《夏日大作戰 全新4K修復版》2026 上映，原片是 2009）
     // 只認明確是舊片再上映的字樣；「數位2D版」這種只是放映規格，那一年的新片照樣要比年份
     const rerun = /修復|重映|重製|再映|經典|紀念|週年|[48]K/i.test(title);
     const year = rerun ? 0 : Number((release || "").slice(0, 4)) || 0;
-    const poster = await posterLane(async () => {
+    const quick = await posterLane(async () => {
       try {
         const q = baseTitle(title).toLowerCase().replace(/[\\/?#%]/g, " ").trim();
         const r = await platform().fetchText(`https://v3.sg.media-imdb.com/suggestion/x/${encodeURIComponent(q)}.json`, { "User-Agent": UA });
@@ -1019,8 +1019,11 @@ export function posterLight(title: string, release?: string): Promise<string> {
         return "";
       }
     });
+    // 快查找不到（大約四分之一的舊片）：改用跟電影頁一樣的完整查法，清單不用點進去也會有海報。
+    // 比較慢、請求也多，所以只在快查失敗時才做，而且同時最多 4 部（moviePoster 自己會排隊）；查過的記在手機上
+    const poster = quick || (await moviePoster(title).catch(() => ""));
     const latest = readExtras();
-    latest["l|" + nk] = { poster, trailer: "", trailerName: "", at: Date.now(), v: 2 } as MovieExtras & { at: number };
+    latest["l|" + nk] = { poster, trailer: "", trailerName: "", at: Date.now(), v: 3 } as MovieExtras & { at: number };
     cacheSet("extras.json", JSON.stringify(latest));
     return poster || thumb;
   })().then((u) => {

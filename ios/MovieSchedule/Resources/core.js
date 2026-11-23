@@ -1488,10 +1488,10 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
       const me = await metaOf(title);
       if (me && me.p) return normImageUrl(me.p);
       const own = all["l|" + nk];
-      if (own && Date.now() - own.at < (own.poster ? 30 : own.v === 2 ? 3 : 0) * 864e5) return own.poster || thumb;
+      if (own && Date.now() - own.at < (own.poster ? 30 : own.v === 3 ? 3 : 0) * 864e5) return own.poster || thumb;
       const rerun = /修復|重映|重製|再映|經典|紀念|週年|[48]K/i.test(title);
       const year = rerun ? 0 : Number((release || "").slice(0, 4)) || 0;
-      const poster = await posterLane(async () => {
+      const quick = await posterLane(async () => {
         try {
           const q = baseTitle(title).toLowerCase().replace(/[\\/?#%]/g, " ").trim();
           const r = await platform().fetchText(`https://v3.sg.media-imdb.com/suggestion/x/${encodeURIComponent(q)}.json`, { "User-Agent": UA });
@@ -1503,8 +1503,9 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
           return "";
         }
       });
+      const poster = quick || await moviePoster(title).catch(() => "");
       const latest = readExtras();
-      latest["l|" + nk] = { poster, trailer: "", trailerName: "", at: Date.now(), v: 2 };
+      latest["l|" + nk] = { poster, trailer: "", trailerName: "", at: Date.now(), v: 3 };
       cacheSet("extras.json", JSON.stringify(latest));
       return poster || thumb;
     })().then((u) => {
@@ -2812,7 +2813,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   var extra = { boxOffice, nowShowing, nowShowingMulti, movieBoard, festivalBoard, festivalFilm, nearby, patchSettings, fillMovie, formatList };
   var BRIDGE_LEVEL = 2;
   globalThis.MS = {
-    version: "2026.11.23-1621",
+    version: "2026.11.23-1720",
     level: BRIDGE_LEVEL,
     init(saved) {
       cache = saved || {};
