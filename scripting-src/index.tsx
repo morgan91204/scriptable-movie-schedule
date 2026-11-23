@@ -947,7 +947,12 @@ function BoxOfficeMoviePage({ item: x }: { item: BoxOfficeItem }) {
     <MovieHero title={x.name} lines={[boxCountryText(x.country), `${date} 上映`]} />
     {/* 個別資訊：跟官方網站列的欄位一樣（國別、發行、出品、上映日期、院數、票數、金額） */}
     <Section header={<Text>{`票房第 ${x.rank} 名`}</Text>} footer={<Text>資料來源：國家電影及視聽文化中心「全國電影票房統計」。場次通目前沒有這部片的場次，可能已經下檔，或只在少數戲院放映。</Text>}>
-      {boxInfoRows(x, info.data || null).map(([label, value]) => <LabeledContent key={label} title={label} value={value} />)}
+      {/* 右邊的內容一行放不下時，字體自動縮小到放得下（最小縮到六成） */}
+      {boxInfoRows(x, info.data || null).map(([label, value]) => <HStack key={label} spacing={12}>
+        <Text>{label}</Text>
+        <Spacer />
+        <Text foregroundStyle={"secondaryLabel"} lineLimit={1} minScaleFactor={0.6}>{value}</Text>
+      </HStack>)}
     </Section>
   </List>
 }

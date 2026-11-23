@@ -63,7 +63,7 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .item .sub.dim{font-size:12px;opacity:.75;margin-top:1px}
 .item .right{font-size:14px;color:var(--fg2);flex:none;max-width:40%;text-align:right}
 .item.kv .body{flex:0 0 auto}
-.item.kv .right{flex:1 1 auto;max-width:none;min-width:0}
+.item.kv .right{flex:1 1 auto;max-width:none;min-width:0;white-space:nowrap;overflow:hidden}
 .item .badge{flex:none;font-size:12px;padding:2px 8px;border-radius:999px;background:var(--chip);color:var(--chip-fg)}
 .item .chev{color:var(--fg2);opacity:.55;font-size:22px;line-height:1;flex:none}
 .item.muted .title,.item.muted .sub{color:var(--fg2)}
@@ -199,8 +199,12 @@ function stripSync(){var a=document.querySelectorAll('.chips.scroll');for(var i=
 // 清單底下的「自動載入更多」：快滑到它（還差 900px）就自動觸發一次，不用使用者按
 var moreSeen=null;function autoMore(){var el=document.querySelector('.auto-more');if(!el||!window.IntersectionObserver)return;if(moreSeen)moreSeen.disconnect();
   moreSeen=new IntersectionObserver(function(es){for(var i=0;i<es.length;i++)if(es[i].isIntersecting&&!es[i].target.dataset.fired){es[i].target.dataset.fired='1';es[i].target.click();}},{rootMargin:'900px 0px'});moreSeen.observe(el);}
-setTimeout(autoMore,300);
-window.__render=function(html,to){var y=window.scrollY;document.getElementById('root').innerHTML=html;stripSync();autoMore();scrollKeep(to<0?y:to);var f=document.querySelector('input[autofocus]');if(f)setTimeout(function(){f.focus()},50);syncHist();};
+// 資料列右邊的內容（發行公司、票房）一行放不下時：字體一點一點縮小到放得下為止（最小 10px；再放不下才換行）
+function fitText(){var a=document.querySelectorAll('.item.kv .right');for(var i=0;i<a.length;i++){var el=a[i],size=14;el.style.fontSize='';el.style.whiteSpace='';
+  while(el.scrollWidth>el.clientWidth+1&&size>10){size-=0.5;el.style.fontSize=size+'px';}
+  if(el.scrollWidth>el.clientWidth+1){el.style.whiteSpace='normal';el.style.overflow='visible';}}}
+setTimeout(autoMore,300);setTimeout(fitText,50);window.addEventListener('resize',fitText);
+window.__render=function(html,to){var y=window.scrollY;document.getElementById('root').innerHTML=html;stripSync();autoMore();fitText();scrollKeep(to<0?y:to);var f=document.querySelector('input[autofocus]');if(f)setTimeout(function(){f.focus()},50);syncHist();};
 // 從螢幕左緣往右滑：回上一頁（等於點左上角的「返回」）。內容會跟著手指稍微移動，放開時滑得夠遠才算
 var sw=null;
 function swReset(now){sw=null;var c=document.querySelector('.content');if(c){c.style.transition=now?'none':'transform .15s';c.style.transform='';}}

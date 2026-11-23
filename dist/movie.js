@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.23-1952
+// @movie-schedule-app 電影行程 v2026.11.23-1953
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/parsers.gen.ts
@@ -2760,7 +2760,7 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .item .sub.dim{font-size:12px;opacity:.75;margin-top:1px}
 .item .right{font-size:14px;color:var(--fg2);flex:none;max-width:40%;text-align:right}
 .item.kv .body{flex:0 0 auto}
-.item.kv .right{flex:1 1 auto;max-width:none;min-width:0}
+.item.kv .right{flex:1 1 auto;max-width:none;min-width:0;white-space:nowrap;overflow:hidden}
 .item .badge{flex:none;font-size:12px;padding:2px 8px;border-radius:999px;background:var(--chip);color:var(--chip-fg)}
 .item .chev{color:var(--fg2);opacity:.55;font-size:22px;line-height:1;flex:none}
 .item.muted .title,.item.muted .sub{color:var(--fg2)}
@@ -2895,8 +2895,12 @@ function stripSync(){var a=document.querySelectorAll('.chips.scroll');for(var i=
 // 清單底下的「自動載入更多」：快滑到它（還差 900px）就自動觸發一次，不用使用者按
 var moreSeen=null;function autoMore(){var el=document.querySelector('.auto-more');if(!el||!window.IntersectionObserver)return;if(moreSeen)moreSeen.disconnect();
   moreSeen=new IntersectionObserver(function(es){for(var i=0;i<es.length;i++)if(es[i].isIntersecting&&!es[i].target.dataset.fired){es[i].target.dataset.fired='1';es[i].target.click();}},{rootMargin:'900px 0px'});moreSeen.observe(el);}
-setTimeout(autoMore,300);
-window.__render=function(html,to){var y=window.scrollY;document.getElementById('root').innerHTML=html;stripSync();autoMore();scrollKeep(to<0?y:to);var f=document.querySelector('input[autofocus]');if(f)setTimeout(function(){f.focus()},50);syncHist();};
+// 資料列右邊的內容（發行公司、票房）一行放不下時：字體一點一點縮小到放得下為止（最小 10px；再放不下才換行）
+function fitText(){var a=document.querySelectorAll('.item.kv .right');for(var i=0;i<a.length;i++){var el=a[i],size=14;el.style.fontSize='';el.style.whiteSpace='';
+  while(el.scrollWidth>el.clientWidth+1&&size>10){size-=0.5;el.style.fontSize=size+'px';}
+  if(el.scrollWidth>el.clientWidth+1){el.style.whiteSpace='normal';el.style.overflow='visible';}}}
+setTimeout(autoMore,300);setTimeout(fitText,50);window.addEventListener('resize',fitText);
+window.__render=function(html,to){var y=window.scrollY;document.getElementById('root').innerHTML=html;stripSync();autoMore();fitText();scrollKeep(to<0?y:to);var f=document.querySelector('input[autofocus]');if(f)setTimeout(function(){f.focus()},50);syncHist();};
 // 從螢幕左緣往右滑：回上一頁（等於點左上角的「返回」）。內容會跟著手指稍微移動，放開時滑得夠遠才算
 var sw=null;
 function swReset(now){sw=null;var c=document.querySelector('.content');if(c){c.style.transition=now?'none':'transform .15s';c.style.transform='';}}
@@ -3233,14 +3237,14 @@ var App = class {
   }
   /** 最新版本是多少。網頁版問的是自己網站現在上線的版本（重新整理就會拿到的那一版），不是 GitHub 上的 */
   checkVersion() {
-    if (true) return checkLatest("2026.11.23-1952");
+    if (true) return checkLatest("2026.11.23-1953");
     return (async () => {
       try {
         const r = await globalThis.fetch("/api/version?t=" + Date.now(), { cache: "no-store" });
         const latest = String((await r.json()).version || "");
         if (!latest) return null;
         const num = (v) => Number(v.replace(/\D/g, "")) || 0;
-        return { latest, isLatest: num("2026.11.23-1952") >= num(latest) };
+        return { latest, isLatest: num("2026.11.23-1953") >= num(latest) };
       } catch (_) {
         return null;
       }
@@ -3341,11 +3345,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.23-1952"}`);
+          Pasteboard.copy(`版本 ${"2026.11.23-1953"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.23-1952"}`,
+      `版本 ${"2026.11.23-1953"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -3687,7 +3691,7 @@ var App = class {
     if (false) {
       if (!r) return /* @__PURE__ */ h(Note, { text: "（無法確認是否為最新版：連不到網站）" });
       if (r.isLatest) return /* @__PURE__ */ h(Note, { text: "✅ 已是最新版" });
-      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.23-1952"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
+      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.23-1953"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
         globalThis.location.reload();
       } }));
     }
