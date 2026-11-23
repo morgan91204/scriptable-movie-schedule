@@ -156,6 +156,32 @@ function weekFilms(data, today) {
   const b = Object.values(data.up || {}).filter((m) => m.r >= from && m.r <= to && !m.a).map((m) => m.t);
   return Array.from(new Set([...a, ...b]));
 }
+// ── 用 Google 登入同步設定 ──
+// 伺服器只存：Google 帳號識別碼的雜湊（u:…）→ 設定；登入憑證的雜湊（t:…）→ 是哪一個帳號。不存 email、姓名、大頭貼。
+export const GOOGLE_CLIENT_ID = "591652673833-vluv8bc246871jpv40ijqalpus3tm2ge.apps.googleusercontent.com";
+const b64uBytes = (s) => Uint8Array.from(atob(String(s).replace(/-/g, "+").replace(/_/g, "/")), (c) => c.charCodeAt(0));
+const sha256hex = async (s) => Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s)))).map((b) => b.toString(16).padStart(2, "0")).join("");
+let googleKeys = null, googleKeysAt = 0;
+/** 驗證 Google 給的身分憑證（ID token）：簽章、發給誰（aud）、誰發的（iss）、有沒有過期、nonce；通過就回傳帳號識別碼（sub） */
+export async function verifyGoogle(idToken, nonce, fetchKeys) {
+  const parts = String(idToken || "").split(".");
+  if (parts.length !== 3) throw new Error("bad token");
+  const dec = (x) => JSON.parse(new TextDecoder().decode(b64uBytes(x)));
+  const head = dec(parts[0]), body = dec(parts[1]);
+  if (head.alg !== "RS256") throw new Error("bad alg");
+  if (!googleKeys || Date.now() - googleKeysAt > 3600e3) { googleKeys = await (fetchKeys ? fetchKeys() : fetch("https://www.googleapis.com/oauth2/v3/certs").then((r) => r.json())); googleKeysAt = Date.now(); }
+  const jwk = ((googleKeys && googleKeys.keys) || []).find((k) => k.kid === head.kid);
+  if (!jwk) { googleKeys = null; throw new Error("unknown key"); }
+  const key = await crypto.subtle.importKey("jwk", { kty: jwk.kty, n: jwk.n, e: jwk.e, alg: "RS256", ext: true }, { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" }, false, ["verify"]);
+  const ok = await crypto.subtle.verify("RSASSA-PKCS1-v1_5", key, b64uBytes(parts[2]), new TextEncoder().encode(parts[0] + "." + parts[1]));
+  if (!ok) throw new Error("bad signature");
+  if (body.aud !== GOOGLE_CLIENT_ID) throw new Error("bad audience");
+  if (body.iss !== "https://accounts.google.com" && body.iss !== "accounts.google.com") throw new Error("bad issuer");
+  if (!(Number(body.exp) * 1000 > Date.now())) throw new Error("expired");
+  if (!nonce || body.nonce !== nonce) throw new Error("bad nonce");
+  if (!body.sub) throw new Error("no subject");
+  return String(body.sub);
+}
 /** 所有訂閱都存在這一個 Durable Object 裡（人數不多；每筆一個鍵） */
 export class PushHub {
   constructor(state, env) { this.state = state; this.env = env; this.data = null; this.dataAt = 0; }
@@ -172,6 +198,7 @@ export class PushHub {
     if (path === "/run") return json(await this.run());
     let b;
     try { b = await req.json(); } catch (_) { return json({ error: "bad json" }, 400); }
+    if (path.startsWith("/sync/")) return this.sync(path, b || {});
     const endpoint = String((b.subscription && b.subscription.endpoint) || b.endpoint || "");
     if (!okEndpoint(endpoint) || endpoint.length > 1000) return json({ error: "bad endpoint" }, 400);
     const id = "s:" + (await idOf(endpoint));
@@ -218,6 +245,40 @@ export class PushHub {
     const bc = old.bc || { week: weekId(), fl: Object.fromEntries(Object.keys((data && data.fests) || {}).filter((k) => data.fests[k].n > 0).map((k) => [k, 1])) };
     await this.state.storage.put(id, { endpoint, keys: { p256dh: keys.p256dh, auth: keys.auth }, prefs, endCfg, opt, favs, sent, bc, at: Date.now() });
     return json({ ok: true, count: favs.length });
+  }
+  /** 同步設定：login 用 Google 的身分憑證換一張登入憑證；get／put 讀寫設定；logout 登出這台；wipe 刪掉伺服器上的設定並登出所有裝置 */
+  async sync(path, b) {
+    if (path === "/sync/login") {
+      let sub;
+      try { sub = await verifyGoogle(b.id_token, String(b.nonce || ""), this.env.GOOGLE_KEYS_TEST ? () => JSON.parse(this.env.GOOGLE_KEYS_TEST) : null); } catch (e) { return json({ error: "登入沒有通過驗證" }, 401); }
+      const uid = await sha256hex("片刻|" + sub);
+      const raw = new Uint8Array(32); crypto.getRandomValues(raw);
+      const token = Array.from(raw).map((x) => x.toString(16).padStart(2, "0")).join("");
+      await this.state.storage.put("t:" + (await sha256hex(token)), { uid, at: Date.now() });
+      return json({ ok: true, token });
+    }
+    const token = String(b.token || "");
+    if (!/^[0-9a-f]{64}$/.test(token)) return json({ error: "not signed in" }, 401);
+    const tkey = "t:" + (await sha256hex(token));
+    const sess = await this.state.storage.get(tkey);
+    if (!sess) return json({ error: "not signed in" }, 401);
+    const ukey = "u:" + sess.uid;
+    if (path === "/sync/get") { const u = await this.state.storage.get(ukey); return json({ ok: true, data: u ? u.data : null, at: u ? u.at : 0 }); }
+    if (path === "/sync/put") {
+      const text = JSON.stringify(b.data || {});
+      if (text.length > 100000) return json({ error: "too large" }, 413);
+      const at = Date.now();
+      await this.state.storage.put(ukey, { data: JSON.parse(text), at });
+      return json({ ok: true, at });
+    }
+    if (path === "/sync/logout") { await this.state.storage.delete(tkey); return json({ ok: true }); }
+    if (path === "/sync/wipe") {
+      await this.state.storage.delete(ukey);
+      const all = await this.state.storage.list({ prefix: "t:" });
+      for (const [k, v] of all) if (v && v.uid === sess.uid) await this.state.storage.delete(k);
+      return json({ ok: true });
+    }
+    return json({ error: "not found" }, 404);
   }
   /** 每小時跑一次：條件新成立、使用者有開那一種通知、還沒發過 → 推送。晚上十點到早上九點不吵人（留到早上再發） */
   async run() {
@@ -294,6 +355,13 @@ export async function handlePush(req, env, path) {
   if (Number(req.headers.get("content-length") || 0) > 60000) return json({ error: "too large" }, 413);
   const hub = env.PUSH.get(env.PUSH.idFromName("hub"));
   return hub.fetch(new Request("https://hub" + path.replace("/api/push", ""), { method: "POST", body: await req.text(), headers: { "content-type": "application/json" } }));
+}
+/** worker.js 把 /api/sync/* 交給這裡（跟通知用同一個儲存空間） */
+export async function handleSync(req, env, path) {
+  if (req.method !== "POST") return json({ error: "method" }, 405);
+  if (Number(req.headers.get("content-length") || 0) > 150000) return json({ error: "too large" }, 413);
+  const hub = env.PUSH.get(env.PUSH.idFromName("hub"));
+  return hub.fetch(new Request("https://hub" + path.replace("/api/sync", "/sync"), { method: "POST", body: await req.text(), headers: { "content-type": "application/json" } }));
 }
 export async function runPush(env) {
   const hub = env.PUSH.get(env.PUSH.idFromName("hub"));

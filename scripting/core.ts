@@ -229,8 +229,42 @@ export async function loadSettings(): Promise<Settings> {
   }
 }
 
+let settingsSavedHook: ((s: Settings) => void) | null = null;
+/** 設定存檔之後要做的事（網頁版登入 Google 時：把設定同步到伺服器） */
+export function setSettingsSavedHook(fn: ((s: Settings) => void) | null): void { settingsSavedHook = fn; }
 export function saveSettings(s: Settings): void {
   platform().saveSettingsJSON(JSON.stringify(s, null, 1));
+  if (settingsSavedHook) { try { settingsSavedHook(s); } catch (_) {} }
+}
+// ── 用 Google 登入同步設定（網頁版）──
+const DEFAULT_FAVORITES = ["vscinemas-xinyi", "eslite", "spot-hs", "spot-taipei"];
+/** 會同步的設定：三種收藏、廣告時間、地圖、通知的選項。行事曆名稱是每台裝置各自的，不同步 */
+export interface SyncData { favorites: string[]; favMovies?: FavMovie[]; favIssuers?: string[]; ads: number; maps?: MapsApp; notify?: NotifyPrefs }
+export function syncPick(s: Settings): SyncData {
+  return { favorites: s.favorites, favMovies: s.favMovies || [], favIssuers: s.favIssuers || [], ads: s.ads, ...(s.maps ? { maps: s.maps } : {}), ...(s.notify ? { notify: s.notify } : {}) };
+}
+/** 把伺服器上的那一份整個套用到這台（另一台改過之後，這台開啟時用） */
+export function syncApply(s: Settings, r: Partial<SyncData>): Settings {
+  const out: Settings = { ...s };
+  if (Array.isArray(r.favorites)) out.favorites = r.favorites.filter((x) => typeof x === "string");
+  if (Array.isArray(r.favMovies)) out.favMovies = r.favMovies.filter((f) => f && typeof f.key === "string" && typeof f.title === "string");
+  if (Array.isArray(r.favIssuers)) out.favIssuers = r.favIssuers.filter((x) => typeof x === "string");
+  if (typeof r.ads === "number") out.ads = r.ads;
+  if (r.maps === "apple" || r.maps === "google") out.maps = r.maps;
+  if (r.notify && typeof r.notify === "object") out.notify = r.notify;
+  return out;
+}
+/** 第一次在這台登入：兩邊的收藏合在一起（這台如果還是預設的那四間影城，就不帶過去）；其他設定以伺服器上的為準 */
+export function syncMerge(local: Settings, r: Partial<SyncData>): Settings {
+  const uniq = <T,>(list: T[], key: (x: T) => string) => list.filter((x, i) => list.findIndex((y) => key(y) === key(x)) === i);
+  const untouched = local.favorites.length === DEFAULT_FAVORITES.length && local.favorites.every((x, i) => x === DEFAULT_FAVORITES[i]);
+  const remote = syncApply(local, r);
+  return {
+    ...remote,
+    favorites: Array.isArray(r.favorites) ? uniq([...remote.favorites, ...(untouched ? [] : local.favorites)], (x) => x) : local.favorites,
+    favMovies: uniq([...(remote.favMovies || []), ...(local.favMovies || [])], (x) => x.key),
+    favIssuers: uniq([...(remote.favIssuers || []), ...(local.favIssuers || [])], (x) => x),
+  };
 }
 
 const cacheGet = (name: string) => platform().cacheGet(name);

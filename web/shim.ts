@@ -207,6 +207,59 @@ autoUpdate();
 document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") autoUpdate(); });
 window.addEventListener("pageshow", (e) => { if ((e as PageTransitionEvent).persisted) autoUpdate(); });
 
+// ── 用 Google 登入同步設定 ──
+// 登入：整頁跳到 Google，回來時身分憑證在網址的 # 後面（不經過伺服器的網址紀錄）；拿它跟我們的伺服器換一張登入憑證存在這台。
+const GOOGLE_CLIENT_ID = "591652673833-vluv8bc246871jpv40ijqalpus3tm2ge.apps.googleusercontent.com";
+const SY = { token: "ms:sync-token", at: "ms:sync-at", nonce: "ms:sync-nonce" };
+const lsGet = (k: string) => { try { return localStorage.getItem(k) || ""; } catch (_) { return ""; } };
+const lsSet = (k: string, v: string) => { try { if (v) localStorage.setItem(k, v); else localStorage.removeItem(k); } catch (_) {} };
+const syncPost = async (path: string, body: Record<string, unknown>): Promise<any> => {
+  const r = await fetch("/api/sync/" + path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+  if (r.status === 401 && path !== "login") lsSet(SY.token, ""); // 登入憑證失效（在別台按了「刪除並登出」）
+  return r.json();
+};
+g.__sync = {
+  on: () => !!lsGet(SY.token),
+  at: () => Number(lsGet(SY.at)) || 0,
+  setAt: (at: number) => lsSet(SY.at, String(at || "")),
+  login() {
+    const raw = new Uint8Array(16); crypto.getRandomValues(raw);
+    const nonce = Array.from(raw).map((x) => x.toString(16).padStart(2, "0")).join("");
+    lsSet(SY.nonce, nonce);
+    location.href = "https://accounts.google.com/o/oauth2/v2/auth?" + new URLSearchParams({ client_id: GOOGLE_CLIENT_ID, redirect_uri: location.origin + "/api/auth/google", response_type: "id_token", scope: "openid", nonce, prompt: "select_account" }).toString();
+  },
+  /** 剛從 Google 回來的話，把登入完成：回傳 "ok"／"fail"；不是剛回來回傳 "" */
+  async finish(): Promise<string> {
+    const h = new URLSearchParams(location.hash.replace(/^#/, ""));
+    const idToken = h.get("id_token"), err = h.get("error");
+    if (!idToken && !err) return "";
+    history.replaceState(null, "", location.pathname + location.search); // 憑證不留在網址上
+    const nonce = lsGet(SY.nonce);
+    lsSet(SY.nonce, "");
+    if (!idToken || !nonce) return "fail";
+    try {
+      const r = await syncPost("login", { id_token: idToken, nonce });
+      if (!r || !r.token) return "fail";
+      lsSet(SY.token, r.token);
+      lsSet(SY.at, "");
+      return "ok";
+    } catch (_) { return "fail"; }
+  },
+  async pull(): Promise<{ data: unknown; at: number } | null> {
+    if (!lsGet(SY.token)) return null;
+    const r = await syncPost("get", { token: lsGet(SY.token) }).catch(() => null);
+    return r && r.ok ? { data: r.data, at: r.at || 0 } : null;
+  },
+  async push(data: unknown): Promise<boolean> {
+    if (!lsGet(SY.token)) return false;
+    const r = await syncPost("put", { token: lsGet(SY.token), data }).catch(() => null);
+    if (r && r.ok) lsSet(SY.at, String(r.at));
+    return !!(r && r.ok);
+  },
+  async logout(): Promise<void> { const t = lsGet(SY.token); lsSet(SY.token, ""); lsSet(SY.at, ""); if (t) await syncPost("logout", { token: t }).catch(() => null); },
+  async wipe(): Promise<void> { const t = lsGet(SY.token); lsSet(SY.token, ""); lsSet(SY.at, ""); if (t) await syncPost("wipe", { token: t }).catch(() => null); },
+};
+
 // ── 收藏電影通知（Web Push）──
 // 狀態：unsupported 這個瀏覽器不支援／needs-install iPhone 要先加到主畫面／denied 使用者在系統設定擋掉了／off 還沒開／on 已開
 const pushOK = () => "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;

@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.24-0332
+// @movie-schedule-app 電影行程 v2026.11.24-0358
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/parsers.gen.ts
@@ -748,8 +748,43 @@ async function loadSettings() {
     return def;
   }
 }
+var settingsSavedHook = null;
+function setSettingsSavedHook(fn) {
+  settingsSavedHook = fn;
+}
 function saveSettings(s) {
   platform().saveSettingsJSON(JSON.stringify(s, null, 1));
+  if (settingsSavedHook) {
+    try {
+      settingsSavedHook(s);
+    } catch (_) {
+    }
+  }
+}
+var DEFAULT_FAVORITES = ["vscinemas-xinyi", "eslite", "spot-hs", "spot-taipei"];
+function syncPick(s) {
+  return { favorites: s.favorites, favMovies: s.favMovies || [], favIssuers: s.favIssuers || [], ads: s.ads, ...s.maps ? { maps: s.maps } : {}, ...s.notify ? { notify: s.notify } : {} };
+}
+function syncApply(s, r) {
+  const out = { ...s };
+  if (Array.isArray(r.favorites)) out.favorites = r.favorites.filter((x) => typeof x === "string");
+  if (Array.isArray(r.favMovies)) out.favMovies = r.favMovies.filter((f) => f && typeof f.key === "string" && typeof f.title === "string");
+  if (Array.isArray(r.favIssuers)) out.favIssuers = r.favIssuers.filter((x) => typeof x === "string");
+  if (typeof r.ads === "number") out.ads = r.ads;
+  if (r.maps === "apple" || r.maps === "google") out.maps = r.maps;
+  if (r.notify && typeof r.notify === "object") out.notify = r.notify;
+  return out;
+}
+function syncMerge(local, r) {
+  const uniq = (list, key) => list.filter((x, i) => list.findIndex((y) => key(y) === key(x)) === i);
+  const untouched = local.favorites.length === DEFAULT_FAVORITES.length && local.favorites.every((x, i) => x === DEFAULT_FAVORITES[i]);
+  const remote = syncApply(local, r);
+  return {
+    ...remote,
+    favorites: Array.isArray(r.favorites) ? uniq([...remote.favorites, ...untouched ? [] : local.favorites], (x) => x) : local.favorites,
+    favMovies: uniq([...remote.favMovies || [], ...local.favMovies || []], (x) => x.key),
+    favIssuers: uniq([...remote.favIssuers || [], ...local.favIssuers || []], (x) => x)
+  };
 }
 var cacheGet = (name) => platform().cacheGet(name);
 var cacheSet = (name, v) => platform().cacheSet(name, v);
@@ -3901,6 +3936,12 @@ var App = class {
     this.latest = this.checkVersion();
     this.latestAt = Date.now();
     // ── 設定 ──
+    // ── 用 Google 登入同步設定（網頁版）──
+    this.syncNote = "";
+    // 同步那一組下方的一句話（剛登入、登入失敗…）
+    this.syncMute = false;
+    // 正在套用伺服器的設定：這次存檔不要再傳回去
+    this.syncTimer = null;
     this.notifyOpen = false;
     // ── 依縣市找影院 ──
     // 搜尋欄直接放在這一頁最上面：有打字就即時顯示符合的影城（不另開一頁），清空就回到縣市清單
@@ -4015,14 +4056,14 @@ var App = class {
   }
   /** 最新版本是多少。網頁版問的是自己網站現在上線的版本（重新整理就會拿到的那一版），不是 GitHub 上的 */
   checkVersion() {
-    if (true) return checkLatest("2026.11.24-0332");
+    if (true) return checkLatest("2026.11.24-0358");
     return (async () => {
       try {
         const r = await globalThis.fetch("/api/version?t=" + Date.now(), { cache: "no-store" });
         const latest = String((await r.json()).version || "");
         if (!latest) return null;
         const num = (v) => Number(v.replace(/\D/g, "")) || 0;
-        return { latest, isLatest: num("2026.11.24-0332") >= num(latest) };
+        return { latest, isLatest: num("2026.11.24-0358") >= num(latest) };
       } catch (_) {
         return null;
       }
@@ -4030,6 +4071,7 @@ var App = class {
   }
   async run() {
     this.settings = await loadSettings();
+    await this.syncStart().catch(() => void 0);
     setTabBar(() => ({ active: this.tab, items: this.TABS, onTap: (id) => this.switchTab(id) }));
     setBackGuard(() => this.stack.length > 1);
     this.go(() => this.homeView(), "讀取影城清單…");
@@ -4039,6 +4081,7 @@ var App = class {
       this.switchTab("movies");
     }
     await this.openShared().catch(() => void 0);
+    if (this.syncNote) this.switchTab("settings");
     loadFestivals().catch(() => []);
     const input = String(args.shortcutParameter || args.urls && args.urls[0] || args.plainTexts && args.plainTexts[0] || "");
     let pendingUrl = input;
@@ -4145,6 +4188,72 @@ var App = class {
       this.movieMode = "box";
       this.switchTab("movies");
     } }) : null), this.installEntry(), await this.versionNote());
+  }
+  sync() {
+    return false ? globalThis.__sync : null;
+  }
+  /** 開啟時：剛從 Google 登入回來就把兩邊的設定合起來；已經登入的話，伺服器上的比較新就套用過來。之後每次存設定都自動上傳 */
+  async syncStart() {
+    const sy = this.sync();
+    if (!sy) return;
+    setSettingsSavedHook(() => {
+      if (this.syncMute || !sy.on()) return;
+      const G = globalThis;
+      G.clearTimeout(this.syncTimer);
+      this.syncTimer = G.setTimeout(() => {
+        sy.push(syncPick(this.settings)).catch(() => false);
+      }, 1200);
+    });
+    const applyLocal = (next) => {
+      this.syncMute = true;
+      this.settings = next;
+      saveSettings(next);
+      this.syncMute = false;
+    };
+    const fin = await sy.finish();
+    if (fin === "fail") {
+      this.syncNote = "登入沒有完成，請再試一次。";
+      return;
+    }
+    if (fin === "ok") {
+      const r2 = await sy.pull();
+      if (r2 && r2.data) applyLocal(syncMerge(this.settings, r2.data));
+      await sy.push(syncPick(this.settings));
+      this.syncNote = r2 && r2.data ? "已登入，這台和帳號裡的收藏已經合在一起。" : "已登入，這台的設定已經存到帳號裡。";
+      return;
+    }
+    if (!sy.on()) return;
+    const r = await Promise.race([sy.pull(), sleep(2500).then(() => null)]);
+    if (r && r.data && r.at > sy.at()) {
+      applyLocal(syncApply(this.settings, r.data));
+      sy.setAt(r.at);
+    }
+  }
+  syncSection() {
+    const sy = this.sync();
+    if (!sy) return "";
+    if (!sy.on())
+      return /* @__PURE__ */ h(Section, { title: "同步", hint: this.syncNote || "登入後，收藏影城、收藏電影、收藏發行商和各項設定會存到你的帳號，在別的裝置或瀏覽器登入同一個帳號就會帶過來。我們只存帳號的識別碼（經過雜湊）和設定，不存 email 和姓名。不登入也能照常使用。" }, /* @__PURE__ */ h(Item, { icon: "🔄", title: "用 Google 登入來同步", subtitle: "例如讓主畫面的 App 和 Safari 用同一份收藏", accent: true, onTap: () => sy.login() }));
+    return /* @__PURE__ */ h(Section, { title: "同步", hint: this.syncNote || "已登入 Google，設定有變動會自動同步。通知要在每台裝置各自開啟。" }, /* @__PURE__ */ h(Item, { icon: "✅", title: "已登入，自動同步中", subtitle: "點一下立刻同步一次", chevron: false, onTap: async () => {
+      const r = await sy.pull();
+      if (r && r.data && r.at > sy.at()) {
+        this.syncMute = true;
+        this.settings = syncApply(this.settings, r.data);
+        saveSettings(this.settings);
+        this.syncMute = false;
+        sy.setAt(r.at);
+        this.pushSync();
+        await this.ui.toast("已帶入帳號裡比較新的設定");
+      } else await this.ui.toast(await sy.push(syncPick(this.settings)) ? "已同步" : "同步失敗，請稍後再試");
+    } }), /* @__PURE__ */ h(Item, { icon: "🚪", title: "登出", subtitle: "這台的收藏會留著，只是不再同步", chevron: false, onTap: async () => {
+      await sy.logout();
+      this.syncNote = "";
+      await this.ui.toast("已登出");
+    } }), /* @__PURE__ */ h(Item, { icon: "🗑", title: "刪除帳號裡的資料並登出", subtitle: "伺服器上的設定會刪掉，所有裝置都會登出；這台的收藏會留著", chevron: false, onTap: async () => {
+      await sy.wipe();
+      this.syncNote = "";
+      await this.ui.toast("已刪除並登出");
+    } }));
   }
   // 設定頁「算哪些影城」的選項有沒有展開
   /** 網頁版的通知介面（web/shim.ts 的 __push）；Scriptable 版沒有 */
@@ -4281,16 +4390,16 @@ var App = class {
     return /* @__PURE__ */ h(Page, { title: "設定" }, /* @__PURE__ */ h(Section, { title: "加入行事曆時", hint: `廣告預告：${ADS_NOTE}` }, /* @__PURE__ */ h(Item, { icon: "📅", title: "寫入的行事曆", subtitle: this.calendarName, onTap: () => this.go(() => this.calendarView()) }), /* @__PURE__ */ h(Item, { icon: "📺", title: "廣告預告", subtitle: `預計散場時間會加上 ${this.settings.ads} 分鐘`, right: "點一下切換", chevron: false, onTap: () => this.cycleAds() }), /* @__PURE__ */ h(Item, { icon: "🗺", title: "導航地圖", subtitle: "點地址、分享、行程備註的導航連結", right: MAPS_LABEL[this.settings.maps || "apple"], chevron: false, onTap: () => {
       this.settings.maps = this.settings.maps === "google" ? "apple" : "google";
       saveSettings(this.settings);
-    } })), await this.notifyLink(), /* @__PURE__ */ h(Section, { title: "關於" }, false ? /* @__PURE__ */ h(Item, { icon: "📲", title: "加到主畫面", subtitle: "像 App 一樣從主畫面開啟，看圖示教學", onTap: () => this.go(() => this.installView()) }) : null, /* @__PURE__ */ h(Item, { icon: "ℹ️", title: "關於", subtitle: "資料來源、隱私權政策、場次通", onTap: () => this.go(() => this.aboutView()) })), /* @__PURE__ */ h(
+    } })), await this.notifyLink(), this.syncSection(), /* @__PURE__ */ h(Section, { title: "關於" }, false ? /* @__PURE__ */ h(Item, { icon: "📲", title: "加到主畫面", subtitle: "像 App 一樣從主畫面開啟，看圖示教學", onTap: () => this.go(() => this.installView()) }) : null, /* @__PURE__ */ h(Item, { icon: "ℹ️", title: "關於", subtitle: "資料來源、隱私權政策、場次通", onTap: () => this.go(() => this.aboutView()) })), /* @__PURE__ */ h(
       "p",
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.24-0332"}`);
+          Pasteboard.copy(`版本 ${"2026.11.24-0358"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.24-0332"}`,
+      `版本 ${"2026.11.24-0358"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -4632,7 +4741,7 @@ var App = class {
     if (false) {
       if (!r) return /* @__PURE__ */ h(Note, { text: "（無法確認是否為最新版：連不到網站）" });
       if (r.isLatest) return /* @__PURE__ */ h(Note, { text: "✅ 已是最新版" });
-      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.24-0332"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
+      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.24-0358"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
         globalThis.location.reload();
       } }));
     }

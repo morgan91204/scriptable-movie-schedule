@@ -194,11 +194,15 @@
     saveSettings: () => saveSettings,
     searchTitles: () => searchTitles,
     setMetaEnabled: () => setMetaEnabled,
+    setSettingsSavedHook: () => setSettingsSavedHook,
     shareText: () => shareText,
     showDay: () => showDay,
     showMinute: () => showMinute,
     soonBoard: () => soonBoard,
     soonGroups: () => soonGroups,
+    syncApply: () => syncApply,
+    syncMerge: () => syncMerge,
+    syncPick: () => syncPick,
     ticketsText: () => ticketsText,
     tmdbRuntime: () => tmdbRuntime,
     tmdbTest: () => tmdbTest,
@@ -956,8 +960,43 @@ function parseTwMovieDay(doc) {
       return def;
     }
   }
+  var settingsSavedHook = null;
+  function setSettingsSavedHook(fn) {
+    settingsSavedHook = fn;
+  }
   function saveSettings(s) {
     platform().saveSettingsJSON(JSON.stringify(s, null, 1));
+    if (settingsSavedHook) {
+      try {
+        settingsSavedHook(s);
+      } catch (_) {
+      }
+    }
+  }
+  var DEFAULT_FAVORITES = ["vscinemas-xinyi", "eslite", "spot-hs", "spot-taipei"];
+  function syncPick(s) {
+    return { favorites: s.favorites, favMovies: s.favMovies || [], favIssuers: s.favIssuers || [], ads: s.ads, ...s.maps ? { maps: s.maps } : {}, ...s.notify ? { notify: s.notify } : {} };
+  }
+  function syncApply(s, r) {
+    const out = { ...s };
+    if (Array.isArray(r.favorites)) out.favorites = r.favorites.filter((x) => typeof x === "string");
+    if (Array.isArray(r.favMovies)) out.favMovies = r.favMovies.filter((f) => f && typeof f.key === "string" && typeof f.title === "string");
+    if (Array.isArray(r.favIssuers)) out.favIssuers = r.favIssuers.filter((x) => typeof x === "string");
+    if (typeof r.ads === "number") out.ads = r.ads;
+    if (r.maps === "apple" || r.maps === "google") out.maps = r.maps;
+    if (r.notify && typeof r.notify === "object") out.notify = r.notify;
+    return out;
+  }
+  function syncMerge(local, r) {
+    const uniq = (list, key) => list.filter((x, i) => list.findIndex((y) => key(y) === key(x)) === i);
+    const untouched = local.favorites.length === DEFAULT_FAVORITES.length && local.favorites.every((x, i) => x === DEFAULT_FAVORITES[i]);
+    const remote = syncApply(local, r);
+    return {
+      ...remote,
+      favorites: Array.isArray(r.favorites) ? uniq([...remote.favorites, ...untouched ? [] : local.favorites], (x) => x) : local.favorites,
+      favMovies: uniq([...remote.favMovies || [], ...local.favMovies || []], (x) => x.key),
+      favIssuers: uniq([...remote.favIssuers || [], ...local.favIssuers || []], (x) => x)
+    };
   }
   var cacheGet = (name) => platform().cacheGet(name);
   var cacheSet = (name, v) => platform().cacheSet(name, v);
@@ -3670,7 +3709,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   var extra = { boxOffice, filmList, soonList, nowShowing, nowShowingMulti, movieBoard: movieBoard2, festivalBoard, festivalFilm, nearby, patchSettings, fillMovie, formatList };
   var BRIDGE_LEVEL = 2;
   globalThis.MS = {
-    version: "2026.11.24-0332",
+    version: "2026.11.24-0358",
     level: BRIDGE_LEVEL,
     init(saved) {
       cache = saved || {};

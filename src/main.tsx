@@ -10,11 +10,11 @@ import { scriptablePlatform } from "./platform-scriptable";
 import {
   Cinema, Settings, Movie, Version, EXTRA, CITY_ORDER, AD_STEPS,
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
-  loadSettings, saveSettings, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, communityKey, SITE_URL, TW,
+  loadSettings, saveSettings, setSettingsSavedHook, syncPick, syncApply, syncMerge, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, communityKey, SITE_URL, TW,
   FORMATS, formatsOf, filterVersions, filterVersionsAny, movieRows, movieDays, nearest, kmLabel, WINDOWS, findShowtimes, findShowtimesMulti, multiLabel, multiDetail, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText,
   hallOf, tmdbTest, movieExtras, moviePoster, movieRuntime, posterSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxCountries, boxByCountry, boxInfo, boxInfoRows, boxCountryText, BOX_COUNTRY_NOTE, boxCountryTag, boxCountriesPicked, loadMovieBoard, loadSoonBoard, notifyPrefs, notifyPayload, notifyEndScope, notifyEndPick, notifyQuiet, NOTIFY_PRE_STEPS, NOTIFY_KINDS, boxStatus, STATUS_LABEL, boxInfoBy, isFavMovie, toggleFavMovie, favMovieRows, favMovieBox, soonGroups, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityCached, communityVote, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalsReady, festivalNote, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, festivalDefaultDate, festivalStateLabel, festivalState, festivalFooter, linkMovies, nowGroupLine, nowFilter, festivalPick, movieAbout, festivalSearch, festivalSearchLines, festivalTrailer, festivalYears, festivalsAny, festivalGroups, festivalChipNote, festivalStatusLine, movieRatings, ratingTier,
 } from "./core";
-import type { MovieExtras, Ratings, Community, BoxOfficeItem, BoxSort, MovieEntry, SoonEntry, UpcomingFilm, FavMovie, FavRow, NotifyPrefs, NotifyKind, Festival, FestivalFilm, FestivalSession } from "./core";
+import type { MovieExtras, Ratings, Community, BoxOfficeItem, BoxSort, MovieEntry, SoonEntry, UpcomingFilm, FavMovie, FavRow, NotifyPrefs, NotifyKind, SyncData, Festival, FestivalFilm, FestivalSession } from "./core";
 import { setTabBar, setBackGuard, esc } from "./jsx";
 import type { TwMovie, TwMovieCinema, Format, LatLng, Hit } from "./core";
 
@@ -112,6 +112,7 @@ class App {
 
   async run() {
     this.settings = await loadSettings();
+    await this.syncStart().catch(() => undefined);
     setTabBar(() => ({ active: this.tab, items: this.TABS, onTap: (id) => this.switchTab(id) }));
     setBackGuard(() => this.stack.length > 1);
     this.go(() => this.homeView(), "讀取影城清單…");
@@ -119,6 +120,7 @@ class App {
     const startTab = IS_WEB ? (/[?&]tab=(soon|fest)\b/.exec(String((globalThis as any).location?.search || "")) || [])[1] : "";
     if (startTab) { this.movieMode = startTab as "soon" | "fest"; this.switchTab("movies"); }
     await this.openShared().catch(() => undefined);
+    if (this.syncNote) this.switchTab("settings"); // 剛從 Google 登入回來：直接到設定頁看結果
     loadFestivals().catch(() => []); // 背景先看有沒有影展（有才會在電影分頁多出「影展」）
     const input = String(args.shortcutParameter || (args.urls && args.urls[0]) || (args.plainTexts && args.plainTexts[0]) || "");
     let pendingUrl = input;
@@ -255,6 +257,56 @@ class App {
   }
 
   // ── 設定 ──
+  // ── 用 Google 登入同步設定（網頁版）──
+  syncNote = ""; // 同步那一組下方的一句話（剛登入、登入失敗…）
+  syncMute = false; // 正在套用伺服器的設定：這次存檔不要再傳回去
+  syncTimer: any = null;
+  sync(): any { return IS_WEB ? (globalThis as any).__sync : null; }
+  /** 開啟時：剛從 Google 登入回來就把兩邊的設定合起來；已經登入的話，伺服器上的比較新就套用過來。之後每次存設定都自動上傳 */
+  async syncStart(): Promise<void> {
+    const sy = this.sync();
+    if (!sy) return;
+    setSettingsSavedHook(() => {
+      if (this.syncMute || !sy.on()) return;
+      const G = globalThis as any;
+      G.clearTimeout(this.syncTimer);
+      this.syncTimer = G.setTimeout(() => { sy.push(syncPick(this.settings)).catch(() => false); }, 1200);
+    });
+    const applyLocal = (next: Settings) => { this.syncMute = true; this.settings = next; saveSettings(next); this.syncMute = false; };
+    const fin: string = await sy.finish();
+    if (fin === "fail") { this.syncNote = "登入沒有完成，請再試一次。"; return; }
+    if (fin === "ok") {
+      const r = await sy.pull();
+      if (r && r.data) applyLocal(syncMerge(this.settings, r.data as Partial<SyncData>));
+      await sy.push(syncPick(this.settings));
+      this.syncNote = r && r.data ? "已登入，這台和帳號裡的收藏已經合在一起。" : "已登入，這台的設定已經存到帳號裡。";
+      return;
+    }
+    if (!sy.on()) return;
+    const r = await Promise.race([sy.pull(), sleep(2500).then(() => null)]);
+    if (r && r.data && r.at > sy.at()) { applyLocal(syncApply(this.settings, r.data as Partial<SyncData>)); sy.setAt(r.at); }
+  }
+  syncSection(): string {
+    const sy = this.sync();
+    if (!sy) return "";
+    if (!sy.on())
+      return (
+        <Section title="同步" hint={this.syncNote || "登入後，收藏影城、收藏電影、收藏發行商和各項設定會存到你的帳號，在別的裝置或瀏覽器登入同一個帳號就會帶過來。我們只存帳號的識別碼（經過雜湊）和設定，不存 email 和姓名。不登入也能照常使用。"}>
+          <Item icon="🔄" title="用 Google 登入來同步" subtitle="例如讓主畫面的 App 和 Safari 用同一份收藏" accent onTap={() => sy.login()} />
+        </Section>
+      );
+    return (
+      <Section title="同步" hint={this.syncNote || "已登入 Google，設定有變動會自動同步。通知要在每台裝置各自開啟。"}>
+        <Item icon="✅" title="已登入，自動同步中" subtitle="點一下立刻同步一次" chevron={false} onTap={async () => {
+          const r = await sy.pull();
+          if (r && r.data && r.at > sy.at()) { this.syncMute = true; this.settings = syncApply(this.settings, r.data as Partial<SyncData>); saveSettings(this.settings); this.syncMute = false; sy.setAt(r.at); this.pushSync(); await this.ui.toast("已帶入帳號裡比較新的設定"); }
+          else await this.ui.toast((await sy.push(syncPick(this.settings))) ? "已同步" : "同步失敗，請稍後再試");
+        }} />
+        <Item icon="🚪" title="登出" subtitle="這台的收藏會留著，只是不再同步" chevron={false} onTap={async () => { await sy.logout(); this.syncNote = ""; await this.ui.toast("已登出"); }} />
+        <Item icon="🗑" title="刪除帳號裡的資料並登出" subtitle="伺服器上的設定會刪掉，所有裝置都會登出；這台的收藏會留著" chevron={false} onTap={async () => { await sy.wipe(); this.syncNote = ""; await this.ui.toast("已刪除並登出"); }} />
+      </Section>
+    );
+  }
   notifyOpen = false; // 設定頁「算哪些影城」的選項有沒有展開
   /** 網頁版的通知介面（web/shim.ts 的 __push）；Scriptable 版沒有 */
   push(): any { return IS_WEB ? (globalThis as any).__push : null; }
@@ -467,6 +519,7 @@ class App {
           }} />
         </Section>
         {await this.notifyLink()}
+        {this.syncSection()}
         <Section title="關於">
           {IS_WEB && !this.isStandalone() ? <Item icon="📲" title="加到主畫面" subtitle="像 App 一樣從主畫面開啟，看圖示教學" onTap={() => this.go(() => this.installView())} /> : null}
           <Item icon="ℹ️" title="關於" subtitle="資料來源、隱私權政策、場次通" onTap={() => this.go(() => this.aboutView())} />
