@@ -28,7 +28,7 @@ async function boxOffice(by?: string, years?: string[], query?: string, limit?: 
   const paged = sort === "year";
   const rows = (paged ? found.slice(0, limit || core.BOX_PAGE) : found).map(({ x, m }) => ({ x, m, lines: core.boxOfficeLines(x, sort, pastWeek), light: (paged || pastWeek) && !m }));
   return {
-    label: core.boxOfficeTitle(b, sort, picked, wk.id), source: b.source, footer: core.boxOfficeFooter(b, sort, picked, wk.id), sorts,
+    label: core.boxOfficeTitle(b, sort, picked, wk.id) + core.boxCountryTag(land), countryNote: core.BOX_COUNTRY_NOTE, source: b.source, footer: core.boxOfficeFooter(b, sort, picked, wk.id), sorts,
     sort, years: core.boxYears(b), selYears: picked, // 年度排行可以選的年份、實際採用的年份
     weeks: core.boxWeekOptions(b), selWeek: wk.id, // 週票房可以選的週次、實際採用的那一週
     countries: countries.map((c) => ({ id: c.id, label: `${c.id}（${c.count} 部）` })), selCountry: land, everyone: everyone.length, // 國別篩選

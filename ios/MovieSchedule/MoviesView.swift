@@ -145,12 +145,12 @@ struct BoxOfficeSection: View {
             }
             if let lands = board.value?.countries, lands.count > 1 {
                 Section {
-                    Picker("國別", selection: Binding(get: { board.value?.selCountry ?? "" }, set: { country = $0 })) {
+                    Picker("出品國別", selection: Binding(get: { board.value?.selCountry ?? "" }, set: { country = $0 })) {
                         Text("全部（\(board.value?.everyone ?? 0) 部）").tag("")
                         ForEach(lands) { Text($0.label).tag($0.id) }
                     }
                 } footer: {
-                    Text("選了國別，名次會在那個國別裡重排。")
+                    Text(board.value?.countryNote ?? "這是全台灣戲院的票房排行，出品國別只是篩選。")
                 }
             }
             if sort == "year", let options = board.value?.years, options.count > 1 {

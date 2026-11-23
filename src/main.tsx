@@ -12,7 +12,7 @@ import {
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
   loadSettings, saveSettings, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, TW,
   FORMATS, formatsOf, filterVersions, filterVersionsAny, movieRows, movieDays, nearest, kmLabel, WINDOWS, findShowtimes, findShowtimesMulti, multiLabel, multiDetail, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText,
-  hallOf, tmdbTest, movieExtras, moviePoster, movieRuntime, posterSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxCountries, boxByCountry, boxInfo, boxInfoRows, boxCountryText, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityCached, communityVote, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalsReady, festivalNote, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, festivalDefaultDate, festivalStateLabel, festivalState, festivalFooter, linkMovies, nowGroupLine, nowFilter, festivalPick, movieAbout, festivalSearch, festivalSearchLines, festivalTrailer, festivalYears, festivalsAny, festivalGroups, festivalChipNote, festivalStatusLine, movieRatings, ratingTier,
+  hallOf, tmdbTest, movieExtras, moviePoster, movieRuntime, posterSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxCountries, boxByCountry, boxInfo, boxInfoRows, boxCountryText, BOX_COUNTRY_NOTE, boxCountryTag, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityCached, communityVote, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalsReady, festivalNote, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, festivalDefaultDate, festivalStateLabel, festivalState, festivalFooter, linkMovies, nowGroupLine, nowFilter, festivalPick, movieAbout, festivalSearch, festivalSearchLines, festivalTrailer, festivalYears, festivalsAny, festivalGroups, festivalChipNote, festivalStatusLine, movieRatings, ratingTier,
 } from "./core";
 import type { MovieExtras, Ratings, Community, BoxOfficeItem, BoxSort, Festival, FestivalFilm, FestivalSession } from "./core";
 import { setTabBar, setBackGuard, esc } from "./jsx";
@@ -1095,7 +1095,7 @@ class App {
       return { src, url: u };
     };
     return (
-      <Page title="依電影找場次" subtitle={boxOfficeTitle(b, by, years, week.id)} onBack={() => this.back()}>
+      <Page title="依電影找場次" subtitle={boxOfficeTitle(b, by, years, week.id) + boxCountryTag(country)} onBack={() => this.back()}>
         {this.movieModeChips()}
         {sorts.length > 1 ? (
           <Chips>
@@ -1110,7 +1110,7 @@ class App {
           </Section>
         ) : null}
         {countries.length > 1 ? (
-          <Section title="國別" hint="選了國別，名次會在那個國別裡重排。可以左右滑動。">
+          <Section title="出品國別（全台票房，可篩選出品國）" hint={BOX_COUNTRY_NOTE + "可以左右滑動。"}>
             <Chips scroll>
               <Chip label="全部" sub={`${everyone.length} 部`} muted={!!country} onTap={() => { this.boxCountry = ""; }} />
               {countries.map((c) => <Chip label={c.id} sub={`${c.count} 部`} muted={country !== c.id} onTap={() => { this.boxCountry = c.id; }} />)}
@@ -1131,7 +1131,7 @@ class App {
         <input class="field" name="q" value={this.movieQuery} placeholder="搜尋片名" />
         <Button label="搜尋" kind="secondary" enter onTap={(v) => { this.movieQuery = v.q || ""; }} />
         {rows.length ? null : <Empty icon="🎞" text="排行上找不到相符的電影" />}
-        <Section title={boxOfficeTitle(b, by, years, week.id)} hint={boxOfficeFooter(b, by, years, week.id)}>
+        <Section title={boxOfficeTitle(b, by, years, week.id) + boxCountryTag(country)} hint={boxOfficeFooter(b, by, years, week.id)}>
           {rows.map(({ x, m }, i) => {
             const t = thumb(posters[i] as string | undefined);
             return (

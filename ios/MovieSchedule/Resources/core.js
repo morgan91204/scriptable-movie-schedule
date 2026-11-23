@@ -18,6 +18,7 @@
     BOXOFFICE_URL: () => BOXOFFICE_URL,
     BOXOFFICE_WEEKS_URL: () => BOXOFFICE_WEEKS_URL,
     BOXOFFICE_YEARS_URL: () => BOXOFFICE_YEARS_URL,
+    BOX_COUNTRY_NOTE: () => BOX_COUNTRY_NOTE,
     BOX_PAGE: () => BOX_PAGE,
     CINEMA_APPS: () => CINEMA_APPS,
     CITY_ORDER: () => CITY_ORDER,
@@ -46,6 +47,7 @@
     bookingUrl: () => bookingUrl,
     boxByCountry: () => boxByCountry,
     boxCountries: () => boxCountries,
+    boxCountryTag: () => boxCountryTag,
     boxCountryText: () => boxCountryText,
     boxInfo: () => boxInfo,
     boxInfoRows: () => boxInfoRows,
@@ -1906,6 +1908,8 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     const parts = String(country || "").split(/##|[\/、,，;；]/).map((c) => c.trim()).filter(Boolean).map((c) => COUNTRY_ALIAS[c] || c);
     return parts.filter((c, i) => parts.indexOf(c) === i).join("、");
   }
+  var BOX_COUNTRY_NOTE = "這是全台灣戲院的票房排行。「出品國別」是電影的出品國：選了只是把那個國家出品的片篩出來、名次在裡面重排，票房一樣是在台灣賣出的。";
+  var boxCountryTag = (country) => country ? `｜${country}出品` : "";
   function boxCountries(list) {
     const n = {};
     for (const x of list) {
@@ -1937,7 +1941,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   function boxInfoRows(x, info) {
     const num = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
     const rows = [];
-    if (x.country) rows.push(["國別", boxCountryText(x.country)]);
+    if (x.country) rows.push(["出品國別", boxCountryText(x.country)]);
     if (info && info.issue) rows.push(["發行", info.issue]);
     if (info && info.produce) rows.push(["出品", info.produce]);
     rows.push(["上映日期", x.release.replace(/-/g, "/")]);
@@ -1962,7 +1966,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   }
   var BOX_PAGE = 100;
   function boxOfficeFooter(b, by, years, week) {
-    const src = `資料來源：${b.source}。官方每週更新一次。`;
+    const src = `這是全台灣戲院的票房。資料來源：${b.source}。官方每週更新一次。`;
     if (by === "week" && boxWeekPicked(b, week).past)
       return `這是那一週的排行：「當週」是那七天的票房，「累計」算到那一週為止。那時候上映的片，現在可能已經下檔。標「上映至當時」的是官方那一週才第一次列入的新片，數字是上映以來的累計。${src}`;
     if (by === "year") {
@@ -2825,7 +2829,8 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     const paged = sort === "year";
     const rows = (paged ? found.slice(0, limit || BOX_PAGE) : found).map(({ x, m }) => ({ x, m, lines: boxOfficeLines(x, sort, pastWeek), light: (paged || pastWeek) && !m }));
     return {
-      label: boxOfficeTitle(b, sort, picked, wk.id),
+      label: boxOfficeTitle(b, sort, picked, wk.id) + boxCountryTag(land),
+      countryNote: BOX_COUNTRY_NOTE,
       source: b.source,
       footer: boxOfficeFooter(b, sort, picked, wk.id),
       sorts,
@@ -2933,7 +2938,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   var extra = { boxOffice, nowShowing, nowShowingMulti, movieBoard, festivalBoard, festivalFilm, nearby, patchSettings, fillMovie, formatList };
   var BRIDGE_LEVEL = 2;
   globalThis.MS = {
-    version: "2026.11.23-1949",
+    version: "2026.11.23-1952",
     level: BRIDGE_LEVEL,
     init(saved) {
       cache = saved || {};

@@ -14,7 +14,7 @@ import {
   Cinema, Movie, Settings, Version, TwMovie, TwMovieCinema, CITY_ORDER, TW,
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
   loadSettings, saveSettings, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, cinemaAddress,
-  FORMATS, formatsOf, filterVersions, filterVersionsAny, movieRows, movieDays, nearest, kmLabel, WINDOWS, findShowtimes, findShowtimesMulti, multiLabel, multiDetail, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText, hallOf, tmdbTest, movieExtras, moviePoster, posterReady, posterTint, POSTER_TINTS, normImageUrl, movieRuntime, posterSrc, isLocalSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxCountries, boxByCountry, boxInfo, boxInfoRows, boxCountryText, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityVote, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, SCRIPTING_IMPORT_URL, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, festivalDefaultDate, festivalStateLabel, festivalState, festivalFooter, linkMovies, nowGroupLine, nowFilter, festivalPick, movieAbout, festivalSearch, festivalSearchLines, festivalTrailer, festivalYears, festivalGroups, festivalChipNote, festivalStatusLine, movieRatings, ratingTier,
+  FORMATS, formatsOf, filterVersions, filterVersionsAny, movieRows, movieDays, nearest, kmLabel, WINDOWS, findShowtimes, findShowtimesMulti, multiLabel, multiDetail, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText, hallOf, tmdbTest, movieExtras, moviePoster, posterReady, posterTint, POSTER_TINTS, normImageUrl, movieRuntime, posterSrc, isLocalSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxCountries, boxByCountry, boxInfo, boxInfoRows, boxCountryText, BOX_COUNTRY_NOTE, boxCountryTag, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityVote, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, SCRIPTING_IMPORT_URL, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, festivalDefaultDate, festivalStateLabel, festivalState, festivalFooter, linkMovies, nowGroupLine, nowFilter, festivalPick, movieAbout, festivalSearch, festivalSearchLines, festivalTrailer, festivalYears, festivalGroups, festivalChipNote, festivalStatusLine, movieRatings, ratingTier,
 } from "./core"
 import type { Format, LatLng, Hit, Community, BoxOfficeItem, BoxSort, Festival, FestivalFilm, FestivalSession } from "./core"
 
@@ -1004,8 +1004,8 @@ function BoxOfficeSections({ movies, query }: { movies: TwMovie[]; query: string
       {weekOptions.map((o) => <Text key={o.id} tag={o.id}>{`${o.label}（${o.note}）`}</Text>)}
     </Picker>
   </Section> : null}
-  {countries.length > 1 ? <Section footer={<Text>選了國別，名次會在那個國別裡重排。</Text>}>
-    <Picker title={"國別"} value={country} onChanged={(v: string) => setPickedCountry(v)}>
+  {countries.length > 1 ? <Section footer={<Text>{BOX_COUNTRY_NOTE}</Text>}>
+    <Picker title={"出品國別"} value={country} onChanged={(v: string) => setPickedCountry(v)}>
       <Text tag={""}>{`全部（${everyone.length} 部）`}</Text>
       {countries.map((c) => <Text key={c.id} tag={c.id}>{`${c.id}（${c.count} 部）`}</Text>)}
     </Picker>
@@ -1019,7 +1019,7 @@ function BoxOfficeSections({ movies, query }: { movies: TwMovie[]; query: string
     onToggle: (y) => setPickedYears(y === "all" ? (years.length === yearOptions.length ? [] : yearOptions.slice()) : years.indexOf(y) < 0 ? [...years, y] : years.length > 1 ? years.filter((z) => z !== y) : years),
     footer: "可以複選，選了幾年就合在一起排。點「全選」一次選完，再點一次回到最新的一年。",
   }) : null}
-  <Section header={<Text>{boxOfficeTitle(b, sort, years, week.id)}</Text>} footer={<Text>{`${shown.length ? "" : "排行上找不到相符的電影。\n"}${boxOfficeFooter(b, sort, years, week.id)}${failNote}`}</Text>}>
+  <Section header={<Text>{boxOfficeTitle(b, sort, years, week.id) + boxCountryTag(country)}</Text>} footer={<Text>{`${shown.length ? "" : "排行上找不到相符的電影。\n"}${boxOfficeFooter(b, sort, years, week.id)}${failNote}`}</Text>}>
     {shown.map((x, i) => {
       const m = match(x.name)
       const lines = boxOfficeLines(x, sort, pastWeek)

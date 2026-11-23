@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.23-1949
+// @movie-schedule-app 電影行程 v2026.11.23-1952
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/parsers.gen.ts
@@ -1703,6 +1703,8 @@ function boxCountryText(country) {
   const parts = String(country || "").split(/##|[\/、,，;；]/).map((c) => c.trim()).filter(Boolean).map((c) => COUNTRY_ALIAS[c] || c);
   return parts.filter((c, i) => parts.indexOf(c) === i).join("、");
 }
+var BOX_COUNTRY_NOTE = "這是全台灣戲院的票房排行。「出品國別」是電影的出品國：選了只是把那個國家出品的片篩出來、名次在裡面重排，票房一樣是在台灣賣出的。";
+var boxCountryTag = (country) => country ? `｜${country}出品` : "";
 function boxCountries(list) {
   const n = {};
   for (const x of list) {
@@ -1734,7 +1736,7 @@ async function boxInfo(x) {
 function boxInfoRows(x, info) {
   const num = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
   const rows = [];
-  if (x.country) rows.push(["國別", boxCountryText(x.country)]);
+  if (x.country) rows.push(["出品國別", boxCountryText(x.country)]);
   if (info && info.issue) rows.push(["發行", info.issue]);
   if (info && info.produce) rows.push(["出品", info.produce]);
   rows.push(["上映日期", x.release.replace(/-/g, "/")]);
@@ -1759,7 +1761,7 @@ function boxOfficeTitle(b, by, years, week) {
 }
 var BOX_PAGE = 100;
 function boxOfficeFooter(b, by, years, week) {
-  const src = `資料來源：${b.source}。官方每週更新一次。`;
+  const src = `這是全台灣戲院的票房。資料來源：${b.source}。官方每週更新一次。`;
   if (by === "week" && boxWeekPicked(b, week).past)
     return `這是那一週的排行：「當週」是那七天的票房，「累計」算到那一週為止。那時候上映的片，現在可能已經下檔。標「上映至當時」的是官方那一週才第一次列入的新片，數字是上映以來的累計。${src}`;
   if (by === "year") {
@@ -3231,14 +3233,14 @@ var App = class {
   }
   /** 最新版本是多少。網頁版問的是自己網站現在上線的版本（重新整理就會拿到的那一版），不是 GitHub 上的 */
   checkVersion() {
-    if (true) return checkLatest("2026.11.23-1949");
+    if (true) return checkLatest("2026.11.23-1952");
     return (async () => {
       try {
         const r = await globalThis.fetch("/api/version?t=" + Date.now(), { cache: "no-store" });
         const latest = String((await r.json()).version || "");
         if (!latest) return null;
         const num = (v) => Number(v.replace(/\D/g, "")) || 0;
-        return { latest, isLatest: num("2026.11.23-1949") >= num(latest) };
+        return { latest, isLatest: num("2026.11.23-1952") >= num(latest) };
       } catch (_) {
         return null;
       }
@@ -3339,11 +3341,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.23-1949"}`);
+          Pasteboard.copy(`版本 ${"2026.11.23-1952"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.23-1949"}`,
+      `版本 ${"2026.11.23-1952"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -3685,7 +3687,7 @@ var App = class {
     if (false) {
       if (!r) return /* @__PURE__ */ h(Note, { text: "（無法確認是否為最新版：連不到網站）" });
       if (r.isLatest) return /* @__PURE__ */ h(Note, { text: "✅ 已是最新版" });
-      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.23-1949"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
+      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.23-1952"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
         globalThis.location.reload();
       } }));
     }
@@ -3891,11 +3893,11 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
       if (src && src === u) cachePoster(u);
       return { src, url: u };
     };
-    return /* @__PURE__ */ h(Page, { title: "依電影找場次", subtitle: boxOfficeTitle(b, by, years, week.id), onBack: () => this.back() }, this.movieModeChips(), sorts.length > 1 ? /* @__PURE__ */ h(Chips, null, sorts.map((x) => /* @__PURE__ */ h(Chip, { label: x.label, sub: x.id === "year" ? "含已下檔" : "上映中", muted: by !== x.id, onTap: () => {
+    return /* @__PURE__ */ h(Page, { title: "依電影找場次", subtitle: boxOfficeTitle(b, by, years, week.id) + boxCountryTag(country), onBack: () => this.back() }, this.movieModeChips(), sorts.length > 1 ? /* @__PURE__ */ h(Chips, null, sorts.map((x) => /* @__PURE__ */ h(Chip, { label: x.label, sub: x.id === "year" ? "含已下檔" : "上映中", muted: by !== x.id, onTap: () => {
       this.boxSort = x.id;
     } }))) : null, by === "week" && weekOptions.length > 1 ? /* @__PURE__ */ h(Section, { title: "週次", hint: "可以回頭看過去幾週的排行。" }, /* @__PURE__ */ h(Chips, null, weekOptions.map((o) => /* @__PURE__ */ h(Chip, { label: o.label, sub: o.note, muted: week.id !== o.id, onTap: () => {
       this.boxWeek = o.note === "最新" ? "" : o.id;
-    } })))) : null, countries.length > 1 ? /* @__PURE__ */ h(Section, { title: "國別", hint: "選了國別，名次會在那個國別裡重排。可以左右滑動。" }, /* @__PURE__ */ h(Chips, { scroll: true }, /* @__PURE__ */ h(Chip, { label: "全部", sub: `${everyone.length} 部`, muted: !!country, onTap: () => {
+    } })))) : null, countries.length > 1 ? /* @__PURE__ */ h(Section, { title: "出品國別（全台票房，可篩選出品國）", hint: BOX_COUNTRY_NOTE + "可以左右滑動。" }, /* @__PURE__ */ h(Chips, { scroll: true }, /* @__PURE__ */ h(Chip, { label: "全部", sub: `${everyone.length} 部`, muted: !!country, onTap: () => {
       this.boxCountry = "";
     } }), countries.map((c) => /* @__PURE__ */ h(Chip, { label: c.id, sub: `${c.count} 部`, muted: country !== c.id, onTap: () => {
       this.boxCountry = c.id;
@@ -3905,7 +3907,7 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
       this.boxYears = years.indexOf(y) < 0 ? [...years, y] : years.length > 1 ? years.filter((z) => z !== y) : years;
     } })))) : null, /* @__PURE__ */ h("input", { class: "field", name: "q", value: this.movieQuery, placeholder: "搜尋片名" }), /* @__PURE__ */ h(Button, { label: "搜尋", kind: "secondary", enter: true, onTap: (v) => {
       this.movieQuery = v.q || "";
-    } }), rows.length ? null : /* @__PURE__ */ h(Empty, { icon: "🎞", text: "排行上找不到相符的電影" }), /* @__PURE__ */ h(Section, { title: boxOfficeTitle(b, by, years, week.id), hint: boxOfficeFooter(b, by, years, week.id) }, rows.map(({ x, m }, i) => {
+    } }), rows.length ? null : /* @__PURE__ */ h(Empty, { icon: "🎞", text: "排行上找不到相符的電影" }), /* @__PURE__ */ h(Section, { title: boxOfficeTitle(b, by, years, week.id) + boxCountryTag(country), hint: boxOfficeFooter(b, by, years, week.id) }, rows.map(({ x, m }, i) => {
       const t = thumb(posters[i]);
       return /* @__PURE__ */ h(
         Item,

@@ -1476,6 +1476,10 @@ export function boxCountryText(country: string): string {
   const parts = String(country || "").split(/##|[\/、,，;；]/).map((c) => c.trim()).filter(Boolean).map((c) => COUNTRY_ALIAS[c] || c);
   return parts.filter((c, i) => parts.indexOf(c) === i).join("、");
 }
+/** 「出品國別」篩選底下的說明：排行是台灣的票房，國別只是把某國出品的片篩出來 */
+export const BOX_COUNTRY_NOTE = "這是全台灣戲院的票房排行。「出品國別」是電影的出品國：選了只是把那個國家出品的片篩出來、名次在裡面重排，票房一樣是在台灣賣出的。";
+/** 排行標題後面接的篩選說明：「｜日本出品」（沒篩選是空字串） */
+export const boxCountryTag = (country: string): string => (country ? `｜${country}出品` : "");
 /** 這份排行裡有哪些國別（主要出品國）、各幾部（多的在前），給「國別」篩選用 */
 export function boxCountries(list: BoxOfficeItem[]): { id: string; count: number }[] {
   const n: Record<string, number> = {};
@@ -1506,7 +1510,7 @@ export async function boxInfo(x: { name: string; release: string }): Promise<Box
 export function boxInfoRows(x: BoxOfficeItem, info: BoxInfo | null): [string, string][] {
   const num = (n: number) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
   const rows: [string, string][] = [];
-  if (x.country) rows.push(["國別", boxCountryText(x.country)]);
+  if (x.country) rows.push(["出品國別", boxCountryText(x.country)]);
   if (info && info.issue) rows.push(["發行", info.issue]);
   if (info && info.produce) rows.push(["出品", info.produce]);
   rows.push(["上映日期", x.release.replace(/-/g, "/")]);
@@ -1534,7 +1538,7 @@ export function boxOfficeTitle(b: BoxOffice, by: BoxSort, years?: string[], week
 export const BOX_PAGE = 100;
 /** 排行下方的說明 */
 export function boxOfficeFooter(b: BoxOffice, by: BoxSort, years?: string[], week?: string): string {
-  const src = `資料來源：${b.source}。官方每週更新一次。`;
+  const src = `這是全台灣戲院的票房。資料來源：${b.source}。官方每週更新一次。`;
   if (by === "week" && boxWeekPicked(b, week).past)
     return `這是那一週的排行：「當週」是那七天的票房，「累計」算到那一週為止。那時候上映的片，現在可能已經下檔。標「上映至當時」的是官方那一週才第一次列入的新片，數字是上映以來的累計。${src}`;
   if (by === "year") {
