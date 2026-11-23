@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.23-1620
+// @movie-schedule-app 電影行程 v2026.11.23-1621
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/parsers.gen.ts
@@ -1308,8 +1308,8 @@ function posterLight(title, release) {
     const me = await metaOf(title);
     if (me && me.p) return normImageUrl(me.p);
     const own = all["l|" + nk];
-    if (own && Date.now() - own.at < (own.poster ? 30 : 3) * 864e5) return own.poster || thumb;
-    const year = Number((release || "").slice(0, 4)) || 0;
+    if (own && Date.now() - own.at < (own.poster ? 30 : own.v === 2 ? 3 : 0) * 864e5) return own.poster || thumb;
+    const year = isReissue(title) ? 0 : Number((release || "").slice(0, 4)) || 0;
     const poster = await posterLane(async () => {
       try {
         const q = baseTitle(title).toLowerCase().replace(/[\\/?#%]/g, " ").trim();
@@ -1323,7 +1323,7 @@ function posterLight(title, release) {
       }
     });
     const latest = readExtras();
-    latest["l|" + nk] = { poster, trailer: "", trailerName: "", at: Date.now() };
+    latest["l|" + nk] = { poster, trailer: "", trailerName: "", at: Date.now(), v: 2 };
     cacheSet("extras.json", JSON.stringify(latest));
     return poster || thumb;
   })().then((u) => {
@@ -3116,14 +3116,14 @@ var App = class {
   }
   /** 最新版本是多少。網頁版問的是自己網站現在上線的版本（重新整理就會拿到的那一版），不是 GitHub 上的 */
   checkVersion() {
-    if (true) return checkLatest("2026.11.23-1620");
+    if (true) return checkLatest("2026.11.23-1621");
     return (async () => {
       try {
         const r = await globalThis.fetch("/api/version?t=" + Date.now(), { cache: "no-store" });
         const latest = String((await r.json()).version || "");
         if (!latest) return null;
         const num = (v) => Number(v.replace(/\D/g, "")) || 0;
-        return { latest, isLatest: num("2026.11.23-1620") >= num(latest) };
+        return { latest, isLatest: num("2026.11.23-1621") >= num(latest) };
       } catch (_) {
         return null;
       }
@@ -3224,11 +3224,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.23-1620"}`);
+          Pasteboard.copy(`版本 ${"2026.11.23-1621"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.23-1620"}`,
+      `版本 ${"2026.11.23-1621"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -3570,7 +3570,7 @@ var App = class {
     if (false) {
       if (!r) return /* @__PURE__ */ h(Note, { text: "（無法確認是否為最新版：連不到網站）" });
       if (r.isLatest) return /* @__PURE__ */ h(Note, { text: "✅ 已是最新版" });
-      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.23-1620"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
+      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.23-1621"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
         globalThis.location.reload();
       } }));
     }

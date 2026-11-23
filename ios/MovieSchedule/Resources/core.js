@@ -1488,8 +1488,8 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
       const me = await metaOf(title);
       if (me && me.p) return normImageUrl(me.p);
       const own = all["l|" + nk];
-      if (own && Date.now() - own.at < (own.poster ? 30 : 3) * 864e5) return own.poster || thumb;
-      const year = Number((release || "").slice(0, 4)) || 0;
+      if (own && Date.now() - own.at < (own.poster ? 30 : own.v === 2 ? 3 : 0) * 864e5) return own.poster || thumb;
+      const year = isReissue(title) ? 0 : Number((release || "").slice(0, 4)) || 0;
       const poster = await posterLane(async () => {
         try {
           const q = baseTitle(title).toLowerCase().replace(/[\\/?#%]/g, " ").trim();
@@ -1503,7 +1503,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
         }
       });
       const latest = readExtras();
-      latest["l|" + nk] = { poster, trailer: "", trailerName: "", at: Date.now() };
+      latest["l|" + nk] = { poster, trailer: "", trailerName: "", at: Date.now(), v: 2 };
       cacheSet("extras.json", JSON.stringify(latest));
       return poster || thumb;
     })().then((u) => {
@@ -2811,7 +2811,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   var extra = { boxOffice, nowShowing, nowShowingMulti, movieBoard, festivalBoard, festivalFilm, nearby, patchSettings, fillMovie, formatList };
   var BRIDGE_LEVEL = 2;
   globalThis.MS = {
-    version: "2026.11.23-1620",
+    version: "2026.11.23-1621",
     level: BRIDGE_LEVEL,
     init(saved) {
       cache = saved || {};

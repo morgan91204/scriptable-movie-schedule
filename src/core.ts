@@ -999,9 +999,12 @@ export function posterLight(title: string, release?: string): Promise<string> {
     const thumb = hits.length ? normImageUrl(hits[0].poster) : ""; // 電影頁只找到預告縮圖：清單自己也找不到時就用它（跟電影頁顯示同一張）
     const me = await metaOf(title);
     if (me && me.p) return normImageUrl(me.p);
-    const own = all["l|" + nk] as (MovieExtras & { at: number }) | undefined;
-    if (own && Date.now() - own.at < (own.poster ? 30 : 3) * 86400e3) return own.poster || thumb;
-    const year = Number((release || "").slice(0, 4)) || 0;
+    const own = all["l|" + nk] as (MovieExtras & { at: number; v?: number }) | undefined;
+    // 找到的記 30 天；沒找到的記 3 天，但舊規則（重映片也比年份）記下的「沒找到」一律重查
+    if (own && Date.now() - own.at < (own.poster ? 30 : own.v === 2 ? 3 : 0) * 86400e3) return own.poster || thumb;
+    // 年份用來擋同名的別部片；重映、修復版的上映日期是重映日，跟原片年份對不上，所以不比
+    //（《夏日大作戰 全新4K修復版》2026 上映，原片是 2009）
+    const year = isReissue(title) ? 0 : Number((release || "").slice(0, 4)) || 0;
     const poster = await posterLane(async () => {
       try {
         const q = baseTitle(title).toLowerCase().replace(/[\\/?#%]/g, " ").trim();
@@ -1015,7 +1018,7 @@ export function posterLight(title: string, release?: string): Promise<string> {
       }
     });
     const latest = readExtras();
-    latest["l|" + nk] = { poster, trailer: "", trailerName: "", at: Date.now() } as MovieExtras & { at: number };
+    latest["l|" + nk] = { poster, trailer: "", trailerName: "", at: Date.now(), v: 2 } as MovieExtras & { at: number };
     cacheSet("extras.json", JSON.stringify(latest));
     return poster || thumb;
   })().then((u) => {
