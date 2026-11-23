@@ -46,6 +46,7 @@
     bookingUrl: () => bookingUrl,
     boxByCountry: () => boxByCountry,
     boxCountries: () => boxCountries,
+    boxCountryText: () => boxCountryText,
     boxInfo: () => boxInfo,
     boxInfoRows: () => boxInfoRows,
     boxMainCountry: () => boxMainCountry,
@@ -1896,10 +1897,14 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     if (by !== "total") return b.list;
     return b.list.slice().sort((x, y) => y.total - x.total).map((x, i) => ({ ...x, rank: i + 1 }));
   }
-  var COUNTRY_ALIAS = { 中國大陸: "中國", 大陸: "中國", 台灣: "中華民國", 臺灣: "中華民國", 南韓: "韓國", 澳大利亞: "澳洲", Australia: "澳洲", France: "法國", 美: "美國", 法: "法國", 日: "日本", 德: "德國", 北馬其頓: "馬其頓" };
+  var COUNTRY_ALIAS = { 中國大陸: "中國", 大陸: "中國", 中華民國: "台灣", 臺灣: "台灣", 南韓: "韓國", 澳大利亞: "澳洲", Australia: "澳洲", France: "法國", 美: "美國", 法: "法國", 日: "日本", 德: "德國", 北馬其頓: "馬其頓" };
   function boxMainCountry(country) {
     const first = String(country || "").split(/##|[\/、,，;；]/)[0].trim();
     return COUNTRY_ALIAS[first] || first;
+  }
+  function boxCountryText(country) {
+    const parts = String(country || "").split(/##|[\/、,，;；]/).map((c) => c.trim()).filter(Boolean).map((c) => COUNTRY_ALIAS[c] || c);
+    return parts.filter((c, i) => parts.indexOf(c) === i).join("、");
   }
   function boxCountries(list) {
     const n = {};
@@ -1932,7 +1937,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   function boxInfoRows(x, info) {
     const num = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
     const rows = [];
-    if (x.country) rows.push(["國別", x.country.replace(/##/g, "、").replace(/\s*\/\s*/g, "、")]);
+    if (x.country) rows.push(["國別", boxCountryText(x.country)]);
     if (info && info.issue) rows.push(["發行", info.issue]);
     if (info && info.produce) rows.push(["出品", info.produce]);
     rows.push(["上映日期", x.release.replace(/-/g, "/")]);
@@ -2928,7 +2933,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   var extra = { boxOffice, nowShowing, nowShowingMulti, movieBoard, festivalBoard, festivalFilm, nearby, patchSettings, fillMovie, formatList };
   var BRIDGE_LEVEL = 2;
   globalThis.MS = {
-    version: "2026.11.23-1933",
+    version: "2026.11.23-1941",
     level: BRIDGE_LEVEL,
     init(saved) {
       cache = saved || {};

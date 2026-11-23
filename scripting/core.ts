@@ -1466,10 +1466,15 @@ export function boxOfficeBy(b: BoxOffice, by: BoxSort, years?: string[], week?: 
 }
 // 官方的國別欄位是各片商自己填的，寫法很亂：合拍片寫成「中國大陸/香港」「中華民國##中華民國」，同一國有「中國大陸／大陸／中國」「澳洲／澳大利亞／Australia」幾種寫法。
 // 篩選用的是「主要出品國」：取第一個，再把同一國的不同寫法併在一起（個別資訊那一頁仍然照官方原文顯示）
-const COUNTRY_ALIAS: Record<string, string> = { 中國大陸: "中國", 大陸: "中國", 台灣: "中華民國", 臺灣: "中華民國", 南韓: "韓國", 澳大利亞: "澳洲", Australia: "澳洲", France: "法國", 美: "美國", 法: "法國", 日: "日本", 德: "德國", 北馬其頓: "馬其頓" };
+const COUNTRY_ALIAS: Record<string, string> = { 中國大陸: "中國", 大陸: "中國", 中華民國: "台灣", 臺灣: "台灣", 南韓: "韓國", 澳大利亞: "澳洲", Australia: "澳洲", France: "法國", 美: "美國", 法: "法國", 日: "日本", 德: "德國", 北馬其頓: "馬其頓" };
 export function boxMainCountry(country: string): string {
   const first = String(country || "").split(/##|[\/、,，;；]/)[0].trim();
   return COUNTRY_ALIAS[first] || first;
+}
+/** 國別的完整寫法（合拍片每一國都列）：同樣把寫法統一（官方的「中華民國」顯示成「台灣」），重複的只留一個 */
+export function boxCountryText(country: string): string {
+  const parts = String(country || "").split(/##|[\/、,，;；]/).map((c) => c.trim()).filter(Boolean).map((c) => COUNTRY_ALIAS[c] || c);
+  return parts.filter((c, i) => parts.indexOf(c) === i).join("、");
 }
 /** 這份排行裡有哪些國別（主要出品國）、各幾部（多的在前），給「國別」篩選用 */
 export function boxCountries(list: BoxOfficeItem[]): { id: string; count: number }[] {
@@ -1501,7 +1506,7 @@ export async function boxInfo(x: { name: string; release: string }): Promise<Box
 export function boxInfoRows(x: BoxOfficeItem, info: BoxInfo | null): [string, string][] {
   const num = (n: number) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
   const rows: [string, string][] = [];
-  if (x.country) rows.push(["國別", x.country.replace(/##/g, "、").replace(/\s*\/\s*/g, "、")]);
+  if (x.country) rows.push(["國別", boxCountryText(x.country)]);
   if (info && info.issue) rows.push(["發行", info.issue]);
   if (info && info.produce) rows.push(["出品", info.produce]);
   rows.push(["上映日期", x.release.replace(/-/g, "/")]);
