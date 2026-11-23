@@ -1,5 +1,5 @@
 {
- "updated": "2026-11-22T06:51:56.986Z",
+ "updated": "2026-11-23T11:32:45.869Z",
  "mode": "week",
  "start": "2026-11-09",
  "end": "2026-11-15",
@@ -1340,6 +1340,7 @@
    "release": "2026-07-28",
    "theaters": 90,
    "total": 600442693,
+   "c": 130,
    "showing": true
   },
   {
@@ -1348,6 +1349,7 @@
    "release": "2026-07-16",
    "theaters": 93,
    "total": 457780072,
+   "c": 130,
    "showing": true
   },
   {
@@ -1355,14 +1357,16 @@
    "name": "超級瑪利歐銀河電影版",
    "release": "2026-04-01",
    "theaters": 96,
-   "total": 290755706
+   "total": 290755706,
+   "c": 130
   },
   {
    "rank": 4,
    "name": "狸想世界",
    "release": "2026-03-18",
    "theaters": 92,
-   "total": 288760165
+   "total": 288760165,
+   "c": 130
   },
   {
    "rank": 5,
@@ -1370,6 +1374,7 @@
    "release": "2026-06-17",
    "theaters": 92,
    "total": 286198886,
+   "c": 130,
    "showing": true
   },
   {
@@ -1377,14 +1382,16 @@
    "name": "穿著Prada的惡魔2",
    "release": "2026-04-29",
    "theaters": 93,
-   "total": 240552157
+   "total": 240552157,
+   "c": 130
   },
   {
    "rank": 7,
    "name": "屍速禁區",
    "release": "2026-05-22",
    "theaters": 84,
-   "total": 233799368
+   "total": 233799368,
+   "c": 167
   },
   {
    "rank": 8,
@@ -1392,6 +1399,7 @@
    "release": "2026-06-24",
    "theaters": 88,
    "total": 216192064,
+   "c": 87,
    "showing": true
   },
   {
@@ -1400,6 +1408,7 @@
    "release": "2026-07-25",
    "theaters": 88,
    "total": 174933361,
+   "c": 87,
    "showing": true
   },
   {
@@ -1408,6 +1417,7 @@
    "release": "2026-03-18",
    "theaters": 94,
    "total": 173881727,
+   "c": 130,
    "showing": true
   },
   {
@@ -1416,6 +1426,7 @@
    "release": "2026-09-17",
    "theaters": 91,
    "total": 157151765,
+   "c": 130,
    "showing": true
   },
   {
@@ -1424,6 +1435,7 @@
    "release": "2026-08-07",
    "theaters": 81,
    "total": 145345741,
+   "c": 130,
    "showing": true
   },
   {
@@ -1432,6 +1444,7 @@
    "release": "2026-04-22",
    "theaters": 88,
    "total": 108122761,
+   "c": 130,
    "showing": true
   },
   {
@@ -1439,7 +1452,8 @@
    "name": "小小兵&大怪獸",
    "release": "2026-06-30",
    "theaters": 92,
-   "total": 107618505
+   "total": 107618505,
+   "c": 130
   },
   {
    "rank": 15,
@@ -1447,6 +1461,7 @@
    "release": "2026-01-01",
    "theaters": 96,
    "total": 96632791,
+   "c": 8,
    "showing": true
   },
   {
@@ -1455,6 +1470,7 @@
    "release": "2026-08-27",
    "theaters": 92,
    "total": 91275728,
+   "c": 8,
    "showing": true
   },
   {
@@ -1462,14 +1478,16 @@
    "name": "雙囍",
    "release": "2026-02-17",
    "theaters": 97,
-   "total": 85692259
+   "total": 85692259,
+   "c": 8
   },
   {
    "rank": 18,
    "name": "後室",
    "release": "2026-05-25",
    "theaters": 89,
-   "total": 84422079
+   "total": 84422079,
+   "c": 130
   },
   {
    "rank": 19,
@@ -1477,6 +1495,7 @@
    "release": "2026-08-27",
    "theaters": 90,
    "total": 81676487,
+   "c": 8,
    "showing": true
   },
   {
@@ -1485,6 +1504,7 @@
    "release": "2026-11-02",
    "theaters": 82,
    "total": 74818512,
+   "c": 87,
    "showing": true
   },
   {
@@ -1493,6 +1513,7 @@
    "release": "2026-08-07",
    "theaters": 83,
    "total": 57192970,
+   "c": 87,
    "showing": true
   },
   {
@@ -1500,7 +1521,8 @@
    "name": "揭密日",
    "release": "2026-06-09",
    "theaters": 91,
-   "total": 56691756
+   "total": 56691756,
+   "c": 130
   },
   {
    "rank": 23,
@@ -1508,6 +1530,7 @@
    "release": "2026-08-12",
    "theaters": 92,
    "total": 50253371,
+   "c": 130,
    "showing": true
   },
   {
@@ -1516,6 +1539,7 @@
    "release": "2026-04-25",
    "theaters": 13,
    "total": 47306391,
+   "c": 87,
    "showing": true
   },
   {
@@ -1523,7 +1547,8 @@
    "name": "功夫",
    "release": "2026-02-13",
    "theaters": 98,
-   "total": 47050244
+   "total": 47050244,
+   "c": 8
   },
   {
    "rank": 26,
@@ -1531,6 +1556,7 @@
    "release": "2026-10-21",
    "theaters": 89,
    "total": 46496386,
+   "c": 130,
    "showing": true
   },
   {
@@ -1539,6 +1565,7 @@
    "release": "2026-09-17",
    "theaters": 91,
    "total": 45037803,
+   "c": 130,
    "showing": true
   },
   {
@@ -1547,6 +1574,7 @@
    "release": "2026-08-14",
    "theaters": 88,
    "total": 41329134,
+   "c": 130,
    "showing": true
   },
   {
@@ -1555,6 +1583,7 @@
    "release": "2026-07-08",
    "theaters": 83,
    "total": 40703111,
+   "c": 87,
    "showing": true
   },
   {
@@ -1563,6 +1592,7 @@
    "release": "2026-07-08",
    "theaters": 91,
    "total": 39577067,
+   "c": 130,
    "showing": true
   },
   {
@@ -1570,42 +1600,48 @@
    "name": "抓馬戀人",
    "release": "2026-04-02",
    "theaters": 75,
-   "total": 36947114
+   "total": 36947114,
+   "c": 130
   },
   {
    "rank": 32,
    "name": "寒戰1994",
    "release": "2026-05-01",
    "theaters": 89,
-   "total": 34763356
+   "total": 34763356,
+   "c": 168
   },
   {
    "rank": 33,
    "name": "李克寧 墓乃伊",
    "release": "2026-04-15",
    "theaters": 86,
-   "total": 34263695
+   "total": 34263695,
+   "c": 130
   },
   {
    "rank": 34,
    "name": "劇場版「暗殺教室」：我們的時光",
    "release": "2026-03-27",
    "theaters": 72,
-   "total": 33052307
+   "total": 33052307,
+   "c": 87
   },
   {
    "rank": 35,
    "name": "復仇者聯盟：終局之戰 加碼重映",
    "release": "2026-09-24",
    "theaters": 83,
-   "total": 32761451
+   "total": 32761451,
+   "c": 130
   },
   {
    "rank": 36,
    "name": "曼達洛人與古古",
    "release": "2026-05-20",
    "theaters": 90,
-   "total": 32348873
+   "total": 32348873,
+   "c": 130
   },
   {
    "rank": 37,
@@ -1613,6 +1649,7 @@
    "release": "2026-10-08",
    "theaters": 83,
    "total": 31109286,
+   "c": 130,
    "showing": true
   },
   {
@@ -1620,7 +1657,8 @@
    "name": "玩命航線",
    "release": "2026-08-19",
    "theaters": 81,
-   "total": 30338951
+   "total": 30338951,
+   "c": 130
   },
   {
    "rank": 39,
@@ -1628,6 +1666,7 @@
    "release": "2026-11-06",
    "theaters": 88,
    "total": 30036247,
+   "c": 87,
    "showing": true
   },
   {
@@ -1635,7 +1674,8 @@
    "name": "山羊巔峰",
    "release": "2026-02-13",
    "theaters": 87,
-   "total": 30016261
+   "total": 30016261,
+   "c": 130
   },
   {
    "rank": 41,
@@ -1643,6 +1683,7 @@
    "release": "2026-09-04",
    "theaters": 51,
    "total": 29345498,
+   "c": 87,
    "showing": true
   },
   {
@@ -1650,28 +1691,32 @@
    "name": "天眼浩劫",
    "release": "2026-02-06",
    "theaters": 86,
-   "total": 28300232
+   "total": 28300232,
+   "c": 130
   },
   {
    "rank": 43,
    "name": "希望：末日血戰",
    "release": "2026-09-04",
    "theaters": 93,
-   "total": 27113406
+   "total": 27113406,
+   "c": 167
   },
   {
    "rank": 44,
    "name": "神木之島",
    "release": "2026-05-08",
    "theaters": 50,
-   "total": 23676086
+   "total": 23676086,
+   "c": 8
   },
   {
    "rank": 45,
    "name": "ONE OK ROCK DETOX JAPAN TOUR 2025 AT NISSAN STADIUM IN CINEMAS",
    "release": "2026-04-17",
    "theaters": 33,
-   "total": 23192170
+   "total": 23192170,
+   "c": 167
   },
   {
    "rank": 46,
@@ -1679,6 +1724,7 @@
    "release": "2026-10-01",
    "theaters": 91,
    "total": 21024802,
+   "c": 130,
    "showing": true
   },
   {
@@ -1687,6 +1733,7 @@
    "release": "2026-05-08",
    "theaters": 81,
    "total": 20662665,
+   "c": 8,
    "showing": true
   },
   {
@@ -1694,42 +1741,48 @@
    "name": "超少女",
    "release": "2026-06-23",
    "theaters": 92,
-   "total": 19705496
+   "total": 19705496,
+   "c": 130
   },
   {
    "rank": 49,
    "name": "新劇場版 銀魂 -吉原大炎上-",
    "release": "2026-05-15",
    "theaters": 83,
-   "total": 17802588
+   "total": 17802588,
+   "c": 87
   },
   {
    "rank": 50,
    "name": "天劫倒數 2：大遷徙",
    "release": "2026-01-09",
    "theaters": 86,
-   "total": 17697936
+   "total": 17697936,
+   "c": 130
   },
   {
    "rank": 51,
    "name": "尋秦記",
    "release": "2026-01-03",
    "theaters": 81,
-   "total": 17543017
+   "total": 17543017,
+   "c": 168
   },
   {
    "rank": 52,
    "name": "STRAY KIDS: THE DOMINATE EXPERIENCE",
    "release": "2026-03-13",
    "theaters": 44,
-   "total": 17511745
+   "total": 17511745,
+   "c": 130
   },
   {
    "rank": 53,
    "name": "關鍵公敵",
    "release": "2026-01-30",
    "theaters": 92,
-   "total": 17051264
+   "total": 17051264,
+   "c": 130
   },
   {
    "rank": 54,
@@ -1737,6 +1790,7 @@
    "release": "2026-09-10",
    "theaters": 90,
    "total": 16687741,
+   "c": 8,
    "showing": true
   },
   {
@@ -1744,21 +1798,24 @@
    "name": "驚聲尖笑",
    "release": "2026-06-05",
    "theaters": 86,
-   "total": 16353430
+   "total": 16353430,
+   "c": 130
   },
   {
    "rank": 56,
    "name": "藍色監獄",
    "release": "2026-08-12",
    "theaters": 70,
-   "total": 15591541
+   "total": 15591541,
+   "c": 87
   },
   {
    "rank": 57,
    "name": "機動戰士鋼彈 閃光的哈薩威 喀耳刻的魔女",
    "release": "2026-03-19",
    "theaters": 56,
-   "total": 15549047
+   "total": 15549047,
+   "c": 87
   },
   {
    "rank": 58,
@@ -1766,6 +1823,7 @@
    "release": "2026-10-13",
    "theaters": 90,
    "total": 15440281,
+   "c": 130,
    "showing": true
   },
   {
@@ -1773,35 +1831,40 @@
    "name": "關於我轉生變成史萊姆這檔事 劇場版 蒼海之淚篇",
    "release": "2026-04-28",
    "theaters": 90,
-   "total": 15288069
+   "total": 15288069,
+   "c": 87
   },
   {
    "rank": 60,
    "name": "死亡賭局",
    "release": "2026-04-24",
    "theaters": 88,
-   "total": 14673738
+   "total": 14673738,
+   "c": 8
   },
   {
    "rank": 61,
    "name": "死亡之握：鬼牽手",
    "release": "2026-04-17",
    "theaters": 83,
-   "total": 14595882
+   "total": 14595882,
+   "c": 8
   },
   {
    "rank": 62,
    "name": "神奇數字馬戲團 最終章",
    "release": "2026-06-05",
    "theaters": 48,
-   "total": 14073881
+   "total": 14073881,
+   "c": 113
   },
   {
    "rank": 63,
    "name": "陰兒房：穿越陰深處",
    "release": "2026-08-19",
    "theaters": 87,
-   "total": 14069780
+   "total": 14069780,
+   "c": 130
   },
   {
    "rank": 64,
@@ -1809,6 +1872,7 @@
    "release": "2026-10-15",
    "theaters": 88,
    "total": 13728410,
+   "c": 130,
    "showing": true
   },
   {
@@ -1816,28 +1880,32 @@
    "name": "太空超人",
    "release": "2026-05-27",
    "theaters": 92,
-   "total": 13638297
+   "total": 13638297,
+   "c": 130
   },
   {
    "rank": 66,
    "name": "真人快打 II",
    "release": "2026-05-06",
    "theaters": 91,
-   "total": 12748196
+   "total": 12748196,
+   "c": 130
   },
   {
    "rank": 67,
    "name": "火遮眼",
    "release": "2026-06-12",
    "theaters": 75,
-   "total": 11850876
+   "total": 11850876,
+   "c": 143
   },
   {
    "rank": 68,
    "name": "祭弒",
    "release": "2026-04-19",
    "theaters": 83,
-   "total": 11670257
+   "total": 11670257,
+   "c": 8
   },
   {
    "rank": 69,
@@ -1845,6 +1913,7 @@
    "release": "2026-10-16",
    "theaters": 71,
    "total": 11620725,
+   "c": 87,
    "showing": true
   },
   {
@@ -1852,14 +1921,16 @@
    "name": "劇場版 我內心的糟糕念頭",
    "release": "2026-02-13",
    "theaters": 14,
-   "total": 11020952
+   "total": 11020952,
+   "c": 87
   },
   {
    "rank": 71,
    "name": "哈利波特：神秘的魔法石",
    "release": "2026-08-28",
    "theaters": 16,
-   "total": 10983463
+   "total": 10983463,
+   "c": 130
   },
   {
    "rank": 72,
@@ -1867,6 +1938,7 @@
    "release": "2026-10-16",
    "theaters": 14,
    "total": 10803836,
+   "c": 87,
    "showing": true
   },
   {
@@ -1874,28 +1946,32 @@
    "name": "重返沉默之丘",
    "release": "2026-01-23",
    "theaters": 79,
-   "total": 10637434
+   "total": 10637434,
+   "c": 130
   },
   {
    "rank": 74,
    "name": "咆哮山莊",
    "release": "2026-02-13",
    "theaters": 83,
-   "total": 10517679
+   "total": 10517679,
+   "c": 130
   },
   {
    "rank": 75,
    "name": "腎上腺 母侵",
    "release": "2026-06-12",
    "theaters": 49,
-   "total": 10225042
+   "total": 10225042,
+   "c": 8
   },
   {
    "rank": 76,
    "name": "犯罪101",
    "release": "2026-02-26",
    "theaters": 91,
-   "total": 10113864
+   "total": 10113864,
+   "c": 130
   },
   {
    "rank": 77,
@@ -1903,6 +1979,7 @@
    "release": "2026-09-11",
    "theaters": 76,
    "total": 10051839,
+   "c": 87,
    "showing": true
   },
   {
@@ -1911,6 +1988,7 @@
    "release": "2026-10-09",
    "theaters": 11,
    "total": 9390150,
+   "c": 87,
    "showing": true
   },
   {
@@ -1919,6 +1997,7 @@
    "release": "2026-10-08",
    "theaters": 90,
    "total": 9255095,
+   "c": 130,
    "showing": true
   },
   {
@@ -1926,7 +2005,8 @@
    "name": "殺木池：鬼水禁地",
    "release": "2026-04-24",
    "theaters": 65,
-   "total": 9221518
+   "total": 9221518,
+   "c": 167
   },
   {
    "rank": 81,
@@ -1934,6 +2014,7 @@
    "release": "2026-10-23",
    "theaters": 50,
    "total": 9165743,
+   "c": 87,
    "showing": true
   },
   {
@@ -1941,14 +2022,16 @@
    "name": "飛吧！熊鷹",
    "release": "2026-04-09",
    "theaters": 50,
-   "total": 9004579
+   "total": 9004579,
+   "c": 8
   },
   {
    "rank": 83,
    "name": "墜2",
    "release": "2026-09-04",
    "theaters": 73,
-   "total": 8872072
+   "total": 8872072,
+   "c": 130
   },
   {
    "rank": 84,
@@ -1956,6 +2039,7 @@
    "release": "2026-07-08",
    "theaters": 80,
    "total": 8684958,
+   "c": 130,
    "showing": true
   },
   {
@@ -1963,21 +2047,24 @@
    "name": "日租家庭",
    "release": "2026-01-26",
    "theaters": 49,
-   "total": 8504839
+   "total": 8504839,
+   "c": 130
   },
   {
    "rank": 86,
    "name": "綿羊偵探團",
    "release": "2026-05-08",
    "theaters": 75,
-   "total": 8321820
+   "total": 8321820,
+   "c": 130
   },
   {
    "rank": 87,
    "name": "捕風追影",
    "release": "2026-03-27",
    "theaters": 70,
-   "total": 8298917
+   "total": 8298917,
+   "c": 5
   },
   {
    "rank": 88,
@@ -1985,6 +2072,7 @@
    "release": "2026-10-30",
    "theaters": 15,
    "total": 8272160,
+   "c": 167,
    "showing": true
   },
   {
@@ -1993,6 +2081,7 @@
    "release": "2026-10-30",
    "theaters": 75,
    "total": 8184524,
+   "c": 130,
    "showing": true
   },
   {
@@ -2000,28 +2089,32 @@
    "name": "邪降：覺醒",
    "release": "2026-03-20",
    "theaters": 65,
-   "total": 7869843
+   "total": 7869843,
+   "c": 110
   },
   {
    "rank": 91,
    "name": "魯冰花（數位修復版）",
    "release": "2026-07-08",
    "theaters": 67,
-   "total": 7716243
+   "total": 7716243,
+   "c": 8
   },
   {
    "rank": 92,
    "name": "名偵探柯南 引爆摩天樓 4K數位修復版",
    "release": "2026-05-03",
    "theaters": 50,
-   "total": 7485329
+   "total": 7485329,
+   "c": 87
   },
   {
    "rank": 93,
    "name": "PLAVE Asia Tour [Dash: Quantum Leap] Encore in Cinemas",
    "release": "2026-06-05",
    "theaters": 44,
-   "total": 7402830
+   "total": 7402830,
+   "c": 167
   },
   {
    "rank": 94,
@@ -2029,6 +2122,7 @@
    "release": "2026-10-30",
    "theaters": 36,
    "total": 7333494,
+   "c": 5,
    "showing": true
   },
   {
@@ -2036,28 +2130,32 @@
    "name": "妳最後留下的歌",
    "release": "2026-06-05",
    "theaters": 50,
-   "total": 7306812
+   "total": 7306812,
+   "c": 87
   },
   {
    "rank": 96,
    "name": "弒婚遊戲：2度開局",
    "release": "2026-04-02",
    "theaters": 87,
-   "total": 7300401
+   "total": 7300401,
+   "c": 130
   },
   {
    "rank": 97,
    "name": "荒島囚救",
    "release": "2026-01-29",
    "theaters": 84,
-   "total": 7108208
+   "total": 7108208,
+   "c": 130
   },
   {
    "rank": 98,
    "name": "秒速5公分 真人版",
    "release": "2026-02-06",
    "theaters": 82,
-   "total": 6790518
+   "total": 6790518,
+   "c": 87
   },
   {
    "rank": 99,
@@ -2065,6 +2163,7 @@
    "release": "2026-10-28",
    "theaters": 64,
    "total": 6718939,
+   "c": 8,
    "showing": true
   },
   {
@@ -2072,21 +2171,24 @@
    "name": "夏日大作戰 全新4K修復版",
    "release": "2026-04-02",
    "theaters": 61,
-   "total": 6656639
+   "total": 6656639,
+   "c": 87
   },
   {
    "rank": 101,
    "name": "NO GOOD！歐吉桑",
    "release": "2026-04-10",
    "theaters": 61,
-   "total": 6592990
+   "total": 6592990,
+   "c": 8
   },
   {
    "rank": 102,
    "name": "驚聲尖叫 7",
    "release": "2026-02-26",
    "theaters": 84,
-   "total": 6561267
+   "total": 6561267,
+   "c": 130
   },
   {
    "rank": 103,
@@ -2094,6 +2196,7 @@
    "release": "2026-04-19",
    "theaters": 45,
    "total": 6561172,
+   "c": 8,
    "showing": true
   },
   {
@@ -2101,14 +2204,16 @@
    "name": "巧虎電影　勇氣之歌 (國語版)",
    "release": "2026-02-06",
    "theaters": 19,
-   "total": 6512060
+   "total": 6512060,
+   "c": 87
   },
   {
    "rank": 105,
    "name": "實境誘捕",
    "release": "2026-09-24",
    "theaters": 62,
-   "total": 6385381
+   "total": 6385381,
+   "c": 130
   },
   {
    "rank": 106,
@@ -2116,6 +2221,7 @@
    "release": "2026-10-23",
    "theaters": 15,
    "total": 6189243,
+   "c": 167,
    "showing": true
   },
   {
@@ -2123,35 +2229,40 @@
    "name": "你能吃到媽媽煮的飯的次數，還剩365次",
    "release": "2026-05-08",
    "theaters": 57,
-   "total": 6008978
+   "total": 6008978,
+   "c": 167
   },
   {
    "rank": 108,
    "name": "28年毀滅倒數：人骨聖殿",
    "release": "2026-01-16",
    "theaters": 91,
-   "total": 5946649
+   "total": 5946649,
+   "c": 130
   },
   {
    "rank": 109,
    "name": "深度安靜",
    "release": "2026-03-20",
    "theaters": 61,
-   "total": 5706881
+   "total": 5706881,
+   "c": 8
   },
   {
    "rank": 110,
    "name": "怪奇比莉－溫柔重擊巡迴演唱會 3D 電影",
    "release": "2026-05-08",
    "theaters": 32,
-   "total": 5674425
+   "total": 5674425,
+   "c": 130
   },
   {
    "rank": 111,
    "name": "鬼上車",
    "release": "2026-06-18",
    "theaters": 74,
-   "total": 5590488
+   "total": 5590488,
+   "c": 130
   },
   {
    "rank": 112,
@@ -2159,6 +2270,7 @@
    "release": "2026-09-19",
    "theaters": 84,
    "total": 5542639,
+   "c": 130,
    "showing": true
   },
   {
@@ -2167,6 +2279,7 @@
    "release": "2026-10-14",
    "theaters": 60,
    "total": 5531173,
+   "c": 8,
    "showing": true
   },
   {
@@ -2175,6 +2288,7 @@
    "release": "2026-11-06",
    "theaters": 16,
    "total": 5512458,
+   "c": 87,
    "showing": true
   },
   {
@@ -2182,21 +2296,24 @@
    "name": "情感的價值",
    "release": "2026-01-23",
    "theaters": 36,
-   "total": 5471346
+   "total": 5471346,
+   "c": 78
   },
   {
    "rank": 116,
    "name": "別離無恙",
    "release": "2026-05-15",
    "theaters": 64,
-   "total": 5454682
+   "total": 5454682,
+   "c": 87
   },
   {
    "rank": 117,
    "name": "劇場版 少女樂團吶喊吧【後篇】-嗨, 未來-",
    "release": "2026-01-24",
    "theaters": 16,
-   "total": 5427352
+   "total": 5427352,
+   "c": 87
   },
   {
    "rank": 118,
@@ -2204,6 +2321,7 @@
    "release": "2026-10-16",
    "theaters": 29,
    "total": 5404655,
+   "c": 130,
    "showing": true
   },
   {
@@ -2212,6 +2330,7 @@
    "release": "2026-08-27",
    "theaters": 76,
    "total": 5327137,
+   "c": 130,
    "showing": true
   },
   {
@@ -2219,35 +2338,40 @@
    "name": "劇場版 少女樂團吶喊吧【前篇】-青春狂走曲-",
    "release": "2026-01-09",
    "theaters": 17,
-   "total": 5200961
+   "total": 5200961,
+   "c": 87
   },
   {
    "rank": 121,
    "name": "特種快遞",
    "release": "2026-09-24",
    "theaters": 71,
-   "total": 5171000
+   "total": 5171000,
+   "c": 130
   },
   {
    "rank": 122,
    "name": "超拖樂團之我要幹大事啦！",
    "release": "2026-08-14",
    "theaters": 22,
-   "total": 5141946
+   "total": 5141946,
+   "c": 27
   },
   {
    "rank": 123,
    "name": "72小時即刻救援",
    "release": "2026-03-13",
    "theaters": 75,
-   "total": 5087532
+   "total": 5087532,
+   "c": 130
   },
   {
    "rank": 124,
    "name": "ENHYPEN [WALK THE LINE SUMMER EDITION] IN CINEMAS",
    "release": "2026-03-05",
    "theaters": 24,
-   "total": 5049340
+   "total": 5049340,
+   "c": 167
   },
   {
    "rank": 125,
@@ -2255,6 +2379,7 @@
    "release": "2026-10-08",
    "theaters": 72,
    "total": 5029256,
+   "c": 130,
    "showing": true
   },
   {
@@ -2262,14 +2387,16 @@
    "name": "世外",
    "release": "2026-03-13",
    "theaters": 60,
-   "total": 4967707
+   "total": 4967707,
+   "c": 168
   },
   {
    "rank": 127,
    "name": "電影屁屁偵探：星星與月亮",
    "release": "2026-01-23",
    "theaters": 71,
-   "total": 4835455
+   "total": 4835455,
+   "c": 87
   },
   {
    "rank": 128,
@@ -2277,6 +2404,7 @@
    "release": "2026-10-14",
    "theaters": 76,
    "total": 4507942,
+   "c": 167,
    "showing": true
   },
   {
@@ -2284,42 +2412,48 @@
    "name": "恨女的逆襲",
    "release": "2026-01-16",
    "theaters": 58,
-   "total": 4195986
+   "total": 4195986,
+   "c": 8
   },
   {
    "rank": 130,
    "name": "盜音天才",
    "release": "2026-05-06",
    "theaters": 57,
-   "total": 4191420
+   "total": 4191420,
+   "c": 130
   },
   {
    "rank": 131,
    "name": "機動戰士鋼彈 閃光的哈薩威",
    "release": "2026-03-06",
    "theaters": 28,
-   "total": 4184288
+   "total": 4184288,
+   "c": 87
   },
   {
    "rank": 132,
    "name": "偶像學園!X星光樂園 THE MOVIE -相遇的奇蹟-",
    "release": "2026-08-07",
    "theaters": 10,
-   "total": 4162225
+   "total": 4162225,
+   "c": 87
   },
   {
    "rank": 133,
    "name": "夜王",
    "release": "2026-03-13",
    "theaters": 70,
-   "total": 4114949
+   "total": 4114949,
+   "c": 168
   },
   {
    "rank": 134,
    "name": "祈念之樹",
    "release": "2026-02-26",
    "theaters": 72,
-   "total": 4006549
+   "total": 4006549,
+   "c": 87
   },
   {
    "rank": 135,
@@ -2327,6 +2461,7 @@
    "release": "2026-09-10",
    "theaters": 78,
    "total": 3985043,
+   "c": 130,
    "showing": true
   },
   {
@@ -2335,6 +2470,7 @@
    "release": "2026-10-08",
    "theaters": 79,
    "total": 3839780,
+   "c": 87,
    "showing": true
   },
   {
@@ -2342,14 +2478,16 @@
    "name": "遊戲人生ZERO",
    "release": "2026-10-30",
    "theaters": 7,
-   "total": 3835383
+   "total": 3835383,
+   "c": 87
   },
   {
    "rank": 138,
    "name": "空之境界劇場版：第五章 矛盾螺旋",
    "release": "2026-02-13",
    "theaters": 35,
-   "total": 3772371
+   "total": 3772371,
+   "c": 87
   },
   {
    "rank": 139,
@@ -2357,6 +2495,7 @@
    "release": "2026-06-12",
    "theaters": 28,
    "total": 3753004,
+   "c": 8,
    "showing": true
   },
   {
@@ -2364,42 +2503,48 @@
    "name": "LINKIN PARK：UNSHATTER",
    "release": "2026-09-30",
    "theaters": 28,
-   "total": 3631710
+   "total": 3631710,
+   "c": 130
   },
   {
    "rank": 141,
    "name": "哈姆奈特",
    "release": "2026-02-26",
    "theaters": 47,
-   "total": 3581446
+   "total": 3581446,
+   "c": 130
   },
   {
    "rank": 142,
    "name": "農曆三月二十三",
    "release": "2026-05-08",
    "theaters": 46,
-   "total": 3506583
+   "total": 3506583,
+   "c": 8
   },
   {
    "rank": 143,
    "name": "A KITE風箏",
    "release": "2026-04-10",
    "theaters": 18,
-   "total": 3503843
+   "total": 3503843,
+   "c": 87
   },
   {
    "rank": 144,
    "name": "蠱降",
    "release": "2026-04-02",
    "theaters": 59,
-   "total": 3440628
+   "total": 3440628,
+   "c": 173
   },
   {
    "rank": 145,
    "name": "傳奇女伶 高菊花",
    "release": "2026-05-15",
    "theaters": 34,
-   "total": 3418782
+   "total": 3418782,
+   "c": 8
   },
   {
    "rank": 146,
@@ -2407,6 +2552,7 @@
    "release": "2026-10-23",
    "theaters": 34,
    "total": 3376791,
+   "c": 96,
    "showing": true
   },
   {
@@ -2414,98 +2560,112 @@
    "name": "啵me之我的青春住了鬼",
    "release": "2026-01-23",
    "theaters": 81,
-   "total": 3324602
+   "total": 3324602,
+   "c": 8
   },
   {
    "rank": 148,
    "name": "血鬼村",
    "release": "2026-08-07",
    "theaters": 48,
-   "total": 3291126
+   "total": 3291126,
+   "c": 162
   },
   {
    "rank": 149,
    "name": "王命之徒",
    "release": "2026-02-26",
    "theaters": 63,
-   "total": 3287663
+   "total": 3287663,
+   "c": 167
   },
   {
    "rank": 150,
    "name": "你是不會當樹嗎",
    "release": "2026-04-15",
    "theaters": 23,
-   "total": 3285728
+   "total": 3285728,
+   "c": 67
   },
   {
    "rank": 151,
    "name": "劇場版 銀河特急 Milky☆Subway",
    "release": "2026-04-17",
    "theaters": 65,
-   "total": 3232317
+   "total": 3232317,
+   "c": 87
   },
   {
    "rank": 152,
    "name": "他們要殺你",
    "release": "2026-03-26",
    "theaters": 82,
-   "total": 3222995
+   "total": 3222995,
+   "c": 130
   },
   {
    "rank": 153,
    "name": "我未許願先吹蠟燭",
    "release": "2026-08-14",
    "theaters": 67,
-   "total": 3112080
+   "total": 3112080,
+   "c": 8
   },
   {
    "rank": 154,
    "name": "0時盜數",
    "release": "2026-04-14",
    "theaters": 74,
-   "total": 3019557
+   "total": 3019557,
+   "c": 143
   },
   {
    "rank": 155,
    "name": "科學新娘！",
    "release": "2026-03-04",
    "theaters": 68,
-   "total": 2951293
+   "total": 2951293,
+   "c": 130
   },
   {
    "rank": 156,
    "name": "復活男",
    "release": "2026-10-01",
    "theaters": 48,
-   "total": 2901257
+   "total": 2901257,
+   "c": 167
   },
   {
    "rank": 157,
    "name": "航海王劇場版：紅髮歌姬",
    "release": "2026-07-17",
    "theaters": 25,
-   "total": 2892882
+   "total": 2892882,
+   "c": 87
   },
   {
    "rank": 158,
    "name": "全境屍控",
    "release": "2026-03-06",
    "theaters": 50,
-   "total": 2883322
+   "total": 2883322,
+   "c": 130
   },
   {
    "rank": 159,
    "name": "空之境界劇場版：第七章 殺人考察(後)",
    "release": "2026-04-24",
    "theaters": 36,
-   "total": 2876949
+   "total": 2876949,
+   "c": 87
   },
   {
    "rank": 160,
    "name": "開棺2：家族詛咒",
    "release": "2026-05-08",
    "theaters": 49,
-   "total": 2816561
+   "total": 2816561,
+   "c": 162
   },
   {
    "rank": 161,
@@ -2513,6 +2673,7 @@
    "release": "2026-10-30",
    "theaters": 21,
    "total": 2797647,
+   "c": 87,
    "showing": true
   },
   {
@@ -2520,56 +2681,64 @@
    "name": "攻殼機動隊(1995) 4K 數位修復版",
    "release": "2026-08-28",
    "theaters": 21,
-   "total": 2788867
+   "total": 2788867,
+   "c": 87
   },
   {
    "rank": 163,
    "name": "空之境界劇場版：第四章 伽藍之洞",
    "release": "2026-01-30",
    "theaters": 35,
-   "total": 2700424
+   "total": 2700424,
+   "c": 87
   },
   {
    "rank": 164,
    "name": "鬼入獄",
    "release": "2026-06-10",
    "theaters": 53,
-   "total": 2677946
+   "total": 2677946,
+   "c": 32
   },
   {
    "rank": 165,
    "name": "秒速5公分 導演特別映像版",
    "release": "2026-03-27",
    "theaters": 62,
-   "total": 2663053
+   "total": 2663053,
+   "c": 87
   },
   {
    "rank": 166,
    "name": "愛在每一天",
    "release": "2026-04-19",
    "theaters": 22,
-   "total": 2650260
+   "total": 2650260,
+   "c": 152
   },
   {
    "rank": 167,
    "name": "鬼靈居",
    "release": "2026-01-30",
    "theaters": 50,
-   "total": 2632573
+   "total": 2632573,
+   "c": 110
   },
   {
    "rank": 168,
    "name": "鏈鋸人 總集篇 前篇+鏈鋸人 總集篇 後篇",
    "release": "2026-03-20",
    "theaters": 13,
-   "total": 2596378
+   "total": 2596378,
+   "c": 87
   },
   {
    "rank": 169,
    "name": "ATEEZ : LIGHT THE WAY IN CINEMAS",
    "release": "2026-08-06",
    "theaters": 17,
-   "total": 2522185
+   "total": 2522185,
+   "c": 167
   },
   {
    "rank": 170,
@@ -2577,6 +2746,7 @@
    "release": "2026-09-11",
    "theaters": 57,
    "total": 2513890,
+   "c": 8,
    "showing": true
   },
   {
@@ -2584,105 +2754,120 @@
    "name": "魔法少女小圓劇場版 [新篇] 叛逆的物語+五分鐘開頭影像",
    "release": "2026-08-21",
    "theaters": 11,
-   "total": 2476147
+   "total": 2476147,
+   "c": 87
   },
   {
    "rank": 172,
    "name": "跳躍吧！時空少女 全新4K修復版",
    "release": "2026-02-26",
    "theaters": 50,
-   "total": 2465089
+   "total": 2465089,
+   "c": 87
   },
   {
    "rank": 173,
    "name": "豪門殺人指南",
    "release": "2026-02-26",
    "theaters": 65,
-   "total": 2457302
+   "total": 2457302,
+   "c": 130
   },
   {
    "rank": 174,
    "name": "開放性邀請",
    "release": "2026-08-23",
    "theaters": 34,
-   "total": 2437843
+   "total": 2437843,
+   "c": 130
   },
   {
    "rank": 175,
    "name": "攻殼機動隊 2026",
    "release": "2026-06-27",
    "theaters": 61,
-   "total": 2428595
+   "total": 2428595,
+   "c": 87
   },
   {
    "rank": 176,
    "name": "Moto極速傳奇",
    "release": "2026-05-08",
    "theaters": 34,
-   "total": 2416559
+   "total": 2416559,
+   "c": 157
   },
   {
    "rank": 177,
    "name": "猩瘋血雨",
    "release": "2026-01-30",
    "theaters": 88,
-   "total": 2414969
+   "total": 2414969,
+   "c": 130
   },
   {
    "rank": 178,
    "name": "魅影巨星",
    "release": "2026-04-17",
    "theaters": 21,
-   "total": 2385915
+   "total": 2385915,
+   "c": 130
   },
   {
    "rank": 179,
    "name": "特務搞飛機2",
    "release": "2026-08-12",
    "theaters": 75,
-   "total": 2369993
+   "total": 2369993,
+   "c": 167
   },
   {
    "rank": 180,
    "name": "狂野時代",
    "release": "2026-01-01",
    "theaters": 47,
-   "total": 2365795
+   "total": 2365795,
+   "c": 5
   },
   {
    "rank": 181,
    "name": "重擊人生",
    "release": "2026-01-23",
    "theaters": 64,
-   "total": 2349549
+   "total": 2349549,
+   "c": 130
   },
   {
    "rank": 182,
    "name": "終戰那一天",
    "release": "2026-08-14",
    "theaters": 23,
-   "total": 2327964
+   "total": 2327964,
+   "c": 8
   },
   {
    "rank": 183,
    "name": "後座力",
    "release": "2026-04-30",
    "theaters": 23,
-   "total": 2300532
+   "total": 2300532,
+   "c": 143
   },
   {
    "rank": 184,
    "name": "鬼娃娃",
    "release": "2026-03-06",
    "theaters": 64,
-   "total": 2290072
+   "total": 2290072,
+   "c": 87
   },
   {
    "rank": 185,
    "name": "跟蹤",
    "release": "2026-07-03",
    "theaters": 20,
-   "total": 2243703
+   "total": 2243703,
+   "c": 130
   },
   {
    "rank": 186,
@@ -2690,6 +2875,7 @@
    "release": "2026-10-23",
    "theaters": 16,
    "total": 2239026,
+   "c": 109,
    "showing": true
   },
   {
@@ -2697,35 +2883,40 @@
    "name": "鬼汙",
    "release": "2026-07-17",
    "theaters": 42,
-   "total": 2203184
+   "total": 2203184,
+   "c": 110
   },
   {
    "rank": 188,
    "name": "空之境界劇場版：第六章 忘卻錄音",
    "release": "2026-03-20",
    "theaters": 35,
-   "total": 2180361
+   "total": 2180361,
+   "c": 87
   },
   {
    "rank": 189,
    "name": "Always Lalisa",
    "release": "2026-10-12",
    "theaters": 29,
-   "total": 2179940
+   "total": 2179940,
+   "c": 167
   },
   {
    "rank": 190,
    "name": "MEZZO Forte 次強音",
    "release": "2026-04-30",
    "theaters": 19,
-   "total": 2175585
+   "total": 2175585,
+   "c": 87
   },
   {
    "rank": 191,
    "name": "空之境界劇場版：未來福音",
    "release": "2026-07-31",
    "theaters": 36,
-   "total": 2124738
+   "total": 2124738,
+   "c": 87
   },
   {
    "rank": 192,
@@ -2733,6 +2924,7 @@
    "release": "2026-10-16",
    "theaters": 32,
    "total": 2101784,
+   "c": 87,
    "showing": true
   },
   {
@@ -2740,14 +2932,16 @@
    "name": "出口成髒",
    "release": "2026-05-10",
    "theaters": 59,
-   "total": 2084415
+   "total": 2084415,
+   "c": 130
   },
   {
    "rank": 194,
    "name": "超限戰",
    "release": "2026-05-13",
    "theaters": 23,
-   "total": 2037984
+   "total": 2037984,
+   "c": 27
   },
   {
    "rank": 195,
@@ -2755,6 +2949,7 @@
    "release": "2026-10-23",
    "theaters": 40,
    "total": 2013126,
+   "c": 87,
    "showing": true
   },
   {
@@ -2762,7 +2957,8 @@
    "name": "愛的魔樣",
    "release": "2026-08-14",
    "theaters": 35,
-   "total": 1961756
+   "total": 1961756,
+   "c": 130
   },
   {
    "rank": 197,
@@ -2770,6 +2966,7 @@
    "release": "2026-10-23",
    "theaters": 83,
    "total": 1956455,
+   "c": 130,
    "showing": true
   },
   {
@@ -2777,21 +2974,24 @@
    "name": "動物農莊",
    "release": "2026-04-30",
    "theaters": 71,
-   "total": 1952773
+   "total": 1952773,
+   "c": 130
   },
   {
    "rank": 199,
    "name": "懺悔",
    "release": "2026-09-18",
    "theaters": 42,
-   "total": 1890249
+   "total": 1890249,
+   "c": 87
   },
   {
    "rank": 200,
    "name": "匿殺",
    "release": "2026-02-13",
    "theaters": 59,
-   "total": 1879191
+   "total": 1879191,
+   "c": 5
   }
  ],
  "years": {
@@ -2802,6 +3002,7 @@
     "release": "2026-07-28",
     "theaters": 90,
     "total": 600442693,
+    "c": 130,
     "showing": true
    },
    {
@@ -2810,6 +3011,7 @@
     "release": "2026-07-16",
     "theaters": 93,
     "total": 457780072,
+    "c": 130,
     "showing": true
    },
    {
@@ -2817,14 +3019,16 @@
     "name": "超級瑪利歐銀河電影版",
     "release": "2026-04-01",
     "theaters": 96,
-    "total": 290755706
+    "total": 290755706,
+    "c": 130
    },
    {
     "rank": 4,
     "name": "狸想世界",
     "release": "2026-03-18",
     "theaters": 92,
-    "total": 288760165
+    "total": 288760165,
+    "c": 130
    },
    {
     "rank": 5,
@@ -2832,6 +3036,7 @@
     "release": "2026-06-17",
     "theaters": 92,
     "total": 286198886,
+    "c": 130,
     "showing": true
    },
    {
@@ -2839,14 +3044,16 @@
     "name": "穿著Prada的惡魔2",
     "release": "2026-04-29",
     "theaters": 93,
-    "total": 240552157
+    "total": 240552157,
+    "c": 130
    },
    {
     "rank": 7,
     "name": "屍速禁區",
     "release": "2026-05-22",
     "theaters": 84,
-    "total": 233799368
+    "total": 233799368,
+    "c": 167
    },
    {
     "rank": 8,
@@ -2854,6 +3061,7 @@
     "release": "2026-06-24",
     "theaters": 88,
     "total": 216192064,
+    "c": 87,
     "showing": true
    },
    {
@@ -2862,6 +3070,7 @@
     "release": "2026-07-25",
     "theaters": 88,
     "total": 174933361,
+    "c": 87,
     "showing": true
    },
    {
@@ -2870,6 +3079,7 @@
     "release": "2026-03-18",
     "theaters": 94,
     "total": 173881727,
+    "c": 130,
     "showing": true
    },
    {
@@ -2878,6 +3088,7 @@
     "release": "2026-09-17",
     "theaters": 91,
     "total": 157151765,
+    "c": 130,
     "showing": true
    },
    {
@@ -2886,6 +3097,7 @@
     "release": "2026-08-07",
     "theaters": 81,
     "total": 145345741,
+    "c": 130,
     "showing": true
    },
    {
@@ -2894,6 +3106,7 @@
     "release": "2026-04-22",
     "theaters": 88,
     "total": 108122761,
+    "c": 130,
     "showing": true
    },
    {
@@ -2901,7 +3114,8 @@
     "name": "小小兵&大怪獸",
     "release": "2026-06-30",
     "theaters": 92,
-    "total": 107618505
+    "total": 107618505,
+    "c": 130
    },
    {
     "rank": 15,
@@ -2909,6 +3123,7 @@
     "release": "2026-01-01",
     "theaters": 96,
     "total": 96632791,
+    "c": 8,
     "showing": true
    },
    {
@@ -2917,6 +3132,7 @@
     "release": "2026-08-27",
     "theaters": 92,
     "total": 91275728,
+    "c": 8,
     "showing": true
    },
    {
@@ -2924,14 +3140,16 @@
     "name": "雙囍",
     "release": "2026-02-17",
     "theaters": 97,
-    "total": 85692259
+    "total": 85692259,
+    "c": 8
    },
    {
     "rank": 18,
     "name": "後室",
     "release": "2026-05-25",
     "theaters": 89,
-    "total": 84422079
+    "total": 84422079,
+    "c": 130
    },
    {
     "rank": 19,
@@ -2939,6 +3157,7 @@
     "release": "2026-08-27",
     "theaters": 90,
     "total": 81676487,
+    "c": 8,
     "showing": true
    },
    {
@@ -2947,6 +3166,7 @@
     "release": "2026-11-02",
     "theaters": 82,
     "total": 74818512,
+    "c": 87,
     "showing": true
    },
    {
@@ -2955,6 +3175,7 @@
     "release": "2026-08-07",
     "theaters": 83,
     "total": 57192970,
+    "c": 87,
     "showing": true
    },
    {
@@ -2962,7 +3183,8 @@
     "name": "揭密日",
     "release": "2026-06-09",
     "theaters": 91,
-    "total": 56691756
+    "total": 56691756,
+    "c": 130
    },
    {
     "rank": 23,
@@ -2970,6 +3192,7 @@
     "release": "2026-08-12",
     "theaters": 92,
     "total": 50253371,
+    "c": 130,
     "showing": true
    },
    {
@@ -2978,6 +3201,7 @@
     "release": "2026-04-25",
     "theaters": 13,
     "total": 47306391,
+    "c": 87,
     "showing": true
    },
    {
@@ -2985,7 +3209,8 @@
     "name": "功夫",
     "release": "2026-02-13",
     "theaters": 98,
-    "total": 47050244
+    "total": 47050244,
+    "c": 8
    },
    {
     "rank": 26,
@@ -2993,6 +3218,7 @@
     "release": "2026-10-21",
     "theaters": 89,
     "total": 46496386,
+    "c": 130,
     "showing": true
    },
    {
@@ -3001,6 +3227,7 @@
     "release": "2026-09-17",
     "theaters": 91,
     "total": 45037803,
+    "c": 130,
     "showing": true
    },
    {
@@ -3009,6 +3236,7 @@
     "release": "2026-08-14",
     "theaters": 88,
     "total": 41329134,
+    "c": 130,
     "showing": true
    },
    {
@@ -3017,6 +3245,7 @@
     "release": "2026-07-08",
     "theaters": 83,
     "total": 40703111,
+    "c": 87,
     "showing": true
    },
    {
@@ -3025,6 +3254,7 @@
     "release": "2026-07-08",
     "theaters": 91,
     "total": 39577067,
+    "c": 130,
     "showing": true
    },
    {
@@ -3032,42 +3262,48 @@
     "name": "抓馬戀人",
     "release": "2026-04-02",
     "theaters": 75,
-    "total": 36947114
+    "total": 36947114,
+    "c": 130
    },
    {
     "rank": 32,
     "name": "寒戰1994",
     "release": "2026-05-01",
     "theaters": 89,
-    "total": 34763356
+    "total": 34763356,
+    "c": 168
    },
    {
     "rank": 33,
     "name": "李克寧 墓乃伊",
     "release": "2026-04-15",
     "theaters": 86,
-    "total": 34263695
+    "total": 34263695,
+    "c": 130
    },
    {
     "rank": 34,
     "name": "劇場版「暗殺教室」：我們的時光",
     "release": "2026-03-27",
     "theaters": 72,
-    "total": 33052307
+    "total": 33052307,
+    "c": 87
    },
    {
     "rank": 35,
     "name": "復仇者聯盟：終局之戰 加碼重映",
     "release": "2026-09-24",
     "theaters": 83,
-    "total": 32761451
+    "total": 32761451,
+    "c": 130
    },
    {
     "rank": 36,
     "name": "曼達洛人與古古",
     "release": "2026-05-20",
     "theaters": 90,
-    "total": 32348873
+    "total": 32348873,
+    "c": 130
    },
    {
     "rank": 37,
@@ -3075,6 +3311,7 @@
     "release": "2026-10-08",
     "theaters": 83,
     "total": 31109286,
+    "c": 130,
     "showing": true
    },
    {
@@ -3082,7 +3319,8 @@
     "name": "玩命航線",
     "release": "2026-08-19",
     "theaters": 81,
-    "total": 30338951
+    "total": 30338951,
+    "c": 130
    },
    {
     "rank": 39,
@@ -3090,6 +3328,7 @@
     "release": "2026-11-06",
     "theaters": 88,
     "total": 30036247,
+    "c": 87,
     "showing": true
    },
    {
@@ -3097,7 +3336,8 @@
     "name": "山羊巔峰",
     "release": "2026-02-13",
     "theaters": 87,
-    "total": 30016261
+    "total": 30016261,
+    "c": 130
    },
    {
     "rank": 41,
@@ -3105,6 +3345,7 @@
     "release": "2026-09-04",
     "theaters": 51,
     "total": 29345498,
+    "c": 87,
     "showing": true
    },
    {
@@ -3112,28 +3353,32 @@
     "name": "天眼浩劫",
     "release": "2026-02-06",
     "theaters": 86,
-    "total": 28300232
+    "total": 28300232,
+    "c": 130
    },
    {
     "rank": 43,
     "name": "希望：末日血戰",
     "release": "2026-09-04",
     "theaters": 93,
-    "total": 27113406
+    "total": 27113406,
+    "c": 167
    },
    {
     "rank": 44,
     "name": "神木之島",
     "release": "2026-05-08",
     "theaters": 50,
-    "total": 23676086
+    "total": 23676086,
+    "c": 8
    },
    {
     "rank": 45,
     "name": "ONE OK ROCK DETOX JAPAN TOUR 2025 AT NISSAN STADIUM IN CINEMAS",
     "release": "2026-04-17",
     "theaters": 33,
-    "total": 23192170
+    "total": 23192170,
+    "c": 167
    },
    {
     "rank": 46,
@@ -3141,6 +3386,7 @@
     "release": "2026-10-01",
     "theaters": 91,
     "total": 21024802,
+    "c": 130,
     "showing": true
    },
    {
@@ -3149,6 +3395,7 @@
     "release": "2026-05-08",
     "theaters": 81,
     "total": 20662665,
+    "c": 8,
     "showing": true
    },
    {
@@ -3156,42 +3403,48 @@
     "name": "超少女",
     "release": "2026-06-23",
     "theaters": 92,
-    "total": 19705496
+    "total": 19705496,
+    "c": 130
    },
    {
     "rank": 49,
     "name": "新劇場版 銀魂 -吉原大炎上-",
     "release": "2026-05-15",
     "theaters": 83,
-    "total": 17802588
+    "total": 17802588,
+    "c": 87
    },
    {
     "rank": 50,
     "name": "天劫倒數 2：大遷徙",
     "release": "2026-01-09",
     "theaters": 86,
-    "total": 17697936
+    "total": 17697936,
+    "c": 130
    },
    {
     "rank": 51,
     "name": "尋秦記",
     "release": "2026-01-03",
     "theaters": 81,
-    "total": 17543017
+    "total": 17543017,
+    "c": 168
    },
    {
     "rank": 52,
     "name": "STRAY KIDS: THE DOMINATE EXPERIENCE",
     "release": "2026-03-13",
     "theaters": 44,
-    "total": 17511745
+    "total": 17511745,
+    "c": 130
    },
    {
     "rank": 53,
     "name": "關鍵公敵",
     "release": "2026-01-30",
     "theaters": 92,
-    "total": 17051264
+    "total": 17051264,
+    "c": 130
    },
    {
     "rank": 54,
@@ -3199,6 +3452,7 @@
     "release": "2026-09-10",
     "theaters": 90,
     "total": 16687741,
+    "c": 8,
     "showing": true
    },
    {
@@ -3206,21 +3460,24 @@
     "name": "驚聲尖笑",
     "release": "2026-06-05",
     "theaters": 86,
-    "total": 16353430
+    "total": 16353430,
+    "c": 130
    },
    {
     "rank": 56,
     "name": "藍色監獄",
     "release": "2026-08-12",
     "theaters": 70,
-    "total": 15591541
+    "total": 15591541,
+    "c": 87
    },
    {
     "rank": 57,
     "name": "機動戰士鋼彈 閃光的哈薩威 喀耳刻的魔女",
     "release": "2026-03-19",
     "theaters": 56,
-    "total": 15549047
+    "total": 15549047,
+    "c": 87
    },
    {
     "rank": 58,
@@ -3228,6 +3485,7 @@
     "release": "2026-10-13",
     "theaters": 90,
     "total": 15440281,
+    "c": 130,
     "showing": true
    },
    {
@@ -3235,35 +3493,40 @@
     "name": "關於我轉生變成史萊姆這檔事 劇場版 蒼海之淚篇",
     "release": "2026-04-28",
     "theaters": 90,
-    "total": 15288069
+    "total": 15288069,
+    "c": 87
    },
    {
     "rank": 60,
     "name": "死亡賭局",
     "release": "2026-04-24",
     "theaters": 88,
-    "total": 14673738
+    "total": 14673738,
+    "c": 8
    },
    {
     "rank": 61,
     "name": "死亡之握：鬼牽手",
     "release": "2026-04-17",
     "theaters": 83,
-    "total": 14595882
+    "total": 14595882,
+    "c": 8
    },
    {
     "rank": 62,
     "name": "神奇數字馬戲團 最終章",
     "release": "2026-06-05",
     "theaters": 48,
-    "total": 14073881
+    "total": 14073881,
+    "c": 113
    },
    {
     "rank": 63,
     "name": "陰兒房：穿越陰深處",
     "release": "2026-08-19",
     "theaters": 87,
-    "total": 14069780
+    "total": 14069780,
+    "c": 130
    },
    {
     "rank": 64,
@@ -3271,6 +3534,7 @@
     "release": "2026-10-15",
     "theaters": 88,
     "total": 13728410,
+    "c": 130,
     "showing": true
    },
    {
@@ -3278,28 +3542,32 @@
     "name": "太空超人",
     "release": "2026-05-27",
     "theaters": 92,
-    "total": 13638297
+    "total": 13638297,
+    "c": 130
    },
    {
     "rank": 66,
     "name": "真人快打 II",
     "release": "2026-05-06",
     "theaters": 91,
-    "total": 12748196
+    "total": 12748196,
+    "c": 130
    },
    {
     "rank": 67,
     "name": "火遮眼",
     "release": "2026-06-12",
     "theaters": 75,
-    "total": 11850876
+    "total": 11850876,
+    "c": 143
    },
    {
     "rank": 68,
     "name": "祭弒",
     "release": "2026-04-19",
     "theaters": 83,
-    "total": 11670257
+    "total": 11670257,
+    "c": 8
    },
    {
     "rank": 69,
@@ -3307,6 +3575,7 @@
     "release": "2026-10-16",
     "theaters": 71,
     "total": 11620725,
+    "c": 87,
     "showing": true
    },
    {
@@ -3314,14 +3583,16 @@
     "name": "劇場版 我內心的糟糕念頭",
     "release": "2026-02-13",
     "theaters": 14,
-    "total": 11020952
+    "total": 11020952,
+    "c": 87
    },
    {
     "rank": 71,
     "name": "哈利波特：神秘的魔法石",
     "release": "2026-08-28",
     "theaters": 16,
-    "total": 10983463
+    "total": 10983463,
+    "c": 130
    },
    {
     "rank": 72,
@@ -3329,6 +3600,7 @@
     "release": "2026-10-16",
     "theaters": 14,
     "total": 10803836,
+    "c": 87,
     "showing": true
    },
    {
@@ -3336,28 +3608,32 @@
     "name": "重返沉默之丘",
     "release": "2026-01-23",
     "theaters": 79,
-    "total": 10637434
+    "total": 10637434,
+    "c": 130
    },
    {
     "rank": 74,
     "name": "咆哮山莊",
     "release": "2026-02-13",
     "theaters": 83,
-    "total": 10517679
+    "total": 10517679,
+    "c": 130
    },
    {
     "rank": 75,
     "name": "腎上腺 母侵",
     "release": "2026-06-12",
     "theaters": 49,
-    "total": 10225042
+    "total": 10225042,
+    "c": 8
    },
    {
     "rank": 76,
     "name": "犯罪101",
     "release": "2026-02-26",
     "theaters": 91,
-    "total": 10113864
+    "total": 10113864,
+    "c": 130
    },
    {
     "rank": 77,
@@ -3365,6 +3641,7 @@
     "release": "2026-09-11",
     "theaters": 76,
     "total": 10051839,
+    "c": 87,
     "showing": true
    },
    {
@@ -3373,6 +3650,7 @@
     "release": "2026-10-09",
     "theaters": 11,
     "total": 9390150,
+    "c": 87,
     "showing": true
    },
    {
@@ -3381,6 +3659,7 @@
     "release": "2026-10-08",
     "theaters": 90,
     "total": 9255095,
+    "c": 130,
     "showing": true
    },
    {
@@ -3388,7 +3667,8 @@
     "name": "殺木池：鬼水禁地",
     "release": "2026-04-24",
     "theaters": 65,
-    "total": 9221518
+    "total": 9221518,
+    "c": 167
    },
    {
     "rank": 81,
@@ -3396,6 +3676,7 @@
     "release": "2026-10-23",
     "theaters": 50,
     "total": 9165743,
+    "c": 87,
     "showing": true
    },
    {
@@ -3403,14 +3684,16 @@
     "name": "飛吧！熊鷹",
     "release": "2026-04-09",
     "theaters": 50,
-    "total": 9004579
+    "total": 9004579,
+    "c": 8
    },
    {
     "rank": 83,
     "name": "墜2",
     "release": "2026-09-04",
     "theaters": 73,
-    "total": 8872072
+    "total": 8872072,
+    "c": 130
    },
    {
     "rank": 84,
@@ -3418,6 +3701,7 @@
     "release": "2026-07-08",
     "theaters": 80,
     "total": 8684958,
+    "c": 130,
     "showing": true
    },
    {
@@ -3425,21 +3709,24 @@
     "name": "日租家庭",
     "release": "2026-01-26",
     "theaters": 49,
-    "total": 8504839
+    "total": 8504839,
+    "c": 130
    },
    {
     "rank": 86,
     "name": "綿羊偵探團",
     "release": "2026-05-08",
     "theaters": 75,
-    "total": 8321820
+    "total": 8321820,
+    "c": 130
    },
    {
     "rank": 87,
     "name": "捕風追影",
     "release": "2026-03-27",
     "theaters": 70,
-    "total": 8298917
+    "total": 8298917,
+    "c": 5
    },
    {
     "rank": 88,
@@ -3447,6 +3734,7 @@
     "release": "2026-10-30",
     "theaters": 15,
     "total": 8272160,
+    "c": 167,
     "showing": true
    },
    {
@@ -3455,6 +3743,7 @@
     "release": "2026-10-30",
     "theaters": 75,
     "total": 8184524,
+    "c": 130,
     "showing": true
    },
    {
@@ -3462,28 +3751,32 @@
     "name": "邪降：覺醒",
     "release": "2026-03-20",
     "theaters": 65,
-    "total": 7869843
+    "total": 7869843,
+    "c": 110
    },
    {
     "rank": 91,
     "name": "魯冰花（數位修復版）",
     "release": "2026-07-08",
     "theaters": 67,
-    "total": 7716243
+    "total": 7716243,
+    "c": 8
    },
    {
     "rank": 92,
     "name": "名偵探柯南 引爆摩天樓 4K數位修復版",
     "release": "2026-05-03",
     "theaters": 50,
-    "total": 7485329
+    "total": 7485329,
+    "c": 87
    },
    {
     "rank": 93,
     "name": "PLAVE Asia Tour [Dash: Quantum Leap] Encore in Cinemas",
     "release": "2026-06-05",
     "theaters": 44,
-    "total": 7402830
+    "total": 7402830,
+    "c": 167
    },
    {
     "rank": 94,
@@ -3491,6 +3784,7 @@
     "release": "2026-10-30",
     "theaters": 36,
     "total": 7333494,
+    "c": 5,
     "showing": true
    },
    {
@@ -3498,28 +3792,32 @@
     "name": "妳最後留下的歌",
     "release": "2026-06-05",
     "theaters": 50,
-    "total": 7306812
+    "total": 7306812,
+    "c": 87
    },
    {
     "rank": 96,
     "name": "弒婚遊戲：2度開局",
     "release": "2026-04-02",
     "theaters": 87,
-    "total": 7300401
+    "total": 7300401,
+    "c": 130
    },
    {
     "rank": 97,
     "name": "荒島囚救",
     "release": "2026-01-29",
     "theaters": 84,
-    "total": 7108208
+    "total": 7108208,
+    "c": 130
    },
    {
     "rank": 98,
     "name": "秒速5公分 真人版",
     "release": "2026-02-06",
     "theaters": 82,
-    "total": 6790518
+    "total": 6790518,
+    "c": 87
    },
    {
     "rank": 99,
@@ -3527,6 +3825,7 @@
     "release": "2026-10-28",
     "theaters": 64,
     "total": 6718939,
+    "c": 8,
     "showing": true
    },
    {
@@ -3534,21 +3833,24 @@
     "name": "夏日大作戰 全新4K修復版",
     "release": "2026-04-02",
     "theaters": 61,
-    "total": 6656639
+    "total": 6656639,
+    "c": 87
    },
    {
     "rank": 101,
     "name": "NO GOOD！歐吉桑",
     "release": "2026-04-10",
     "theaters": 61,
-    "total": 6592990
+    "total": 6592990,
+    "c": 8
    },
    {
     "rank": 102,
     "name": "驚聲尖叫 7",
     "release": "2026-02-26",
     "theaters": 84,
-    "total": 6561267
+    "total": 6561267,
+    "c": 130
    },
    {
     "rank": 103,
@@ -3556,6 +3858,7 @@
     "release": "2026-04-19",
     "theaters": 45,
     "total": 6561172,
+    "c": 8,
     "showing": true
    },
    {
@@ -3563,14 +3866,16 @@
     "name": "巧虎電影　勇氣之歌 (國語版)",
     "release": "2026-02-06",
     "theaters": 19,
-    "total": 6512060
+    "total": 6512060,
+    "c": 87
    },
    {
     "rank": 105,
     "name": "實境誘捕",
     "release": "2026-09-24",
     "theaters": 62,
-    "total": 6385381
+    "total": 6385381,
+    "c": 130
    },
    {
     "rank": 106,
@@ -3578,6 +3883,7 @@
     "release": "2026-10-23",
     "theaters": 15,
     "total": 6189243,
+    "c": 167,
     "showing": true
    },
    {
@@ -3585,35 +3891,40 @@
     "name": "你能吃到媽媽煮的飯的次數，還剩365次",
     "release": "2026-05-08",
     "theaters": 57,
-    "total": 6008978
+    "total": 6008978,
+    "c": 167
    },
    {
     "rank": 108,
     "name": "28年毀滅倒數：人骨聖殿",
     "release": "2026-01-16",
     "theaters": 91,
-    "total": 5946649
+    "total": 5946649,
+    "c": 130
    },
    {
     "rank": 109,
     "name": "深度安靜",
     "release": "2026-03-20",
     "theaters": 61,
-    "total": 5706881
+    "total": 5706881,
+    "c": 8
    },
    {
     "rank": 110,
     "name": "怪奇比莉－溫柔重擊巡迴演唱會 3D 電影",
     "release": "2026-05-08",
     "theaters": 32,
-    "total": 5674425
+    "total": 5674425,
+    "c": 130
    },
    {
     "rank": 111,
     "name": "鬼上車",
     "release": "2026-06-18",
     "theaters": 74,
-    "total": 5590488
+    "total": 5590488,
+    "c": 130
    },
    {
     "rank": 112,
@@ -3621,6 +3932,7 @@
     "release": "2026-09-19",
     "theaters": 84,
     "total": 5542639,
+    "c": 130,
     "showing": true
    },
    {
@@ -3629,6 +3941,7 @@
     "release": "2026-10-14",
     "theaters": 60,
     "total": 5531173,
+    "c": 8,
     "showing": true
    },
    {
@@ -3637,6 +3950,7 @@
     "release": "2026-11-06",
     "theaters": 16,
     "total": 5512458,
+    "c": 87,
     "showing": true
    },
    {
@@ -3644,21 +3958,24 @@
     "name": "情感的價值",
     "release": "2026-01-23",
     "theaters": 36,
-    "total": 5471346
+    "total": 5471346,
+    "c": 78
    },
    {
     "rank": 116,
     "name": "別離無恙",
     "release": "2026-05-15",
     "theaters": 64,
-    "total": 5454682
+    "total": 5454682,
+    "c": 87
    },
    {
     "rank": 117,
     "name": "劇場版 少女樂團吶喊吧【後篇】-嗨, 未來-",
     "release": "2026-01-24",
     "theaters": 16,
-    "total": 5427352
+    "total": 5427352,
+    "c": 87
    },
    {
     "rank": 118,
@@ -3666,6 +3983,7 @@
     "release": "2026-10-16",
     "theaters": 29,
     "total": 5404655,
+    "c": 130,
     "showing": true
    },
    {
@@ -3674,6 +3992,7 @@
     "release": "2026-08-27",
     "theaters": 76,
     "total": 5327137,
+    "c": 130,
     "showing": true
    },
    {
@@ -3681,35 +4000,40 @@
     "name": "劇場版 少女樂團吶喊吧【前篇】-青春狂走曲-",
     "release": "2026-01-09",
     "theaters": 17,
-    "total": 5200961
+    "total": 5200961,
+    "c": 87
    },
    {
     "rank": 121,
     "name": "特種快遞",
     "release": "2026-09-24",
     "theaters": 71,
-    "total": 5171000
+    "total": 5171000,
+    "c": 130
    },
    {
     "rank": 122,
     "name": "超拖樂團之我要幹大事啦！",
     "release": "2026-08-14",
     "theaters": 22,
-    "total": 5141946
+    "total": 5141946,
+    "c": 27
    },
    {
     "rank": 123,
     "name": "72小時即刻救援",
     "release": "2026-03-13",
     "theaters": 75,
-    "total": 5087532
+    "total": 5087532,
+    "c": 130
    },
    {
     "rank": 124,
     "name": "ENHYPEN [WALK THE LINE SUMMER EDITION] IN CINEMAS",
     "release": "2026-03-05",
     "theaters": 24,
-    "total": 5049340
+    "total": 5049340,
+    "c": 167
    },
    {
     "rank": 125,
@@ -3717,6 +4041,7 @@
     "release": "2026-10-08",
     "theaters": 72,
     "total": 5029256,
+    "c": 130,
     "showing": true
    },
    {
@@ -3724,14 +4049,16 @@
     "name": "世外",
     "release": "2026-03-13",
     "theaters": 60,
-    "total": 4967707
+    "total": 4967707,
+    "c": 168
    },
    {
     "rank": 127,
     "name": "電影屁屁偵探：星星與月亮",
     "release": "2026-01-23",
     "theaters": 71,
-    "total": 4835455
+    "total": 4835455,
+    "c": 87
    },
    {
     "rank": 128,
@@ -3739,6 +4066,7 @@
     "release": "2026-10-14",
     "theaters": 76,
     "total": 4507942,
+    "c": 167,
     "showing": true
    },
    {
@@ -3746,42 +4074,48 @@
     "name": "恨女的逆襲",
     "release": "2026-01-16",
     "theaters": 58,
-    "total": 4195986
+    "total": 4195986,
+    "c": 8
    },
    {
     "rank": 130,
     "name": "盜音天才",
     "release": "2026-05-06",
     "theaters": 57,
-    "total": 4191420
+    "total": 4191420,
+    "c": 130
    },
    {
     "rank": 131,
     "name": "機動戰士鋼彈 閃光的哈薩威",
     "release": "2026-03-06",
     "theaters": 28,
-    "total": 4184288
+    "total": 4184288,
+    "c": 87
    },
    {
     "rank": 132,
     "name": "偶像學園!X星光樂園 THE MOVIE -相遇的奇蹟-",
     "release": "2026-08-07",
     "theaters": 10,
-    "total": 4162225
+    "total": 4162225,
+    "c": 87
    },
    {
     "rank": 133,
     "name": "夜王",
     "release": "2026-03-13",
     "theaters": 70,
-    "total": 4114949
+    "total": 4114949,
+    "c": 168
    },
    {
     "rank": 134,
     "name": "祈念之樹",
     "release": "2026-02-26",
     "theaters": 72,
-    "total": 4006549
+    "total": 4006549,
+    "c": 87
    },
    {
     "rank": 135,
@@ -3789,6 +4123,7 @@
     "release": "2026-09-10",
     "theaters": 78,
     "total": 3985043,
+    "c": 130,
     "showing": true
    },
    {
@@ -3797,6 +4132,7 @@
     "release": "2026-10-08",
     "theaters": 79,
     "total": 3839780,
+    "c": 87,
     "showing": true
    },
    {
@@ -3804,14 +4140,16 @@
     "name": "遊戲人生ZERO",
     "release": "2026-10-30",
     "theaters": 7,
-    "total": 3835383
+    "total": 3835383,
+    "c": 87
    },
    {
     "rank": 138,
     "name": "空之境界劇場版：第五章 矛盾螺旋",
     "release": "2026-02-13",
     "theaters": 35,
-    "total": 3772371
+    "total": 3772371,
+    "c": 87
    },
    {
     "rank": 139,
@@ -3819,6 +4157,7 @@
     "release": "2026-06-12",
     "theaters": 28,
     "total": 3753004,
+    "c": 8,
     "showing": true
    },
    {
@@ -3826,42 +4165,48 @@
     "name": "LINKIN PARK：UNSHATTER",
     "release": "2026-09-30",
     "theaters": 28,
-    "total": 3631710
+    "total": 3631710,
+    "c": 130
    },
    {
     "rank": 141,
     "name": "哈姆奈特",
     "release": "2026-02-26",
     "theaters": 47,
-    "total": 3581446
+    "total": 3581446,
+    "c": 130
    },
    {
     "rank": 142,
     "name": "農曆三月二十三",
     "release": "2026-05-08",
     "theaters": 46,
-    "total": 3506583
+    "total": 3506583,
+    "c": 8
    },
    {
     "rank": 143,
     "name": "A KITE風箏",
     "release": "2026-04-10",
     "theaters": 18,
-    "total": 3503843
+    "total": 3503843,
+    "c": 87
    },
    {
     "rank": 144,
     "name": "蠱降",
     "release": "2026-04-02",
     "theaters": 59,
-    "total": 3440628
+    "total": 3440628,
+    "c": 173
    },
    {
     "rank": 145,
     "name": "傳奇女伶 高菊花",
     "release": "2026-05-15",
     "theaters": 34,
-    "total": 3418782
+    "total": 3418782,
+    "c": 8
    },
    {
     "rank": 146,
@@ -3869,6 +4214,7 @@
     "release": "2026-10-23",
     "theaters": 34,
     "total": 3376791,
+    "c": 96,
     "showing": true
    },
    {
@@ -3876,98 +4222,112 @@
     "name": "啵me之我的青春住了鬼",
     "release": "2026-01-23",
     "theaters": 81,
-    "total": 3324602
+    "total": 3324602,
+    "c": 8
    },
    {
     "rank": 148,
     "name": "血鬼村",
     "release": "2026-08-07",
     "theaters": 48,
-    "total": 3291126
+    "total": 3291126,
+    "c": 162
    },
    {
     "rank": 149,
     "name": "王命之徒",
     "release": "2026-02-26",
     "theaters": 63,
-    "total": 3287663
+    "total": 3287663,
+    "c": 167
    },
    {
     "rank": 150,
     "name": "你是不會當樹嗎",
     "release": "2026-04-15",
     "theaters": 23,
-    "total": 3285728
+    "total": 3285728,
+    "c": 67
    },
    {
     "rank": 151,
     "name": "劇場版 銀河特急 Milky☆Subway",
     "release": "2026-04-17",
     "theaters": 65,
-    "total": 3232317
+    "total": 3232317,
+    "c": 87
    },
    {
     "rank": 152,
     "name": "他們要殺你",
     "release": "2026-03-26",
     "theaters": 82,
-    "total": 3222995
+    "total": 3222995,
+    "c": 130
    },
    {
     "rank": 153,
     "name": "我未許願先吹蠟燭",
     "release": "2026-08-14",
     "theaters": 67,
-    "total": 3112080
+    "total": 3112080,
+    "c": 8
    },
    {
     "rank": 154,
     "name": "0時盜數",
     "release": "2026-04-14",
     "theaters": 74,
-    "total": 3019557
+    "total": 3019557,
+    "c": 143
    },
    {
     "rank": 155,
     "name": "科學新娘！",
     "release": "2026-03-04",
     "theaters": 68,
-    "total": 2951293
+    "total": 2951293,
+    "c": 130
    },
    {
     "rank": 156,
     "name": "復活男",
     "release": "2026-10-01",
     "theaters": 48,
-    "total": 2901257
+    "total": 2901257,
+    "c": 167
    },
    {
     "rank": 157,
     "name": "航海王劇場版：紅髮歌姬",
     "release": "2026-07-17",
     "theaters": 25,
-    "total": 2892882
+    "total": 2892882,
+    "c": 87
    },
    {
     "rank": 158,
     "name": "全境屍控",
     "release": "2026-03-06",
     "theaters": 50,
-    "total": 2883322
+    "total": 2883322,
+    "c": 130
    },
    {
     "rank": 159,
     "name": "空之境界劇場版：第七章 殺人考察(後)",
     "release": "2026-04-24",
     "theaters": 36,
-    "total": 2876949
+    "total": 2876949,
+    "c": 87
    },
    {
     "rank": 160,
     "name": "開棺2：家族詛咒",
     "release": "2026-05-08",
     "theaters": 49,
-    "total": 2816561
+    "total": 2816561,
+    "c": 162
    },
    {
     "rank": 161,
@@ -3975,6 +4335,7 @@
     "release": "2026-10-30",
     "theaters": 21,
     "total": 2797647,
+    "c": 87,
     "showing": true
    },
    {
@@ -3982,56 +4343,64 @@
     "name": "攻殼機動隊(1995) 4K 數位修復版",
     "release": "2026-08-28",
     "theaters": 21,
-    "total": 2788867
+    "total": 2788867,
+    "c": 87
    },
    {
     "rank": 163,
     "name": "空之境界劇場版：第四章 伽藍之洞",
     "release": "2026-01-30",
     "theaters": 35,
-    "total": 2700424
+    "total": 2700424,
+    "c": 87
    },
    {
     "rank": 164,
     "name": "鬼入獄",
     "release": "2026-06-10",
     "theaters": 53,
-    "total": 2677946
+    "total": 2677946,
+    "c": 32
    },
    {
     "rank": 165,
     "name": "秒速5公分 導演特別映像版",
     "release": "2026-03-27",
     "theaters": 62,
-    "total": 2663053
+    "total": 2663053,
+    "c": 87
    },
    {
     "rank": 166,
     "name": "愛在每一天",
     "release": "2026-04-19",
     "theaters": 22,
-    "total": 2650260
+    "total": 2650260,
+    "c": 152
    },
    {
     "rank": 167,
     "name": "鬼靈居",
     "release": "2026-01-30",
     "theaters": 50,
-    "total": 2632573
+    "total": 2632573,
+    "c": 110
    },
    {
     "rank": 168,
     "name": "鏈鋸人 總集篇 前篇+鏈鋸人 總集篇 後篇",
     "release": "2026-03-20",
     "theaters": 13,
-    "total": 2596378
+    "total": 2596378,
+    "c": 87
    },
    {
     "rank": 169,
     "name": "ATEEZ : LIGHT THE WAY IN CINEMAS",
     "release": "2026-08-06",
     "theaters": 17,
-    "total": 2522185
+    "total": 2522185,
+    "c": 167
    },
    {
     "rank": 170,
@@ -4039,6 +4408,7 @@
     "release": "2026-09-11",
     "theaters": 57,
     "total": 2513890,
+    "c": 8,
     "showing": true
    },
    {
@@ -4046,105 +4416,120 @@
     "name": "魔法少女小圓劇場版 [新篇] 叛逆的物語+五分鐘開頭影像",
     "release": "2026-08-21",
     "theaters": 11,
-    "total": 2476147
+    "total": 2476147,
+    "c": 87
    },
    {
     "rank": 172,
     "name": "跳躍吧！時空少女 全新4K修復版",
     "release": "2026-02-26",
     "theaters": 50,
-    "total": 2465089
+    "total": 2465089,
+    "c": 87
    },
    {
     "rank": 173,
     "name": "豪門殺人指南",
     "release": "2026-02-26",
     "theaters": 65,
-    "total": 2457302
+    "total": 2457302,
+    "c": 130
    },
    {
     "rank": 174,
     "name": "開放性邀請",
     "release": "2026-08-23",
     "theaters": 34,
-    "total": 2437843
+    "total": 2437843,
+    "c": 130
    },
    {
     "rank": 175,
     "name": "攻殼機動隊 2026",
     "release": "2026-06-27",
     "theaters": 61,
-    "total": 2428595
+    "total": 2428595,
+    "c": 87
    },
    {
     "rank": 176,
     "name": "Moto極速傳奇",
     "release": "2026-05-08",
     "theaters": 34,
-    "total": 2416559
+    "total": 2416559,
+    "c": 157
    },
    {
     "rank": 177,
     "name": "猩瘋血雨",
     "release": "2026-01-30",
     "theaters": 88,
-    "total": 2414969
+    "total": 2414969,
+    "c": 130
    },
    {
     "rank": 178,
     "name": "魅影巨星",
     "release": "2026-04-17",
     "theaters": 21,
-    "total": 2385915
+    "total": 2385915,
+    "c": 130
    },
    {
     "rank": 179,
     "name": "特務搞飛機2",
     "release": "2026-08-12",
     "theaters": 75,
-    "total": 2369993
+    "total": 2369993,
+    "c": 167
    },
    {
     "rank": 180,
     "name": "狂野時代",
     "release": "2026-01-01",
     "theaters": 47,
-    "total": 2365795
+    "total": 2365795,
+    "c": 5
    },
    {
     "rank": 181,
     "name": "重擊人生",
     "release": "2026-01-23",
     "theaters": 64,
-    "total": 2349549
+    "total": 2349549,
+    "c": 130
    },
    {
     "rank": 182,
     "name": "終戰那一天",
     "release": "2026-08-14",
     "theaters": 23,
-    "total": 2327964
+    "total": 2327964,
+    "c": 8
    },
    {
     "rank": 183,
     "name": "後座力",
     "release": "2026-04-30",
     "theaters": 23,
-    "total": 2300532
+    "total": 2300532,
+    "c": 143
    },
    {
     "rank": 184,
     "name": "鬼娃娃",
     "release": "2026-03-06",
     "theaters": 64,
-    "total": 2290072
+    "total": 2290072,
+    "c": 87
    },
    {
     "rank": 185,
     "name": "跟蹤",
     "release": "2026-07-03",
     "theaters": 20,
-    "total": 2243703
+    "total": 2243703,
+    "c": 130
    },
    {
     "rank": 186,
@@ -4152,6 +4537,7 @@
     "release": "2026-10-23",
     "theaters": 16,
     "total": 2239026,
+    "c": 109,
     "showing": true
    },
    {
@@ -4159,35 +4545,40 @@
     "name": "鬼汙",
     "release": "2026-07-17",
     "theaters": 42,
-    "total": 2203184
+    "total": 2203184,
+    "c": 110
    },
    {
     "rank": 188,
     "name": "空之境界劇場版：第六章 忘卻錄音",
     "release": "2026-03-20",
     "theaters": 35,
-    "total": 2180361
+    "total": 2180361,
+    "c": 87
    },
    {
     "rank": 189,
     "name": "Always Lalisa",
     "release": "2026-10-12",
     "theaters": 29,
-    "total": 2179940
+    "total": 2179940,
+    "c": 167
    },
    {
     "rank": 190,
     "name": "MEZZO Forte 次強音",
     "release": "2026-04-30",
     "theaters": 19,
-    "total": 2175585
+    "total": 2175585,
+    "c": 87
    },
    {
     "rank": 191,
     "name": "空之境界劇場版：未來福音",
     "release": "2026-07-31",
     "theaters": 36,
-    "total": 2124738
+    "total": 2124738,
+    "c": 87
    },
    {
     "rank": 192,
@@ -4195,6 +4586,7 @@
     "release": "2026-10-16",
     "theaters": 32,
     "total": 2101784,
+    "c": 87,
     "showing": true
    },
    {
@@ -4202,14 +4594,16 @@
     "name": "出口成髒",
     "release": "2026-05-10",
     "theaters": 59,
-    "total": 2084415
+    "total": 2084415,
+    "c": 130
    },
    {
     "rank": 194,
     "name": "超限戰",
     "release": "2026-05-13",
     "theaters": 23,
-    "total": 2037984
+    "total": 2037984,
+    "c": 27
    },
    {
     "rank": 195,
@@ -4217,6 +4611,7 @@
     "release": "2026-10-23",
     "theaters": 40,
     "total": 2013126,
+    "c": 87,
     "showing": true
    },
    {
@@ -4224,7 +4619,8 @@
     "name": "愛的魔樣",
     "release": "2026-08-14",
     "theaters": 35,
-    "total": 1961756
+    "total": 1961756,
+    "c": 130
    },
    {
     "rank": 197,
@@ -4232,6 +4628,7 @@
     "release": "2026-10-23",
     "theaters": 83,
     "total": 1956455,
+    "c": 130,
     "showing": true
    },
    {
@@ -4239,21 +4636,24 @@
     "name": "動物農莊",
     "release": "2026-04-30",
     "theaters": 71,
-    "total": 1952773
+    "total": 1952773,
+    "c": 130
    },
    {
     "rank": 199,
     "name": "懺悔",
     "release": "2026-09-18",
     "theaters": 42,
-    "total": 1890249
+    "total": 1890249,
+    "c": 87
    },
    {
     "rank": 200,
     "name": "匿殺",
     "release": "2026-02-13",
     "theaters": 59,
-    "total": 1879191
+    "total": 1879191,
+    "c": 5
    }
   ]
  },
