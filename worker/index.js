@@ -1,4 +1,4 @@
-// 電影行程：觀眾即時評分（Cloudflare Worker + Durable Objects）
+// 片刻：觀眾即時評分（Cloudflare Worker + Durable Objects）
 // 每部片一個 Durable Object（內建 SQLite），一台裝置一票、可以改票或取消，同時投票也不會算錯。
 // 分數是 10 分制（1～10）。2026-11 以前是 5 星制：舊的評分在每部片第一次被讀到時一次換算成 ×2（1 星 → 2 分…5 星 → 10 分）。
 // API（v2，10 分制）：

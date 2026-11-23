@@ -1,4 +1,4 @@
-// 電影行程的背景程式：只做一件事，接收「收藏電影通知」並顯示出來；點通知就打開（或切回）電影行程。
+// 片刻的背景程式：只做一件事，接收「收藏電影通知」並顯示出來；點通知就打開（或切回）片刻。
 // 不快取網頁、不攔截連線，所以不會影響網站更新。
 self.addEventListener("install", () => self.skipWaiting());
 self.addEventListener("activate", (e) => e.waitUntil(self.clients.claim()));
@@ -29,7 +29,7 @@ self.addEventListener("push", (e) => {
   let d = {};
   try { d = e.data ? e.data.json() : {}; } catch (_) {}
   e.waitUntil(logAdd(d));
-  e.waitUntil(self.registration.showNotification(d.title || "電影行程", {
+  e.waitUntil(self.registration.showNotification(d.title || "片刻", {
     body: d.body || "",
     tag: d.tag || undefined,
     icon: "/icon-192.png",

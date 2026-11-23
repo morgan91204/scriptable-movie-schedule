@@ -1,4 +1,4 @@
-# 電影行程 iOS 原生 App（SwiftUI）。用 XcodeGen 產生 Xcode 專案：
+# 片刻 iOS 原生 App（SwiftUI）。用 XcodeGen 產生 Xcode 專案：
 #   brew install xcodegen && cd ios && xcodegen && open MovieSchedule.xcodeproj
 name: MovieSchedule
 options:
@@ -23,7 +23,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.morgan91204.movieschedule
         TARGETED_DEVICE_FAMILY: "1"
-        INFOPLIST_KEY_CFBundleDisplayName: 電影行程
+        INFOPLIST_KEY_CFBundleDisplayName: 片刻
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
         INFOPLIST_KEY_NSCalendarsWriteOnlyAccessUsageDescription: 把你選的電影場次加入行事曆。

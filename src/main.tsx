@@ -1,4 +1,4 @@
-// 🎬 電影行程：選影城 → 日期 → 電影 → 場次 → 加入 iOS 行事曆
+// 🎬 片刻：選影城 → 日期 → 電影 → 場次 → 加入 iOS 行事曆
 // 執行環境：Scriptable（iOS）。原始碼用 TSX 撰寫，編譯後的 .js 放進 Scriptable 執行。
 // 畫面：WebView（HTML/CSS），事件迴圈在 run()。資料層在 core.ts，網頁解析在 parsers.ts。
 
@@ -135,7 +135,7 @@ class App {
       job.catch(() => {});
       // 超過 0.2 秒還沒好才顯示「讀取中」，避免快速操作時畫面閃一下
       const quick = await Promise.race([job.then(() => true, () => true), sleep(200).then(() => false)]);
-      if (!quick) await this.ui.render(<Page title="電影行程"><Loading text={this.loadingText} /></Page>);
+      if (!quick) await this.ui.render(<Page title="片刻"><Loading text={this.loadingText} /></Page>);
       this.loadingText = "讀取中…";
       let html: string;
       try {
@@ -206,7 +206,7 @@ class App {
     const favRows = this.favMovOpen && favMovies.length ? await favMovieRows(this.settings).catch(() => [] as FavRow[]) : [];
     const openFav = (r: FavRow) => this.openFavRow(r);
     return (
-      <Page title="🎬 電影行程" subtitle={`${this.cinemas.length} 間影城｜選影城 → 日期 → 電影 → 場次`}>
+      <Page title="🎬 片刻" subtitle={`${this.cinemas.length} 間影城｜選影城 → 日期 → 電影 → 場次`}>
         <Section>
           <Item icon="🕘" title="現在有什麼可以看" subtitle="依時段找收藏、附近或各縣市的場次" onTap={() => this.go(() => this.nowView())} />
           <Item icon="🎞️" title="依電影找場次" subtitle="先選電影，再看哪些影城有放映" onTap={() => this.go(() => this.movieListView(), "讀取電影清單…")} />
@@ -270,7 +270,7 @@ class App {
     const state: string = await p.refresh().catch(() => "unsupported");
     const prefs = notifyPrefs(this.settings);
     const on = NOTIFY_KINDS.filter((k) => prefs[k.id]).map((k) => k.label.replace(/時$/, ""));
-    const note = state === "on" ? (on.length ? (on.length > 3 ? `${on.slice(0, 3).join("、")}等 ${on.length} 種` : on.join("、")) : "每一種通知都關著") : state === "needs-install" ? "要先把電影行程加到主畫面" : state === "unsupported" ? "這個瀏覽器不支援" : state === "denied" ? "系統設定裡沒有允許通知" : "開放場次、上映、快下檔、影展開始時通知你";
+    const note = state === "on" ? (on.length ? (on.length > 3 ? `${on.slice(0, 3).join("、")}等 ${on.length} 種` : on.join("、")) : "每一種通知都關著") : state === "needs-install" ? "要先把「片刻」加到主畫面" : state === "unsupported" ? "這個瀏覽器不支援" : state === "denied" ? "系統設定裡沒有允許通知" : "開放場次、上映、快下檔、影展開始時通知你";
     return (
       <Section title="通知">
         <Item icon={state === "on" ? "🔔" : "🔕"} title="收藏電影通知" subtitle={note} right={state === "on" ? "已開啟" : "未開啟"} onTap={() => this.go(() => this.notifyView())} />
@@ -341,7 +341,7 @@ class App {
     const n = (this.settings.favMovies || []).length;
     if (state === "needs-install")
       return (
-        <Section title="收藏電影通知" hint="iPhone 和 iPad 要先把電影行程加到主畫面，從主畫面的圖示開啟後，才能開啟通知（這是 iOS 的規定）。">
+        <Section title="收藏電影通知" hint="iPhone 和 iPad 要先把「片刻」加到主畫面，從主畫面的圖示開啟後，才能開啟通知（這是 iOS 的規定）。">
           <Item icon="🔔" title="先加到主畫面" subtitle="收藏電影開放場次、上映、快下檔時通知你" onTap={() => this.go(() => this.installView())} />
         </Section>
       );
@@ -353,8 +353,8 @@ class App {
       );
     if (state === "denied")
       return (
-        <Section title="收藏電影通知" hint="到手機或瀏覽器的設定，把電影行程的「通知」改成允許，再回來這裡開啟。">
-          <Item icon="🔕" title="通知被關掉了" subtitle="系統設定裡沒有允許電影行程發通知" chevron={false} />
+        <Section title="收藏電影通知" hint="到手機或瀏覽器的設定，把「片刻」的「通知」改成允許，再回來這裡開啟。">
+          <Item icon="🔕" title="通知被關掉了" subtitle="系統設定裡沒有允許「片刻」發通知" chevron={false} />
         </Section>
       );
     if (state !== "on")
@@ -942,12 +942,12 @@ class App {
     };
     let body: string;
     if (done) {
-      body = <Note text="✅ 已經加到主畫面了。之後從主畫面的「電影行程」圖示開啟就可以。" />;
+      body = <Note text="✅ 已經加到主畫面了。之後從主畫面的「片刻」圖示開啟就可以。" />;
     } else if (prompt) {
       body = (
         <>
           <Button label="📲 安裝到主畫面" onTap={install} />
-          <Note text="按下後瀏覽器會跳出確認視窗，選「安裝」。裝好後會多一個「電影行程」圖示，開起來沒有網址列，像一般的 App。" />
+          <Note text="按下後瀏覽器會跳出確認視窗，選「安裝」。裝好後會多一個「片刻」圖示，開起來沒有網址列，像一般的 App。" />
         </>
       );
     } else if (ios && !iosOther) {
@@ -956,8 +956,8 @@ class App {
           <Steps items={[
             { icon: "share", title: "點「分享」按鈕", text: "Safari 下方工具列上，方框加向上箭頭的圖示。找不到的話先點「⋯」，再點「分享」。" },
             { icon: "plus", title: "往下滑，點「加入主畫面」", text: "選單裡方框加一個加號的那一項。" },
-            { icon: "check", title: "點右上角的「加入」", text: "名稱可以維持「電影行程」。" },
-            { icon: "home", title: "從主畫面開啟", text: "主畫面會多一個「電影行程」圖示，開起來沒有網址列，像一般的 App。" },
+            { icon: "check", title: "點右上角的「加入」", text: "名稱可以維持「片刻」。" },
+            { icon: "home", title: "從主畫面開啟", text: "主畫面會多一個「片刻」圖示，開起來沒有網址列，像一般的 App。" },
           ]} />
           <Note text="要用 Safari 才能加到主畫面。收藏影城等設定存在瀏覽器裡：從主畫面開啟的版本是另一份，設定要重新設一次。" />
         </>
@@ -984,7 +984,7 @@ class App {
     } else {
       body = (
         <Steps items={[
-          { icon: "plus", title: "在網址列右邊找「安裝」圖示", text: "Chrome、Edge 會在網址列右邊出現一個安裝圖示；沒有的話從瀏覽器選單裡找「安裝電影行程」。" },
+          { icon: "plus", title: "在網址列右邊找「安裝」圖示", text: "Chrome、Edge 會在網址列右邊出現一個安裝圖示；沒有的話從瀏覽器選單裡找「安裝片刻」。" },
           { icon: "check", title: "點「安裝」", text: "Safari（macOS）則是從「檔案」選單選「加入 Dock」。" },
         ]} />
       );

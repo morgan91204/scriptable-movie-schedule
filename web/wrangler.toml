@@ -1,4 +1,4 @@
-# 電影行程網頁版。部署：在這個資料夾執行 npx wrangler deploy（先在 repo 根目錄跑 ./build.sh 產生 public/app.js）
+# 片刻網頁版。部署：在這個資料夾執行 npx wrangler deploy（先在 repo 根目錄跑 ./build.sh 產生 public/app.js）
 name = "app"
 main = "worker.js"
 compatibility_date = "2025-09-01"

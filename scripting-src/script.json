@@ -5,8 +5,8 @@
   "version": "1.0.0",
   "description": "Pick a cinema or a movie, choose a showtime, and add it to iOS Calendar with an alert.",
   "localizedNames": {
-    "zh": "電影行程",
-    "zh-Hant": "電影行程",
+    "zh": "片刻",
+    "zh-Hant": "片刻",
     "en": "Movie Schedule"
   },
   "localizedDescriptions": {

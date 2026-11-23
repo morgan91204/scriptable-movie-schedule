@@ -51,7 +51,7 @@ final class LocationFetcher: NSObject, CLLocationManagerDelegate {
         manager.delegate = self
         manager.desiredAccuracy = kCLLocationAccuracyHundredMeters
         if manager.authorizationStatus == .denied || manager.authorizationStatus == .restricted {
-            throw BridgeError(message: "沒有定位權限。請到「設定 → 電影行程」開啟位置。")
+            throw BridgeError(message: "沒有定位權限。請到「設定 → 片刻」開啟位置。")
         }
         return try await withCheckedThrowingContinuation { c in
             waiting = c
@@ -68,7 +68,7 @@ final class LocationFetcher: NSObject, CLLocationManagerDelegate {
             guard self.waiting != nil else { return }
             switch manager.authorizationStatus {
             case .authorizedWhenInUse, .authorizedAlways: manager.requestLocation()
-            case .denied, .restricted: self.finish(.failure(BridgeError(message: "沒有定位權限。請到「設定 → 電影行程」開啟位置。")))
+            case .denied, .restricted: self.finish(.failure(BridgeError(message: "沒有定位權限。請到「設定 → 片刻」開啟位置。")))
             default: break
             }
         }

@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>隱私權政策｜電影行程</title>
-<meta name="description" content="電影行程的隱私權政策：不用註冊、沒有廣告、不追蹤個人。">
+<title>隱私權政策｜片刻</title>
+<meta name="description" content="片刻的隱私權政策：不用註冊、沒有廣告、不追蹤個人。">
 <meta name="theme-color" content="#f2f2f7" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
 <link rel="icon" href="/icon-192.png">
@@ -32,10 +32,10 @@ footer a{margin-right:14px}
 </head>
 <body>
 <main>
-<nav><a href="/">電影行程</a> › 隱私權政策</nav>
+<nav><a href="/">片刻</a> › 隱私權政策</nav>
 <h1>隱私權政策</h1>
 <p class="meta">最後更新：2026 年 11 月 24 日</p>
-<p>「電影行程」用來查詢台灣電影場次，並把場次加入行事曆。它有網頁版、iPhone App，以及在 Scriptable、Scripting 裡執行的腳本版，本政策適用於全部版本。</p>
+<p>「片刻」用來查詢台灣電影場次，並把場次加入行事曆。它有網頁版、iPhone App，以及在 Scriptable、Scripting 裡執行的腳本版，本政策適用於全部版本。</p>
 <p>簡單說：不用註冊、沒有廣告、不追蹤個人。網頁版只有不辨認個人的造訪統計。</p>
 
 <h2>不要求你提供個人資料</h2>
@@ -58,7 +58,7 @@ footer a{margin-right:14px}
 </ul>
 <p>推送位址是瀏覽器隨機產生的，對應不到你的姓名、帳號或聯絡方式；我們也不記錄 IP 位址。沒有開啟通知的話，收藏電影只存在你的裝置上，不會傳給我們。</p>
 <p>收到的通知會在你的裝置上留一份紀錄（「最近的通知」，最多 50 則、30 天），只存在裝置上，不會傳到伺服器。</p>
-<p>你可以隨時在設定裡關閉通知，關閉時伺服器上的這些資料會立刻刪除。如果你直接在系統設定關掉通知、或移除主畫面上的電影行程，推送位址會失效，我們下次要發通知時發現失效就會刪除。通知是透過你所用瀏覽器的推送服務（Apple、Google、Mozilla 或 Microsoft）送達，內容在送出前已經加密，推送服務看不到內容。</p>
+<p>你可以隨時在設定裡關閉通知，關閉時伺服器上的這些資料會立刻刪除。如果你直接在系統設定關掉通知、或移除主畫面上的「片刻」，推送位址會失效，我們下次要發通知時發現失效就會刪除。通知是透過你所用瀏覽器的推送服務（Apple、Google、Mozilla 或 Microsoft）送達，內容在送出前已經加密，推送服務看不到內容。</p>
 <p>除此之外，我們沒有收集任何個人資料。</p>
 
 <h2>伺服器紀錄</h2>
@@ -107,7 +107,7 @@ footer a{margin-right:14px}
 
 <h2>聯絡</h2>
 <p>對隱私有任何疑問，請到 <a href="https://github.com/morgan91204/scriptable-movie-schedule/issues">GitHub 提出</a>。</p>
-<footer><a href="/">回到電影行程</a><a href="/about/">關於</a><a href="/privacy/">隱私權政策</a></footer>
+<footer><a href="/">回到「片刻」</a><a href="/about/">關於</a><a href="/privacy/">隱私權政策</a></footer>
 </main>
 <!-- Cloudflare 網站分析：只統計造訪次數、瀏覽器、裝置類型等，不用 Cookie、不辨認個人（見隱私權政策） -->
 <script type='module' src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "6efde3a32b2943d88fa91d132ff752f7"}'></script>

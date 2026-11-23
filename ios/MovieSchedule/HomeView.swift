@@ -58,7 +58,7 @@ struct HomeView: View {
                     }
                 }
             }
-            .navigationTitle("電影行程")
+            .navigationTitle("片刻")
             .task { if cinemas.value == nil { await load() } }
         }
     }

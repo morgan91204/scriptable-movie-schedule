@@ -1,4 +1,4 @@
-// 🎬 電影行程（Scripting 原生介面版）
+// 🎬 片刻（Scripting 原生介面版）
 // 選影城 → 日期 → 電影 → 場次，或選電影 → 日期 → 影城 → 場次，一鍵加入 iOS 行事曆並設定提醒。
 // 資料層（core.ts、parsers.ts…）與 Scriptable 版共用，原始碼：
 // https://github.com/morgan91204/scriptable-movie-schedule
@@ -214,7 +214,7 @@ function Home({ cinemas }: { cinemas: CinemasLoad }) {
 
   return <NavigationStack>
     <List
-      navigationTitle={"電影行程"}
+      navigationTitle={"片刻"}
       toolbar={{ cancellationAction: <Button title={"關閉"} action={dismiss} /> }}
     >
       {cinemas.error ? <ErrorRow error={cinemas.error} retry={cinemas.reload} /> : null}
@@ -665,7 +665,7 @@ function useUpdatePrompt() {
       if (done === r.latest) return // 這一版已經下載好了，只是還沒重新開啟
       if (await selfUpdate(r.latest)) {
         try { Storage.set("auto-updated", r.latest) } catch (_) {}
-        await Dialog.alert({ title: "已自動更新", message: `電影行程已經更新到 ${r.latest}。\n關掉再開一次就是新版，設定不會消失。` })
+        await Dialog.alert({ title: "已自動更新", message: `片刻已經更新到 ${r.latest}。\n關掉再開一次就是新版，設定不會消失。` })
         return
       }
       let asked = ""
@@ -673,7 +673,7 @@ function useUpdatePrompt() {
       if (asked === r.latest) return
       try { Storage.set("asked-update", r.latest) } catch (_) {}
       const ok = await Dialog.confirm({
-        title: "電影行程有新版本",
+        title: "片刻有新版本",
         message: `目前 ${appVersion()}\n最新 ${r.latest}\n\n要現在更新嗎？會打開 Scripting 的匯入畫面，選「取代／更新」即可，設定不會消失。`,
         cancelLabel: "之後再說",
         confirmLabel: "更新",

@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>關於｜電影行程</title>
-<meta name="description" content="電影行程的資料來源與說明，並感謝場次通整理全台連鎖影城的場次。">
+<title>關於｜片刻</title>
+<meta name="description" content="片刻的資料來源與說明，並感謝場次通整理全台連鎖影城的場次。">
 <meta name="theme-color" content="#f2f2f7" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
 <link rel="icon" href="/icon-192.png">
@@ -32,9 +32,9 @@ footer a{margin-right:14px}
 </head>
 <body>
 <main>
-<nav><a href="/">電影行程</a> › 關於</nav>
-<h1>關於電影行程</h1>
-<p>「電影行程」是一個免費的台灣電影場次查詢工具。選一間影城或一部電影，挑好場次後，一鍵把它加入行事曆：會依片長與廣告時間算出散場時間，並附上影城地址與訂票連結。</p>
+<nav><a href="/">片刻</a> › 關於</nav>
+<h1>關於「片刻」</h1>
+<p>「片刻」是一個免費的台灣電影場次查詢工具。選一間影城或一部電影，挑好場次後，一鍵把它加入行事曆：會依片長與廣告時間算出散場時間，並附上影城地址與訂票連結。</p>
 <p>它有網頁版、iPhone App，以及在 Scriptable、Scripting 裡執行的腳本版，四個版本用的是同一套資料。</p>
 
 <h2>為什麼做這個</h2>
@@ -45,7 +45,7 @@ footer a{margin-right:14px}
 <p>全台 66 間連鎖影城的場次，來自 <a href="https://twshowtimes.com/">場次通（twshowtimes.com）</a>。場次通由橫隔膜 Halami 獨立製作與維護，把威秀、國賓、美麗華、秀泰、喜樂時代、中影、新光、in89、百老匯等九大連鎖的場次整理在同一個地方，並把各家不同寫法的片名對齊成同一部片。</p>
 <p>沒有場次通的整理，這個工具做不出來。想比較各影城的場次、看上映場數排行與特殊廳統計，請直接造訪<a href="https://twshowtimes.com/">場次通</a>。</p>
 </div>
-<p>電影行程讀取的是場次通公開的網頁，與場次通沒有合作或隸屬關係，也不代表場次通的立場。</p>
+<p>「片刻」讀取的是場次通公開的網頁，與場次通沒有合作或隸屬關係，也不代表場次通的立場。</p>
 
 <h2>資料怎麼來</h2>
 <ul>
@@ -75,14 +75,14 @@ footer a{margin-right:14px}
 <li>網頁版可以在設定開啟「收藏電影通知」：收藏的片開放場次、上映、快下檔，或所屬的影展開始時通知你。iPhone 要先把網站加到主畫面。通知每小時判斷一次，可能比實際晚一點。</li>
 <li>即將上映的日期可能再調整；影展的片名在院線上映時可能不同，評分是用影展的片名比對的，冷門片可能對不到。</li>
 <li>票房排行裡標「上映至今」的新片，是官方第一次列入的資料，數字是上映以來的累計，不是單週票房。</li>
-<li>電影行程不販售電影票，與各影城、上述網站都沒有合作或隸屬關係。各網站的名稱與標誌屬於其所有人。</li>
+<li>「片刻」不販售電影票，與各影城、上述網站都沒有合作或隸屬關係。各網站的名稱與標誌屬於其所有人。</li>
 <li>This product uses the TMDB API but is not endorsed or certified by TMDB.</li>
 </ul>
 
 <h2>製作與原始碼</h2>
-<p>電影行程是個人製作的開放原始碼專案，程式碼與安裝方式在 <a href="https://github.com/morgan91204/scriptable-movie-schedule">GitHub</a>。發現場次有誤或有建議，歡迎到 <a href="https://github.com/morgan91204/scriptable-movie-schedule/issues">GitHub 提出</a>。</p>
+<p>「片刻」是個人製作的開放原始碼專案，程式碼與安裝方式在 <a href="https://github.com/morgan91204/scriptable-movie-schedule">GitHub</a>。發現場次有誤或有建議，歡迎到 <a href="https://github.com/morgan91204/scriptable-movie-schedule/issues">GitHub 提出</a>。</p>
 <p>我們如何處理資料，請見<a href="/privacy/">隱私權政策</a>。</p>
-<footer><a href="/">回到電影行程</a><a href="/about/">關於</a><a href="/privacy/">隱私權政策</a></footer>
+<footer><a href="/">回到「片刻」</a><a href="/about/">關於</a><a href="/privacy/">隱私權政策</a></footer>
 </main>
 <!-- Cloudflare 網站分析：只統計造訪次數、瀏覽器、裝置類型等，不用 Cookie、不辨認個人（見隱私權政策） -->
 <script type='module' src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "6efde3a32b2943d88fa91d132ff752f7"}'></script>

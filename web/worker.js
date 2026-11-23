@@ -1,4 +1,4 @@
-// 電影行程網頁版：靜態網頁（public/、pages/，全部打包在這支 Worker 裡）＋ 抓時刻表用的轉發
+// 片刻網頁版：靜態網頁（public/、pages/，全部打包在這支 Worker 裡）＋ 抓時刻表用的轉發
 // 瀏覽器不能直接讀其他網站（跨網域限制），所以由這裡代抓，只允許電影相關網站、只允許 GET。
 const ALLOW = [
   "twshowtimes.com", "atmovies.com.tw", "eslite.com", "spot.org.tw", "spot-hs.org.tw", "luxcinema.com.tw",

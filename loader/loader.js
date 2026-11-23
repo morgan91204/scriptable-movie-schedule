@@ -1,4 +1,4 @@
-// 電影行程｜捷徑載入器（貼進捷徑的 Run Inline Script）
+// 片刻｜捷徑載入器（貼進捷徑的 Run Inline Script）
 // 每次執行先到 GitHub 下載最新版；下載失敗（沒網路等）就用手機上的備份。
 // 原始碼：https://github.com/morgan91204/scriptable-movie-schedule
 const SOURCE = "https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/main/dist/movie.js";
@@ -25,7 +25,7 @@ if (code) {
   await new AsyncFunction("args", code)(args);
 } else {
   const a = new Alert();
-  a.title = "無法下載電影行程";
+  a.title = "無法下載片刻";
   a.message = "第一次使用需要網路連線，請確認後再試一次。";
   a.addAction("好");
   await a.presentAlert();

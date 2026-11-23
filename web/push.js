@@ -179,7 +179,7 @@ export class PushHub {
     if (path === "/test") {
       const sub = await this.state.storage.get(id);
       if (!sub) return json({ error: "not subscribed" }, 404);
-      const status = await send(sub, { title: "電影行程的通知設定好了", body: "收藏電影有新動態時，會像這樣通知你。", tag: "test", url: "/" }, this.env).catch(() => 0);
+      const status = await send(sub, { title: "「片刻」的通知設定好了", body: "收藏電影有新動態時，會像這樣通知你。", tag: "test", url: "/" }, this.env).catch(() => 0);
       if (status === 404 || status === 410) await this.state.storage.delete(id);
       return json({ ok: status >= 200 && status < 300, status });
     }

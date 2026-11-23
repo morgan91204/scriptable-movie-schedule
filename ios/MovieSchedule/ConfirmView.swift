@@ -147,7 +147,7 @@ struct ConfirmView: View {
         do {
             // 只要求「新增行程」的權限，不會讀到你的行事曆內容
             guard try await store.requestWriteOnlyAccessToEvents() else {
-                message = "沒有行事曆權限。請到「設定 → 電影行程」開啟行事曆。"
+                message = "沒有行事曆權限。請到「設定 → 片刻」開啟行事曆。"
                 return
             }
             let event = EKEvent(eventStore: store)
