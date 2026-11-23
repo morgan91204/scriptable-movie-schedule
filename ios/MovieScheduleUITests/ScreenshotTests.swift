@@ -71,8 +71,13 @@ final class ScreenshotTests: XCTestCase {
             shot("movie", wait: 10)
             app.swipeUp()
             shot("movie-cinemas", wait: 2)
-            app.swipeDown() // 捲回去，第一間影城才點得到
+            app.swipeDown() // 捲回最上面
             Thread.sleep(forTimeInterval: 1)
+            // 電影頁上半部有劇情簡介和觀眾評分，第一間影城可能在畫面外（清單只會建立看得到的列）：慢慢往上捲到點得到為止
+            for _ in 0..<6 where !(row("movie-cinema-row").exists && row("movie-cinema-row").isHittable) {
+                app.swipeUp(velocity: .slow)
+                Thread.sleep(forTimeInterval: 0.8)
+            }
             if tap(row("movie-cinema-row"), "放映影城", timeout: 10) {
                 shot("times", wait: 3)
                 if tap(row("time-button"), "場次時間", timeout: 10) {
