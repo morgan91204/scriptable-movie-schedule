@@ -112,6 +112,7 @@ async function refresh(m) {
   if (!k) return;
   const e = (movies[k] ||= {});
   e.seen = now;
+  const recheck = process.env.RECHECK === "1"; // 手動執行時勾選「重新查」：全部重查（比對、挑選規則改過時用）
   // 先確認是哪一部片（TMDB，中文片名完全相同）。確認過就記著不再問（im）；找不到的 14 天再試，試過 3 次就 60 天一次
   if (TMDB_TOKEN && (recheck || !(e.im && e.im.id)) && (!e.ima || recheck || now - e.ima > ((e.imn || 0) >= 3 ? 60 : 14) * DAY)) {
     try {
@@ -130,7 +131,6 @@ async function refresh(m) {
   // 海報／預告：都有的 3 天查一次，缺的 6 小時再試
   // RECHECK=1：缺海報或預告的立刻重查（改了比對規則、加了新來源時手動跑一次）
   // RECHECK=1：全部重查（預告的挑選、檢查規則改過時手動跑一次）
-  const recheck = process.env.RECHECK === "1";
   if (!e.xa || recheck || now - e.xa > (e.p && e.tn ? 3 * DAY : 6 * HOUR)) {
     try {
       const x = await core.movieExtras(m.title, m.slug);
