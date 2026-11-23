@@ -1288,7 +1288,7 @@ class App {
         <Search value={this.movieQuery} placeholder="搜尋片名（中文或英文）" onInput={(t) => { this.movieQuery = t; }} />
         {/* 排序：前面標「排序」，最右邊一顆按鈕寫出方向（高→低），點一下反過來；再點一次選中的排法也會反向 */}
         {board.orders.length > 1 ? (
-          <div class="bar">
+          <div class="sortbar">
             {/* 最左邊是方向按鈕（寫著目前的方向：高到低、新到舊…）：點一下切換；兩個箭頭亮的那個是目前的方向（▲ 小到大、▼ 大到小） */}
             <button class={"dir " + (board.asc ? "asc" : "desc")} aria-label={`排序方向：目前${dirNow}，點一下切換`} onTap={async () => { this.ascBy[sc] = !this.ascBy[sc]; await this.ui.toast(`改成${dirNext}`); }}>
               <span>{esc(dirNow)}</span>

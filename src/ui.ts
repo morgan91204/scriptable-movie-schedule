@@ -20,8 +20,8 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .bar-title .s{font-size:12px;color:var(--fg2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .bar-right{min-width:64px;text-align:right;font-size:13px;color:var(--fg2);white-space:nowrap}
 .content{flex:1;padding:8px 16px calc(env(safe-area-inset-bottom) + 32px)}
-.page.with-tabs .content{padding-bottom:calc(env(safe-area-inset-bottom) + 104px)}
-.tabbar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom) + 12px);z-index:10;width:min(92vw,420px);
+.page.with-tabs .content{padding-bottom:calc(max(env(safe-area-inset-bottom) - 12px,12px) + 104px)}
+.tabbar{position:fixed;left:50%;transform:translateX(-50%);bottom:max(calc(env(safe-area-inset-bottom) - 12px),12px);z-index:10;width:min(92vw,420px);
  display:flex;align-items:center;padding:5px;border-radius:999px;
  background:rgba(255,255,255,.55);-webkit-backdrop-filter:blur(28px) saturate(190%);backdrop-filter:blur(28px) saturate(190%);
  border:1px solid rgba(255,255,255,.55);box-shadow:0 10px 36px rgba(0,0,0,.16),0 1px 2px rgba(0,0,0,.06),inset 0 1px 0 rgba(255,255,255,.7)}
@@ -100,18 +100,18 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .chips.scroll::-webkit-scrollbar{display:none}
 .chips.scroll .chip{flex:0 0 auto;min-width:72px}
 .chips.scroll .chip .l{white-space:nowrap}
-.bar{display:flex;align-items:center;gap:6px;padding:0 14px 0 16px;margin-top:6px}
-.bar .lbl{flex:none;font-size:13px;font-weight:600;color:var(--fg2)}
-.bar .chips{flex:1;min-width:0;padding:6px 0}
-.bar .chips.scroll .chip{min-width:0;padding:7px 12px}
-.bar .dir{flex:none;display:flex;align-items:center;gap:5px;padding:7px 9px 7px 11px;border-radius:12px;background:var(--card);color:var(--accent);font-size:14px;font-weight:600;white-space:nowrap;box-shadow:0 0 0 1px rgba(128,128,128,.25)}
-.bar .dir .arrows{display:flex;flex-direction:column;line-height:1;font-size:9px;gap:1px}
-.bar .dir .arrows i{font-style:normal;color:var(--fg2);opacity:.35}
-.bar .dir.asc .up,.bar .dir.desc .down{color:var(--accent);opacity:1}
-.bar .dir:active{opacity:.6}
-.bar.more .chips{-webkit-mask-image:linear-gradient(to right,#000 calc(100% - 30px),transparent);mask-image:linear-gradient(to right,#000 calc(100% - 30px),transparent)}
-.bar .more-hint{display:none;flex:none;margin-left:-4px;font-size:17px;font-weight:700;line-height:1;color:var(--fg2)}
-.bar.more .more-hint{display:block}
+.sortbar{display:flex;align-items:center;gap:6px;padding:0 14px 0 16px;margin-top:6px}
+.sortbar .lbl{flex:none;font-size:13px;font-weight:600;color:var(--fg2)}
+.sortbar .chips{flex:1;min-width:0;padding:6px 0}
+.sortbar .chips.scroll .chip{min-width:0;padding:7px 12px}
+.sortbar .dir{flex:none;display:flex;align-items:center;gap:5px;padding:7px 9px 7px 11px;border-radius:12px;background:var(--card);color:var(--accent);font-size:14px;font-weight:600;white-space:nowrap;box-shadow:0 0 0 1px rgba(128,128,128,.25)}
+.sortbar .dir .arrows{display:flex;flex-direction:column;line-height:1;font-size:9px;gap:1px}
+.sortbar .dir .arrows i{font-style:normal;color:var(--fg2);opacity:.35}
+.sortbar .dir.asc .up,.sortbar .dir.desc .down{color:var(--accent);opacity:1}
+.sortbar .dir:active{opacity:.6}
+.sortbar.more .chips{-webkit-mask-image:linear-gradient(to right,#000 calc(100% - 30px),transparent);mask-image:linear-gradient(to right,#000 calc(100% - 30px),transparent)}
+.sortbar .more-hint{display:none;flex:none;margin-left:-4px;font-size:17px;font-weight:700;line-height:1;color:var(--fg2)}
+.sortbar.more .more-hint{display:block}
 .chips.tabs{flex-wrap:nowrap;gap:6px}
 .chips.tabs .chip{flex:1 1 0;min-width:0;padding:9px 2px}
 .chips.tabs .chip .l{font-size:15px;white-space:nowrap}
@@ -243,7 +243,7 @@ function fitTitles(){var a=document.querySelectorAll('.item:not(.kv) .title');fo
   while(el.scrollHeight>el.clientHeight+1&&size>12){size-=0.5;el.style.fontSize=size+'px';}
   if(el.scrollHeight>el.clientHeight+1)el.style.webkitLineClamp='3';}}
 // 橫向可以滑的那一排（年份、排序）：右邊還有選項時，右緣淡出並顯示一個小小的「›」
-function barHints(){var a=document.querySelectorAll('.bar .chips');for(var i=0;i<a.length;i++){var el=a[i],p=el.parentNode;
+function barHints(){var a=document.querySelectorAll('.sortbar .chips');for(var i=0;i<a.length;i++){var el=a[i],p=el.parentNode;
   var more=el.scrollWidth-el.clientWidth-el.scrollLeft>6;if(p&&p.classList)p.classList.toggle('more',more);}}
 document.addEventListener('scroll',function(e){var t=e.target;if(t&&t.classList&&t.classList.contains('chips'))barHints();},true);
 function fitText(){fitTitles();barHints();var a=document.querySelectorAll('.item.kv .right');for(var i=0;i<a.length;i++){var el=a[i],size=14;el.style.fontSize='';el.style.whiteSpace='';
