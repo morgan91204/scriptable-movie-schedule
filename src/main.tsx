@@ -215,17 +215,17 @@ class App {
         </Section>
         {/* 三種收藏都固定顯示；還沒有收藏的，展開後是說明和一個直接帶過去的連結 */}
         {(
-          <Section hint={this.favOpen ? "在影城頁可以收藏或取消收藏影城。" : ""}>
+          <Section hint={this.favOpen && favs.length ? "在影城頁可以收藏或取消收藏影城。" : ""}>
             {/* 預設收合，只留這一列；點一下展開清單 */}
             <Item head icon="★" title={favs.length ? `收藏影城（${favs.length} 間）` : "收藏影城（還沒有）"} subtitle={this.favOpen ? "點一下收合" : "點一下展開"} chevron={false} onTap={() => { this.favOpen = !this.favOpen; }} action={{ label: this.favOpen ? "▾" : "▸", hint: this.favOpen ? "收合收藏影城" : "展開收藏影城", onTap: () => { this.favOpen = !this.favOpen; } }} />
             {(this.favOpen ? favs : []).map((c) => (
               <Item icon="★" title={c.name} subtitle={`${c.city} ${c.district}`} onTap={() => this.go(() => this.cinemaView(c), `讀取 ${c.name} 的場次…`)} />
             ))}
-            {this.favOpen && !favs.length ? <Item icon="👉" title="去找影城來收藏" subtitle="進影城頁，點「收藏這間影城」。收藏後這裡可以直接進那間影城，也能只看收藏影城的場次。" accent onTap={() => this.switchTab("cinemas")} /> : null}
+            {this.favOpen && !favs.length ? <Item icon="👉" title="去找影城來收藏" subtitle="在影城頁點「收藏這間影城」。收藏後可以從這裡直接進那間影城。" accent onTap={() => this.switchTab("cinemas")} /> : null}
           </Section>
         )}
         {(
-          <Section hint={this.favIssOpen ? "點發行商看它歷年發行的片（新的在前）。要增減收藏：到「歷年電影」的發行商選單點星號。" : ""}>
+          <Section hint={this.favIssOpen && favIssuers.length ? "點發行商看它歷年發行的片（新的在前）。要增減收藏：到「歷年電影」的發行商選單點星號。" : ""}>
             <Item head icon="★" title={favIssuers.length ? `收藏發行商（${favIssuers.length} 家）` : "收藏發行商（還沒有）"} subtitle={this.favIssOpen ? "點一下收合" : "點一下展開"} chevron={false} onTap={() => { this.favIssOpen = !this.favIssOpen; }} />
             {this.favIssOpen ? favIssuers.map((id) => (
               <Item icon="🏢" title={id} onTap={() => {
@@ -234,17 +234,17 @@ class App {
                 this.go(() => this.movieListView(), `讀取${id}發行的片…`);
               }} />
             )) : null}
-            {this.favIssOpen && !favIssuers.length ? <Item icon="👉" title="去選發行商來收藏" subtitle="在發行商清單點右邊的星號（☆ 變 ★）。收藏後這裡可以直接看那一家歷年發行的片。" accent onTap={() => { this.movieMode = "year"; this.pickQuery = ""; this.tab = "movies"; this.stack = [() => this.movieListView()]; this.go(() => this.boxPickView("issuer"), "讀取發行商…"); }} /> : null}
+            {this.favIssOpen && !favIssuers.length ? <Item icon="👉" title="去選發行商來收藏" subtitle="在發行商清單點右邊的星號（☆ 變 ★）。收藏後可以從這裡看它歷年發行的片。" accent onTap={() => { this.movieMode = "year"; this.pickQuery = ""; this.tab = "movies"; this.stack = [() => this.movieListView()]; this.go(() => this.boxPickView("issuer"), "讀取發行商…"); }} /> : null}
           </Section>
         )}
         {(
-          <Section hint={this.favMovOpen ? "在電影頁的預告按鈕旁邊點愛心加入，再點一次取消。下檔的片也會留在這裡。" : ""}>
+          <Section hint={this.favMovOpen && favMovies.length ? "在電影頁的預告按鈕旁邊點愛心加入，再點一次取消。下檔的片也會留在這裡。" : ""}>
             {/* 預設收合，只留這一列；點一下展開清單 */}
             <Item head icon="♥" title={favMovies.length ? `收藏電影（${favMovies.length} 部）` : "收藏電影（還沒有）"} subtitle={this.favMovOpen ? "點一下收合" : "點一下展開"} chevron={false} onTap={() => { this.favMovOpen = !this.favMovOpen; }} action={{ label: this.favMovOpen ? "▾" : "▸", hint: this.favMovOpen ? "收合收藏電影" : "展開收藏電影", onTap: () => { this.favMovOpen = !this.favMovOpen; } }} />
             {favRows.map((r) => (
               <Item thumb={{ src: r.fav.poster ? posterSrc(r.fav.poster) : "", url: r.fav.poster }} title={r.fav.title} subtitle={r.line} onTap={() => openFav(r)} />
             ))}
-            {this.favMovOpen && !favMovies.length ? <Item icon="👉" title="去找電影來收藏" subtitle="進電影頁，點預告按鈕旁邊的愛心（♡ 變 ♥）。收藏後這裡看得到每部片現在的狀態，也可以開通知。" accent onTap={() => { this.movieMode = "box"; this.switchTab("movies"); }} /> : null}
+            {this.favMovOpen && !favMovies.length ? <Item icon="👉" title="去找電影來收藏" subtitle="在電影頁點預告按鈕旁的愛心（♡ 變 ♥）。收藏後這裡看得到每部片的狀態。" accent onTap={() => { this.movieMode = "box"; this.switchTab("movies"); }} /> : null}
           </Section>
         )}
         {this.installEntry()}
