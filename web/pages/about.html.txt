@@ -83,5 +83,7 @@ footer a{margin-right:14px}
 <p>我們如何處理資料，請見<a href="/privacy/">隱私權政策</a>。</p>
 <footer><a href="/">回到電影行程</a><a href="/about/">關於</a><a href="/privacy/">隱私權政策</a></footer>
 </main>
+<!-- Cloudflare 網站分析：只統計造訪次數、瀏覽器、裝置類型等，不用 Cookie、不辨認個人（見隱私權政策） -->
+<script type='module' src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "6efde3a32b2943d88fa91d132ff752f7"}'></script>
 </body>
 </html>

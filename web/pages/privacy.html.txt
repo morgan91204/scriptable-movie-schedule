@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>隱私權政策｜電影行程</title>
-<meta name="description" content="電影行程的隱私權政策：不用註冊、沒有廣告、不追蹤。">
+<meta name="description" content="電影行程的隱私權政策：不用註冊、沒有廣告、不追蹤個人。">
 <meta name="theme-color" content="#f2f2f7" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
 <link rel="icon" href="/icon-192.png">
@@ -34,9 +34,9 @@ footer a{margin-right:14px}
 <main>
 <nav><a href="/">電影行程</a> › 隱私權政策</nav>
 <h1>隱私權政策</h1>
-<p class="meta">最後更新：2026 年 11 月 23 日</p>
+<p class="meta">最後更新：2026 年 11 月 24 日</p>
 <p>「電影行程」用來查詢台灣電影場次，並把場次加入行事曆。它有網頁版、iPhone App，以及在 Scriptable、Scripting 裡執行的腳本版，本政策適用於全部版本。</p>
-<p>簡單說：不用註冊、沒有廣告、不追蹤你。</p>
+<p>簡單說：不用註冊、沒有廣告、不追蹤個人。網頁版只有不辨認個人的造訪統計。</p>
 
 <h2>不要求你提供個人資料</h2>
 <p>沒有會員註冊、留言或訂票功能。使用任何功能都不需要提供姓名、電子郵件或電話。</p>
@@ -58,20 +58,21 @@ footer a{margin-right:14px}
 <ul>
 <li><strong>位置</strong>：只有在你使用「附近的影城」或選「附近 10 間」時才會取得，用來在裝置上計算與各影城的距離，不會傳到我們的伺服器。</li>
 <li><strong>行事曆</strong>：App 只要求「新增行程」的權限，讀不到你行事曆裡原有的內容。網頁版是下載一個行事曆檔，由你自己打開加入。</li>
-<li><strong>設定</strong>：常去影城、廣告時間、提醒、地圖偏好，都只存在裝置上（網頁版存在瀏覽器的本機儲存空間）。</li>
+<li><strong>設定</strong>：常去影城、收藏的電影、廣告時間、提醒、地圖偏好，都只存在裝置上（網頁版存在瀏覽器的本機儲存空間）。</li>
 <li><strong>快取</strong>：場次、海報等資料會暫存在裝置上以加快顯示。刪除 App，或清除瀏覽器的網站資料，就會一併清除。</li>
 </ul>
 
-<h2>Cookie、瀏覽器儲存空間與廣告</h2>
-<p>我們不使用 Cookie，沒有放任何廣告，也沒有使用流量分析或追蹤工具。</p>
+<h2>Cookie、使用統計、瀏覽器儲存空間與廣告</h2>
+<p>我們不使用 Cookie，沒有放任何廣告，也不會追蹤個別的使用者。</p>
+<p><strong>網頁版的使用統計</strong>：為了知道大概有多少人在用、用什麼裝置，好安排開發的優先順序，網頁版使用 Cloudflare Web Analytics（Cloudflare 提供的網站分析）。它不使用 Cookie、不在你的瀏覽器存任何東西，也不會建立可以辨認個人的紀錄。統計的內容是彙總的數字：造訪次數、瀏覽的頁面、從哪個網站連過來、國家、瀏覽器與作業系統的種類、裝置類型（手機或電腦），以及頁面載入的速度。這些資料由 Cloudflare 依其隱私權政策處理，我們只看得到彙總後的統計。iPhone App 與腳本版沒有這項統計。</p>
 <p>網頁版會用到瀏覽器的「本機儲存空間」（localStorage、sessionStorage）。它和 Cookie 一樣是存在你瀏覽器裡的資料，但只有這個網站自己讀得到，不會隨著連線自動送出，也不會用來追蹤你。存的東西只有讓功能運作所需要的：</p>
 <ul>
-<li><strong>設定</strong>：常去影城、廣告時間、提醒、地圖偏好。</li>
+<li><strong>設定</strong>：常去影城、收藏的電影、廣告時間、提醒、地圖偏好。</li>
 <li><strong>快取</strong>：查過的場次、電影資料與海報網址，用來加快顯示；會自動過期、空間不夠時自動清掉。</li>
 <li><strong>評分用的匿名代號與你評過的分數</strong>：讓評分一台裝置只算一票，並在畫面上顯示你給過的分數。</li>
 <li><strong>版本記號</strong>：網站更新後自動重新載入一次用的，關掉分頁就消失。</li>
 </ul>
-<p>這些都只存在你的瀏覽器裡。要清除的話，到瀏覽器的設定清除這個網站的資料即可；清除後常去影城等設定會回到預設值。因為只存功能必要的資料、沒有追蹤，所以進站時不會跳出 Cookie 同意視窗。</p>
+<p>這些都只存在你的瀏覽器裡。要清除的話，到瀏覽器的設定清除這個網站的資料即可；清除後常去影城等設定會回到預設值。因為只存功能必要的資料、使用統計也不用 Cookie、不辨認個人，所以進站時不會跳出 Cookie 同意視窗。</p>
 
 <h2>第三方網站</h2>
 <p>App 與腳本版會直接向下列網站讀取公開資料；網頁版則由我們的伺服器代為讀取。和你用瀏覽器造訪這些網站一樣，對方會看到連線的 IP 位址與一般連線資訊，並依各自的隱私權政策處理：</p>
@@ -82,6 +83,7 @@ footer a{margin-right:14px}
 <li>The Movie Database（TMDB）：部分海報圖片放在 TMDB 的圖片伺服器</li>
 <li>海報與劇照圖片：畫面上的圖片由你的裝置直接向圖片所在的網站下載（TMDB、IMDb、開眼電影網、YouTube，以及各影展官網）</li>
 <li>YouTube：尋找與開啟預告片</li>
+<li>Cloudflare Web Analytics（static.cloudflareinsights.com）：只有網頁版，送出不辨認個人的造訪統計</li>
 </ul>
 <p>你點「訂票」「導航」「觀看預告」或評分連結時，會開啟影城官網、地圖、YouTube 等外部網站或 App。它們有各自的隱私權政策，不在本政策範圍內。</p>
 <p>我們不會把你的資料賣給或分享給任何第三方。</p>
@@ -96,5 +98,7 @@ footer a{margin-right:14px}
 <p>對隱私有任何疑問，請到 <a href="https://github.com/morgan91204/scriptable-movie-schedule/issues">GitHub 提出</a>。</p>
 <footer><a href="/">回到電影行程</a><a href="/about/">關於</a><a href="/privacy/">隱私權政策</a></footer>
 </main>
+<!-- Cloudflare 網站分析：只統計造訪次數、瀏覽器、裝置類型等，不用 Cookie、不辨認個人（見隱私權政策） -->
+<script type='module' src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "6efde3a32b2943d88fa91d132ff752f7"}'></script>
 </body>
 </html>
