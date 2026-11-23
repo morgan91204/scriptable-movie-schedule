@@ -1,9 +1,11 @@
 // 電影行程：觀眾即時評分（Cloudflare Worker + Durable Objects）
 // 每部片一個 Durable Object（內建 SQLite），一台裝置一票、可以改票或取消，同時投票也不會算錯。
-// API：
-//   GET  /v1/stats?m=<片名鍵>&d=<裝置代號>   → { n, avg, dist:[1星..5星人數], mine }
-//   POST /v1/vote  { m, d, s }               → 同上（s = 1～5；0 = 取消評分）
-//   GET  /v1/all                             → { movies: { <片名鍵>: [1星..5星人數] } }（所有有人評分的片）
+// 分數是 10 分制（1～10）。2026-11 以前是 5 星制：舊的評分在每部片第一次被讀到時一次換算成 ×2（1 星 → 2 分…5 星 → 10 分）。
+// API（v2，10 分制）：
+//   GET  /v2/stats?m=<片名鍵>&d=<裝置代號>   → { n, avg, dist:[1分..10分人數], mine }
+//   POST /v2/vote  { m, d, s }               → 同上（s = 1～10；0 = 取消評分）
+//   GET  /v2/all                             → { movies: { <片名鍵>: [1分..10分人數] } }（所有有人評分的片）
+// 舊版 App 用的 v1（5 星制）照常能用：投 n 星存成 2n 分；讀的時候把 10 分制兩兩併成 5 星（1–2 分 = 1 星…9–10 分 = 5 星）
 // 省請求數：GitHub Actions 每 30 分鐘把 /v1/all 存成靜態檔，App 平常讀靜態檔，只有投票（和每部片第一次查自己的票）才會打到這裡。
 import { DurableObject } from "cloudflare:workers";
 
@@ -17,6 +19,16 @@ const HEADERS = {
 const json = (o, status = 200) => new Response(JSON.stringify(o), { status, headers: HEADERS });
 const okMovie = (m) => typeof m === "string" && m.length >= 1 && m.length <= 120;
 const okDevice = (d) => typeof d === "string" && /^[A-Za-z0-9_-]{16,64}$/.test(d);
+/** 10 分制的各分人數 → 5 星制（給舊版 App）：1–2 分算 1 星…9–10 分算 5 星 */
+const dist5 = (d10) => [0, 1, 2, 3, 4].map((i) => (Number(d10[i * 2]) || 0) + (Number(d10[i * 2 + 1]) || 0));
+/** 還沒換算的舊資料（只有 5 格）→ 10 分制：n 星放在 2n 分 */
+const dist10 = (d) => (d.length > 5 ? Array.from({ length: 10 }, (_, i) => Number(d[i]) || 0) : Array.from({ length: 10 }, (_, i) => (i % 2 ? Number(d[(i - 1) / 2]) || 0 : 0)));
+/** 10 分制的統計 → 5 星制的統計（給舊版 App） */
+const stats5 = (o) => {
+  const dist = dist5(o.dist);
+  const sum = dist.reduce((a, c, i) => a + c * (i + 1), 0);
+  return { n: o.n, avg: o.n ? Math.round((sum / o.n) * 10) / 10 : 0, dist, mine: Math.ceil((o.mine || 0) / 2) };
+};
 
 // 同一個 IP 10 分鐘內最多投 60 次（擋灌票，一般人不會碰到）
 const LIMIT_MAX = 60;
@@ -29,18 +41,24 @@ export default {
     try {
       if (url.pathname === "/") return json({ ok: true, service: "movie-ratings" });
 
-      if (url.pathname === "/v1/stats" && req.method === "GET") {
+      const v = (url.pathname.match(/^\/v([12])\//) || [])[1]; // 1 = 舊版 App（5 星制），2 = 10 分制
+      const path = url.pathname.replace(/^\/v[12]\//, "/");
+      const shape = (o) => (v === "1" ? stats5(o) : o);
+
+      if (v && path === "/stats" && req.method === "GET") {
         const m = url.searchParams.get("m") || "";
         const d = url.searchParams.get("d") || "";
         if (!okMovie(m)) return json({ error: "bad movie" }, 400);
-        return json(await env.MOVIE.get(env.MOVIE.idFromName(m)).stats(okDevice(d) ? d : "", m));
+        return json(shape(await env.MOVIE.get(env.MOVIE.idFromName(m)).stats(okDevice(d) ? d : "", m)));
       }
 
-      if (url.pathname === "/v1/all" && req.method === "GET") {
-        return json({ movies: await env.INDEX.get(env.INDEX.idFromName("all")).all() });
+      if (v && path === "/all" && req.method === "GET") {
+        const all = await env.INDEX.get(env.INDEX.idFromName("all")).all();
+        for (const k of Object.keys(all)) all[k] = v === "1" ? dist5(dist10(all[k])) : dist10(all[k]);
+        return json({ movies: all });
       }
 
-      if (url.pathname === "/v1/vote" && req.method === "POST") {
+      if (v && path === "/vote" && req.method === "POST") {
         let b;
         try {
           b = await req.json();
@@ -48,10 +66,10 @@ export default {
           return json({ error: "bad json" }, 400);
         }
         const m = b && b.m, d = b && b.d, s = Number(b && b.s);
-        if (!okMovie(m) || !okDevice(d) || !Number.isInteger(s) || s < 0 || s > 5) return json({ error: "bad request" }, 400);
+        if (!okMovie(m) || !okDevice(d) || !Number.isInteger(s) || s < 0 || s > (v === "1" ? 5 : 10)) return json({ error: "bad request" }, 400);
         const ip = req.headers.get("cf-connecting-ip") || "unknown";
         if (!(await env.LIMIT.get(env.LIMIT.idFromName(ip)).hit(LIMIT_MAX, LIMIT_WINDOW))) return json({ error: "too many votes, try later" }, 429);
-        return json(await env.MOVIE.get(env.MOVIE.idFromName(m)).vote(d, s, m));
+        return json(shape(await env.MOVIE.get(env.MOVIE.idFromName(m)).vote(d, v === "1" ? s * 2 : s, m)));
       }
 
       return json({ error: "not found" }, 404);
@@ -68,11 +86,19 @@ export class Movie extends DurableObject {
     this.env = env;
     this.sql = ctx.storage.sql;
     this.sql.exec("CREATE TABLE IF NOT EXISTS votes (dev TEXT PRIMARY KEY, score INTEGER NOT NULL, at INTEGER NOT NULL)");
+    // 5 星制 → 10 分制：舊的分數一次換算成 ×2。換算和「已經換算過」的記號寫在同一筆交易裡，不會只做一半、也不會做兩次
+    this.sql.exec("CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT NOT NULL)");
+    if (!this.sql.exec("SELECT v FROM meta WHERE k = 'scale'").toArray().length) {
+      ctx.storage.transactionSync(() => {
+        this.sql.exec("UPDATE votes SET score = score * 2");
+        this.sql.exec("INSERT INTO meta (k, v) VALUES ('scale', '10')");
+      });
+    }
   }
   /** 把這部片的統計同步到總表（有變才送）；失敗不影響投票 */
   async sync(key, dist) {
     if (!key) return;
-    const sig = dist.join(",");
+    const sig = "10:" + dist.join(","); // 前面的 10 = 十分制（跟換算前存的記號不同，換算後會重新同步一次）
     if ((await this.ctx.storage.get("indexed")) === sig) return;
     try {
       await this.env.INDEX.get(this.env.INDEX.idFromName("all")).put(key, dist);
@@ -92,8 +118,8 @@ export class Movie extends DurableObject {
     return out;
   }
   count(dev) {
-    const dist = [0, 0, 0, 0, 0];
-    for (const r of this.sql.exec("SELECT score, COUNT(*) AS c FROM votes GROUP BY score")) dist[r.score - 1] = r.c;
+    const dist = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+    for (const r of this.sql.exec("SELECT score, COUNT(*) AS c FROM votes GROUP BY score")) if (r.score >= 1 && r.score <= 10) dist[r.score - 1] = r.c;
     const n = dist.reduce((a, b) => a + b, 0);
     const sum = dist.reduce((a, c, i) => a + c * (i + 1), 0);
     let mine = 0;
@@ -105,7 +131,7 @@ export class Movie extends DurableObject {
   }
 }
 
-/** 總表：所有有人評分的片，各星等人數（給 /v1/all 一次讀完） */
+/** 總表：所有有人評分的片，各分數人數（給 /v2/all 一次讀完）。換算成 10 分制以前存的是 5 格，讀出來時由上面的 dist10 補成 10 格 */
 export class Index extends DurableObject {
   constructor(ctx, env) {
     super(ctx, env);

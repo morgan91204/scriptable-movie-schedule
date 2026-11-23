@@ -50,7 +50,7 @@ final class Bridge: NSObject, WKScriptMessageHandlerWithReply, WKNavigationDeleg
     // 有就下載存起來，下次啟動改用新的，不用等 App 更新。畫面（Swift）不會變，所以只換用「相容等級」相同的。
 
     /// 橋接層的相容等級，要跟 ios/bridge.ts 的 BRIDGE_LEVEL 一樣
-    static let level = 1
+    static let level = 2
     /// 現在實際在用的資料層版本（設定頁顯示用）
     private(set) var coreVersion = ""
     private static let remoteBase = "https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/main/"

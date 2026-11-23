@@ -366,31 +366,41 @@ struct CommunitySection: View {
     @State private var message: String?
 
     var body: some View {
+        let mine = stats?.mine ?? 0
         Section {
-            HStack(spacing: 6) {
-                ForEach(1...5, id: \.self) { s in
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                if let c = stats {
+                    Text(c.n > 0 ? String(format: "%.1f", c.avg) : "-").font(.title.weight(.bold).monospacedDigit())
+                    Text("／10").font(.footnote).foregroundStyle(.secondary)
+                    Spacer()
+                    Text(c.n > 0 ? "\(c.n) 人評分" : "還沒有人評分").font(.subheadline).foregroundStyle(.secondary)
+                } else {
+                    ProgressView()
+                    Spacer()
+                }
+            }
+            // 1～10 分一排按鈕：自己給的那一格實心，比它低的淡橘色
+            HStack(spacing: 4) {
+                ForEach(1...10, id: \.self) { s in
                     Button {
                         Task { await vote(s) }
                     } label: {
-                        Image(systemName: s <= (stats?.mine ?? 0) ? "star.fill" : "star")
-                            .font(.title2).foregroundStyle(.yellow)
+                        Text("\(s)")
+                            .font(.subheadline.weight(.bold).monospacedDigit())
+                            .frame(maxWidth: .infinity, minHeight: 34)
+                            .foregroundStyle(s == mine ? Color.white : s < mine ? Color.orange : Color.secondary)
+                            .background(RoundedRectangle(cornerRadius: 8).fill(s == mine ? Color.orange : Color(.tertiarySystemFill)))
                     }
                     .buttonStyle(.plain)
                     .disabled(busy)
-                    .accessibilityLabel("\(s) 星")
-                }
-                Spacer()
-                if let c = stats {
-                    Text(c.n > 0 ? String(format: "%.1f 分・%d 人", c.avg, c.n) : "還沒有人評分").font(.subheadline).foregroundStyle(.secondary)
-                } else {
-                    ProgressView()
+                    .accessibilityLabel("\(s) 分")
                 }
             }
             if let message { Text(message).font(.footnote).foregroundStyle(.red) }
         } header: {
             Text("觀眾評分")
         } footer: {
-            Text((stats?.mine ?? 0) > 0 ? "你給了 \(stats?.mine ?? 0) 星，再點一次同一顆星可以取消。" : "點星星給分，一支手機一票。")
+            Text(mine > 0 ? "你給了 \(mine) 分（滿分 10），再點一次同一個分數可以取消。" : "滿分 10 分，點一個分數評分，一支手機一票。")
         }
         .task(id: title) { stats = try? await Bridge.shared.call("communityStats", [title]) }
     }

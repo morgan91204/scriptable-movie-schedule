@@ -19,6 +19,11 @@ jobs:
         with:
           node-version: 22
       - name: 讀評分總表
-        run: node tools/community.mjs "$RUNNER_TEMP/community.json"
+        run: |
+          node tools/community.mjs "$RUNNER_TEMP/community.json"
+          node tools/community.mjs "$RUNNER_TEMP/community10.json" v2
       - name: 有變化才發佈到 data 分支
-        run: tools/publish-data.sh "$RUNNER_TEMP/community.json" community.json "更新資料"
+        run: |
+          tools/publish-data.sh "$RUNNER_TEMP/community.json" community.json "更新資料"
+          git checkout -q -f "$GITHUB_SHA"
+          tools/publish-data.sh "$RUNNER_TEMP/community10.json" community10.json "更新資料"

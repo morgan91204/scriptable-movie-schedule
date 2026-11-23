@@ -518,43 +518,43 @@ class App {
     const vote = async (s: number) => {
       try {
         await communityVote(title, s === mine ? 0 : s);
-        await this.ui.toast(s === mine ? "已取消你的評分" : `已送出 ${s} 星`);
+        await this.ui.toast(s === mine ? "已取消你的評分" : `已送出 ${s} 分`);
       } catch (e) {
         await this.ui.toast(String((e as Error)?.message || e));
       }
     };
     return (
-      <Section title="觀眾評分" hint="匿名評分，一台手機一票，可以隨時更改；點已選的星星可以取消。兩個版本的評分會一起統計。">
+      <Section title="觀眾評分" hint="滿分 10 分。匿名評分，一台手機一票，可以隨時更改；再點一次已選的分數可以取消。各版本的評分會一起統計。">
         <div class="cm">
           <div class="cm-top">
-            <div class="cm-avg">{n ? avg.toFixed(1) : "-"}</div>
+            <div class="cm-avg">{n ? avg.toFixed(1) : "-"}<small>／10</small></div>
             <div class="cm-meta">
-              <span class="cm-stars" aria-label={n ? `平均 ${avg} 星` : "還沒有評分"}>
+              <span class="cm-stars" aria-label={n ? `平均 ${avg} 分，滿分 10 分` : "還沒有評分"}>
                 <span class="bg">★★★★★</span>
-                <span class="fg" style={`width:${(avg / 5) * 100}%`}>★★★★★</span>
+                <span class="fg" style={`width:${(avg / 10) * 100}%`}>★★★★★</span>
               </span>
               <span class="cm-n">{esc(status)}</span>
             </div>
             {c && n ? (
               <div class="cm-dist">
-                {[5, 4, 3, 2, 1].map((s) => (
+                {[10, 9, 8, 7, 6, 5, 4, 3, 2, 1].map((s) => (
                   <div class="cm-row">
                     <span>{s}</span>
-                    <i style={`width:${Math.round((c.dist[s - 1] / max) * 100)}%`} />
+                    <i style={`width:${Math.round(((c.dist[s - 1] || 0) / max) * 100)}%`} />
                   </div>
                 ))}
               </div>
             ) : null}
           </div>
           <div class="cm-mine">
-            <span>{mine ? `你給 ${mine} 星` : "點星星評分"}</span>
-            <span class="cm-pick">
-              {[1, 2, 3, 4, 5].map((s) => (
-                <button class={"cm-star" + (s <= mine ? " on" : "")} aria-label={`${s} 星`} onTap={() => vote(s)}>
-                  ★<span class="sr">{s}</span>
-                </button>
-              ))}
-            </span>
+            <span>{mine ? `你給 ${mine} 分` : "點一個分數評分（滿分 10）"}</span>
+          </div>
+          <div class="cm-pick">
+            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((s) => (
+              <button class={"cm-num" + (s === mine ? " on" : s < mine ? " below" : "")} aria-label={`${s} 分`} onTap={() => vote(s)}>
+                {s}
+              </button>
+            ))}
           </div>
         </div>
       </Section>
@@ -1009,7 +1009,9 @@ class App {
     );
   }
   /** 影展的一部片：列出還沒演的所有場次，點一場加入行事曆 */
-  festivalFilmView(f: Festival, film: FestivalFilm): string {
+  async festivalFilmView(f: Festival, film: FestivalFilm): Promise<string> {
+    // 觀眾評分：跟院線片共用同一套（片名相同就是同一部片的分數）
+    const rated: Community | false = communityCached(film.title) || (await communityStats(film.title).catch(() => false as const));
     const sessions = festivalFilmSessions(f, film.id);
     const pick = (x: FestivalSession) => {
       const cinema = festivalCinema(x, this.cinemas, f);
@@ -1023,6 +1025,7 @@ class App {
     return (
       <Page title={film.title} subtitle={f.name} onBack={() => this.back()}>
         <Hero title={film.title} poster={film.poster || undefined} lines={[[film.rating, film.mins ? `${film.mins} 分鐘` : ""].filter(Boolean).join("｜"), `${f.name}（${festivalStateLabel(f)}）`, "影展片名，院線上映時可能不同"]} trailerLabel={festivalTrailer(film).label} onTrailer={() => Safari.open(festivalTrailer(film).url)} />
+        {this.community(film.title, rated)}
         {film.intro || film.credits ? (
           <Section title="介紹" hint={`介紹來自${f.source}。`}>
             <Para text={film.intro || film.credits || ""} dim={film.intro ? film.credits : ""} />

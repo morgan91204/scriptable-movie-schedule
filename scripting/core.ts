@@ -2202,8 +2202,8 @@ export const PRIVACY_URL = SITE_URL + "/privacy/";
 export const COMMUNITY_API = "https://movie-ratings.twmovietime.workers.dev";
 export interface Community {
   n: number; // 評分人數
-  avg: number; // 平均（1～5，一位小數；沒人評分是 0）
-  dist: number[]; // 1 星～5 星各幾人
+  avg: number; // 平均（1～10 分，一位小數；沒人評分是 0）
+  dist: number[]; // 1 分～10 分各幾人
   mine: number; // 這支手機給的分數（0 = 還沒評）
 }
 /** 這支手機的匿名代號：第一次用時隨機產生，存在本機；只用來做「一台一票、可以改票」 */
@@ -2226,7 +2226,7 @@ export function communityCached(title: string): Community | null {
 
 // 省伺服器請求：所有片的評分統計每 30 分鐘由 GitHub Actions 存成靜態檔（data 分支），App 平常只讀這個檔；
 // 自己投的票記在手機上。只有投票、以及每部片第一次（之後每 30 天一次）確認自己的票時才會打到伺服器。
-export const COMMUNITY_SUMMARY_URL = "https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/data/community.json";
+export const COMMUNITY_SUMMARY_URL = "https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/data/community10.json"; // 10 分制的總表（舊版 App 讀的 5 星制是 community.json）
 type Summary = Record<string, number[]>;
 let summaryMem: { at: number; job: Promise<Summary | null> } | null = null;
 /** 靜態總表（記 5 分鐘）；還沒有這個檔或讀不到回傳 null，改用伺服器 */
@@ -2249,7 +2249,7 @@ function loadSummary(): Promise<Summary | null> {
 interface MyVote { s: number; at: number; dist?: number[]; dat?: number }
 const readMyVotes = (): Record<string, MyVote> => {
   try {
-    return JSON.parse(cacheGet("my-votes.json") || "{}") || {};
+    return JSON.parse(cacheGet("my-votes10.json") || "{}") || {}; // 10 分制換了檔名：舊檔記的是 5 星制的分數，不能沿用
   } catch (_) {
     return {};
   }
@@ -2258,10 +2258,10 @@ function saveMyVote(k: string, c: Community, fresh: boolean) {
   const all = readMyVotes();
   for (const [key, v] of Object.entries(all)) if (!v.s && Date.now() - v.at > 60 * 86400e3) delete all[key]; // 沒投票的舊紀錄清掉
   all[k] = fresh ? { s: c.mine, at: Date.now(), dist: c.dist, dat: Date.now() } : { s: c.mine, at: Date.now() };
-  cacheSet("my-votes.json", JSON.stringify(all));
+  cacheSet("my-votes10.json", JSON.stringify(all));
 }
 const fromDist = (dist: number[], mine: number): Community => {
-  const d = [0, 1, 2, 3, 4].map((i) => Number(dist[i]) || 0);
+  const d = Array.from({ length: 10 }, (_, i) => Number(dist[i]) || 0);
   const n = d.reduce((a, b) => a + b, 0);
   const sum = d.reduce((a, c, i) => a + c * (i + 1), 0);
   return { n, avg: n ? Math.round((sum / n) * 10) / 10 : 0, dist: d, mine };
@@ -2281,7 +2281,7 @@ export async function communityStats(title: string): Promise<Community> {
       return c;
     }
   }
-  const r = await platform().fetchText(`${COMMUNITY_API}/v1/stats?m=${encodeURIComponent(k)}&d=${encodeURIComponent(deviceId())}`, { accept: "application/json" });
+  const r = await platform().fetchText(`${COMMUNITY_API}/v2/stats?m=${encodeURIComponent(k)}&d=${encodeURIComponent(deviceId())}`, { accept: "application/json" });
   if (r.status !== 200) throw new Error("觀眾評分暫時讀不到");
   const c = JSON.parse(r.body) as Community;
   communityMem[k] = { ...c, at: Date.now() };
@@ -2292,7 +2292,7 @@ export async function communityStats(title: string): Promise<Community> {
 export async function communityVote(title: string, score: number): Promise<Community> {
   const k = communityKey(title);
   const r = await platform().fetchText(
-    `${COMMUNITY_API}/v1/vote`,
+    `${COMMUNITY_API}/v2/vote`,
     { accept: "application/json", "content-type": "application/json" },
     { method: "POST", body: JSON.stringify({ m: k, d: deviceId(), s: score }) }
   );

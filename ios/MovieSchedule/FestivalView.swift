@@ -173,6 +173,7 @@ struct FestivalFilmView: View {
                     }
                     .listRowBackground(Color.clear)
                 }
+                CommunitySection(title: d.film.title) // 觀眾評分：跟院線片共用同一套（片名相同就是同一部片的分數）
                 let intro = d.film.intro ?? ""
                 let credits = d.film.credits ?? ""
                 if !(intro.isEmpty && credits.isEmpty) {

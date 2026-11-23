@@ -2450,7 +2450,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   function communityCached(title) {
     return communityMem[communityKey(title)] || null;
   }
-  var COMMUNITY_SUMMARY_URL = "https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/data/community.json";
+  var COMMUNITY_SUMMARY_URL = "https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/data/community10.json";
   var summaryMem = null;
   function loadSummary() {
     if (summaryMem && Date.now() - summaryMem.at < 3e5) return summaryMem.job;
@@ -2469,7 +2469,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   }
   var readMyVotes = () => {
     try {
-      return JSON.parse(cacheGet("my-votes.json") || "{}") || {};
+      return JSON.parse(cacheGet("my-votes10.json") || "{}") || {};
     } catch (_) {
       return {};
     }
@@ -2478,10 +2478,10 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     const all = readMyVotes();
     for (const [key, v] of Object.entries(all)) if (!v.s && Date.now() - v.at > 60 * 864e5) delete all[key];
     all[k] = fresh ? { s: c.mine, at: Date.now(), dist: c.dist, dat: Date.now() } : { s: c.mine, at: Date.now() };
-    cacheSet("my-votes.json", JSON.stringify(all));
+    cacheSet("my-votes10.json", JSON.stringify(all));
   }
   var fromDist = (dist, mine) => {
-    const d = [0, 1, 2, 3, 4].map((i) => Number(dist[i]) || 0);
+    const d = Array.from({ length: 10 }, (_, i) => Number(dist[i]) || 0);
     const n = d.reduce((a, b) => a + b, 0);
     const sum = d.reduce((a, c, i) => a + c * (i + 1), 0);
     return { n, avg: n ? Math.round(sum / n * 10) / 10 : 0, dist: d, mine };
@@ -2499,7 +2499,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
         return c2;
       }
     }
-    const r = await platform().fetchText(`${COMMUNITY_API}/v1/stats?m=${encodeURIComponent(k)}&d=${encodeURIComponent(deviceId())}`, { accept: "application/json" });
+    const r = await platform().fetchText(`${COMMUNITY_API}/v2/stats?m=${encodeURIComponent(k)}&d=${encodeURIComponent(deviceId())}`, { accept: "application/json" });
     if (r.status !== 200) throw new Error("觀眾評分暫時讀不到");
     const c = JSON.parse(r.body);
     communityMem[k] = { ...c, at: Date.now() };
@@ -2509,7 +2509,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   async function communityVote(title, score) {
     const k = communityKey(title);
     const r = await platform().fetchText(
-      `${COMMUNITY_API}/v1/vote`,
+      `${COMMUNITY_API}/v2/vote`,
       { accept: "application/json", "content-type": "application/json" },
       { method: "POST", body: JSON.stringify({ m: k, d: deviceId(), s: score }) }
     );
@@ -2798,9 +2798,9 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   }
   var formatList = () => FORMATS;
   var extra = { boxOffice, nowShowing, nowShowingMulti, movieBoard, festivalBoard, festivalFilm, nearby, patchSettings, fillMovie, formatList };
-  var BRIDGE_LEVEL = 1;
+  var BRIDGE_LEVEL = 2;
   globalThis.MS = {
-    version: "2026.11.23-1452",
+    version: "2026.11.23-1512",
     level: BRIDGE_LEVEL,
     init(saved) {
       cache = saved || {};

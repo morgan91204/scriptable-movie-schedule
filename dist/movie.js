@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.23-1452
+// @movie-schedule-app 電影行程 v2026.11.23-1512
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/parsers.gen.ts
@@ -2231,7 +2231,7 @@ var communityMem = {};
 function communityCached(title) {
   return communityMem[communityKey(title)] || null;
 }
-var COMMUNITY_SUMMARY_URL = "https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/data/community.json";
+var COMMUNITY_SUMMARY_URL = "https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/data/community10.json";
 var summaryMem = null;
 function loadSummary() {
   if (summaryMem && Date.now() - summaryMem.at < 3e5) return summaryMem.job;
@@ -2250,7 +2250,7 @@ function loadSummary() {
 }
 var readMyVotes = () => {
   try {
-    return JSON.parse(cacheGet("my-votes.json") || "{}") || {};
+    return JSON.parse(cacheGet("my-votes10.json") || "{}") || {};
   } catch (_) {
     return {};
   }
@@ -2259,10 +2259,10 @@ function saveMyVote(k, c, fresh) {
   const all = readMyVotes();
   for (const [key, v] of Object.entries(all)) if (!v.s && Date.now() - v.at > 60 * 864e5) delete all[key];
   all[k] = fresh ? { s: c.mine, at: Date.now(), dist: c.dist, dat: Date.now() } : { s: c.mine, at: Date.now() };
-  cacheSet("my-votes.json", JSON.stringify(all));
+  cacheSet("my-votes10.json", JSON.stringify(all));
 }
 var fromDist = (dist, mine) => {
-  const d = [0, 1, 2, 3, 4].map((i) => Number(dist[i]) || 0);
+  const d = Array.from({ length: 10 }, (_, i) => Number(dist[i]) || 0);
   const n = d.reduce((a, b) => a + b, 0);
   const sum = d.reduce((a, c, i) => a + c * (i + 1), 0);
   return { n, avg: n ? Math.round(sum / n * 10) / 10 : 0, dist: d, mine };
@@ -2280,7 +2280,7 @@ async function communityStats(title) {
       return c2;
     }
   }
-  const r = await platform().fetchText(`${COMMUNITY_API}/v1/stats?m=${encodeURIComponent(k)}&d=${encodeURIComponent(deviceId())}`, { accept: "application/json" });
+  const r = await platform().fetchText(`${COMMUNITY_API}/v2/stats?m=${encodeURIComponent(k)}&d=${encodeURIComponent(deviceId())}`, { accept: "application/json" });
   if (r.status !== 200) throw new Error("觀眾評分暫時讀不到");
   const c = JSON.parse(r.body);
   communityMem[k] = { ...c, at: Date.now() };
@@ -2290,7 +2290,7 @@ async function communityStats(title) {
 async function communityVote(title, score) {
   const k = communityKey(title);
   const r = await platform().fetchText(
-    `${COMMUNITY_API}/v1/vote`,
+    `${COMMUNITY_API}/v2/vote`,
     { accept: "application/json", "content-type": "application/json" },
     { method: "POST", body: JSON.stringify({ m: k, d: deviceId(), s: score }) }
   );
@@ -2711,7 +2711,8 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .trailer:active{opacity:.7}
 .cm{padding:14px 16px}
 .cm-top{display:flex;align-items:center;gap:12px}
-.cm-avg{font-size:40px;font-weight:700;line-height:1;font-variant-numeric:tabular-nums;min-width:58px;text-align:center}
+.cm-avg{font-size:40px;font-weight:700;line-height:1;font-variant-numeric:tabular-nums;min-width:58px;text-align:center;white-space:nowrap}
+.cm-avg small{font-size:13px;font-weight:600;color:var(--fg2);margin-left:1px}
 .cm-meta{display:flex;flex-direction:column;gap:4px;min-width:0}
 .cm-stars{position:relative;display:inline-block;font-size:17px;letter-spacing:1px;line-height:1}
 .cm-stars .bg{color:var(--line)}
@@ -2719,11 +2720,15 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .cm-stars .fg{position:absolute;left:0;top:0;overflow:hidden;white-space:nowrap;color:#ff9f0a}
 .cm-n{font-size:13px;color:var(--fg2)}
 .cm-dist{flex:1;display:flex;flex-direction:column;gap:2px;min-width:70px;max-width:130px;margin-left:auto}
-.cm-row{display:flex;align-items:center;gap:5px;font-size:9px;color:var(--fg2);line-height:1}
-.cm-row span{width:7px;text-align:right;flex:none}
-.cm-row i{display:block;height:4px;border-radius:2px;background:var(--fg2);opacity:.55;min-width:2px}
+.cm-row{display:flex;align-items:center;gap:5px;font-size:8px;color:var(--fg2);line-height:1}
+.cm-row span{width:10px;text-align:right;flex:none}
+.cm-row i{display:block;height:3px;border-radius:2px;background:var(--fg2);opacity:.55;min-width:2px}
 .cm-mine{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:12px;padding-top:10px;border-top:1px solid var(--line);font-size:15px}
-.cm-pick{display:flex;gap:2px}
+.cm-pick{display:flex;gap:4px;margin-top:8px}
+.cm-num{flex:1 1 0;min-width:0;height:36px;border-radius:9px;font-size:15px;font-weight:700;font-variant-numeric:tabular-nums;background:var(--chip);color:var(--fg2)}
+.cm-num.below{background:rgba(255,159,10,.22);color:#c77700}
+.cm-num.on{background:#ff9f0a;color:#fff}
+.cm-num:active{transform:scale(.92)}
 .cm-star{font-size:28px;line-height:1;padding:2px 3px;color:var(--line)}
 @media(prefers-color-scheme:dark){.cm-star{color:#48484a}}
 .cm-star.on{color:#ff9f0a}
@@ -3102,14 +3107,14 @@ var App = class {
   }
   /** 最新版本是多少。網頁版問的是自己網站現在上線的版本（重新整理就會拿到的那一版），不是 GitHub 上的 */
   checkVersion() {
-    if (true) return checkLatest("2026.11.23-1452");
+    if (true) return checkLatest("2026.11.23-1512");
     return (async () => {
       try {
         const r = await globalThis.fetch("/api/version?t=" + Date.now(), { cache: "no-store" });
         const latest = String((await r.json()).version || "");
         if (!latest) return null;
         const num = (v) => Number(v.replace(/\D/g, "")) || 0;
-        return { latest, isLatest: num("2026.11.23-1452") >= num(latest) };
+        return { latest, isLatest: num("2026.11.23-1512") >= num(latest) };
       } catch (_) {
         return null;
       }
@@ -3210,11 +3215,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.23-1452"}`);
+          Pasteboard.copy(`版本 ${"2026.11.23-1512"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.23-1452"}`,
+      `版本 ${"2026.11.23-1512"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -3389,12 +3394,12 @@ var App = class {
     const vote = async (s) => {
       try {
         await communityVote(title, s === mine ? 0 : s);
-        await this.ui.toast(s === mine ? "已取消你的評分" : `已送出 ${s} 星`);
+        await this.ui.toast(s === mine ? "已取消你的評分" : `已送出 ${s} 分`);
       } catch (e) {
         await this.ui.toast(String(e?.message || e));
       }
     };
-    return /* @__PURE__ */ h(Section, { title: "觀眾評分", hint: "匿名評分，一台手機一票，可以隨時更改；點已選的星星可以取消。兩個版本的評分會一起統計。" }, /* @__PURE__ */ h("div", { class: "cm" }, /* @__PURE__ */ h("div", { class: "cm-top" }, /* @__PURE__ */ h("div", { class: "cm-avg" }, n ? avg.toFixed(1) : "-"), /* @__PURE__ */ h("div", { class: "cm-meta" }, /* @__PURE__ */ h("span", { class: "cm-stars", "aria-label": n ? `平均 ${avg} 星` : "還沒有評分" }, /* @__PURE__ */ h("span", { class: "bg" }, "★★★★★"), /* @__PURE__ */ h("span", { class: "fg", style: `width:${avg / 5 * 100}%` }, "★★★★★")), /* @__PURE__ */ h("span", { class: "cm-n" }, esc(status))), c && n ? /* @__PURE__ */ h("div", { class: "cm-dist" }, [5, 4, 3, 2, 1].map((s) => /* @__PURE__ */ h("div", { class: "cm-row" }, /* @__PURE__ */ h("span", null, s), /* @__PURE__ */ h("i", { style: `width:${Math.round(c.dist[s - 1] / max * 100)}%` })))) : null), /* @__PURE__ */ h("div", { class: "cm-mine" }, /* @__PURE__ */ h("span", null, mine ? `你給 ${mine} 星` : "點星星評分"), /* @__PURE__ */ h("span", { class: "cm-pick" }, [1, 2, 3, 4, 5].map((s) => /* @__PURE__ */ h("button", { class: "cm-star" + (s <= mine ? " on" : ""), "aria-label": `${s} 星`, onTap: () => vote(s) }, "★", /* @__PURE__ */ h("span", { class: "sr" }, s)))))));
+    return /* @__PURE__ */ h(Section, { title: "觀眾評分", hint: "滿分 10 分。匿名評分，一台手機一票，可以隨時更改；再點一次已選的分數可以取消。各版本的評分會一起統計。" }, /* @__PURE__ */ h("div", { class: "cm" }, /* @__PURE__ */ h("div", { class: "cm-top" }, /* @__PURE__ */ h("div", { class: "cm-avg" }, n ? avg.toFixed(1) : "-", /* @__PURE__ */ h("small", null, "／10")), /* @__PURE__ */ h("div", { class: "cm-meta" }, /* @__PURE__ */ h("span", { class: "cm-stars", "aria-label": n ? `平均 ${avg} 分，滿分 10 分` : "還沒有評分" }, /* @__PURE__ */ h("span", { class: "bg" }, "★★★★★"), /* @__PURE__ */ h("span", { class: "fg", style: `width:${avg / 10 * 100}%` }, "★★★★★")), /* @__PURE__ */ h("span", { class: "cm-n" }, esc(status))), c && n ? /* @__PURE__ */ h("div", { class: "cm-dist" }, [10, 9, 8, 7, 6, 5, 4, 3, 2, 1].map((s) => /* @__PURE__ */ h("div", { class: "cm-row" }, /* @__PURE__ */ h("span", null, s), /* @__PURE__ */ h("i", { style: `width:${Math.round((c.dist[s - 1] || 0) / max * 100)}%` })))) : null), /* @__PURE__ */ h("div", { class: "cm-mine" }, /* @__PURE__ */ h("span", null, mine ? `你給 ${mine} 分` : "點一個分數評分（滿分 10）")), /* @__PURE__ */ h("div", { class: "cm-pick" }, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((s) => /* @__PURE__ */ h("button", { class: "cm-num" + (s === mine ? " on" : s < mine ? " below" : ""), "aria-label": `${s} 分`, onTap: () => vote(s) }, s)))));
   }
   hero(e, title, lines) {
     const { x, r } = e;
@@ -3556,7 +3561,7 @@ var App = class {
     if (false) {
       if (!r) return /* @__PURE__ */ h(Note, { text: "（無法確認是否為最新版：連不到網站）" });
       if (r.isLatest) return /* @__PURE__ */ h(Note, { text: "✅ 已是最新版" });
-      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.23-1452"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
+      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.23-1512"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
         globalThis.location.reload();
       } }));
     }
@@ -3705,7 +3710,8 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
     ))), day.length ? null : /* @__PURE__ */ h(Empty, { icon: "🎞", text: "這一天沒有場次" })));
   }
   /** 影展的一部片：列出還沒演的所有場次，點一場加入行事曆 */
-  festivalFilmView(f, film) {
+  async festivalFilmView(f, film) {
+    const rated = communityCached(film.title) || await communityStats(film.title).catch(() => false);
     const sessions = festivalFilmSessions(f, film.id);
     const pick = (x) => {
       const cinema = festivalCinema(x, this.cinemas, f);
@@ -3716,7 +3722,7 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
       this.go(() => this.confirmView({ cinema, address: cinema.address || "", booking: x.ticket || film.url, sourceUrl: film.url, date: x.date, movie, version, time: x.time }));
     };
     const end = (x) => film.mins ? fmt(new Date(tpeDate(x.date, x.time).getTime() + (film.mins + this.settings.ads) * 6e4)).slice(-5) : "";
-    return /* @__PURE__ */ h(Page, { title: film.title, subtitle: f.name, onBack: () => this.back() }, /* @__PURE__ */ h(Hero, { title: film.title, poster: film.poster || void 0, lines: [[film.rating, film.mins ? `${film.mins} 分鐘` : ""].filter(Boolean).join("｜"), `${f.name}（${festivalStateLabel(f)}）`, "影展片名，院線上映時可能不同"], trailerLabel: festivalTrailer(film).label, onTrailer: () => Safari.open(festivalTrailer(film).url) }), film.intro || film.credits ? /* @__PURE__ */ h(Section, { title: "介紹", hint: `介紹來自${f.source}。` }, /* @__PURE__ */ h(Para, { text: film.intro || film.credits || "", dim: film.intro ? film.credits : "" })) : null, /* @__PURE__ */ h(Section, { title: "場次", hint: festivalState(f) === "past" ? "這個影展已經結束，場次僅供回顧。" : "點一場加入行事曆。散場時間是依片長和你設定的廣告預告時間估的。" }, sessions.map((x) => /* @__PURE__ */ h(
+    return /* @__PURE__ */ h(Page, { title: film.title, subtitle: f.name, onBack: () => this.back() }, /* @__PURE__ */ h(Hero, { title: film.title, poster: film.poster || void 0, lines: [[film.rating, film.mins ? `${film.mins} 分鐘` : ""].filter(Boolean).join("｜"), `${f.name}（${festivalStateLabel(f)}）`, "影展片名，院線上映時可能不同"], trailerLabel: festivalTrailer(film).label, onTrailer: () => Safari.open(festivalTrailer(film).url) }), this.community(film.title, rated), film.intro || film.credits ? /* @__PURE__ */ h(Section, { title: "介紹", hint: `介紹來自${f.source}。` }, /* @__PURE__ */ h(Para, { text: film.intro || film.credits || "", dim: film.intro ? film.credits : "" })) : null, /* @__PURE__ */ h(Section, { title: "場次", hint: festivalState(f) === "past" ? "這個影展已經結束，場次僅供回顧。" : "點一場加入行事曆。散場時間是依片長和你設定的廣告預告時間估的。" }, sessions.map((x) => /* @__PURE__ */ h(
       Item,
       {
         title: `${dateLabel(x.date).replace(/ .*$/, "")}　${x.time}`,

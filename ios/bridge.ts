@@ -119,7 +119,7 @@ declare const APP_VERSION: string;
 /** 橋接層的相容等級：App（Swift 端）只會自動換用「等級相同」的新版資料層。
  *  改了這裡回傳的資料格式、而且舊的 Swift 畫面讀不了（刪欄位、改型別、必填的新欄位）時，把這個數字加 1，
  *  並同步改 ios/MovieSchedule/Bridge.swift 的 Bridge.level；只是多回傳選填的欄位不用改 */
-const BRIDGE_LEVEL = 1;
+const BRIDGE_LEVEL = 2; // 2：觀眾評分改成 10 分制（communityStats／communityVote 的分數是 1～10）
 
 (globalThis as any).MS = {
   version: APP_VERSION,

@@ -131,7 +131,8 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .trailer:active{opacity:.7}
 .cm{padding:14px 16px}
 .cm-top{display:flex;align-items:center;gap:12px}
-.cm-avg{font-size:40px;font-weight:700;line-height:1;font-variant-numeric:tabular-nums;min-width:58px;text-align:center}
+.cm-avg{font-size:40px;font-weight:700;line-height:1;font-variant-numeric:tabular-nums;min-width:58px;text-align:center;white-space:nowrap}
+.cm-avg small{font-size:13px;font-weight:600;color:var(--fg2);margin-left:1px}
 .cm-meta{display:flex;flex-direction:column;gap:4px;min-width:0}
 .cm-stars{position:relative;display:inline-block;font-size:17px;letter-spacing:1px;line-height:1}
 .cm-stars .bg{color:var(--line)}
@@ -139,11 +140,15 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .cm-stars .fg{position:absolute;left:0;top:0;overflow:hidden;white-space:nowrap;color:#ff9f0a}
 .cm-n{font-size:13px;color:var(--fg2)}
 .cm-dist{flex:1;display:flex;flex-direction:column;gap:2px;min-width:70px;max-width:130px;margin-left:auto}
-.cm-row{display:flex;align-items:center;gap:5px;font-size:9px;color:var(--fg2);line-height:1}
-.cm-row span{width:7px;text-align:right;flex:none}
-.cm-row i{display:block;height:4px;border-radius:2px;background:var(--fg2);opacity:.55;min-width:2px}
+.cm-row{display:flex;align-items:center;gap:5px;font-size:8px;color:var(--fg2);line-height:1}
+.cm-row span{width:10px;text-align:right;flex:none}
+.cm-row i{display:block;height:3px;border-radius:2px;background:var(--fg2);opacity:.55;min-width:2px}
 .cm-mine{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:12px;padding-top:10px;border-top:1px solid var(--line);font-size:15px}
-.cm-pick{display:flex;gap:2px}
+.cm-pick{display:flex;gap:4px;margin-top:8px}
+.cm-num{flex:1 1 0;min-width:0;height:36px;border-radius:9px;font-size:15px;font-weight:700;font-variant-numeric:tabular-nums;background:var(--chip);color:var(--fg2)}
+.cm-num.below{background:rgba(255,159,10,.22);color:#c77700}
+.cm-num.on{background:#ff9f0a;color:#fff}
+.cm-num:active{transform:scale(.92)}
 .cm-star{font-size:28px;line-height:1;padding:2px 3px;color:var(--line)}
 @media(prefers-color-scheme:dark){.cm-star{color:#48484a}}
 .cm-star.on{color:#ff9f0a}

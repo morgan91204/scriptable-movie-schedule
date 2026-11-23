@@ -342,11 +342,15 @@ function CommunitySection({ title }: { title: string }) {
     }
     setBusy(false)
   }
-  const starIcon = (i: number) => (avg >= i - 0.25 ? "star.fill" : avg >= i - 0.75 ? "star.leadinghalf.filled" : "star")
+  // 平均是 10 分制，五顆星各代表 2 分
+  const starIcon = (i: number) => (avg / 2 >= i - 0.25 ? "star.fill" : avg / 2 >= i - 0.75 ? "star.leadinghalf.filled" : "star")
   const status = c ? (n ? `${n} 人評分` : "還沒有人評分，來當第一個") : load.error ? "觀眾評分暫時讀不到" : "讀取中…"
-  return <Section header={<Text>觀眾評分</Text>} footer={<Text>匿名評分，一台手機一票，可以隨時更改；點已選的星星可以取消。兩個版本的評分會一起統計。</Text>}>
+  return <Section header={<Text>觀眾評分</Text>} footer={<Text>滿分 10 分。匿名評分，一台手機一票，可以隨時更改；再點一次已選的分數可以取消。各版本的評分會一起統計。</Text>}>
     <HStack spacing={14}>
-      <Text font={"largeTitle"} fontWeight={"bold"} monospacedDigit>{n ? avg.toFixed(1) : "-"}</Text>
+      <HStack alignment={"lastTextBaseline"} spacing={2}>
+        <Text font={"largeTitle"} fontWeight={"bold"} monospacedDigit>{n ? avg.toFixed(1) : "-"}</Text>
+        <Text font={"footnote"} foregroundStyle={"secondaryLabel"}>／10</Text>
+      </HStack>
       <VStack alignment={"leading"} spacing={4}>
         <HStack spacing={2}>
           {[1, 2, 3, 4, 5].map((i) => <Image key={i} systemName={starIcon(i)} foregroundStyle={n ? "systemOrange" : "tertiaryLabel"} font={"subheadline"} />)}
@@ -356,15 +360,18 @@ function CommunitySection({ title }: { title: string }) {
       <Spacer />
       {load.error && !c ? <Button title={"重試"} action={load.reload} buttonStyle={"plain"} foregroundStyle={"systemBlue"} /> : null}
     </HStack>
-    <HStack>
-      <Text>{mine ? `你給 ${mine} 星` : "點星星評分"}</Text>
-      <Spacer />
-      {[1, 2, 3, 4, 5].map((s) =>
-        <Button key={s} action={() => vote(s)} buttonStyle={"plain"} disabled={busy || !c}>
-          <Image systemName={s <= mine ? "star.fill" : "star"} foregroundStyle={s <= mine ? "systemOrange" : "tertiaryLabel"} font={"title2"} />
-        </Button>
-      )}
-    </HStack>
+    <VStack alignment={"leading"} spacing={8}>
+      <Text>{mine ? `你給 ${mine} 分` : "點一個分數評分（滿分 10）"}</Text>
+      <HStack spacing={4}>
+        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((s) =>
+          <Button key={s} action={() => vote(s)} buttonStyle={"plain"} disabled={busy || !c}>
+            <Text font={"subheadline"} fontWeight={"bold"} monospacedDigit frame={{ maxWidth: "infinity", minHeight: 34 }}
+              foregroundStyle={s === mine ? "white" : s < mine ? "systemOrange" : "secondaryLabel"}
+              background={s === mine ? "systemOrange" : "tertiarySystemFill"} clipShape={{ type: "rect", cornerRadius: 8 }}>{`${s}`}</Text>
+          </Button>
+        )}
+      </HStack>
+    </VStack>
     {msg ? <Text font={"caption"} foregroundStyle={"systemRed"}>{msg}</Text> : null}
   </Section>
 }
@@ -1142,6 +1149,7 @@ function FestivalFilmPage({ festival: f, film }: { festival: Festival; film: Fes
         </VStack>
       </HStack>
     </Section>
+    <CommunitySection title={film.title} />
     {film.intro || film.credits ? <Section header={<Text>介紹</Text>} footer={<Text>{`介紹來自${f.source}。`}</Text>}>
       {film.intro ? <Text font={"subheadline"}>{film.intro}</Text> : null}
       {film.credits ? <Text font={"footnote"} foregroundStyle={"secondaryLabel"}>{film.credits}</Text> : null}
