@@ -1254,6 +1254,7 @@ class App {
               ))}
               <Chip label="全部" muted={selYears.length !== years.length} onTap={() => { this.boxYears = selYears.length === years.length ? [] : years.slice(); }} />
             </Chips>
+            <span class="more-hint" aria-hidden="true">›</span>
           </div>
         ) : null}
         {/* 排序：前面標「排序」，最右邊一顆按鈕寫出方向（高→低），點一下反過來；再點一次選中的排法也會反向 */}
@@ -1263,6 +1264,7 @@ class App {
             <Chips scroll>
               {board.orders.map((x) => <Chip label={x.label} muted={board.order !== x.id} onTap={() => { if (board.order === x.id) this.ascBy[sc] = !this.ascBy[sc]; else { this.sortBy[sc] = x.id; this.ascBy[sc] = false; } }} />)}
             </Chips>
+            <span class="more-hint" aria-hidden="true">›</span>
             <button class="dir" aria-label="切換排序方向" onTap={() => { this.ascBy[sc] = !this.ascBy[sc]; }}>{esc((board.asc ? board.dirs[1].label : board.dirs[0].label).replace("到", "→"))}</button>
           </div>
         ) : null}

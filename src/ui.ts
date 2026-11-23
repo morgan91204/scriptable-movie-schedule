@@ -106,6 +106,9 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .bar .chips.scroll .chip{min-width:0;padding:7px 12px}
 .bar .dir{flex:none;padding:7px 10px;border-radius:12px;background:var(--card);color:var(--accent);font-size:14px;font-weight:600;white-space:nowrap}
 .bar .dir:active{opacity:.6}
+.bar.more .chips{-webkit-mask-image:linear-gradient(to right,#000 calc(100% - 30px),transparent);mask-image:linear-gradient(to right,#000 calc(100% - 30px),transparent)}
+.bar .more-hint{display:none;flex:none;margin-left:-4px;font-size:17px;font-weight:700;line-height:1;color:var(--fg2)}
+.bar.more .more-hint{display:block}
 .chips.tabs{flex-wrap:nowrap;gap:6px}
 .chips.tabs .chip{flex:1 1 0;min-width:0;padding:9px 2px}
 .chips.tabs .chip .l{font-size:15px;white-space:nowrap}
@@ -236,7 +239,11 @@ function fitTitles(){var a=document.querySelectorAll('.item:not(.kv) .title');fo
   if(el.scrollHeight<=el.clientHeight+1)continue;
   while(el.scrollHeight>el.clientHeight+1&&size>12){size-=0.5;el.style.fontSize=size+'px';}
   if(el.scrollHeight>el.clientHeight+1)el.style.webkitLineClamp='3';}}
-function fitText(){fitTitles();var a=document.querySelectorAll('.item.kv .right');for(var i=0;i<a.length;i++){var el=a[i],size=14;el.style.fontSize='';el.style.whiteSpace='';
+// 橫向可以滑的那一排（年份、排序）：右邊還有選項時，右緣淡出並顯示一個小小的「›」
+function barHints(){var a=document.querySelectorAll('.bar .chips');for(var i=0;i<a.length;i++){var el=a[i],p=el.parentNode;
+  var more=el.scrollWidth-el.clientWidth-el.scrollLeft>6;if(p&&p.classList)p.classList.toggle('more',more);}}
+document.addEventListener('scroll',function(e){var t=e.target;if(t&&t.classList&&t.classList.contains('chips'))barHints();},true);
+function fitText(){fitTitles();barHints();var a=document.querySelectorAll('.item.kv .right');for(var i=0;i<a.length;i++){var el=a[i],size=14;el.style.fontSize='';el.style.whiteSpace='';
   while(el.scrollWidth>el.clientWidth+1&&size>10){size-=0.5;el.style.fontSize=size+'px';}
   if(el.scrollWidth>el.clientWidth+1){el.style.whiteSpace='normal';el.style.overflow='visible';}}}
 setTimeout(autoMore,300);setTimeout(fitText,50);window.addEventListener('resize',fitText);
