@@ -145,7 +145,7 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .cm-row i{display:block;height:3px;border-radius:2px;background:var(--fg2);opacity:.55;min-width:2px}
 .cm-mine{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:12px;padding-top:10px;border-top:1px solid var(--line);font-size:15px}
 .cm-pick{display:flex;gap:4px;margin-top:8px}
-.cm-num{flex:1 1 0;min-width:0;height:36px;border-radius:9px;font-size:15px;font-weight:700;font-variant-numeric:tabular-nums;background:var(--chip);color:var(--fg2)}
+.cm-num{flex:1 1 0;min-width:0;height:36px;padding:0;text-align:center;border-radius:9px;font-size:15px;font-weight:700;font-variant-numeric:tabular-nums;background:var(--chip);color:var(--fg2)}
 .cm-num.below{background:rgba(255,159,10,.22);color:#c77700}
 .cm-num.on{background:#ff9f0a;color:#fff}
 .cm-num:active{transform:scale(.92)}

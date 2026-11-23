@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.23-1512
+// @movie-schedule-app 電影行程 v2026.11.23-1515
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/parsers.gen.ts
@@ -2725,7 +2725,7 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .cm-row i{display:block;height:3px;border-radius:2px;background:var(--fg2);opacity:.55;min-width:2px}
 .cm-mine{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:12px;padding-top:10px;border-top:1px solid var(--line);font-size:15px}
 .cm-pick{display:flex;gap:4px;margin-top:8px}
-.cm-num{flex:1 1 0;min-width:0;height:36px;border-radius:9px;font-size:15px;font-weight:700;font-variant-numeric:tabular-nums;background:var(--chip);color:var(--fg2)}
+.cm-num{flex:1 1 0;min-width:0;height:36px;padding:0;text-align:center;border-radius:9px;font-size:15px;font-weight:700;font-variant-numeric:tabular-nums;background:var(--chip);color:var(--fg2)}
 .cm-num.below{background:rgba(255,159,10,.22);color:#c77700}
 .cm-num.on{background:#ff9f0a;color:#fff}
 .cm-num:active{transform:scale(.92)}
@@ -3107,14 +3107,14 @@ var App = class {
   }
   /** 最新版本是多少。網頁版問的是自己網站現在上線的版本（重新整理就會拿到的那一版），不是 GitHub 上的 */
   checkVersion() {
-    if (true) return checkLatest("2026.11.23-1512");
+    if (true) return checkLatest("2026.11.23-1515");
     return (async () => {
       try {
         const r = await globalThis.fetch("/api/version?t=" + Date.now(), { cache: "no-store" });
         const latest = String((await r.json()).version || "");
         if (!latest) return null;
         const num = (v) => Number(v.replace(/\D/g, "")) || 0;
-        return { latest, isLatest: num("2026.11.23-1512") >= num(latest) };
+        return { latest, isLatest: num("2026.11.23-1515") >= num(latest) };
       } catch (_) {
         return null;
       }
@@ -3215,11 +3215,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.23-1512"}`);
+          Pasteboard.copy(`版本 ${"2026.11.23-1515"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.23-1512"}`,
+      `版本 ${"2026.11.23-1515"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -3561,7 +3561,7 @@ var App = class {
     if (false) {
       if (!r) return /* @__PURE__ */ h(Note, { text: "（無法確認是否為最新版：連不到網站）" });
       if (r.isLatest) return /* @__PURE__ */ h(Note, { text: "✅ 已是最新版" });
-      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.23-1512"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
+      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.23-1515"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
         globalThis.location.reload();
       } }));
     }
