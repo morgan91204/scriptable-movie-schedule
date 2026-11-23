@@ -1201,7 +1201,7 @@ class App {
   /** 出品國別／發行商的選擇頁：一列一個、標出部數，可以搜尋、可以複選；選好按返回 */
   async boxPickView(kind: "country" | "issuer" | "year"): Promise<string> {
     const sc = this.movieMode === "year" ? "year" : "now";
-    const board = await loadMovieBoard({ scope: sc, sort: this.sortBy[sc], years: this.boxYears, week: this.boxWeek, countries: this.boxCountry, query: this.movieQuery.trim().toLowerCase(), asc: this.ascBy[sc], rate: this.boxRate, fewLast: this.boxFewLast, issuers: this.boxIssuer });
+    const board = await loadMovieBoard({ scope: sc, sort: this.sortBy[sc], years: this.boxYears, week: this.boxWeek, countries: this.boxCountry, query: this.movieQuery.trim().toLowerCase(), asc: this.ascBy[sc], rate: this.boxRate, fewLast: this.boxFewLast, issuers: this.boxIssuer, status: this.boxStatus });
     if (kind === "year") {
       // 年份：新的在上面；至少要留一年
       const ys = board.years, on = board.selYears;
@@ -1243,6 +1243,7 @@ class App {
       </Page>
     );
   }
+  boxStatus = ""; // 歷年電影只看上映中（now）／已下檔（off）；空 = 全部
   boxIssuer: string[] = []; // 只看哪幾家發行商（可以複選；空 = 全部）
   boxFewLast = true; // 依 IMDb 排時，評分人數少的片排在後面（關掉就照分數一起排）
   boxOpen = ""; // 目前展開哪一組篩選（週次／年份／出品國別；空 = 都收合）
@@ -1259,12 +1260,12 @@ class App {
     // 票房、片單（依觀眾評分排時再加評分總表）一次讀好；票房讀不到時清單照樣出來，只是少了依票房排的選項
     const k = this.movieQuery.trim().toLowerCase();
     const sc = this.movieMode === "year" ? "year" : "now"; // 看哪些片由頁籤決定
-    const board = await loadMovieBoard({ scope: sc, sort: this.sortBy[sc], years: this.boxYears, week: this.boxWeek, countries: this.boxCountry, query: k, asc: this.ascBy[sc], rate: this.boxRate, fewLast: this.boxFewLast, issuers: this.boxIssuer });
+    const board = await loadMovieBoard({ scope: sc, sort: this.sortBy[sc], years: this.boxYears, week: this.boxWeek, countries: this.boxCountry, query: k, asc: this.ascBy[sc], rate: this.boxRate, fewLast: this.boxFewLast, issuers: this.boxIssuer, status: this.boxStatus });
     const { years, countries } = board;
     const selYears = board.selYears, country = board.selCountries;
     // 年度排行一年有六百部左右、全選是好幾千部：先畫 100 列，快滑到底時自動接著載入（不用按）。換了排法、年份或搜尋字就從頭開始
     const paged = board.paged;
-    const pageKey = `${board.selIssuers.join(",")}|${board.asc}|${board.rate}|${board.scope}|${board.sort}|${selYears.join(",")}|${board.selWeek}|${k}|${country.join(",")}`;
+    const pageKey = `${board.statusSel || ""}|${board.selIssuers.join(",")}|${board.asc}|${board.rate}|${board.scope}|${board.sort}|${selYears.join(",")}|${board.selWeek}|${k}|${country.join(",")}`;
     if (this.boxPageKey !== pageKey) {
       this.boxPageKey = pageKey;
       this.boxLimit = BOX_PAGE;
@@ -1344,6 +1345,12 @@ class App {
             {board.weeks.length > 1 && this.boxOpen === "week" ? (
               <Chips>
                 {board.weeks.map((o) => <Chip label={o.label} sub={o.note} muted={board.selWeek !== o.id} onTap={() => { this.boxWeek = o.note === "最新" ? "" : o.id; }} />)}
+              </Chips>
+            ) : null}
+            {board.statusPicks ? fold("status", "狀態", board.statusPicks.find((x) => x.id === (board.statusSel || ""))!.label + (board.statusSel ? `（${board.entries.length} 部）` : "")) : null}
+            {board.statusPicks && this.boxOpen === "status" ? (
+              <Chips scroll>
+                {board.statusPicks.map((x) => <Chip label={x.label} sub={`${x.count} 部`} muted={x.id !== (board.statusSel || "")} onTap={() => { this.boxStatus = x.id; this.boxOpen = ""; }} />)}
               </Chips>
             ) : null}
             {/* 出品國別、發行商選項很多：點了進一頁清單（可搜尋、可複選），不用橫向滑 */}

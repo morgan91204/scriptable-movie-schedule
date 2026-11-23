@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.24-0242
+// @movie-schedule-app 電影行程 v2026.11.24-0246
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/parsers.gen.ts
@@ -2065,10 +2065,13 @@ function movieBoard(b, movies, opt = {}) {
       if (sort === "tickets" || sort === "price") return moneyKey(x);
       return { tier: 1, v: x.total, hi: { kind: "money", text: money(x.total), tier: "none" } };
     };
-    const keyed2 = pool2.map((x) => {
+    const keyedAll = pool2.map((x) => {
       const m = match(x.name) || null;
       return { x, m, k: keyOf2(x, m), rank: sort === "total" ? x.rank : null };
     }).filter((e) => hit(e.x.name, e.m?.en));
+    const st = opt.status === "now" || opt.status === "off" ? opt.status : "";
+    const stCount = { now: keyedAll.filter((e) => boxStatus(e.x) === "now").length, off: keyedAll.filter((e) => boxStatus(e.x) === "off").length };
+    const keyed2 = st ? keyedAll.filter((e) => boxStatus(e.x) === st) : keyedAll;
     if (sort === "rating" || sort === "cinemas" || sort === "tickets" || sort === "price") keyed2.slice().sort((a, c) => c.k.tier - a.k.tier || c.k.v - a.k.v).forEach((e, i) => {
       if (e.k.tier > 0) e.rank = i + 1;
     });
@@ -2096,7 +2099,9 @@ function movieBoard(b, movies, opt = {}) {
       issuers: issuers2,
       selIssuers: firm2,
       issuerSummary: landText(firm2, everyone.length),
-      title: (sort === "total" ? `${yt} 年票房排行（截至 ${md(b.end)}）${dirTag}` : `${yt} 年上映 ${entries2.length} 部｜${sort === "date" ? asc ? "最早上映在前" : "最新上映在前" : sort === "rating" ? `${rateName2}${asc ? "低到高" : "高到低"}` : sort === "tickets" ? `累計票數${asc ? "少到多" : "多到少"}` : sort === "price" ? `平均票價${asc ? "低到高" : "高到低"}` : `累計院數${asc ? "少到多" : "多到少"}`}`) + boxCountryTag(land2) + issuerTag(firm2),
+      statusSel: st,
+      statusPicks: [{ id: "", label: "全部", count: keyedAll.length }, { id: "now", label: "上映中", count: stCount.now }, { id: "off", label: "已下檔", count: stCount.off }],
+      title: (st ? st === "now" ? "上映中｜" : "已下檔｜" : "") + (sort === "total" ? `${yt} 年票房排行（截至 ${md(b.end)}）${dirTag}` : `${yt} 年上映 ${entries2.length} 部｜${sort === "date" ? asc ? "最早上映在前" : "最新上映在前" : sort === "rating" ? `${rateName2}${asc ? "低到高" : "高到低"}` : sort === "tickets" ? `累計票數${asc ? "少到多" : "多到少"}` : sort === "price" ? `平均票價${asc ? "低到高" : "高到低"}` : `累計院數${asc ? "少到多" : "多到少"}`}`) + boxCountryTag(land2) + issuerTag(firm2),
       footer: sort === "total" ? boxOfficeFooter(b, "year", selYears, wk.id) : `${yt} 年上映、有票房紀錄的電影（已經下檔的也在裡面）${sort === "date" ? "依上映日期排序" : sort === "tickets" ? "依累計票數排序（上映以來賣出的票數）" : sort === "price" ? "依平均票價排序（累計票房 ÷ 累計票數；特殊廳、演唱會轉播的票價較高）" : sort === "rating" ? `依${rateName2}排序。${rate === "community" ? `評分不到 ${COMMUNITY_MIN} 人的不列入。` : cov}` : `依累計院數排序：上映以來放映過的戲院數（官方票房資料，算到 ${md(b.end)}）。還在上映的片，今天有場次的影城如果比官方的數字多，就用今天的數字，所以上映中和已下檔的片算法相同`}。${src}`.replace("。。", "。"),
       restTitle: "",
       restFooter: "",
@@ -3916,6 +3921,8 @@ var App = class {
     this.boxRate = "";
     // 依評分排時用哪一種評分（空 = IMDb）
     this.pickQuery = "";
+    this.boxStatus = "";
+    // 歷年電影只看上映中（now）／已下檔（off）；空 = 全部
     this.boxIssuer = [];
     // 只看哪幾家發行商（可以複選；空 = 全部）
     this.boxFewLast = true;
@@ -3992,14 +3999,14 @@ var App = class {
   }
   /** 最新版本是多少。網頁版問的是自己網站現在上線的版本（重新整理就會拿到的那一版），不是 GitHub 上的 */
   checkVersion() {
-    if (true) return checkLatest("2026.11.24-0242");
+    if (true) return checkLatest("2026.11.24-0246");
     return (async () => {
       try {
         const r = await globalThis.fetch("/api/version?t=" + Date.now(), { cache: "no-store" });
         const latest = String((await r.json()).version || "");
         if (!latest) return null;
         const num = (v) => Number(v.replace(/\D/g, "")) || 0;
-        return { latest, isLatest: num("2026.11.24-0242") >= num(latest) };
+        return { latest, isLatest: num("2026.11.24-0246") >= num(latest) };
       } catch (_) {
         return null;
       }
@@ -4202,11 +4209,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.24-0242"}`);
+          Pasteboard.copy(`版本 ${"2026.11.24-0246"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.24-0242"}`,
+      `版本 ${"2026.11.24-0246"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -4546,7 +4553,7 @@ var App = class {
     if (false) {
       if (!r) return /* @__PURE__ */ h(Note, { text: "（無法確認是否為最新版：連不到網站）" });
       if (r.isLatest) return /* @__PURE__ */ h(Note, { text: "✅ 已是最新版" });
-      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.24-0242"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
+      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.24-0246"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
         globalThis.location.reload();
       } }));
     }
@@ -4734,7 +4741,7 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
   /** 出品國別／發行商的選擇頁：一列一個、標出部數，可以搜尋、可以複選；選好按返回 */
   async boxPickView(kind) {
     const sc = this.movieMode === "year" ? "year" : "now";
-    const board = await loadMovieBoard({ scope: sc, sort: this.sortBy[sc], years: this.boxYears, week: this.boxWeek, countries: this.boxCountry, query: this.movieQuery.trim().toLowerCase(), asc: this.ascBy[sc], rate: this.boxRate, fewLast: this.boxFewLast, issuers: this.boxIssuer });
+    const board = await loadMovieBoard({ scope: sc, sort: this.sortBy[sc], years: this.boxYears, week: this.boxWeek, countries: this.boxCountry, query: this.movieQuery.trim().toLowerCase(), asc: this.ascBy[sc], rate: this.boxRate, fewLast: this.boxFewLast, issuers: this.boxIssuer, status: this.boxStatus });
     if (kind === "year") {
       const ys = board.years, on = board.selYears;
       const lo = ys.reduce((a, b) => a < b ? a : b, ys[0]), hi = ys.reduce((a, b) => a > b ? a : b, ys[0]);
@@ -4769,11 +4776,11 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
   async boxOfficeView() {
     const k = this.movieQuery.trim().toLowerCase();
     const sc = this.movieMode === "year" ? "year" : "now";
-    const board = await loadMovieBoard({ scope: sc, sort: this.sortBy[sc], years: this.boxYears, week: this.boxWeek, countries: this.boxCountry, query: k, asc: this.ascBy[sc], rate: this.boxRate, fewLast: this.boxFewLast, issuers: this.boxIssuer });
+    const board = await loadMovieBoard({ scope: sc, sort: this.sortBy[sc], years: this.boxYears, week: this.boxWeek, countries: this.boxCountry, query: k, asc: this.ascBy[sc], rate: this.boxRate, fewLast: this.boxFewLast, issuers: this.boxIssuer, status: this.boxStatus });
     const { years, countries } = board;
     const selYears = board.selYears, country = board.selCountries;
     const paged = board.paged;
-    const pageKey = `${board.selIssuers.join(",")}|${board.asc}|${board.rate}|${board.scope}|${board.sort}|${selYears.join(",")}|${board.selWeek}|${k}|${country.join(",")}`;
+    const pageKey = `${board.statusSel || ""}|${board.selIssuers.join(",")}|${board.asc}|${board.rate}|${board.scope}|${board.sort}|${selYears.join(",")}|${board.selWeek}|${k}|${country.join(",")}`;
     if (this.boxPageKey !== pageKey) {
       this.boxPageKey = pageKey;
       this.boxLimit = BOX_PAGE;
@@ -4831,6 +4838,9 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
       this.boxFewLast = !this.boxFewLast;
     } }) : null, board.weeks.length > 1 ? fold("week", "週次", board.weekSummary) : null, board.weeks.length > 1 && this.boxOpen === "week" ? /* @__PURE__ */ h(Chips, null, board.weeks.map((o) => /* @__PURE__ */ h(Chip, { label: o.label, sub: o.note, muted: board.selWeek !== o.id, onTap: () => {
       this.boxWeek = o.note === "最新" ? "" : o.id;
+    } }))) : null, board.statusPicks ? fold("status", "狀態", board.statusPicks.find((x) => x.id === (board.statusSel || "")).label + (board.statusSel ? `（${board.entries.length} 部）` : "")) : null, board.statusPicks && this.boxOpen === "status" ? /* @__PURE__ */ h(Chips, { scroll: true }, board.statusPicks.map((x) => /* @__PURE__ */ h(Chip, { label: x.label, sub: `${x.count} 部`, muted: x.id !== (board.statusSel || ""), onTap: () => {
+      this.boxStatus = x.id;
+      this.boxOpen = "";
     } }))) : null, countries.length > 1 ? /* @__PURE__ */ h(Item, { kv: true, title: "出品國別", right: board.countrySummary, onTap: () => {
       this.pickQuery = "";
       this.go(() => this.boxPickView("country"));
