@@ -1106,6 +1106,8 @@ class App {
           thumb={thumb(posters[i] as string | undefined)}
           title={e.name}
           subtitle={e.lines.filter(Boolean).join("\n")}
+          hi={e.hi}
+          chevron={!e.hi}
           onTap={m ? () => this.go(() => this.movieView(m, ""), `讀取《${m.title}》的放映影城…`) : x ? () => this.go(() => this.boxMovieView(x), `讀取《${x.name}》…`) : undefined}
         />
       );

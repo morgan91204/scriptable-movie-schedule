@@ -176,7 +176,15 @@ struct FilmEntry: Codable, Identifiable {
     var m: TwMovie?
     var lines: [String]   // 兩行說明（共用資料層依排法算好）
     var light: Bool?      // 已下檔的舊片：海報用輕量查法
+    var hi: EntryHi?      // 右邊的重點欄：目前排序依據的那個數字
     var id: String { key }
+}
+/// 清單每一列右邊的重點欄（評分、日期、影城數、票房）；tier 是評分的顏色等級，none = 沒有這項資料
+struct EntryHi: Codable, Hashable {
+    var kind: String
+    var text: String
+    var tier: String
+    var note: String?
 }
 /// 「電影」清單整頁：上映中與票房排行合成一份
 struct FilmList: Codable {

@@ -206,6 +206,8 @@ export function Item(props: {
   kv?: boolean; // 「標題：內容」的資料列：左邊標題只佔自己的寬度，右邊內容用掉剩下的整行（不受 40% 寬度限制，放得下就不換行）
   /** 最右邊另外一顆小按鈕（例如收合這一組），跟整列的點擊分開 */
   action?: { label: string; hint?: string; onTap: Handler };
+  /** 右邊的重點欄：目前排序依據的那個數字（評分、日期、影城數、票房），大字顯示；評分依高低變色，樣式跟電影頁的評分徽章同一套 */
+  hi?: { kind: string; text: string; tier: string; note?: string };
 }): string {
   const cls = ["item", props.head ? "head" : "", props.kv ? "kv" : "", props.onTap ? "tap" : "", props.muted ? "muted" : "", props.accent ? "accent" : "", props.onLongPress ? "long" : ""].join(" ");
   const fallback = "if(this.dataset.url&&this.src!==this.dataset.url){this.src=this.dataset.url}else{this.remove()}";
@@ -230,6 +232,15 @@ export function Item(props: {
       </div>
       {props.badge ? <span class="badge">{esc(props.badge)}</span> : null}
       {props.right ? <span class="right">{esc(props.right)}</span> : null}
+      {props.hi ? (
+        <span class={`hi ${props.hi.kind} ${props.hi.tier}`}>
+          <span class="hv">
+            {props.hi.kind === "imdb" ? <i class="imdb">IMDb</i> : props.hi.kind === "tomato" ? <i class="emo">{props.hi.tier === "bad" ? "🤢" : "🍅"}</i> : props.hi.kind === "popcorn" ? <i class="emo">{props.hi.tier === "bad" ? "🫗" : "🍿"}</i> : props.hi.kind === "community" ? <i class="emo star">★</i> : null}
+            <b>{esc(props.hi.text)}</b>
+          </span>
+          {props.hi.note ? <small>{esc(props.hi.note)}</small> : null}
+        </span>
+      ) : null}
       {props.onTap && props.chevron !== false && !props.action ? <span class="chev">›</span> : null}
       {props.action ? <button class="act" aria-label={props.action.hint || props.action.label} onTap={props.action.onTap}>{esc(props.action.label)}</button> : null}
     </div>

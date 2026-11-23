@@ -16,7 +16,7 @@ import {
   loadSettings, saveSettings, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, cinemaAddress,
   FORMATS, formatsOf, filterVersions, filterVersionsAny, movieRows, movieDays, nearest, kmLabel, WINDOWS, findShowtimes, findShowtimesMulti, multiLabel, multiDetail, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText, hallOf, tmdbTest, movieExtras, moviePoster, posterReady, posterTint, POSTER_TINTS, normImageUrl, movieRuntime, posterSrc, isLocalSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxCountries, boxByCountry, boxInfo, boxInfoRows, boxCountryText, BOX_COUNTRY_NOTE, boxCountryTag, boxCountriesPicked, movieBoard, loadBoxFor, loadCommunitySummary, loadUpcoming, soonBoard, isFavMovie, toggleFavMovie, favMovieRows, favMovieBox, soonGroups, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityVote, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, SCRIPTING_IMPORT_URL, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, festivalDefaultDate, festivalStateLabel, festivalState, festivalFooter, linkMovies, nowGroupLine, nowFilter, festivalPick, movieAbout, festivalSearch, festivalSearchLines, festivalTrailer, festivalYears, festivalGroups, festivalChipNote, festivalStatusLine, movieRatings, ratingTier,
 } from "./core"
-import type { Ratings, FavMovie, FavRow, Format, LatLng, Hit, Community, BoxOfficeItem, BoxSort, BoxOffice, MovieEntry, SoonEntry, UpcomingFilm, Festival, FestivalFilm, FestivalSession } from "./core"
+import type { Ratings, FavMovie, FavRow, EntryHi, Format, LatLng, Hit, Community, BoxOfficeItem, BoxSort, BoxOffice, MovieEntry, SoonEntry, UpcomingFilm, Festival, FestivalFilm, FestivalSession } from "./core"
 
 declare const Safari: any
 declare const Dialog: any
@@ -329,6 +329,22 @@ function RatingBadge({ kind, value, tier, note, url }: { kind: "imdb" | "tomato"
       <Text font={"caption2"} fontWeight={"bold"} foregroundStyle={c.fg} lineLimit={1} fixedSize>{value + (note ? "✓" : "")}</Text>
     </HStack>
   </Button>
+}
+
+/** 清單每一列右邊的重點欄：目前排序依據的那個數字（評分、日期、影城數、票房），大字顯示；評分依高低變色，跟電影頁的徽章同一套 */
+function HiCell({ hi }: { hi: EntryHi }) {
+  const c = TIER[hi.tier as Tier] || TIER.none
+  const rated = hi.kind === "imdb" || hi.kind === "tomato" || hi.kind === "popcorn" || hi.kind === "community"
+  const icon = hi.kind === "tomato" ? (hi.tier === "bad" ? "🤢" : "🍅") : hi.kind === "popcorn" ? (hi.tier === "bad" ? "🫗" : "🍿") : hi.kind === "community" ? "★" : ""
+  return <VStack alignment={"trailing"} spacing={1}>
+    <HStack spacing={3}>
+      {hi.kind === "imdb"
+        ? <Text font={"caption2"} fontWeight={"heavy"} foregroundStyle={"black"} lineLimit={1} fixedSize padding={{ horizontal: 2, vertical: 0 }} background={hi.tier === "none" ? "#C7C7CC" : "#F5C518"} clipShape={{ type: "rect", cornerRadius: 3 }}>IMDb</Text>
+        : icon ? <Text font={"footnote"} lineLimit={1} fixedSize foregroundStyle={hi.kind === "community" ? "systemBlue" : "label"}>{icon}</Text> : null}
+      <Text font={"headline"} fontWeight={"bold"} monospacedDigit foregroundStyle={rated ? (hi.tier === "none" ? "secondaryLabel" : c.fg) : "label"} lineLimit={1} fixedSize>{hi.text}</Text>
+    </HStack>
+    {hi.note ? <Text font={"caption2"} foregroundStyle={"secondaryLabel"} lineLimit={1} fixedSize>{hi.note}</Text> : null}
+  </VStack>
 }
 
 /** 觀眾評分（大家一起統計）：平均、人數，以及「你的評分」五顆星；點已選的那顆可以取消 */
@@ -1022,6 +1038,7 @@ function BoxOfficeSections({ movies, query }: { movies: TwMovie[]; query: string
         {e.lines[1] ? <Text font={"caption"} foregroundStyle={"tertiaryLabel"} lineLimit={1} minScaleFactor={0.8}>{e.lines[1]}</Text> : null}
       </VStack>
       <Spacer />
+      {e.hi ? <HiCell hi={e.hi} /> : null}
     </HStack>
     if (e.m) return <NavigationLink key={e.key} destination={<MoviePage movie={e.m} />}>{body}</NavigationLink>
     if (e.x) return <NavigationLink key={e.key} destination={<BoxOfficeMoviePage item={e.x} />}>{body}</NavigationLink>

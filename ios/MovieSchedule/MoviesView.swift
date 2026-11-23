@@ -324,7 +324,32 @@ struct BoxOfficeSection: View {
                 }
             }
             Spacer(minLength: 4)
+            if let hi = r.hi { hiCell(hi) }
         }
+    }
+
+    /// 右邊的重點欄：目前排序依據的那個數字，大字顯示；評分依高低變色，跟電影頁的徽章同一套
+    private func hiCell(_ hi: EntryHi) -> some View {
+        let color: Color = hi.tier == "good" ? .green : hi.tier == "mid" ? .orange : hi.tier == "bad" ? .red : hi.tier == "none" && ["imdb", "tomato", "popcorn", "community"].contains(hi.kind) ? .secondary : .primary
+        let icon = hi.kind == "tomato" ? (hi.tier == "bad" ? "🤢" : "🍅") : hi.kind == "popcorn" ? (hi.tier == "bad" ? "🫗" : "🍿") : ""
+        return VStack(alignment: .trailing, spacing: 1) {
+            HStack(spacing: 3) {
+                if hi.kind == "imdb" {
+                    Text("IMDb").font(.system(size: 10, weight: .heavy)).foregroundStyle(.black)
+                        .padding(.horizontal, 3).padding(.vertical, 1)
+                        .background(hi.tier == "none" ? Color(.systemGray3) : Color(red: 0.96, green: 0.77, blue: 0.09), in: RoundedRectangle(cornerRadius: 3))
+                } else if hi.kind == "community" {
+                    Image(systemName: "star.fill").font(.caption).foregroundStyle(Color.accentColor)
+                } else if !icon.isEmpty {
+                    Text(icon).font(.footnote).grayscale(hi.tier == "none" ? 1 : 0)
+                }
+                Text(hi.text).font(.headline.bold()).monospacedDigit().foregroundStyle(color)
+            }
+            if let note = hi.note, !note.isEmpty {
+                Text(note).font(.caption2).foregroundStyle(.secondary)
+            }
+        }
+        .fixedSize()
     }
 
     private func load() async {
