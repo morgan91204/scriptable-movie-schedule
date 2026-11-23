@@ -66,7 +66,7 @@ jobs:
       - name: 通知用的精簡資料（收藏電影的通知每小時用它判斷）
         run: |
           curl -fsSL "https://raw.githubusercontent.com/${{ github.repository }}/data/notify.json?t=$(date +%s)" -o "$RUNNER_TEMP/prev-notify.json" || echo "還沒有通知資料"
-          node tools/notify.mjs "$RUNNER_TEMP/prev-notify.json" "$RUNNER_TEMP/festival.json" "$RUNNER_TEMP/notify.json" "$RUNNER_TEMP/tw-near.json" "$RUNNER_TEMP/official.json" || echo "通知資料這次略過"
+          node tools/notify.mjs "$RUNNER_TEMP/prev-notify.json" "$RUNNER_TEMP/festival.json" "$RUNNER_TEMP/notify.json" "$RUNNER_TEMP/tw-near.json" "$RUNNER_TEMP/official.json" "$RUNNER_TEMP/upcoming.json" || echo "通知資料這次略過"
       - name: 發佈影展劇照的備份到 img 分支（要比影展資料先發佈：資料裡的圖片網址指向這裡）
         run: |
           tools/publish-images.sh "$RUNNER_TEMP/fest-img"

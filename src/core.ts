@@ -46,6 +46,10 @@ export interface Settings {
 /** 收藏電影通知種類：open 開放場次了、rel 上映了、end 快下檔了、fest 影展開始了 */
 export interface NotifyPrefs {
   open: boolean; rel: boolean; end: boolean; fest: boolean;
+  favc?: boolean; fmt?: boolean; pre?: boolean; rate?: boolean; week?: boolean; flist?: boolean;
+  fmts?: string[]; // 特殊廳有場次時：要哪幾種廳（IMAX、杜比…）
+  preDays?: number; // 上映前幾天提醒（預設 3）
+  quietOn?: boolean; quietFrom?: number; quietTo?: number; // 勿擾時段（預設開，22 點到 9 點）
   endMax?: number; // 快下檔：放映的影城剩下幾間以下才通知（自己填，1 到 30；預設 3）
   endScope?: "all" | "city" | "fav"; // 舊的寫法（只能三選一）；現在看 endFav 和 endCities
   endFav?: boolean; // 算收藏影城
@@ -64,23 +68,37 @@ export function notifyEndScope(p: NotifyPrefs): string {
 }
 /** 交給通知伺服器的整包設定：要哪幾種、快下檔的門檻與範圍、收藏的片（只有片名鍵、片名、影展代碼）。
  *  收藏影城只有在範圍有選「收藏影城」時才傳 */
-export function notifyPayload(s: Settings): { prefs: Record<string, boolean>; endCfg: { max: number; scope: string; cities: string[]; cinemas: string[] }; favs: ReturnType<typeof notifyFavs> } {
+export function notifyPayload(s: Settings): { prefs: Record<string, boolean>; opt: { fmts: string[]; preDays: number; quiet: { on: boolean; from: number; to: number }; cinemas: string[] }; endCfg: { max: number; scope: string; cities: string[]; cinemas: string[] }; favs: ReturnType<typeof notifyFavs> } {
   const p = notifyPrefs(s);
   const pick = notifyEndPick(p);
   const scope = pick.fav && pick.cities.length ? "mix" : pick.fav ? "fav" : pick.cities.length ? "city" : "all";
   return {
-    prefs: { open: p.open, rel: p.rel, end: p.end, fest: p.fest },
+    prefs: Object.fromEntries(NOTIFY_KINDS.map((k) => [k.id, !!p[k.id]])),
+    // 收藏影城只有開了「收藏影城開始放映時」才傳
+    opt: { fmts: (p.fmts || []).filter((f) => (FORMATS as readonly string[]).indexOf(f) >= 0), preDays: p.preDays || 3, quiet: notifyQuiet(p), cinemas: p.favc ? s.favorites.slice(0, 80) : [] },
     endCfg: { max: Math.min(30, Math.max(1, p.endMax || 3)), scope, cities: pick.cities, cinemas: pick.fav ? s.favorites.slice(0, 80) : [] },
     favs: notifyFavs(s),
   };
 }
-export const NOTIFY_KINDS: { id: "open" | "rel" | "end" | "fest"; label: string; note: string }[] = [
-  { id: "open", label: "開放場次時", note: "還沒排片的片，戲院開始排場次、可以訂票了" },
-  { id: "rel", label: "上映時", note: "收藏的片正式上映的那一天" },
-  { id: "end", label: "快下檔時", note: "放映的影城變少到你設定的間數以下" },
-  { id: "fest", label: "影展開始時", note: "收藏的影展片所屬的影展開始了" },
+export type NotifyKind = "open" | "rel" | "end" | "fest" | "favc" | "fmt" | "pre" | "rate" | "week" | "flist";
+/** 通知種類。group：fav = 跟著收藏的電影走；all = 不用收藏也會發（預設關） */
+export const NOTIFY_KINDS: { id: NotifyKind; label: string; note: string; group: "fav" | "all" }[] = [
+  { id: "open", label: "開放場次時", note: "還沒排片的片，戲院開始排場次、可以訂票了", group: "fav" },
+  { id: "pre", label: "上映前提醒", note: "上映前幾天提醒一次", group: "fav" },
+  { id: "rel", label: "上映時", note: "收藏的片正式上映的那一天", group: "fav" },
+  { id: "favc", label: "收藏影城開始放映時", note: "你收藏的影城排了這部片（今天或明天有場次）", group: "fav" },
+  { id: "fmt", label: "特殊廳有場次時", note: "IMAX、杜比、4DX 等你選的廳別開始有場次", group: "fav" },
+  { id: "rate", label: "評分出爐時", note: "有了 IMDb 或番茄指數", group: "fav" },
+  { id: "end", label: "快下檔時", note: "放映的影城變少到你設定的間數以下", group: "fav" },
+  { id: "fest", label: "影展開始時", note: "收藏的影展片所屬的影展開始了", group: "fav" },
+  { id: "week", label: "每週新片", note: "每週四早上一則：這一週上映哪些片", group: "all" },
+  { id: "flist", label: "影展片單公布時", note: "有影展公布了片單", group: "all" },
 ];
-export const notifyPrefs = (s: Settings): NotifyPrefs => ({ open: true, rel: true, end: true, fest: true, ...(s.notify || {}) });
+/** 「上映前提醒」可以選幾天前 */
+export const NOTIFY_PRE_STEPS = [1, 3, 7];
+export const notifyPrefs = (s: Settings): NotifyPrefs => ({ open: true, rel: true, end: true, fest: true, favc: true, fmt: false, pre: true, rate: false, week: false, flist: false, ...(s.notify || {}) });
+/** 勿擾時段（幾點到幾點不發；預設晚上十點到早上九點） */
+export const notifyQuiet = (p: NotifyPrefs): { on: boolean; from: number; to: number } => ({ on: p.quietOn !== false, from: p.quietFrom ?? 22, to: p.quietTo ?? 9 });
 /** 交給通知伺服器的收藏清單：只有片名鍵、片名、影展代碼（海報、收藏時間這些不傳） */
 export const notifyFavs = (s: Settings): { key: string; title: string; fest?: { id: string; name: string } }[] =>
   (s.favMovies || []).map((f) => ({ key: f.key, title: f.title, ...(f.fest ? { fest: { id: f.fest.id, name: f.fest.name } } : {}) }));

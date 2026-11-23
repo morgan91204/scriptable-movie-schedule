@@ -31,6 +31,7 @@
     MAPS_LABEL: () => MAPS_LABEL,
     META_URL: () => META_URL,
     NOTIFY_KINDS: () => NOTIFY_KINDS,
+    NOTIFY_PRE_STEPS: () => NOTIFY_PRE_STEPS,
     OFFICIAL_URL: () => OFFICIAL_URL,
     POSTERS_URL: () => POSTERS_URL,
     POSTER_TINTS: () => POSTER_TINTS,
@@ -176,6 +177,7 @@
     notifyFavs: () => notifyFavs,
     notifyPayload: () => notifyPayload,
     notifyPrefs: () => notifyPrefs,
+    notifyQuiet: () => notifyQuiet,
     nowFilter: () => nowFilter,
     nowGroupLine: () => nowGroupLine,
     nowHM: () => nowHM,
@@ -803,18 +805,28 @@ function parseTwMovieDay(doc) {
     const pick = notifyEndPick(p);
     const scope = pick.fav && pick.cities.length ? "mix" : pick.fav ? "fav" : pick.cities.length ? "city" : "all";
     return {
-      prefs: { open: p.open, rel: p.rel, end: p.end, fest: p.fest },
+      prefs: Object.fromEntries(NOTIFY_KINDS.map((k) => [k.id, !!p[k.id]])),
+      // 收藏影城只有開了「收藏影城開始放映時」才傳
+      opt: { fmts: (p.fmts || []).filter((f) => FORMATS.indexOf(f) >= 0), preDays: p.preDays || 3, quiet: notifyQuiet(p), cinemas: p.favc ? s.favorites.slice(0, 80) : [] },
       endCfg: { max: Math.min(30, Math.max(1, p.endMax || 3)), scope, cities: pick.cities, cinemas: pick.fav ? s.favorites.slice(0, 80) : [] },
       favs: notifyFavs(s)
     };
   }
   var NOTIFY_KINDS = [
-    { id: "open", label: "開放場次時", note: "還沒排片的片，戲院開始排場次、可以訂票了" },
-    { id: "rel", label: "上映時", note: "收藏的片正式上映的那一天" },
-    { id: "end", label: "快下檔時", note: "放映的影城變少到你設定的間數以下" },
-    { id: "fest", label: "影展開始時", note: "收藏的影展片所屬的影展開始了" }
+    { id: "open", label: "開放場次時", note: "還沒排片的片，戲院開始排場次、可以訂票了", group: "fav" },
+    { id: "pre", label: "上映前提醒", note: "上映前幾天提醒一次", group: "fav" },
+    { id: "rel", label: "上映時", note: "收藏的片正式上映的那一天", group: "fav" },
+    { id: "favc", label: "收藏影城開始放映時", note: "你收藏的影城排了這部片（今天或明天有場次）", group: "fav" },
+    { id: "fmt", label: "特殊廳有場次時", note: "IMAX、杜比、4DX 等你選的廳別開始有場次", group: "fav" },
+    { id: "rate", label: "評分出爐時", note: "有了 IMDb 或番茄指數", group: "fav" },
+    { id: "end", label: "快下檔時", note: "放映的影城變少到你設定的間數以下", group: "fav" },
+    { id: "fest", label: "影展開始時", note: "收藏的影展片所屬的影展開始了", group: "fav" },
+    { id: "week", label: "每週新片", note: "每週四早上一則：這一週上映哪些片", group: "all" },
+    { id: "flist", label: "影展片單公布時", note: "有影展公布了片單", group: "all" }
   ];
-  var notifyPrefs = (s) => ({ open: true, rel: true, end: true, fest: true, ...s.notify || {} });
+  var NOTIFY_PRE_STEPS = [1, 3, 7];
+  var notifyPrefs = (s) => ({ open: true, rel: true, end: true, fest: true, favc: true, fmt: false, pre: true, rate: false, week: false, flist: false, ...s.notify || {} });
+  var notifyQuiet = (p) => ({ on: p.quietOn !== false, from: p.quietFrom ?? 22, to: p.quietTo ?? 9 });
   var notifyFavs = (s) => (s.favMovies || []).map((f) => ({ key: f.key, title: f.title, ...f.fest ? { fest: { id: f.fest.id, name: f.fest.name } } : {} }));
   var MAPS_LABEL = { apple: "Apple 地圖", google: "Google 地圖" };
   function mapsUrl(name, address, app = "apple") {
@@ -3658,7 +3670,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   var extra = { boxOffice, filmList, soonList, nowShowing, nowShowingMulti, movieBoard: movieBoard2, festivalBoard, festivalFilm, nearby, patchSettings, fillMovie, formatList };
   var BRIDGE_LEVEL = 2;
   globalThis.MS = {
-    version: "2026.11.24-0246",
+    version: "2026.11.24-0250",
     level: BRIDGE_LEVEL,
     init(saved) {
       cache = saved || {};

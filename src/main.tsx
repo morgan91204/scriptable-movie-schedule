@@ -12,9 +12,9 @@ import {
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
   loadSettings, saveSettings, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, TW,
   FORMATS, formatsOf, filterVersions, filterVersionsAny, movieRows, movieDays, nearest, kmLabel, WINDOWS, findShowtimes, findShowtimesMulti, multiLabel, multiDetail, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText,
-  hallOf, tmdbTest, movieExtras, moviePoster, movieRuntime, posterSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxCountries, boxByCountry, boxInfo, boxInfoRows, boxCountryText, BOX_COUNTRY_NOTE, boxCountryTag, boxCountriesPicked, loadMovieBoard, loadSoonBoard, notifyPrefs, notifyPayload, notifyEndScope, notifyEndPick, NOTIFY_KINDS, boxStatus, STATUS_LABEL, boxInfoBy, isFavMovie, toggleFavMovie, favMovieRows, favMovieBox, soonGroups, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityCached, communityVote, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalsReady, festivalNote, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, festivalDefaultDate, festivalStateLabel, festivalState, festivalFooter, linkMovies, nowGroupLine, nowFilter, festivalPick, movieAbout, festivalSearch, festivalSearchLines, festivalTrailer, festivalYears, festivalsAny, festivalGroups, festivalChipNote, festivalStatusLine, movieRatings, ratingTier,
+  hallOf, tmdbTest, movieExtras, moviePoster, movieRuntime, posterSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxCountries, boxByCountry, boxInfo, boxInfoRows, boxCountryText, BOX_COUNTRY_NOTE, boxCountryTag, boxCountriesPicked, loadMovieBoard, loadSoonBoard, notifyPrefs, notifyPayload, notifyEndScope, notifyEndPick, notifyQuiet, NOTIFY_PRE_STEPS, NOTIFY_KINDS, boxStatus, STATUS_LABEL, boxInfoBy, isFavMovie, toggleFavMovie, favMovieRows, favMovieBox, soonGroups, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityCached, communityVote, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalsReady, festivalNote, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, festivalDefaultDate, festivalStateLabel, festivalState, festivalFooter, linkMovies, nowGroupLine, nowFilter, festivalPick, movieAbout, festivalSearch, festivalSearchLines, festivalTrailer, festivalYears, festivalsAny, festivalGroups, festivalChipNote, festivalStatusLine, movieRatings, ratingTier,
 } from "./core";
-import type { MovieExtras, Ratings, Community, BoxOfficeItem, BoxSort, MovieEntry, SoonEntry, UpcomingFilm, FavMovie, FavRow, NotifyPrefs, Festival, FestivalFilm, FestivalSession } from "./core";
+import type { MovieExtras, Ratings, Community, BoxOfficeItem, BoxSort, MovieEntry, SoonEntry, UpcomingFilm, FavMovie, FavRow, NotifyPrefs, NotifyKind, Festival, FestivalFilm, FestivalSession } from "./core";
 import { setTabBar, setBackGuard, esc } from "./jsx";
 import type { TwMovie, TwMovieCinema, Format, LatLng, Hit } from "./core";
 
@@ -115,6 +115,9 @@ class App {
     setTabBar(() => ({ active: this.tab, items: this.TABS, onTap: (id) => this.switchTab(id) }));
     setBackGuard(() => this.stack.length > 1);
     this.go(() => this.homeView(), "讀取影城清單…");
+    // 從通知點進來（?tab=soon／?tab=fest）：直接開電影分頁的那一類
+    const startTab = IS_WEB ? (/[?&]tab=(soon|fest)\b/.exec(String((globalThis as any).location?.search || "")) || [])[1] : "";
+    if (startTab) { this.movieMode = startTab as "soon" | "fest"; this.switchTab("movies"); }
     loadFestivals().catch(() => []); // 背景先看有沒有影展（有才會在電影分頁多出「影展」）
     const input = String(args.shortcutParameter || (args.urls && args.urls[0]) || (args.plainTexts && args.plainTexts[0]) || "");
     let pendingUrl = input;
@@ -270,7 +273,7 @@ class App {
     const state: string = await p.refresh().catch(() => "unsupported");
     const prefs = notifyPrefs(this.settings);
     const on = NOTIFY_KINDS.filter((k) => prefs[k.id]).map((k) => k.label.replace(/時$/, ""));
-    const note = state === "on" ? (on.length ? on.join("、") : "四種通知都關著") : state === "needs-install" ? "要先把電影行程加到主畫面" : state === "unsupported" ? "這個瀏覽器不支援" : state === "denied" ? "系統設定裡沒有允許通知" : "開放場次、上映、快下檔、影展開始時通知你";
+    const note = state === "on" ? (on.length ? (on.length > 3 ? `${on.slice(0, 3).join("、")}等 ${on.length} 種` : on.join("、")) : "每一種通知都關著") : state === "needs-install" ? "要先把電影行程加到主畫面" : state === "unsupported" ? "這個瀏覽器不支援" : state === "denied" ? "系統設定裡沒有允許通知" : "開放場次、上映、快下檔、影展開始時通知你";
     return (
       <Section title="通知">
         <Item icon={state === "on" ? "🔔" : "🔕"} title="收藏電影通知" subtitle={note} right={state === "on" ? "已開啟" : "未開啟"} onTap={() => this.go(() => this.notifyView())} />
@@ -321,7 +324,16 @@ class App {
         </Section>
       );
     const set = (patch: Partial<NotifyPrefs>) => { this.settings.notify = { ...prefs, ...patch }; saveSettings(this.settings); this.pushSync(); };
-    const toggle = (id: "open" | "rel" | "end" | "fest") => set({ [id]: !prefs[id] });
+    const toggle = (id: NotifyKind) => {
+      // 特殊廳第一次打開：先預設 IMAX，使用者再自己調
+      if (id === "fmt" && !prefs.fmt && !(prefs.fmts || []).length) return set({ fmt: true, fmts: ["IMAX"] });
+      set({ [id]: !prefs[id] });
+    };
+    const fmts = prefs.fmts || [], preDays = prefs.preDays || 3, quiet = notifyQuiet(prefs);
+    const hh = (h: number) => `${String(h).padStart(2, "0")}:00`;
+    const noteOf = (k: { id: NotifyKind; note: string }) =>
+      k.id === "end" ? endNote : k.id === "pre" ? `上映前 ${preDays} 天提醒一次` : k.id === "fmt" ? (fmts.length ? `${fmts.join("、")} 開始有場次` : k.note) : k.id === "favc" ? `${k.note}；目前收藏 ${this.settings.favorites.length} 間` : k.note;
+    const row = (k: (typeof NOTIFY_KINDS)[number]) => <Item icon={prefs[k.id] ? "✅" : "⬜️"} title={k.label} subtitle={noteOf(k)} chevron={false} onTap={() => toggle(k.id)} />;
     // 快下檔的細項：剩下幾間以下、算哪些影城（全台／指定縣市，可複選／收藏影城）
     const max = prefs.endMax || 3;
     const pick = notifyEndPick(prefs);
@@ -332,9 +344,21 @@ class App {
     const endNote = `${pick.fav && !picked.length ? "你收藏的影城裡" : notifyEndScope(prefs) + "合計"}，還在放映的影城從比較多變成剩下 ${max} 間以下`;
     return (
       <>
-        <Section title="什麼時候通知" hint="點一下開或關。晚上十點到早上九點不會發通知，留到早上再發。">
-          {NOTIFY_KINDS.map((k) => <Item icon={prefs[k.id] ? "✅" : "⬜️"} title={k.label} subtitle={k.id === "end" ? endNote : k.note} chevron={false} onTap={() => toggle(k.id)} />)}
+        <Section title="收藏電影有動態時" hint="點一下開或關。">
+          {NOTIFY_KINDS.filter((k) => k.group === "fav").map(row)}
         </Section>
+        {prefs.pre ? (
+          <Section title="上映前提醒">
+            <Item kv title="幾天前提醒" right={`${preDays} 天前 ⇄`} chevron={false} onTap={() => set({ preDays: NOTIFY_PRE_STEPS[(NOTIFY_PRE_STEPS.indexOf(preDays) + 1) % NOTIFY_PRE_STEPS.length] })} />
+          </Section>
+        ) : null}
+        {prefs.fmt ? (
+          <Section title="特殊廳" hint="可以選好幾種；可以左右滑動。只看連鎖影城今天和明天的場次。">
+            <Chips scroll>
+              {FORMATS.map((f) => <Chip label={f} muted={fmts.indexOf(f) < 0} onTap={() => set({ fmts: fmts.indexOf(f) < 0 ? [...fmts, f] : fmts.filter((z) => z !== f) })} />)}
+            </Chips>
+          </Section>
+        ) : null}
         {prefs.end ? (
           <Section title="快下檔的條件" hint={this.notifyOpen ? "收藏影城和縣市可以一起選、縣市可以選好幾個，合起來算；可以左右滑動" : ""}>
             <Item kv title="剩下幾間以下" right={`${max} 間以下 ✎`} chevron={false} onTap={async () => {
@@ -356,6 +380,14 @@ class App {
             ) : null}
           </Section>
         ) : null}
+        <Section title="不用收藏也會通知" hint="預設關閉，想要再打開。">
+          {NOTIFY_KINDS.filter((k) => k.group === "all").map(row)}
+        </Section>
+        <Section title="勿擾時段" hint={quiet.on ? `${hh(quiet.from)} 到${quiet.from > quiet.to ? "隔天" : ""} ${hh(quiet.to)} 不發通知，這段時間的通知留到之後再發。` : "任何時間都可能發通知。"}>
+          <Item icon={quiet.on ? "✅" : "⬜️"} title="晚上不要通知我" chevron={false} onTap={() => set({ quietOn: !quiet.on })} />
+          {quiet.on ? <Item kv title="開始" right={`${hh(quiet.from)} ⇄`} chevron={false} onTap={() => set({ quietFrom: [20, 21, 22, 23, 0, 1][([20, 21, 22, 23, 0, 1].indexOf(quiet.from) + 1) % 6] })} /> : null}
+          {quiet.on ? <Item kv title="結束" right={`${hh(quiet.to)} ⇄`} chevron={false} onTap={() => set({ quietTo: [6, 7, 8, 9, 10, 11, 12][([6, 7, 8, 9, 10, 11, 12].indexOf(quiet.to) + 1) % 7] })} /> : null}
+        </Section>
         <Section hint={`已開啟${n ? `，目前收藏了 ${n} 部` : "；還沒有收藏的電影，到電影頁點愛心收藏"}。你收藏的片名存在我們的伺服器上，只用來判斷什麼時候通知；關閉通知時會一起刪掉。`}>
           <Item icon="📨" title="傳一則測試通知" subtitle="確認這台裝置收得到" chevron={false} onTap={async () => { await this.ui.toast((await p.test()) ? "已送出，幾秒內應該會收到" : "送不出去，請關閉通知後重新開啟"); }} />
           <Item icon="🔕" title="關閉通知" subtitle="停止通知，並刪除伺服器上的資料" chevron={false} onTap={async () => { await p.disable(); await this.ui.toast("通知已關閉"); }} />
