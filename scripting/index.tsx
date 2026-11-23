@@ -237,7 +237,7 @@ function Home({ cinemas }: { cinemas: CinemasLoad }) {
 
         {!cinemas.data && !cinemas.error ? <Section><Loading text={"讀取影城清單…"} /></Section> : null}
 
-        {favs.length ? <Section footer={<Text>在影城頁可以加入或移除常去影城。影城搜尋在「影城」分頁，行事曆與提醒在「設定」分頁。</Text>}>
+        {favs.length ? <Section footer={favOpen ? <Text>在影城頁可以加入或移除常去影城。</Text> : undefined}>
           {/* 預設收合，只留這一列；點一下展開清單 */}
           <Button action={() => setFavOpen(!favOpen)}>
             <HStack spacing={8}>
