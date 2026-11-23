@@ -1064,7 +1064,7 @@ class App {
     const week = boxWeekPicked(b, this.boxWeek); // 週票房看哪一週（預設最新）
     const match = boxMatcher(all);
     const found = boxOfficeBy(b, by, years, week.id).map((x) => ({ x, m: match(x.name) })).filter(({ x, m }) => !k || `${x.name} ${m?.en || ""}`.toLowerCase().includes(k));
-    // 年度排行一年有六百部左右、全選是好幾千部：一次顯示 100 列，底下「顯示更多」。換了排法、年份或搜尋字就從頭開始
+    // 年度排行一年有六百部左右、全選是好幾千部：先畫 100 列，快滑到底時自動接著載入（不用按）。換了排法、年份或搜尋字就從頭開始
     const paged = by === "year";
     const pageKey = `${by}|${years.join(",")}|${week.id}|${k}`;
     if (this.boxPageKey !== pageKey) {
@@ -1134,7 +1134,8 @@ class App {
           })}
         </Section>
         {paged && found.length > rows.length ? (
-          <Button label={`顯示更多（還有 ${found.length - rows.length} 部）`} kind="secondary" onTap={() => { this.boxLimit += BOX_PAGE; }} />
+          // 不用按：快滑到底時自動接著載入下一批（一次全部畫出好幾千列會卡住，所以還是分批，只是自動）
+          <button class="auto-more" onTap={() => { this.boxLimit += BOX_PAGE * 2; }}>{`載入中…已顯示 ${rows.length}／${found.length} 部`}</button>
         ) : null}
       </Page>
     );

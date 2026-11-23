@@ -102,6 +102,7 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .item .act:active{background:var(--line)}
 .item.head{background:var(--chip)}
 .item.head .title{font-size:18px;font-weight:700}
+.auto-more{display:block;width:100%;padding:18px 14px 26px;text-align:center;font-size:13px;color:var(--fg2);background:transparent}
 .para{padding:12px 14px;font-size:15px;line-height:1.6;white-space:pre-line}
 .para .dim{margin-top:8px;font-size:13px;color:var(--fg2)}
 .note.warn{color:var(--orange)}
@@ -193,7 +194,11 @@ function scrollKeep(to){window.scrollTo(0,to);if(to>0){var again=function(){if(M
   (window.requestAnimationFrame||setTimeout)(again);setTimeout(again,120);}}
 try{if('scrollRestoration' in history)history.scrollRestoration='manual';}catch(_){} // 位置由我們自己還原，瀏覽器不要插手
 function stripSync(){var a=document.querySelectorAll('.chips.scroll');for(var i=0;i<a.length;i++){var on=a[i].querySelector('.chip:not(.muted)');if(on)a[i].scrollLeft=Math.max(0,on.offsetLeft-a[i].offsetLeft-(a[i].clientWidth-on.offsetWidth)/2);}}
-window.__render=function(html,to){var y=window.scrollY;document.getElementById('root').innerHTML=html;stripSync();scrollKeep(to<0?y:to);var f=document.querySelector('input[autofocus]');if(f)setTimeout(function(){f.focus()},50);syncHist();};
+// 清單底下的「自動載入更多」：快滑到它（還差 900px）就自動觸發一次，不用使用者按
+var moreSeen=null;function autoMore(){var el=document.querySelector('.auto-more');if(!el||!window.IntersectionObserver)return;if(moreSeen)moreSeen.disconnect();
+  moreSeen=new IntersectionObserver(function(es){for(var i=0;i<es.length;i++)if(es[i].isIntersecting&&!es[i].target.dataset.fired){es[i].target.dataset.fired='1';es[i].target.click();}},{rootMargin:'900px 0px'});moreSeen.observe(el);}
+setTimeout(autoMore,300);
+window.__render=function(html,to){var y=window.scrollY;document.getElementById('root').innerHTML=html;stripSync();autoMore();scrollKeep(to<0?y:to);var f=document.querySelector('input[autofocus]');if(f)setTimeout(function(){f.focus()},50);syncHist();};
 // 從螢幕左緣往右滑：回上一頁（等於點左上角的「返回」）。內容會跟著手指稍微移動，放開時滑得夠遠才算
 var sw=null;
 function swReset(now){sw=null;var c=document.querySelector('.content');if(c){c.style.transition=now?'none':'transform .15s';c.style.transform='';}}

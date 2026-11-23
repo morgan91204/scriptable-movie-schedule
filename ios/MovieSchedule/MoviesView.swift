@@ -191,13 +191,12 @@ struct BoxOfficeSection: View {
                         }
                     }
                     if let total = b.total, total > rows.count {
-                        // 滑到這一列就自動載入下一批（也可以直接點）
-                        Button {
-                            limit += 100
-                        } label: {
-                            Label("顯示更多（還有 \(total - rows.count) 部）", systemImage: "chevron.down")
+                        // 不用按：滑到這一列就自動接著載入下一批
+                        HStack {
+                            ProgressView()
+                            Text("載入中…已顯示 \(rows.count)／\(total) 部").font(.footnote).foregroundStyle(.secondary)
                         }
-                        .onAppear { limit = rows.count + 100 }
+                        .onAppear { limit = rows.count + 200 }
                     }
                 } header: {
                     Text(b.label)

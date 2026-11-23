@@ -974,7 +974,7 @@ function BoxOfficeSections({ movies, query }: { movies: TwMovie[]; query: string
   const match = useMemo(() => boxMatcher(movies), [movies.length])
   // 搜尋片名：中文片名或對得到的英文片名
   const found = (b ? boxOfficeBy(b, sort, years, week.id) : []).filter((x) => !query || `${x.name} ${match(x.name)?.en || ""}`.toLowerCase().includes(query))
-  // 年度排行一年有六百部左右、全選是好幾千部：一次顯示 100 列，底下「顯示更多」。換了排法、年份或搜尋字就從頭開始
+  // 年度排行一年有六百部左右、全選是好幾千部：先顯示 100 列，滑到底自動接著載入（不用按）。換了排法、年份或搜尋字就從頭開始
   const paged = sort === "year"
   const pageKey = `${sort}|${years.join(",")}|${week.id}|${query}`
   const [page, setPage] = useState<{ key: string; n: number }>({ key: "", n: BOX_PAGE })
@@ -1028,7 +1028,10 @@ function BoxOfficeSections({ movies, query }: { movies: TwMovie[]; query: string
       return <NavigationLink key={x.rank} destination={m ? <MoviePage movie={m} /> : <BoxOfficeMoviePage item={x} />}>{body}</NavigationLink>
     })}
     {paged && found.length > shown.length
-      ? <Button title={`顯示更多（還有 ${found.length - shown.length} 部）`} systemImage={"chevron.down"} action={() => setPage({ key: pageKey, n: limit + BOX_PAGE })} />
+      // 不用按：滑到這一列就自動接著載入下一批（也可以點）
+      ? <Button action={() => setPage({ key: pageKey, n: limit + BOX_PAGE * 2 })}>
+          <Text font={"footnote"} foregroundStyle={"secondaryLabel"} onAppear={() => setPage({ key: pageKey, n: limit + BOX_PAGE * 2 })}>{`載入中…已顯示 ${shown.length}／${found.length} 部`}</Text>
+        </Button>
       : null}
   </Section>
   </>

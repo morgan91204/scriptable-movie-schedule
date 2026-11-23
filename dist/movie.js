@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.23-1721
+// @movie-schedule-app 電影行程 v2026.11.23-1730
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/parsers.gen.ts
@@ -2709,6 +2709,7 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .item .act:active{background:var(--line)}
 .item.head{background:var(--chip)}
 .item.head .title{font-size:18px;font-weight:700}
+.auto-more{display:block;width:100%;padding:18px 14px 26px;text-align:center;font-size:13px;color:var(--fg2);background:transparent}
 .para{padding:12px 14px;font-size:15px;line-height:1.6;white-space:pre-line}
 .para .dim{margin-top:8px;font-size:13px;color:var(--fg2)}
 .note.warn{color:var(--orange)}
@@ -2799,7 +2800,11 @@ function scrollKeep(to){window.scrollTo(0,to);if(to>0){var again=function(){if(M
   (window.requestAnimationFrame||setTimeout)(again);setTimeout(again,120);}}
 try{if('scrollRestoration' in history)history.scrollRestoration='manual';}catch(_){} // 位置由我們自己還原，瀏覽器不要插手
 function stripSync(){var a=document.querySelectorAll('.chips.scroll');for(var i=0;i<a.length;i++){var on=a[i].querySelector('.chip:not(.muted)');if(on)a[i].scrollLeft=Math.max(0,on.offsetLeft-a[i].offsetLeft-(a[i].clientWidth-on.offsetWidth)/2);}}
-window.__render=function(html,to){var y=window.scrollY;document.getElementById('root').innerHTML=html;stripSync();scrollKeep(to<0?y:to);var f=document.querySelector('input[autofocus]');if(f)setTimeout(function(){f.focus()},50);syncHist();};
+// 清單底下的「自動載入更多」：快滑到它（還差 900px）就自動觸發一次，不用使用者按
+var moreSeen=null;function autoMore(){var el=document.querySelector('.auto-more');if(!el||!window.IntersectionObserver)return;if(moreSeen)moreSeen.disconnect();
+  moreSeen=new IntersectionObserver(function(es){for(var i=0;i<es.length;i++)if(es[i].isIntersecting&&!es[i].target.dataset.fired){es[i].target.dataset.fired='1';es[i].target.click();}},{rootMargin:'900px 0px'});moreSeen.observe(el);}
+setTimeout(autoMore,300);
+window.__render=function(html,to){var y=window.scrollY;document.getElementById('root').innerHTML=html;stripSync();autoMore();scrollKeep(to<0?y:to);var f=document.querySelector('input[autofocus]');if(f)setTimeout(function(){f.focus()},50);syncHist();};
 // 從螢幕左緣往右滑：回上一頁（等於點左上角的「返回」）。內容會跟著手指稍微移動，放開時滑得夠遠才算
 var sw=null;
 function swReset(now){sw=null;var c=document.querySelector('.content');if(c){c.style.transition=now?'none':'transform .15s';c.style.transform='';}}
@@ -3134,14 +3139,14 @@ var App = class {
   }
   /** 最新版本是多少。網頁版問的是自己網站現在上線的版本（重新整理就會拿到的那一版），不是 GitHub 上的 */
   checkVersion() {
-    if (true) return checkLatest("2026.11.23-1721");
+    if (true) return checkLatest("2026.11.23-1730");
     return (async () => {
       try {
         const r = await globalThis.fetch("/api/version?t=" + Date.now(), { cache: "no-store" });
         const latest = String((await r.json()).version || "");
         if (!latest) return null;
         const num = (v) => Number(v.replace(/\D/g, "")) || 0;
-        return { latest, isLatest: num("2026.11.23-1721") >= num(latest) };
+        return { latest, isLatest: num("2026.11.23-1730") >= num(latest) };
       } catch (_) {
         return null;
       }
@@ -3242,11 +3247,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.23-1721"}`);
+          Pasteboard.copy(`版本 ${"2026.11.23-1730"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.23-1721"}`,
+      `版本 ${"2026.11.23-1730"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -3588,7 +3593,7 @@ var App = class {
     if (false) {
       if (!r) return /* @__PURE__ */ h(Note, { text: "（無法確認是否為最新版：連不到網站）" });
       if (r.isLatest) return /* @__PURE__ */ h(Note, { text: "✅ 已是最新版" });
-      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.23-1721"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
+      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.23-1730"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
         globalThis.location.reload();
       } }));
     }
@@ -3813,9 +3818,12 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
           onTap: m ? () => this.go(() => this.movieView(m, ""), `讀取《${m.title}》的放映影城…`) : () => this.go(() => this.boxMovieView(x), `讀取《${x.name}》…`)
         }
       );
-    })), paged && found.length > rows.length ? /* @__PURE__ */ h(Button, { label: `顯示更多（還有 ${found.length - rows.length} 部）`, kind: "secondary", onTap: () => {
-      this.boxLimit += BOX_PAGE;
-    } }) : null);
+    })), paged && found.length > rows.length ? (
+      // 不用按：快滑到底時自動接著載入下一批（一次全部畫出好幾千列會卡住，所以還是分批，只是自動）
+      /* @__PURE__ */ h("button", { class: "auto-more", onTap: () => {
+        this.boxLimit += BOX_PAGE * 2;
+      } }, `載入中…已顯示 ${rows.length}／${found.length} 部`)
+    ) : null);
   }
   /** 票房排行上、場次通已經沒有場次的片：海報、評分、預告、觀眾評分與票房 */
   async boxMovieView(x) {
