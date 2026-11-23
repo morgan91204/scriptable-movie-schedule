@@ -3,13 +3,13 @@ import { PARSERS_JS } from "./parsers.gen";
 import { platform } from "./platform";
 import { GEO } from "./geo";
 import { AT_BUILTIN, AT_COVERED, AT_SKIP, AT_REGIONS } from "./at-list";
-import type { Movie, Version, TwCinema, TwDay, MultiDay, SpotMovie, LuxFilm, AtTheater, AtDay, TwMovie, TwMovieDay, TwMovieCinema } from "./parsers";
+import type { Movie, Version, TwCinema, TwDay, MultiDay, SpotMovie, LuxFilm, NwacEvent, AtTheater, AtDay, TwMovie, TwMovieDay, TwMovieCinema } from "./parsers";
 export type { TwMovie, TwMovieDay, TwMovieCinema } from "./parsers";
 export type { Movie, Version } from "./parsers";
 
 // ───────────────────────── 資料模型 ─────────────────────────
 
-export type Source = "tw" | "eslite" | "spot-hs" | "spot-taipei" | "lux" | "at";
+export type Source = "tw" | "eslite" | "spot-hs" | "spot-taipei" | "lux" | "nwac" | "at";
 
 export interface Cinema {
   id: string;
@@ -93,6 +93,16 @@ export const EXTRA: Cinema[] = [
     url: "https://www.luxcinema.com.tw/web/2020.php?type=ShowTimes",
     address: "台北市萬華區武昌街二段",
     aliases: "樂聲 lux 西門 西門町 電影街",
+  },
+  {
+    id: "nwac",
+    name: "內惟戲院（內惟藝術中心）",
+    city: "高雄市",
+    district: "鼓山區",
+    source: "nwac",
+    url: "https://www.nwac.org.tw/tw/movie-showings",
+    address: "高雄市鼓山區馬卡道路329號",
+    aliases: "內惟 內惟藝術中心 藝術中心 高美館 美術館 nwac",
   },
 ];
 
@@ -363,6 +373,7 @@ export async function multiDayLive(c: Cinema): Promise<MultiDay> {
   if (c.source === "eslite") return parse<MultiDay>("parseEslite", await getText(c.url));
   if (c.source === "spot-hs") return parse<MultiDay>("parseSpotHs", await getText(c.url));
   if (c.source === "lux") return luxCinema();
+  if (c.source === "nwac") return nwacCinema();
   return spotTaipei();
 }
 async function multiDay(c: Cinema): Promise<MultiDay> {
@@ -374,6 +385,30 @@ async function multiDay(c: Cinema): Promise<MultiDay> {
   const r = hit && hit.schedules && Object.keys(hit.schedules).some((d) => d >= today) ? hit : await multiDayLive(c);
   multiCache[c.id] = r;
   return r;
+}
+
+// 內惟藝術中心的內惟戲院（高雄）：官網「場次」頁一次列出前後幾個月的場次；片長、分級在每部片的介紹頁（只讀還沒演完的片）
+async function nwacCinema(): Promise<MultiDay> {
+  const base = "https://www.nwac.org.tw/tw/";
+  const today = todayTPE();
+  const events = (await parse<NwacEvent[]>("parseNwac", await getText(base + "movie-showings"))).filter((e) => e.date >= today);
+  const ids = Array.from(new Set(events.map((e) => e.id).filter(Boolean))).slice(0, 60);
+  const details = await parseMany<{ runtime: number; rating: string }>("parseNwacFilm",
+    await Promise.all(ids.map((id) => getText(`${base}movies-content/${id}`).catch(() => "<html><body></body></html>")))
+  );
+  const schedules: Record<string, Movie[]> = {};
+  for (const e of events) {
+    const d = details[ids.indexOf(e.id)] || { runtime: 0, rating: "" };
+    const list = schedules[e.date] || (schedules[e.date] = []);
+    let m = list.find((x) => x.title === e.title);
+    if (!m) list.push((m = { title: e.title, runtime: d.runtime, rating: d.rating, versions: [] }));
+    const label = e.hall || "一般場";
+    let v = m.versions.find((x) => x.label === label);
+    if (!v) m.versions.push((v = { label, times: [] }));
+    if (v.times.indexOf(e.time) < 0) v.times.push(e.time);
+  }
+  for (const list of Object.values(schedules)) for (const m of list) for (const v of m.versions) v.times.sort();
+  return { schedules, notice: "週一休館。影展、特別放映的售票方式請看官網。" };
 }
 
 // 光點台北：首頁時刻表是圖片，改讀最近幾個月每部片的介紹頁（網址有規則，不用手動更新）

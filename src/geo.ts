@@ -61,6 +61,7 @@ export const GEO: Record<string, [number, number]> = {
   "in89-talee":[22.62154, 120.29834],
   "in89-taoyuan":[25.02592, 121.29401],
   "lux":[25.04468, 121.50706],
+  "nwac":[22.6611, 120.2816], // 內惟藝術中心（馬卡道路，美術館園區西北側；大約位置）
   "miramar-dazhi":[25.08465, 121.5563],
   "showtimes-beigang":[23.56888, 120.29928],
   "showtimes-chiayi":[23.48297, 120.44888],

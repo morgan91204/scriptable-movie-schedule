@@ -188,7 +188,7 @@ function SettingsPage() {
         {(["apple", "google"] as const).map((k) => <Text key={k} tag={k}>{MAPS_LABEL[k]}</Text>)}
       </Picker>
     </Section>
-    <Section header={<Text>關於</Text>} footer={<Text>連鎖影城的場次來自場次通（twshowtimes.com），感謝場次通的整理；其他來自開眼電影網，以及誠品、光點、樂聲官網。實際場次以影城公告為準。</Text>}>
+    <Section header={<Text>關於</Text>} footer={<Text>連鎖影城的場次來自場次通（twshowtimes.com），感謝場次通的整理；其他來自開眼電影網，以及誠品、光點、樂聲、內惟戲院官網。實際場次以影城公告為準。</Text>}>
       <Button title={"關於與資料來源"} systemImage={"info.circle"} action={() => Safari.openURL(ABOUT_URL)} />
       <Button title={"隱私權政策"} systemImage={"hand.raised"} action={() => Safari.openURL(PRIVACY_URL)} />
       <Button title={"前往場次通"} systemImage={"heart"} action={() => Safari.openURL("https://twshowtimes.com/")} />

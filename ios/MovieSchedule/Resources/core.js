@@ -387,6 +387,43 @@ function parseLux(doc) {
   }
   return out;
 }
+function parseNwac(doc) {
+  const clean = (s) => String(s || "").replace(/\\s+/g, " ").trim();
+  const out = [];
+  const seen = {};
+  for (const slide of Array.from(doc.querySelectorAll(".swiper-slide[data-year][data-month]"))) {
+    const y = Number(slide.getAttribute("data-year")), mo = Number(slide.getAttribute("data-month"));
+    if (!y || !mo) continue;
+    for (const item of Array.from(slide.querySelectorAll(".calendar__item"))) {
+      if (/not-current-month/.test(item.getAttribute("class") || "")) continue;
+      const d = Number(clean(item.querySelector(".calendar__head span")?.textContent));
+      if (!d) continue;
+      const date = \`\${y}-\${String(mo).padStart(2, "0")}-\${String(d).padStart(2, "0")}\`;
+      for (const ev of Array.from(item.querySelectorAll(".event"))) {
+        const raw = clean(ev.querySelector(".event-title")?.textContent);
+        const cut = raw.match(/^(.*[\\u3000-\\u9fff\\uff00-\\uffef])\\s*[A-Za-z][\\x20-\\x7e’‘“”éèêàçôûïüöäñ]*$/);
+        const title = clean(cut ? cut[1] : raw);
+        const spans = Array.from(ev.querySelectorAll(".event-intro span")).map((s) => clean(s.textContent));
+        const time = (spans.find((s) => /^\\d{1,2}:\\d{2}$/.test(s)) || "").padStart(5, "0");
+        const hall = spans.find((s) => s && !/^\\d{1,2}:\\d{2}$/.test(s)) || "";
+        const id = ((ev.querySelector('a[href*="movies-content/"]')?.getAttribute("href") || "").match(/movies-content\\/([0-9A-Za-z]+)/) || [])[1] || "";
+        const key = [date, time, hall, title].join("|");
+        if (!title || !/^(?:[01]\\d|2[0-3]):[0-5]\\d$/.test(time) || seen[key]) continue;
+        seen[key] = true;
+        out.push({ date, title, id, hall, time });
+      }
+    }
+  }
+  return out;
+}
+function parseNwacFilm(doc) {
+  const text = String(doc.querySelector(".specification")?.textContent || doc.body.textContent || "").replace(/\\s+/g, " ");
+  const rt = text.match(/片長[：:]\\s*(\\d{1,3})\\s*(?:min|分)/i);
+  const g = text.match(/級別[：:]\\s*(普遍級|保護級|輔導?級?\\s*(?:12|15|十二|十五)\\s*歲?級?|輔\\d{2}級?|限制級)/);
+  let rating = g ? g[1].replace(/\\s+/g, "") : "";
+  if (/^輔/.test(rating)) rating = /15|十五/.test(rating) ? "輔15級" : "輔12級";
+  return { runtime: rt ? Number(rt[1]) : 0, rating };
+}
 function parseLuxFilm(doc) {
   const text = String(doc.body.textContent || "").replace(/\\s+/g, " ");
   return {
@@ -536,6 +573,8 @@ function parseTwMovieDay(doc) {
   parseEslite,
   parseLux,
   parseLuxFilm,
+  parseNwac,
+  parseNwacFilm,
   parseSpotHs,
   parseSpotMovie,
   parseTwDay,
@@ -617,6 +656,8 @@ function parseTwMovieDay(doc) {
     "in89-talee": [22.62154, 120.29834],
     "in89-taoyuan": [25.02592, 121.29401],
     "lux": [25.04468, 121.50706],
+    "nwac": [22.6611, 120.2816],
+    // 內惟藝術中心（馬卡道路，美術館園區西北側；大約位置）
     "miramar-dazhi": [25.08465, 121.5563],
     "showtimes-beigang": [23.56888, 120.29928],
     "showtimes-chiayi": [23.48297, 120.44888],
@@ -777,6 +818,16 @@ function parseTwMovieDay(doc) {
       url: "https://www.luxcinema.com.tw/web/2020.php?type=ShowTimes",
       address: "台北市萬華區武昌街二段",
       aliases: "樂聲 lux 西門 西門町 電影街"
+    },
+    {
+      id: "nwac",
+      name: "內惟戲院（內惟藝術中心）",
+      city: "高雄市",
+      district: "鼓山區",
+      source: "nwac",
+      url: "https://www.nwac.org.tw/tw/movie-showings",
+      address: "高雄市鼓山區馬卡道路329號",
+      aliases: "內惟 內惟藝術中心 藝術中心 高美館 美術館 nwac"
     }
   ];
   var CITY_ORDER = [
@@ -1004,6 +1055,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     if (c.source === "eslite") return parse("parseEslite", await getText(c.url));
     if (c.source === "spot-hs") return parse("parseSpotHs", await getText(c.url));
     if (c.source === "lux") return luxCinema();
+    if (c.source === "nwac") return nwacCinema();
     return spotTaipei();
   }
   async function multiDay(c) {
@@ -1014,6 +1066,29 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     const r = hit && hit.schedules && Object.keys(hit.schedules).some((d) => d >= today) ? hit : await multiDayLive(c);
     multiCache[c.id] = r;
     return r;
+  }
+  async function nwacCinema() {
+    const base = "https://www.nwac.org.tw/tw/";
+    const today = todayTPE();
+    const events = (await parse("parseNwac", await getText(base + "movie-showings"))).filter((e) => e.date >= today);
+    const ids = Array.from(new Set(events.map((e) => e.id).filter(Boolean))).slice(0, 60);
+    const details = await parseMany(
+      "parseNwacFilm",
+      await Promise.all(ids.map((id) => getText(`${base}movies-content/${id}`).catch(() => "<html><body></body></html>")))
+    );
+    const schedules = {};
+    for (const e of events) {
+      const d = details[ids.indexOf(e.id)] || { runtime: 0, rating: "" };
+      const list = schedules[e.date] || (schedules[e.date] = []);
+      let m = list.find((x) => x.title === e.title);
+      if (!m) list.push(m = { title: e.title, runtime: d.runtime, rating: d.rating, versions: [] });
+      const label = e.hall || "一般場";
+      let v = m.versions.find((x) => x.label === label);
+      if (!v) m.versions.push(v = { label, times: [] });
+      if (v.times.indexOf(e.time) < 0) v.times.push(e.time);
+    }
+    for (const list of Object.values(schedules)) for (const m of list) for (const v of m.versions) v.times.sort();
+    return { schedules, notice: "週一休館。影展、特別放映的售票方式請看官網。" };
   }
   var LUX_HALL = { XL: "XL 巨幕廳（800 席）", L: "L 大廳（218 席）" };
   async function luxCinema() {
@@ -3244,7 +3319,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   var extra = { boxOffice, filmList, soonList, nowShowing, nowShowingMulti, movieBoard: movieBoard2, festivalBoard, festivalFilm, nearby, patchSettings, fillMovie, formatList };
   var BRIDGE_LEVEL = 2;
   globalThis.MS = {
-    version: "2026.11.23-2323",
+    version: "2026.11.23-2343",
     level: BRIDGE_LEVEL,
     init(saved) {
       cache = saved || {};

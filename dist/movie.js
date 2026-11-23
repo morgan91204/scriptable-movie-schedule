@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.23-2323
+// @movie-schedule-app 電影行程 v2026.11.23-2343
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/parsers.gen.ts
@@ -202,6 +202,43 @@ function parseLux(doc) {
   }
   return out;
 }
+function parseNwac(doc) {
+  const clean = (s) => String(s || "").replace(/\\s+/g, " ").trim();
+  const out = [];
+  const seen = {};
+  for (const slide of Array.from(doc.querySelectorAll(".swiper-slide[data-year][data-month]"))) {
+    const y = Number(slide.getAttribute("data-year")), mo = Number(slide.getAttribute("data-month"));
+    if (!y || !mo) continue;
+    for (const item of Array.from(slide.querySelectorAll(".calendar__item"))) {
+      if (/not-current-month/.test(item.getAttribute("class") || "")) continue;
+      const d = Number(clean(item.querySelector(".calendar__head span")?.textContent));
+      if (!d) continue;
+      const date = \`\${y}-\${String(mo).padStart(2, "0")}-\${String(d).padStart(2, "0")}\`;
+      for (const ev of Array.from(item.querySelectorAll(".event"))) {
+        const raw = clean(ev.querySelector(".event-title")?.textContent);
+        const cut = raw.match(/^(.*[\\u3000-\\u9fff\\uff00-\\uffef])\\s*[A-Za-z][\\x20-\\x7e’‘“”éèêàçôûïüöäñ]*$/);
+        const title = clean(cut ? cut[1] : raw);
+        const spans = Array.from(ev.querySelectorAll(".event-intro span")).map((s) => clean(s.textContent));
+        const time = (spans.find((s) => /^\\d{1,2}:\\d{2}$/.test(s)) || "").padStart(5, "0");
+        const hall = spans.find((s) => s && !/^\\d{1,2}:\\d{2}$/.test(s)) || "";
+        const id = ((ev.querySelector('a[href*="movies-content/"]')?.getAttribute("href") || "").match(/movies-content\\/([0-9A-Za-z]+)/) || [])[1] || "";
+        const key = [date, time, hall, title].join("|");
+        if (!title || !/^(?:[01]\\d|2[0-3]):[0-5]\\d$/.test(time) || seen[key]) continue;
+        seen[key] = true;
+        out.push({ date, title, id, hall, time });
+      }
+    }
+  }
+  return out;
+}
+function parseNwacFilm(doc) {
+  const text = String(doc.querySelector(".specification")?.textContent || doc.body.textContent || "").replace(/\\s+/g, " ");
+  const rt = text.match(/片長[：:]\\s*(\\d{1,3})\\s*(?:min|分)/i);
+  const g = text.match(/級別[：:]\\s*(普遍級|保護級|輔導?級?\\s*(?:12|15|十二|十五)\\s*歲?級?|輔\\d{2}級?|限制級)/);
+  let rating = g ? g[1].replace(/\\s+/g, "") : "";
+  if (/^輔/.test(rating)) rating = /15|十五/.test(rating) ? "輔15級" : "輔12級";
+  return { runtime: rt ? Number(rt[1]) : 0, rating };
+}
 function parseLuxFilm(doc) {
   const text = String(doc.body.textContent || "").replace(/\\s+/g, " ");
   return {
@@ -351,6 +388,8 @@ function parseTwMovieDay(doc) {
   parseEslite,
   parseLux,
   parseLuxFilm,
+  parseNwac,
+  parseNwacFilm,
   parseSpotHs,
   parseSpotMovie,
   parseTwDay,
@@ -432,6 +471,8 @@ var GEO = {
   "in89-talee": [22.62154, 120.29834],
   "in89-taoyuan": [25.02592, 121.29401],
   "lux": [25.04468, 121.50706],
+  "nwac": [22.6611, 120.2816],
+  // 內惟藝術中心（馬卡道路，美術館園區西北側；大約位置）
   "miramar-dazhi": [25.08465, 121.5563],
   "showtimes-beigang": [23.56888, 120.29928],
   "showtimes-chiayi": [23.48297, 120.44888],
@@ -592,6 +633,16 @@ var EXTRA = [
     url: "https://www.luxcinema.com.tw/web/2020.php?type=ShowTimes",
     address: "台北市萬華區武昌街二段",
     aliases: "樂聲 lux 西門 西門町 電影街"
+  },
+  {
+    id: "nwac",
+    name: "內惟戲院（內惟藝術中心）",
+    city: "高雄市",
+    district: "鼓山區",
+    source: "nwac",
+    url: "https://www.nwac.org.tw/tw/movie-showings",
+    address: "高雄市鼓山區馬卡道路329號",
+    aliases: "內惟 內惟藝術中心 藝術中心 高美館 美術館 nwac"
   }
 ];
 var CITY_ORDER = [
@@ -819,6 +870,7 @@ async function multiDayLive(c) {
   if (c.source === "eslite") return parse("parseEslite", await getText(c.url));
   if (c.source === "spot-hs") return parse("parseSpotHs", await getText(c.url));
   if (c.source === "lux") return luxCinema();
+  if (c.source === "nwac") return nwacCinema();
   return spotTaipei();
 }
 async function multiDay(c) {
@@ -829,6 +881,29 @@ async function multiDay(c) {
   const r = hit && hit.schedules && Object.keys(hit.schedules).some((d) => d >= today) ? hit : await multiDayLive(c);
   multiCache[c.id] = r;
   return r;
+}
+async function nwacCinema() {
+  const base = "https://www.nwac.org.tw/tw/";
+  const today = todayTPE();
+  const events = (await parse("parseNwac", await getText(base + "movie-showings"))).filter((e) => e.date >= today);
+  const ids = Array.from(new Set(events.map((e) => e.id).filter(Boolean))).slice(0, 60);
+  const details = await parseMany(
+    "parseNwacFilm",
+    await Promise.all(ids.map((id) => getText(`${base}movies-content/${id}`).catch(() => "<html><body></body></html>")))
+  );
+  const schedules = {};
+  for (const e of events) {
+    const d = details[ids.indexOf(e.id)] || { runtime: 0, rating: "" };
+    const list = schedules[e.date] || (schedules[e.date] = []);
+    let m = list.find((x) => x.title === e.title);
+    if (!m) list.push(m = { title: e.title, runtime: d.runtime, rating: d.rating, versions: [] });
+    const label = e.hall || "一般場";
+    let v = m.versions.find((x) => x.label === label);
+    if (!v) m.versions.push(v = { label, times: [] });
+    if (v.times.indexOf(e.time) < 0) v.times.push(e.time);
+  }
+  for (const list of Object.values(schedules)) for (const m of list) for (const v of m.versions) v.times.sort();
+  return { schedules, notice: "週一休館。影展、特別放映的售票方式請看官網。" };
 }
 var LUX_HALL = { XL: "XL 巨幕廳（800 席）", L: "L 大廳（218 席）" };
 async function luxCinema() {
@@ -3539,14 +3614,14 @@ var App = class {
   }
   /** 最新版本是多少。網頁版問的是自己網站現在上線的版本（重新整理就會拿到的那一版），不是 GitHub 上的 */
   checkVersion() {
-    if (true) return checkLatest("2026.11.23-2323");
+    if (true) return checkLatest("2026.11.23-2343");
     return (async () => {
       try {
         const r = await globalThis.fetch("/api/version?t=" + Date.now(), { cache: "no-store" });
         const latest = String((await r.json()).version || "");
         if (!latest) return null;
         const num = (v) => Number(v.replace(/\D/g, "")) || 0;
-        return { latest, isLatest: num("2026.11.23-2323") >= num(latest) };
+        return { latest, isLatest: num("2026.11.23-2343") >= num(latest) };
       } catch (_) {
         return null;
       }
@@ -3642,16 +3717,16 @@ var App = class {
     return /* @__PURE__ */ h(Page, { title: "設定" }, /* @__PURE__ */ h(Section, { title: "加入行事曆時", hint: `廣告預告：${ADS_NOTE}` }, /* @__PURE__ */ h(Item, { icon: "📅", title: "寫入的行事曆", subtitle: this.calendarName, onTap: () => this.go(() => this.calendarView()) }), /* @__PURE__ */ h(Item, { icon: "📺", title: "廣告預告", subtitle: `預計散場時間會加上 ${this.settings.ads} 分鐘`, right: "點一下切換", chevron: false, onTap: () => this.cycleAds() }), /* @__PURE__ */ h(Item, { icon: "🗺", title: "導航地圖", subtitle: "點地址、分享、行程備註的導航連結", right: MAPS_LABEL[this.settings.maps || "apple"], chevron: false, onTap: () => {
       this.settings.maps = this.settings.maps === "google" ? "apple" : "google";
       saveSettings(this.settings);
-    } })), /* @__PURE__ */ h(Section, { title: "關於", hint: "連鎖影城的場次來自場次通（twshowtimes.com），感謝場次通的整理；其他來自開眼電影網，以及誠品、光點、樂聲官網。實際場次以影城公告為準。" }, false ? /* @__PURE__ */ h(Item, { icon: "📲", title: "加到主畫面", subtitle: "像 App 一樣從主畫面開啟，看圖示教學", onTap: () => this.go(() => this.installView()) }) : null, /* @__PURE__ */ h(Item, { icon: "ℹ️", title: "關於與資料來源", accent: true, chevron: false, onTap: () => Safari.open(ABOUT_URL) }), /* @__PURE__ */ h(Item, { icon: "🔒", title: "隱私權政策", accent: true, chevron: false, onTap: () => Safari.open(PRIVACY_URL) }), /* @__PURE__ */ h(Item, { icon: "🙏", title: "前往場次通", subtitle: "比較各影城場次、看上映場數排行", accent: true, chevron: false, onTap: () => Safari.open("https://twshowtimes.com/") })), /* @__PURE__ */ h(
+    } })), /* @__PURE__ */ h(Section, { title: "關於", hint: "連鎖影城的場次來自場次通（twshowtimes.com），感謝場次通的整理；其他來自開眼電影網，以及誠品、光點、樂聲、內惟戲院官網。實際場次以影城公告為準。" }, false ? /* @__PURE__ */ h(Item, { icon: "📲", title: "加到主畫面", subtitle: "像 App 一樣從主畫面開啟，看圖示教學", onTap: () => this.go(() => this.installView()) }) : null, /* @__PURE__ */ h(Item, { icon: "ℹ️", title: "關於與資料來源", accent: true, chevron: false, onTap: () => Safari.open(ABOUT_URL) }), /* @__PURE__ */ h(Item, { icon: "🔒", title: "隱私權政策", accent: true, chevron: false, onTap: () => Safari.open(PRIVACY_URL) }), /* @__PURE__ */ h(Item, { icon: "🙏", title: "前往場次通", subtitle: "比較各影城場次、看上映場數排行", accent: true, chevron: false, onTap: () => Safari.open("https://twshowtimes.com/") })), /* @__PURE__ */ h(
       "p",
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.23-2323"}`);
+          Pasteboard.copy(`版本 ${"2026.11.23-2343"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.23-2323"}`,
+      `版本 ${"2026.11.23-2343"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -3972,7 +4047,7 @@ var App = class {
     if (false) {
       if (!r) return /* @__PURE__ */ h(Note, { text: "（無法確認是否為最新版：連不到網站）" });
       if (r.isLatest) return /* @__PURE__ */ h(Note, { text: "✅ 已是最新版" });
-      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.23-2323"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
+      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.23-2343"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
         globalThis.location.reload();
       } }));
     }
@@ -4494,6 +4569,7 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
     else if (/spot-hs\.org\.tw/.test(url)) c = EXTRA.find((x) => x.id === "spot-hs");
     else if (/spot\.org\.tw/.test(url)) c = EXTRA.find((x) => x.id === "spot-taipei");
     else if (/luxcinema\.com\.tw/.test(url)) c = EXTRA.find((x) => x.id === "lux");
+    else if (/nwac\.org\.tw/.test(url)) c = EXTRA.find((x) => x.id === "nwac");
     else {
       const at = url.match(/atmovies\.com\.tw\/showtime\/(t\w+)\//);
       if (at) c = this.cinemas.find((x) => x.id === "at-" + at[1]);

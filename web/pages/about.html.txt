@@ -51,7 +51,7 @@ footer a{margin-right:14px}
 <ul>
 <li><strong>連鎖影城的場次、片長、分級</strong>：<a href="https://twshowtimes.com/">場次通</a>，共 66 間。</li>
 <li><strong>其他戲院的場次，以及海報、預告、片長</strong>：<a href="https://www.atmovies.com.tw/">開眼電影網</a>，共 37 間；另外補上五間威秀的 Gold Class、MUCROWN、TITAN 等頂級影廳場次。</li>
-<li><strong>誠品電影院、光點華山、光點台北、樂聲影城</strong>：各自的官網時刻表。</li>
+<li><strong>誠品電影院、光點華山、光點台北、樂聲影城、內惟戲院（高雄內惟藝術中心）</strong>：各自的官網時刻表。</li>
 <li><strong>票房排行</strong>（每週、累計、2016 年至今的年度排行，以及出品國別、發行公司等資訊）：國家電影及視聽文化中心「<a href="https://boxofficetw.tfai.org.tw/">全國電影票房統計</a>」開放資料，依政府資料開放授權條款第 1 版使用。</li>
 <li><strong>即將上映</strong>：已經排了場次的片來自場次通；還沒有場次的片單與上映日期來自<a href="https://www.atmovies.com.tw/">開眼電影網</a>的「近期上映」。</li>
 <li><strong>影展</strong>（金馬、台北電影節、高雄電影節、女性影展、桃園電影節、南方影展、兒童影展、臺中動畫影展、人權電影節、酷兒影展、紀錄片影展巡迴等）：各影展官網公開的場次表；人權電影節來自主辦單位的 KKTIX 活動頁。影展的片名、簡介與劇照屬於各影展與片商，劇照另存了一份縮圖，避免官網換屆後看不到。</li>

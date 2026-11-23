@@ -259,6 +259,48 @@ export function parseLux(doc: Document): LuxFilm[] {
   return out;
 }
 
+export interface NwacEvent { date: string; title: string; id: string; hall: string; time: string }
+/** 內惟藝術中心（高雄）內惟戲院的「場次」頁：一頁有前後共五個月的月曆，每天底下一場一格（片名、時間、影廳、介紹頁連結）。
+ *  片名後面接著英文片名（「沙央 SAYANG」「告別的年代 The Age of Goodbyes」）：只留中文，才對得上其他戲院的同一部片 */
+export function parseNwac(doc: Document): NwacEvent[] {
+  const clean = (s: unknown) => String(s || "").replace(/\s+/g, " ").trim();
+  const out: NwacEvent[] = [];
+  const seen: Record<string, boolean> = {};
+  for (const slide of Array.from(doc.querySelectorAll(".swiper-slide[data-year][data-month]"))) {
+    const y = Number(slide.getAttribute("data-year")), mo = Number(slide.getAttribute("data-month"));
+    if (!y || !mo) continue;
+    for (const item of Array.from(slide.querySelectorAll(".calendar__item"))) {
+      if (/not-current-month/.test(item.getAttribute("class") || "")) continue; // 月曆頭尾補的別月日期：那幾天在它自己的月份會再出現一次
+      const d = Number(clean(item.querySelector(".calendar__head span")?.textContent));
+      if (!d) continue;
+      const date = `${y}-${String(mo).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+      for (const ev of Array.from(item.querySelectorAll(".event"))) {
+        const raw = clean(ev.querySelector(".event-title")?.textContent);
+        const cut = raw.match(/^(.*[\u3000-\u9fff\uff00-\uffef])\s*[A-Za-z][\x20-\x7e’‘“”éèêàçôûïüöäñ]*$/);
+        const title = clean(cut ? cut[1] : raw);
+        const spans = Array.from(ev.querySelectorAll(".event-intro span")).map((s) => clean(s.textContent));
+        const time = (spans.find((s) => /^\d{1,2}:\d{2}$/.test(s)) || "").padStart(5, "0");
+        const hall = spans.find((s) => s && !/^\d{1,2}:\d{2}$/.test(s)) || "";
+        const id = ((ev.querySelector('a[href*="movies-content/"]')?.getAttribute("href") || "").match(/movies-content\/([0-9A-Za-z]+)/) || [])[1] || "";
+        const key = [date, time, hall, title].join("|");
+        if (!title || !/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(time) || seen[key]) continue;
+        seen[key] = true;
+        out.push({ date, title, id, hall, time });
+      }
+    }
+  }
+  return out;
+}
+/** 內惟戲院單片介紹頁：「片長：90min」「級別：保護級6」 */
+export function parseNwacFilm(doc: Document): { runtime: number; rating: string } {
+  const text = String(doc.querySelector(".specification")?.textContent || doc.body.textContent || "").replace(/\s+/g, " ");
+  const rt = text.match(/片長[：:]\s*(\d{1,3})\s*(?:min|分)/i);
+  const g = text.match(/級別[：:]\s*(普遍級|保護級|輔導?級?\s*(?:12|15|十二|十五)\s*歲?級?|輔\d{2}級?|限制級)/);
+  let rating = g ? g[1].replace(/\s+/g, "") : "";
+  if (/^輔/.test(rating)) rating = /15|十五/.test(rating) ? "輔15級" : "輔12級";
+  return { runtime: rt ? Number(rt[1]) : 0, rating };
+}
+
 /** 樂聲影城單片介紹頁：「長度 | 98 min」「級別 | 輔12級」 */
 export function parseLuxFilm(doc: Document): { runtime: number; rating: string } {
   const text = String(doc.body.textContent || "").replace(/\s+/g, " ");
