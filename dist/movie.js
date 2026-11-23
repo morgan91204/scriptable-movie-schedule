@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.24-0201
+// @movie-schedule-app 電影行程 v2026.11.24-0206
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/parsers.gen.ts
@@ -3979,14 +3979,14 @@ var App = class {
   }
   /** 最新版本是多少。網頁版問的是自己網站現在上線的版本（重新整理就會拿到的那一版），不是 GitHub 上的 */
   checkVersion() {
-    if (true) return checkLatest("2026.11.24-0201");
+    if (true) return checkLatest("2026.11.24-0206");
     return (async () => {
       try {
         const r = await globalThis.fetch("/api/version?t=" + Date.now(), { cache: "no-store" });
         const latest = String((await r.json()).version || "");
         if (!latest) return null;
         const num = (v) => Number(v.replace(/\D/g, "")) || 0;
-        return { latest, isLatest: num("2026.11.24-0201") >= num(latest) };
+        return { latest, isLatest: num("2026.11.24-0206") >= num(latest) };
       } catch (_) {
         return null;
       }
@@ -4174,11 +4174,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.24-0201"}`);
+          Pasteboard.copy(`版本 ${"2026.11.24-0206"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.24-0201"}`,
+      `版本 ${"2026.11.24-0206"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -4518,7 +4518,7 @@ var App = class {
     if (false) {
       if (!r) return /* @__PURE__ */ h(Note, { text: "（無法確認是否為最新版：連不到網站）" });
       if (r.isLatest) return /* @__PURE__ */ h(Note, { text: "✅ 已是最新版" });
-      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.24-0201"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
+      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.24-0206"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
         globalThis.location.reload();
       } }));
     }
@@ -4891,7 +4891,7 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
     const about = movieAbout(d);
     const box = await Promise.race([boxInfoBy(m.title).catch(() => null), sleep(this.rerendering ? 0 : 1200).then(() => null)]);
     const status = m.comingSoon ? "soon" : "now";
-    return /* @__PURE__ */ h(Page, { title: m.title, subtitle: [m.rating || d.rating, runtime ? `${runtime} 分鐘` : "", `${d.cinemas.length} 間影城`].filter(Boolean).join("｜"), onBack: () => this.back() }, this.hero(x, m.title, [m.en, [m.rating || d.rating, runtime ? `${runtime} 分鐘` : ""].filter(Boolean).join("｜"), releaseLabel(d.release || m.release || releaseOf(m.title)), `${d.cinemas.length} 間影城有放映`]), about.text || about.credits ? /* @__PURE__ */ h(Section, { title: "劇情簡介", hint: "簡介來自場次通。" }, /* @__PURE__ */ h(Para, { text: about.text || about.credits, dim: about.text ? about.credits : "" })) : null, /* @__PURE__ */ h(Section, { hint: this.infoOpen && box ? `資料來源：國家電影及視聽文化中心「全國電影票房統計」，官方每週更新一次。` : "" }, /* @__PURE__ */ h(Item, { kv: true, title: "狀態", tag: { text: STATUS_LABEL[status], tone: status } }), box ? /* @__PURE__ */ h(Item, { kv: true, title: "票房資訊", right: `${money(box.x.total)} ${this.infoOpen ? "▾" : "▸"}`, chevron: false, onTap: () => {
+    return /* @__PURE__ */ h(Page, { title: m.title, subtitle: [m.rating || d.rating, runtime ? `${runtime} 分鐘` : "", `${d.cinemas.length} 間影城`].filter(Boolean).join("｜"), onBack: () => this.back() }, this.hero(x, m.title, [m.en, [m.rating || d.rating, runtime ? `${runtime} 分鐘` : ""].filter(Boolean).join("｜"), releaseLabel(d.release || m.release || releaseOf(m.title)), `${d.cinemas.length} 間影城有放映`]), about.text || about.credits ? /* @__PURE__ */ h(Section, { title: "劇情簡介", hint: "簡介來自場次通。" }, /* @__PURE__ */ h(Para, { text: about.text || about.credits, dim: about.text ? about.credits : "" })) : null, /* @__PURE__ */ h(Section, { hint: box ? this.infoOpen ? `資料來源：國家電影及視聽文化中心「全國電影票房統計」，官方每週更新一次。` : "點「票房資訊」可以展開，看票數、院數、發行商等更多資訊。" : "" }, /* @__PURE__ */ h(Item, { kv: true, title: "狀態", tag: { text: STATUS_LABEL[status], tone: status } }), box ? /* @__PURE__ */ h(Item, { kv: true, title: "票房資訊", right: `${money(box.x.total)}｜${this.infoOpen ? "收合 ▾" : "展開 ▸"}`, chevron: false, onTap: () => {
       this.infoOpen = !this.infoOpen;
     } }) : /* @__PURE__ */ h(Item, { kv: true, title: "票房資訊", right: "官方資料還沒列入" }), box && this.infoOpen ? boxInfoRows(box.x, box.info).map(([label, value]) => /* @__PURE__ */ h(Item, { kv: true, title: label, right: value })) : null), /* @__PURE__ */ h(Section, { title: "日期", hint: "日期、縣市、特殊廳都可以複選。" }, /* @__PURE__ */ h(Chips, null, allDates.map((dt) => /* @__PURE__ */ h(Chip, { label: dateLabel(dt).replace(/（.）.*$/, ""), sub: dt === todayTPE() ? "今天" : dateLabel(dt).match(/（(.)）/)?.[1] || "", muted: selDates.indexOf(dt) < 0, onTap: () => {
       this.movieDates = toggle(selDates, dt, true);

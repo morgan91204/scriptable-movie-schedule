@@ -1472,9 +1472,9 @@ class App {
           </Section>
         ) : null}
         {/* 狀態一直看得到；其餘的票房資訊預設收合，點了才展開（這一頁主要是找場次） */}
-        <Section hint={this.infoOpen && box ? `資料來源：國家電影及視聽文化中心「全國電影票房統計」，官方每週更新一次。` : ""}>
+        <Section hint={box ? (this.infoOpen ? `資料來源：國家電影及視聽文化中心「全國電影票房統計」，官方每週更新一次。` : "點「票房資訊」可以展開，看票數、院數、發行商等更多資訊。") : ""}>
           <Item kv title="狀態" tag={{ text: STATUS_LABEL[status], tone: status }} />
-          {box ? <Item kv title="票房資訊" right={`${money(box.x.total)} ${this.infoOpen ? "▾" : "▸"}`} chevron={false} onTap={() => { this.infoOpen = !this.infoOpen; }} /> : <Item kv title="票房資訊" right="官方資料還沒列入" />}
+          {box ? <Item kv title="票房資訊" right={`${money(box.x.total)}｜${this.infoOpen ? "收合 ▾" : "展開 ▸"}`} chevron={false} onTap={() => { this.infoOpen = !this.infoOpen; }} /> : <Item kv title="票房資訊" right="官方資料還沒列入" />}
           {box && this.infoOpen ? boxInfoRows(box.x, box.info).map(([label, value]) => <Item kv title={label} right={value} />) : null}
         </Section>
         <Section title="日期" hint="日期、縣市、特殊廳都可以複選。">
