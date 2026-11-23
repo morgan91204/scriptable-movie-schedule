@@ -14,7 +14,7 @@ import {
   Cinema, Movie, Settings, Version, TwMovie, TwMovieCinema, CITY_ORDER, TW,
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
   loadSettings, saveSettings, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, cinemaAddress,
-  FORMATS, formatsOf, filterVersions, filterVersionsAny, movieRows, movieDays, nearest, kmLabel, WINDOWS, findShowtimes, findShowtimesMulti, multiLabel, multiDetail, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText, hallOf, tmdbTest, movieExtras, moviePoster, posterReady, posterTint, POSTER_TINTS, normImageUrl, movieRuntime, posterSrc, isLocalSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxCountries, boxByCountry, boxInfo, boxInfoRows, boxCountryText, BOX_COUNTRY_NOTE, boxCountryTag, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityVote, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, SCRIPTING_IMPORT_URL, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, festivalDefaultDate, festivalStateLabel, festivalState, festivalFooter, linkMovies, nowGroupLine, nowFilter, festivalPick, movieAbout, festivalSearch, festivalSearchLines, festivalTrailer, festivalYears, festivalGroups, festivalChipNote, festivalStatusLine, movieRatings, ratingTier,
+  FORMATS, formatsOf, filterVersions, filterVersionsAny, movieRows, movieDays, nearest, kmLabel, WINDOWS, findShowtimes, findShowtimesMulti, multiLabel, multiDetail, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText, hallOf, tmdbTest, movieExtras, moviePoster, posterReady, posterTint, POSTER_TINTS, normImageUrl, movieRuntime, posterSrc, isLocalSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxCountries, boxByCountry, boxInfo, boxInfoRows, boxCountryText, BOX_COUNTRY_NOTE, boxCountryTag, boxCountriesPicked, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityVote, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, SCRIPTING_IMPORT_URL, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, festivalDefaultDate, festivalStateLabel, festivalState, festivalFooter, linkMovies, nowGroupLine, nowFilter, festivalPick, movieAbout, festivalSearch, festivalSearchLines, festivalTrailer, festivalYears, festivalGroups, festivalChipNote, festivalStatusLine, movieRatings, ratingTier,
 } from "./core"
 import type { Format, LatLng, Hit, Community, BoxOfficeItem, BoxSort, Festival, FestivalFilm, FestivalSession } from "./core"
 
@@ -979,12 +979,13 @@ function BoxOfficeSections({ movies, query }: { movies: TwMovie[]; query: string
   // 搜尋片名：中文片名或對得到的英文片名
   const everyone = b ? boxOfficeBy(b, sort, years, week.id) : []
   const countries = boxCountries(everyone) // 這份排行裡有哪些國別（多的在前）
-  const [pickedCountry, setPickedCountry] = useState("") // 只看哪個國別（空 = 全部）
-  const country = countries.some((c) => c.id === pickedCountry) ? pickedCountry : ""
+  const [pickedCountry, setPickedCountry] = useState<string[]>([]) // 只看哪幾個出品國別（可以複選；空 = 全部）
+  const [countryOpen, setCountryOpen] = useState(false)
+  const country = boxCountriesPicked(countries, pickedCountry)
   const found = boxByCountry(everyone, country).filter((x) => !query || `${x.name} ${match(x.name)?.en || ""}`.toLowerCase().includes(query))
   // 年度排行一年有六百部左右、全選是好幾千部：先顯示 100 列，滑到底自動接著載入（不用按）。換了排法、年份或搜尋字就從頭開始
   const paged = sort === "year"
-  const pageKey = `${sort}|${years.join(",")}|${week.id}|${query}|${country}`
+  const pageKey = `${sort}|${years.join(",")}|${week.id}|${query}|${country.join(",")}`
   const [page, setPage] = useState<{ key: string; n: number }>({ key: "", n: BOX_PAGE })
   const limit = page.key === pageKey ? page.n : BOX_PAGE
   const shown = paged ? found.slice(0, limit) : found
@@ -1009,12 +1010,15 @@ function BoxOfficeSections({ movies, query }: { movies: TwMovie[]; query: string
       {weekOptions.map((o) => <Text key={o.id} tag={o.id}>{`${o.label}（${o.note}）`}</Text>)}
     </Picker>
   </Section> : null}
-  {countries.length > 1 ? <Section footer={<Text>{BOX_COUNTRY_NOTE}</Text>}>
-    <Picker title={"出品國別"} value={country} onChanged={(v: string) => setPickedCountry(v)}>
-      <Text tag={""}>{`全部（${everyone.length} 部）`}</Text>
-      {countries.map((c) => <Text key={c.id} tag={c.id}>{`${c.id}（${c.count} 部）`}</Text>)}
-    </Picker>
-  </Section> : null}
+  {countries.length > 1 ? multiPick({
+    title: "出品國別", open: countryOpen, onOpen: () => setCountryOpen(!countryOpen),
+    summary: country.length ? country.join("、") : `全部（${everyone.length} 部）`,
+    // 第一個選項是「全部」：點了就清掉所有勾選
+    options: [{ id: "", label: `全部（${everyone.length} 部）` }, ...countries.map((c) => ({ id: c.id, label: `${c.id}（${c.count} 部）` }))],
+    selected: country.length ? country : [""],
+    onToggle: (id) => setPickedCountry(!id ? [] : country.indexOf(id) < 0 ? [...country, id] : country.filter((z) => z !== id)),
+    footer: BOX_COUNTRY_NOTE,
+  }) : null}
   {sort === "year" && yearOptions.length > 1 ? multiPick({
     title: "年份", open: yearOpen, onOpen: () => setYearOpen(!yearOpen),
     summary: years.length === yearOptions.length ? `全部（${yearOptions[yearOptions.length - 1]}–${yearOptions[0]}）` : years.join("、"),

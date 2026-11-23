@@ -117,7 +117,7 @@ struct BoxOfficeSection: View {
     @State private var years: Set<String> = [] // 年度排行選了哪幾年（空 = 最新的一年）
     @State private var limit = 100 // 年度排行目前顯示幾列（一年六百部左右，分批顯示）
     @State private var week = "" // 週票房看哪一週（空 = 最新）
-    @State private var country = "" // 只看哪個國別（空 = 全部）
+    @State private var countries: Set<String> = [] // 只看哪幾個出品國別（可以複選；空 = 全部）
 
     var body: some View {
         Group {
@@ -144,11 +144,33 @@ struct BoxOfficeSection: View {
                 }
             }
             if let lands = board.value?.countries, lands.count > 1 {
+                let picked = board.value?.selCountries ?? []
                 Section {
-                    Picker("出品國別", selection: Binding(get: { board.value?.selCountry ?? "" }, set: { country = $0 })) {
-                        Text("全部（\(board.value?.everyone ?? 0) 部）").tag("")
-                        ForEach(lands) { Text($0.label).tag($0.id) }
+                    // 出品國別可以複選：選單點了不會關，可以連續勾
+                    Menu {
+                        Button {
+                            countries = []
+                        } label: {
+                            if picked.isEmpty { Label("全部（\(board.value?.everyone ?? 0) 部）", systemImage: "checkmark") } else { Text("全部（\(board.value?.everyone ?? 0) 部）") }
+                        }
+                        ForEach(lands) { c in
+                            Button {
+                                var next = Set(picked)
+                                if next.contains(c.id) { next.remove(c.id) } else { next.insert(c.id) }
+                                countries = next
+                            } label: {
+                                if picked.contains(c.id) { Label(c.label, systemImage: "checkmark") } else { Text(c.label) }
+                            }
+                        }
+                    } label: {
+                        HStack {
+                            Text("出品國別").foregroundStyle(Color.primary)
+                            Spacer()
+                            Text(picked.isEmpty ? "全部" : picked.joined(separator: "、")).foregroundStyle(.secondary).lineLimit(1)
+                            Image(systemName: "chevron.up.chevron.down").font(.caption).foregroundStyle(.tertiary)
+                        }
                     }
+                    .menuActionDismissBehavior(.disabled)
                 } footer: {
                     Text(board.value?.countryNote ?? "這是全台灣戲院的票房排行，出品國別只是篩選。")
                 }
@@ -216,11 +238,11 @@ struct BoxOfficeSection: View {
                 }
             }
         }
-        .task(id: [sort, years.sorted().joined(separator: ","), query, String(limit), week, country].joined(separator: "|")) { await load() }
+        .task(id: [sort, years.sorted().joined(separator: ","), query, String(limit), week, countries.sorted().joined(separator: ",")].joined(separator: "|")) { await load() }
         .onChange(of: sort) { _, _ in limit = 100 }
         .onChange(of: years) { _, _ in limit = 100 }
         .onChange(of: query) { _, _ in limit = 100 }
-        .onChange(of: country) { _, _ in limit = 100 }
+        .onChange(of: countries) { _, _ in limit = 100 }
     }
 
     private func rowLabel(_ r: BoxOfficeRow) -> some View {
@@ -247,7 +269,7 @@ struct BoxOfficeSection: View {
 
     private func load() async {
         do {
-            board = .loaded(try await Bridge.shared.call("boxOffice", [sort, years.sorted(), query.trimmingCharacters(in: .whitespaces), limit, week, country]))
+            board = .loaded(try await Bridge.shared.call("boxOffice", [sort, years.sorted(), query.trimmingCharacters(in: .whitespaces), limit, week, countries.sorted()]))
         } catch {
             board = .failed(errorText(error))
         }

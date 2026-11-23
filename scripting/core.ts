@@ -1477,19 +1477,22 @@ export function boxCountryText(country: string): string {
   return parts.filter((c, i) => parts.indexOf(c) === i).join("、");
 }
 /** 「出品國別」篩選底下的說明：排行是台灣的票房，國別只是把某國出品的片篩出來 */
-export const BOX_COUNTRY_NOTE = "這是全台灣戲院的票房排行。「出品國別」是電影的出品國：選了只是把那個國家出品的片篩出來、名次在裡面重排，票房一樣是在台灣賣出的。";
-/** 排行標題後面接的篩選說明：「｜日本出品」（沒篩選是空字串） */
-export const boxCountryTag = (country: string): string => (country ? `｜${country}出品` : "");
+export const BOX_COUNTRY_NOTE = "這是全台灣戲院的票房排行。「出品國別」是電影的出品國，可以複選：選了只是把那幾個國家出品的片篩出來、名次在裡面重排，票房一樣是在台灣賣出的。";
+/** 排行標題後面接的篩選說明：「｜日本出品」「｜日本、美國出品」（沒篩選是空字串；超過三個就寫「等 N 國」） */
+export const boxCountryTag = (picked: string[]): string =>
+  !picked.length ? "" : `｜${picked.length > 3 ? `${picked.slice(0, 2).join("、")} 等 ${picked.length} 國` : picked.join("、")}出品`;
+/** 使用者選的國別裡，這份排行實際有的那些（換了排法、年份後，原本選的可能不在裡面） */
+export const boxCountriesPicked = (options: { id: string }[], picked: string[]): string[] => options.map((c) => c.id).filter((id) => picked.indexOf(id) >= 0);
 /** 這份排行裡有哪些國別（主要出品國）、各幾部（多的在前），給「國別」篩選用 */
 export function boxCountries(list: BoxOfficeItem[]): { id: string; count: number }[] {
   const n: Record<string, number> = {};
   for (const x of list) { const c = boxMainCountry(x.country); if (c) n[c] = (n[c] || 0) + 1; }
   return Object.keys(n).map((id) => ({ id, count: n[id] })).sort((a, b) => b.count - a.count || a.id.localeCompare(b.id));
 }
-/** 只留某個國別的片，名次在這個國別裡重排（跟官方網站篩選國別後的排法一樣）；country 空的 = 全部 */
-export function boxByCountry(list: BoxOfficeItem[], country: string): BoxOfficeItem[] {
-  if (!country) return list;
-  return list.filter((x) => boxMainCountry(x.country) === country).map((x, i) => ({ ...x, rank: i + 1 }));
+/** 只留選中的那幾個國別的片（可以複選），名次在篩出來的片裡重排；沒選 = 全部 */
+export function boxByCountry(list: BoxOfficeItem[], picked: string[]): BoxOfficeItem[] {
+  if (!picked.length) return list;
+  return list.filter((x) => picked.indexOf(boxMainCountry(x.country)) >= 0).map((x, i) => ({ ...x, rank: i + 1 }));
 }
 export const BOXOFFICE_INFO_URL = "https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/main/dist/boxoffice-info-";
 export interface BoxInfo { issue: string; produce: string; tickets: number }

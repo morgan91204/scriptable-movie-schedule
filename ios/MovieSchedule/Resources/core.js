@@ -47,6 +47,7 @@
     bookingUrl: () => bookingUrl,
     boxByCountry: () => boxByCountry,
     boxCountries: () => boxCountries,
+    boxCountriesPicked: () => boxCountriesPicked,
     boxCountryTag: () => boxCountryTag,
     boxCountryText: () => boxCountryText,
     boxInfo: () => boxInfo,
@@ -1908,8 +1909,9 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     const parts = String(country || "").split(/##|[\/、,，;；]/).map((c) => c.trim()).filter(Boolean).map((c) => COUNTRY_ALIAS[c] || c);
     return parts.filter((c, i) => parts.indexOf(c) === i).join("、");
   }
-  var BOX_COUNTRY_NOTE = "這是全台灣戲院的票房排行。「出品國別」是電影的出品國：選了只是把那個國家出品的片篩出來、名次在裡面重排，票房一樣是在台灣賣出的。";
-  var boxCountryTag = (country) => country ? `｜${country}出品` : "";
+  var BOX_COUNTRY_NOTE = "這是全台灣戲院的票房排行。「出品國別」是電影的出品國，可以複選：選了只是把那幾個國家出品的片篩出來、名次在裡面重排，票房一樣是在台灣賣出的。";
+  var boxCountryTag = (picked) => !picked.length ? "" : `｜${picked.length > 3 ? `${picked.slice(0, 2).join("、")} 等 ${picked.length} 國` : picked.join("、")}出品`;
+  var boxCountriesPicked = (options, picked) => options.map((c) => c.id).filter((id) => picked.indexOf(id) >= 0);
   function boxCountries(list) {
     const n = {};
     for (const x of list) {
@@ -1918,9 +1920,9 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     }
     return Object.keys(n).map((id) => ({ id, count: n[id] })).sort((a, b) => b.count - a.count || a.id.localeCompare(b.id));
   }
-  function boxByCountry(list, country) {
-    if (!country) return list;
-    return list.filter((x) => boxMainCountry(x.country) === country).map((x, i) => ({ ...x, rank: i + 1 }));
+  function boxByCountry(list, picked) {
+    if (!picked.length) return list;
+    return list.filter((x) => picked.indexOf(boxMainCountry(x.country)) >= 0).map((x, i) => ({ ...x, rank: i + 1 }));
   }
   var BOXOFFICE_INFO_URL = "https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/main/dist/boxoffice-info-";
   var boxInfoMem = {};
@@ -2824,7 +2826,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     const k = (query || "").trim().toLowerCase();
     const everyone = boxOfficeBy(b, sort, picked, wk.id);
     const countries = boxCountries(everyone);
-    const land = countries.some((c) => c.id === country) ? country : "";
+    const land = boxCountriesPicked(countries, Array.isArray(country) ? country : []);
     const found = boxByCountry(everyone, land).map((x) => ({ x, m: match(x.name) || null })).filter(({ x, m }) => !k || `${x.name} ${m?.en || ""}`.toLowerCase().includes(k));
     const paged = sort === "year";
     const rows = (paged ? found.slice(0, limit || BOX_PAGE) : found).map(({ x, m }) => ({ x, m, lines: boxOfficeLines(x, sort, pastWeek), light: (paged || pastWeek) && !m }));
@@ -2842,7 +2844,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
       selWeek: wk.id,
       // 週票房可以選的週次、實際採用的那一週
       countries: countries.map((c) => ({ id: c.id, label: `${c.id}（${c.count} 部）` })),
-      selCountry: land,
+      selCountries: land,
       everyone: everyone.length,
       // 國別篩選
       total: found.length,
@@ -2938,7 +2940,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   var extra = { boxOffice, nowShowing, nowShowingMulti, movieBoard, festivalBoard, festivalFilm, nearby, patchSettings, fillMovie, formatList };
   var BRIDGE_LEVEL = 2;
   globalThis.MS = {
-    version: "2026.11.23-1953",
+    version: "2026.11.23-1956",
     level: BRIDGE_LEVEL,
     init(saved) {
       cache = saved || {};

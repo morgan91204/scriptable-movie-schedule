@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.23-1953
+// @movie-schedule-app 電影行程 v2026.11.23-1956
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/parsers.gen.ts
@@ -1703,8 +1703,9 @@ function boxCountryText(country) {
   const parts = String(country || "").split(/##|[\/、,，;；]/).map((c) => c.trim()).filter(Boolean).map((c) => COUNTRY_ALIAS[c] || c);
   return parts.filter((c, i) => parts.indexOf(c) === i).join("、");
 }
-var BOX_COUNTRY_NOTE = "這是全台灣戲院的票房排行。「出品國別」是電影的出品國：選了只是把那個國家出品的片篩出來、名次在裡面重排，票房一樣是在台灣賣出的。";
-var boxCountryTag = (country) => country ? `｜${country}出品` : "";
+var BOX_COUNTRY_NOTE = "這是全台灣戲院的票房排行。「出品國別」是電影的出品國，可以複選：選了只是把那幾個國家出品的片篩出來、名次在裡面重排，票房一樣是在台灣賣出的。";
+var boxCountryTag = (picked) => !picked.length ? "" : `｜${picked.length > 3 ? `${picked.slice(0, 2).join("、")} 等 ${picked.length} 國` : picked.join("、")}出品`;
+var boxCountriesPicked = (options, picked) => options.map((c) => c.id).filter((id) => picked.indexOf(id) >= 0);
 function boxCountries(list) {
   const n = {};
   for (const x of list) {
@@ -1713,9 +1714,9 @@ function boxCountries(list) {
   }
   return Object.keys(n).map((id) => ({ id, count: n[id] })).sort((a, b) => b.count - a.count || a.id.localeCompare(b.id));
 }
-function boxByCountry(list, country) {
-  if (!country) return list;
-  return list.filter((x) => boxMainCountry(x.country) === country).map((x, i) => ({ ...x, rank: i + 1 }));
+function boxByCountry(list, picked) {
+  if (!picked.length) return list;
+  return list.filter((x) => picked.indexOf(boxMainCountry(x.country)) >= 0).map((x, i) => ({ ...x, rank: i + 1 }));
 }
 var BOXOFFICE_INFO_URL = "https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/main/dist/boxoffice-info-";
 var boxInfoMem = {};
@@ -3180,8 +3181,8 @@ var App = class {
     // 年度排行選了哪幾年（空 = 最新的一年）
     this.boxWeek = "";
     // 週票房看哪一週（空 = 最新）
-    this.boxCountry = "";
-    // 只看哪個國別（空 = 全部）
+    this.boxCountry = [];
+    // 只看哪幾個出品國別（可以複選；空 = 全部）
     this.boxLimit = 100;
     // 年度排行目前顯示幾列
     this.boxPageKey = "";
@@ -3237,14 +3238,14 @@ var App = class {
   }
   /** 最新版本是多少。網頁版問的是自己網站現在上線的版本（重新整理就會拿到的那一版），不是 GitHub 上的 */
   checkVersion() {
-    if (true) return checkLatest("2026.11.23-1953");
+    if (true) return checkLatest("2026.11.23-1956");
     return (async () => {
       try {
         const r = await globalThis.fetch("/api/version?t=" + Date.now(), { cache: "no-store" });
         const latest = String((await r.json()).version || "");
         if (!latest) return null;
         const num = (v) => Number(v.replace(/\D/g, "")) || 0;
-        return { latest, isLatest: num("2026.11.23-1953") >= num(latest) };
+        return { latest, isLatest: num("2026.11.23-1956") >= num(latest) };
       } catch (_) {
         return null;
       }
@@ -3345,11 +3346,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.23-1953"}`);
+          Pasteboard.copy(`版本 ${"2026.11.23-1956"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.23-1953"}`,
+      `版本 ${"2026.11.23-1956"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -3691,7 +3692,7 @@ var App = class {
     if (false) {
       if (!r) return /* @__PURE__ */ h(Note, { text: "（無法確認是否為最新版：連不到網站）" });
       if (r.isLatest) return /* @__PURE__ */ h(Note, { text: "✅ 已是最新版" });
-      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.23-1953"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
+      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.23-1956"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
         globalThis.location.reload();
       } }));
     }
@@ -3873,10 +3874,10 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
     const match = boxMatcher(all);
     const everyone = boxOfficeBy(b, by, years, week.id);
     const countries = boxCountries(everyone);
-    const country = countries.some((c) => c.id === this.boxCountry) ? this.boxCountry : "";
+    const country = boxCountriesPicked(countries, this.boxCountry);
     const found = boxByCountry(everyone, country).map((x) => ({ x, m: match(x.name) })).filter(({ x, m }) => !k || `${x.name} ${m?.en || ""}`.toLowerCase().includes(k));
     const paged = by === "year";
-    const pageKey = `${by}|${years.join(",")}|${week.id}|${k}|${country}`;
+    const pageKey = `${by}|${years.join(",")}|${week.id}|${k}|${country.join(",")}`;
     if (this.boxPageKey !== pageKey) {
       this.boxPageKey = pageKey;
       this.boxLimit = BOX_PAGE;
@@ -3901,10 +3902,10 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
       this.boxSort = x.id;
     } }))) : null, by === "week" && weekOptions.length > 1 ? /* @__PURE__ */ h(Section, { title: "週次", hint: "可以回頭看過去幾週的排行。" }, /* @__PURE__ */ h(Chips, null, weekOptions.map((o) => /* @__PURE__ */ h(Chip, { label: o.label, sub: o.note, muted: week.id !== o.id, onTap: () => {
       this.boxWeek = o.note === "最新" ? "" : o.id;
-    } })))) : null, countries.length > 1 ? /* @__PURE__ */ h(Section, { title: "出品國別（全台票房，可篩選出品國）", hint: BOX_COUNTRY_NOTE + "可以左右滑動。" }, /* @__PURE__ */ h(Chips, { scroll: true }, /* @__PURE__ */ h(Chip, { label: "全部", sub: `${everyone.length} 部`, muted: !!country, onTap: () => {
-      this.boxCountry = "";
-    } }), countries.map((c) => /* @__PURE__ */ h(Chip, { label: c.id, sub: `${c.count} 部`, muted: country !== c.id, onTap: () => {
-      this.boxCountry = c.id;
+    } })))) : null, countries.length > 1 ? /* @__PURE__ */ h(Section, { title: "出品國別（全台票房，可篩選出品國）", hint: BOX_COUNTRY_NOTE + "可以左右滑動。" }, /* @__PURE__ */ h(Chips, { scroll: true }, /* @__PURE__ */ h(Chip, { label: "全部", sub: `${everyone.length} 部`, muted: country.length > 0, onTap: () => {
+      this.boxCountry = [];
+    } }), countries.map((c) => /* @__PURE__ */ h(Chip, { label: c.id, sub: `${c.count} 部`, muted: country.indexOf(c.id) < 0, onTap: () => {
+      this.boxCountry = country.indexOf(c.id) < 0 ? [...country, c.id] : country.filter((z) => z !== c.id);
     } })))) : null, by === "year" && yearOptions.length > 1 ? /* @__PURE__ */ h(Section, { title: "年份", hint: "可以複選，選了幾年就合在一起排；全選就是 2016 年至今的總排行。" }, /* @__PURE__ */ h(Chips, null, /* @__PURE__ */ h(Chip, { label: "全選", muted: years.length !== yearOptions.length, onTap: () => {
       this.boxYears = years.length === yearOptions.length ? [] : yearOptions.slice();
     } }), yearOptions.map((y) => /* @__PURE__ */ h(Chip, { label: y, muted: years.indexOf(y) < 0, onTap: () => {
