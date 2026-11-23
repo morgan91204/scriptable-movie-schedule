@@ -1278,7 +1278,10 @@ function MoviesPage() {
   const k = query.trim().toLowerCase()
   // 即將上映：場次通已經有場次的片＋還沒有場次的片（伺服器整理的近期上映片單），依上映月份分段
   const upcoming = useLoad(() => loadUpcoming(), [])
-  const soon = useMemo(() => soonBoard(movies.data || [], upcoming.data || [], k), [movies.data, upcoming.data, k])
+  const [soonWhen, setSoonWhen] = useState("") // 即將上映的篩選：上映時間、場次狀態
+  const [soonState, setSoonState] = useState("")
+  const [soonShut, setSoonShut] = useState<string[]>([]) // 收合起來的月份
+  const soon = useMemo(() => soonBoard(movies.data || [], upcoming.data || [], k, { when: soonWhen, state: soonState }), [movies.data, upcoming.data, k, soonWhen, soonState])
   const list = soon.groups.flatMap((g) => g.items)
   useEffect(() => { if (movies.data && mode === "soon") prefetchPosters(list.filter((e) => e.m).map((e) => e.m as TwMovie)) }, [movies.data, k, mode]) // 背景先抓海報，進電影頁就不用等
   const films = list.map((e) => ({ title: e.title, slug: e.m?.slug, en: e.m ? e.m.en : e.u?.en }))
@@ -1315,8 +1318,19 @@ function MoviesPage() {
     {mode === "fest" ? <FestivalSections list={festList} query={k} /> : mode === "box" ? <BoxOfficeSections key={"now"} movies={movies.data || []} query={k} scope={"now"} /> : mode === "year" ? <BoxOfficeSections key={"year"} movies={movies.data || []} query={k} scope={"year"} /> : <>
       {movies.error ? <ErrorRow error={movies.error} retry={movies.reload} /> : null}
       {!movies.data && !movies.error ? <Section><Loading text={"讀取電影清單…"} /></Section> : null}
-      {/* 依上映月份分段 */}
-      {(() => { let n = 0; return soon.groups.map((g, gi) => <Section key={g.title} header={<Text>{g.title}</Text>} footer={gi === soon.groups.length - 1 ? <Text>{soon.footer}</Text> : undefined}>{g.items.map((e) => row(e, n++))}</Section>) })()}
+      <Section>
+        <Picker title={"上映時間"} value={soon.when} onChanged={(v: string) => setSoonWhen(v)}>
+          {soon.whens.map((w) => <Text key={w.id} tag={w.id}>{`${w.label}（${w.count}）`}</Text>)}
+        </Picker>
+        <Picker title={"場次"} value={soon.state} onChanged={(v: string) => setSoonState(v)}>
+          {soon.states.map((s) => <Text key={s.id} tag={s.id}>{`${s.label}（${s.count}）`}</Text>)}
+        </Picker>
+      </Section>
+      {/* 依上映月份分段；點月份那一列可以收合 */}
+      {(() => { let n = 0; return soon.groups.map((g, gi) => { const mk = g.title.replace(/（\d+）$/, ""); const shut = soonShut.indexOf(mk) >= 0; const rows = g.items.map((e) => row(e, n++)); return <Section key={mk} footer={gi === soon.groups.length - 1 ? <Text>{soon.footer}</Text> : undefined}>
+        <Button action={() => setSoonShut(shut ? soonShut.filter((x) => x !== mk) : [...soonShut, mk])}><HStack><Text foregroundStyle={"label"} fontWeight={"semibold"}>{g.title}</Text><Spacer /><Text foregroundStyle={"secondaryLabel"}>{shut ? "展開 ▸" : "收合 ▾"}</Text></HStack></Button>
+        {shut ? null : rows}
+      </Section> }) })()}
       {movies.data && !list.length ? <Section><Text foregroundStyle={"secondaryLabel"}>找不到相符的電影。</Text></Section> : null}
     </>}
   </List>

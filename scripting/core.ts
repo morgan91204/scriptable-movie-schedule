@@ -2035,9 +2035,17 @@ export function loadUpcoming(): Promise<UpcomingFilm[]> {
 }
 /** 「即將上映」的一列：m = 場次通已經有場次的片；u = 還沒有場次、只知道上映日期的片（兩個不會同時是 null） */
 export interface SoonEntry { key: string; title: string; m: TwMovie | null; u: UpcomingFilm | null; lines: [string, string] }
-export interface SoonBoard { total: number; open: number; groups: { title: string; items: SoonEntry[] }[]; footer: string }
+export interface SoonPick { id: string; label: string; count: number }
+export interface SoonBoard {
+  total: number; open: number; groups: { title: string; items: SoonEntry[] }[]; footer: string;
+  /** 上映時間的選項（全部／兩週內／各個月份）與目前選的 */
+  whens: SoonPick[]; when: string; whenLabel: string;
+  /** 場次狀態的選項（全部／可查場次／尚未開放場次）與目前選的 */
+  states: SoonPick[]; state: string; stateLabel: string;
+}
+export interface SoonOpt { when?: string; state?: string }
 /** 把場次通「已經可以查場次」的片和「還沒有場次」的片合在一起，依上映月份分段 */
-export function soonBoard(movies: TwMovie[], upcoming: UpcomingFilm[], query?: string): SoonBoard {
+export function soonBoard(movies: TwMovie[], upcoming: UpcomingFilm[], query?: string, opt: SoonOpt = {}): SoonBoard {
   const k = (query || "").trim().toLowerCase();
   const hit = (name: string, en?: string) => !k || `${name} ${en || ""}`.toLowerCase().includes(k);
   const today = todayTPE();
@@ -2045,7 +2053,7 @@ export function soonBoard(movies: TwMovie[], upcoming: UpcomingFilm[], query?: s
   for (const u of upcoming) upOf[communityKey(u.title)] ||= u;
   const known: Record<string, boolean> = {}; // 場次通已經有的片（上映中的也算：開眼的日期偶爾比實際晚）
   for (const m of movies) known[communityKey(m.title)] = true;
-  const rows: (SoonEntry & { release?: string })[] = [];
+  let rows: (SoonEntry & { release?: string })[] = [];
   for (const m of movies) {
     if (!m.comingSoon || !hit(m.title, m.en)) continue;
     const u = upOf[communityKey(m.title)];
@@ -2054,21 +2062,35 @@ export function soonBoard(movies: TwMovie[], upcoming: UpcomingFilm[], query?: s
     const [a, b] = movieLines(mm);
     rows.push({ key: m.slug, title: m.title, m, u: null, lines: [[a, "可查場次"].filter(Boolean).join("｜"), b], release });
   }
-  const open = rows.length;
   for (const u of upcoming) {
     if (known[communityKey(u.title)] || u.release <= today || !hit(u.title, u.en)) continue;
     rows.push({ key: "u|" + u.title + "|" + u.release, title: u.title, m: null, u, lines: [[`${mdOf(u.release)} ${u.approx ? "當週" : ""}上映`, u.rating, u.runtime ? `${u.runtime} 分` : "", "尚未開放場次"].filter(Boolean).join("｜"), u.en || ""], release: u.release });
   }
   rows.sort((a, b) => (a.release || "9999").localeCompare(b.release || "9999")); // 穩定排序：同一天有場次的在前
+  // 篩選：上映時間（兩週內／某個月）和場次狀態。各選項後面的部數是「照另一個條件篩過之後」的數字
+  const in2w = addDays(today, 14), thisYear = today.slice(0, 4);
+  const whenOK = (r: { release?: string }, w: string) => !w || (w === "2w" ? !!r.release && r.release <= in2w : w === "none" ? !r.release : (r.release || "").slice(0, 7) === w);
+  const stateOK = (r: SoonEntry, s: string) => !s || (s === "open" ? !!r.m : !r.m);
+  const months = Array.from(new Set(rows.map((r) => (r.release || "").slice(0, 7)).filter(Boolean))).sort();
+  const whenIds = ["", "2w", ...months, ...(rows.some((r) => !r.release) ? ["none"] : [])];
+  const whenName = (w: string) => (!w ? "全部" : w === "2w" ? "兩週內" : w === "none" ? "日期未定" : `${w.slice(0, 4) === thisYear ? "" : w.slice(0, 4) + " 年 "}${Number(w.slice(5, 7))} 月`);
+  const when = whenIds.indexOf(opt.when || "") >= 0 ? opt.when || "" : "";
+  const state = opt.state === "open" || opt.state === "wait" ? opt.state : "";
+  const stateName = (s: string) => (!s ? "全部" : s === "open" ? "可查場次" : "尚未開放場次");
+  const whens = whenIds.map((w) => ({ id: w, label: whenName(w), count: rows.filter((r) => whenOK(r, w) && stateOK(r, state)).length }));
+  const states = ["", "open", "wait"].map((s) => ({ id: s, label: stateName(s), count: rows.filter((r) => whenOK(r, when) && stateOK(r, s)).length }));
+  rows = rows.filter((r) => whenOK(r, when) && stateOK(r, state));
+  const open = rows.filter((r) => r.m).length;
   return {
+    whens, when, whenLabel: whenName(when), states, state, stateLabel: stateName(state),
     total: rows.length, open, groups: soonGroups(rows).map((g) => ({ title: g.title, items: g.items.map(({ release: _r, ...e }) => e) })),
     footer: `標「可查場次」的已經可以找場次（資料來自場次通）；標「尚未開放場次」的是之後要上映、戲院還沒排場次的片${upcoming.length ? "（片單與上映日期來自開眼電影網，日期可能再調整）" : ""}。`,
   };
 }
 /** 「即將上映」要的資料一次讀好 */
-export async function loadSoonBoard(query?: string): Promise<SoonBoard> {
+export async function loadSoonBoard(query?: string, opt: SoonOpt = {}): Promise<SoonBoard> {
   const [movies, upcoming] = await Promise.all([loadMovies(), loadUpcoming().catch(() => [] as UpcomingFilm[])]);
-  return soonBoard(movies, upcoming, query);
+  return soonBoard(movies, upcoming, query, opt);
 }
 // ───────────────────────── 年度排行的三大評分（伺服器慢慢建立的總表） ─────────────────────────
 export const YEAR_RATINGS_URL = "https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/data/ratings-years.json";

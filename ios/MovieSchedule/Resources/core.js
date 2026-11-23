@@ -2492,7 +2492,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     upcomingMem = { at: Date.now(), job };
     return job;
   }
-  function soonBoard(movies, upcoming, query) {
+  function soonBoard(movies, upcoming, query, opt = {}) {
     const k = (query || "").trim().toLowerCase();
     const hit = (name, en) => !k || `${name} ${en || ""}`.toLowerCase().includes(k);
     const today = todayTPE();
@@ -2500,7 +2500,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     for (const u of upcoming) upOf[communityKey(u.title)] ||= u;
     const known = {};
     for (const m of movies) known[communityKey(m.title)] = true;
-    const rows = [];
+    let rows = [];
     for (const m of movies) {
       if (!m.comingSoon || !hit(m.title, m.en)) continue;
       const u = upOf[communityKey(m.title)];
@@ -2509,22 +2509,40 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
       const [a, b] = movieLines(mm);
       rows.push({ key: m.slug, title: m.title, m, u: null, lines: [[a, "可查場次"].filter(Boolean).join("｜"), b], release });
     }
-    const open = rows.length;
     for (const u of upcoming) {
       if (known[communityKey(u.title)] || u.release <= today || !hit(u.title, u.en)) continue;
       rows.push({ key: "u|" + u.title + "|" + u.release, title: u.title, m: null, u, lines: [[`${mdOf(u.release)} ${u.approx ? "當週" : ""}上映`, u.rating, u.runtime ? `${u.runtime} 分` : "", "尚未開放場次"].filter(Boolean).join("｜"), u.en || ""], release: u.release });
     }
     rows.sort((a, b) => (a.release || "9999").localeCompare(b.release || "9999"));
+    const in2w = addDays(today, 14), thisYear = today.slice(0, 4);
+    const whenOK = (r, w) => !w || (w === "2w" ? !!r.release && r.release <= in2w : w === "none" ? !r.release : (r.release || "").slice(0, 7) === w);
+    const stateOK = (r, s) => !s || (s === "open" ? !!r.m : !r.m);
+    const months = Array.from(new Set(rows.map((r) => (r.release || "").slice(0, 7)).filter(Boolean))).sort();
+    const whenIds = ["", "2w", ...months, ...rows.some((r) => !r.release) ? ["none"] : []];
+    const whenName = (w) => !w ? "全部" : w === "2w" ? "兩週內" : w === "none" ? "日期未定" : `${w.slice(0, 4) === thisYear ? "" : w.slice(0, 4) + " 年 "}${Number(w.slice(5, 7))} 月`;
+    const when = whenIds.indexOf(opt.when || "") >= 0 ? opt.when || "" : "";
+    const state = opt.state === "open" || opt.state === "wait" ? opt.state : "";
+    const stateName = (s) => !s ? "全部" : s === "open" ? "可查場次" : "尚未開放場次";
+    const whens = whenIds.map((w) => ({ id: w, label: whenName(w), count: rows.filter((r) => whenOK(r, w) && stateOK(r, state)).length }));
+    const states = ["", "open", "wait"].map((s) => ({ id: s, label: stateName(s), count: rows.filter((r) => whenOK(r, when) && stateOK(r, s)).length }));
+    rows = rows.filter((r) => whenOK(r, when) && stateOK(r, state));
+    const open = rows.filter((r) => r.m).length;
     return {
+      whens,
+      when,
+      whenLabel: whenName(when),
+      states,
+      state,
+      stateLabel: stateName(state),
       total: rows.length,
       open,
       groups: soonGroups(rows).map((g) => ({ title: g.title, items: g.items.map(({ release: _r, ...e }) => e) })),
       footer: `標「可查場次」的已經可以找場次（資料來自場次通）；標「尚未開放場次」的是之後要上映、戲院還沒排場次的片${upcoming.length ? "（片單與上映日期來自開眼電影網，日期可能再調整）" : ""}。`
     };
   }
-  async function loadSoonBoard(query) {
+  async function loadSoonBoard(query, opt = {}) {
     const [movies, upcoming] = await Promise.all([loadMovies(), loadUpcoming().catch(() => [])]);
-    return soonBoard(movies, upcoming, query);
+    return soonBoard(movies, upcoming, query, opt);
   }
   var YEAR_RATINGS_URL = "https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/data/ratings-years.json";
   var yearRatingKey = (name, release) => `${normTitle(name)}|${String(release || "").slice(0, 4)}`;
@@ -3632,7 +3650,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   var extra = { boxOffice, filmList, soonList, nowShowing, nowShowingMulti, movieBoard: movieBoard2, festivalBoard, festivalFilm, nearby, patchSettings, fillMovie, formatList };
   var BRIDGE_LEVEL = 2;
   globalThis.MS = {
-    version: "2026.11.24-0150",
+    version: "2026.11.24-0155",
     level: BRIDGE_LEVEL,
     init(saved) {
       cache = saved || {};

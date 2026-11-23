@@ -250,6 +250,27 @@ class App {
     if (p) p.sync(notifyPayload(this.settings)).catch(() => null);
   }
   /** 設定頁的「收藏電影的通知」：依裝置的狀況顯示開啟按鈕、各種通知的開關，或說明為什麼不能用 */
+  /** 設定頁的一列：點進去才是完整的通知設定 */
+  async notifyLink(): Promise<string> {
+    const p = this.push();
+    if (!p) return "";
+    const state: string = await p.refresh().catch(() => "unsupported");
+    const prefs = notifyPrefs(this.settings);
+    const on = NOTIFY_KINDS.filter((k) => prefs[k.id]).map((k) => k.label.replace(/時$/, ""));
+    const note = state === "on" ? (on.length ? on.join("、") : "四種通知都關著") : state === "needs-install" ? "要先把電影行程加到主畫面" : state === "unsupported" ? "這個瀏覽器不支援" : state === "denied" ? "系統設定裡沒有允許通知" : "開放場次、上映、快下檔、影展開始時通知你";
+    return (
+      <Section title="通知">
+        <Item icon={state === "on" ? "🔔" : "🔕"} title="收藏電影的通知" subtitle={note} right={state === "on" ? "已開啟" : "未開啟"} onTap={() => this.go(() => this.notifyView())} />
+      </Section>
+    );
+  }
+  async notifyView(): Promise<string> {
+    return (
+      <Page title="收藏電影的通知" onBack={() => this.back()}>
+        {await this.notifySection()}
+      </Page>
+    );
+  }
   async notifySection(): Promise<string> {
     const p = this.push();
     if (!p) return "";
@@ -294,30 +315,30 @@ class App {
     const picked = scope === "city" ? prefs.endCities || [] : [];
     if (!this.cinemas.length) this.cinemas = await loadCinemas().catch(() => [] as Cinema[]);
     const cities = Array.from(new Set(this.cinemas.map((c) => c.city))).sort((a, b) => (CITY_ORDER.indexOf(a) + 1 || 99) - (CITY_ORDER.indexOf(b) + 1 || 99));
-    const endRows = prefs.end ? (
+    const endNote = scope === "fav" ? `你收藏的影城裡，還在放映的從比較多變成剩下 ${max} 間以下` : `${notifyEndScope(prefs)}放映的影城，從比較多變成剩下 ${max} 間以下`;
+    return (
       <>
-        <Item kv title="　剩下幾間以下" right={`${max} 間以下 ⇄`} chevron={false} onTap={() => set({ endMax: NOTIFY_END_STEPS[(NOTIFY_END_STEPS.indexOf(max) + 1) % NOTIFY_END_STEPS.length] })} />
-        <Item kv title="　算哪些影城" right={`${notifyEndScope(prefs)} ${this.notifyOpen ? "▾" : "▸"}`} chevron={false} onTap={() => { this.notifyOpen = !this.notifyOpen; }} />
-        {this.notifyOpen ? (
-          <Chips scroll>
+        <Section title="什麼時候通知" hint="點一下開或關。晚上十點到早上九點不會發通知，留到早上再發。">
+          {NOTIFY_KINDS.map((k) => <Item icon={prefs[k.id] ? "✅" : "⬜️"} title={k.label} subtitle={k.id === "end" ? endNote : k.note} chevron={false} onTap={() => toggle(k.id)} />)}
+        </Section>
+        {prefs.end ? (
+          <Section title="快下檔的條件" hint={this.notifyOpen ? "縣市可以選好幾個；可以左右滑動" : ""}>
+            <Item kv title="剩下幾間以下" right={`${max} 間以下 ⇄`} chevron={false} onTap={() => set({ endMax: NOTIFY_END_STEPS[(NOTIFY_END_STEPS.indexOf(max) + 1) % NOTIFY_END_STEPS.length] })} />
+            <Item kv title="算哪些影城" right={`${notifyEndScope(prefs)} ${this.notifyOpen ? "▾" : "▸"}`} chevron={false} onTap={() => { this.notifyOpen = !this.notifyOpen; }} />
+            {this.notifyOpen ? (
+              <Chips scroll>
             <Chip label="全台" muted={scope !== "all"} onTap={() => set({ endScope: "all", endCities: [] })} />
             <Chip label="收藏的影城" sub={`${this.settings.favorites.length} 間`} muted={scope !== "fav"} onTap={() => set({ endScope: "fav", endCities: [] })} />
             {cities.map((c) => <Chip label={c} muted={picked.indexOf(c) < 0} onTap={() => { const next = picked.indexOf(c) < 0 ? [...picked, c] : picked.filter((z) => z !== c); set(next.length ? { endScope: "city", endCities: next } : { endScope: "all", endCities: [] }); }} />)}
-          </Chips>
+              </Chips>
+            ) : null}
+          </Section>
         ) : null}
+        <Section hint={`已開啟${n ? `，目前收藏了 ${n} 部` : "；還沒有收藏的電影，到電影頁點愛心收藏"}。你收藏的片名存在我們的伺服器上，只用來判斷什麼時候通知；關閉通知時會一起刪掉。`}>
+          <Item icon="📨" title="傳一則測試通知" subtitle="確認這台裝置收得到" chevron={false} onTap={async () => { await this.ui.toast((await p.test()) ? "已送出，幾秒內應該會收到" : "送不出去，請關閉通知後重新開啟"); }} />
+          <Item icon="🔕" title="關閉通知" subtitle="停止通知，並刪除伺服器上的資料" chevron={false} onTap={async () => { await p.disable(); await this.ui.toast("通知已關閉"); }} />
+        </Section>
       </>
-    ) : "";
-    return (
-      <Section title="收藏電影的通知" hint={`已開啟${n ? `，目前收藏了 ${n} 部` : "；還沒有收藏的電影，到電影頁點愛心收藏"}。晚上十點到早上九點不會發通知，留到早上再發。你收藏的片名存在我們的伺服器上，只用來判斷什麼時候通知；關閉通知時會一起刪掉。`}>
-        {NOTIFY_KINDS.map((k) => (
-          <>
-            <Item icon={prefs[k.id] ? "✅" : "⬜️"} title={k.label} subtitle={k.id === "end" ? (scope === "fav" ? `你收藏的影城裡，還在放映的從比較多變成剩下 ${max} 間以下` : `${notifyEndScope(prefs)}放映的影城，從比較多變成剩下 ${max} 間以下`) : k.note} chevron={false} onTap={() => toggle(k.id)} />
-            {k.id === "end" ? endRows : ""}
-          </>
-        ))}
-        <Item icon="📨" title="傳一則測試通知" subtitle="確認這台裝置收得到" chevron={false} onTap={async () => { await this.ui.toast((await p.test()) ? "已送出，幾秒內應該會收到" : "送不出去，請關閉通知後重新開啟"); }} />
-        <Item icon="🔕" title="關閉通知" subtitle="停止通知，並刪除伺服器上的資料" chevron={false} onTap={async () => { await p.disable(); await this.ui.toast("通知已關閉"); }} />
-      </Section>
     );
   }
   async settingsView(): Promise<string> {
@@ -332,7 +353,7 @@ class App {
             saveSettings(this.settings);
           }} />
         </Section>
-        {await this.notifySection()}
+        {await this.notifyLink()}
         <Section title="關於" hint="連鎖影城的場次來自場次通（twshowtimes.com），感謝場次通的整理；其他來自開眼電影網，以及誠品、光點、樂聲、內惟戲院官網。實際場次以影城公告為準。">
           {IS_WEB && !this.isStandalone() ? <Item icon="📲" title="加到主畫面" subtitle="像 App 一樣從主畫面開啟，看圖示教學" onTap={() => this.go(() => this.installView())} /> : null}
           <Item icon="ℹ️" title="關於與資料來源" accent chevron={false} onTap={() => Safari.open(ABOUT_URL)} />
@@ -993,6 +1014,10 @@ class App {
 
   // ── 依電影找 ──
   movieQuery = "";
+  soonWhen = ""; // 即將上映的篩選：上映時間（"" 全部、"2w" 兩週內、"2026-12" 某個月）
+  soonState = ""; // 場次狀態（"" 全部、"open" 可查場次、"wait" 尚未開放）
+  soonOpen = ""; // 目前展開哪一組篩選
+  soonShut: string[] = []; // 收合起來的月份
   /** 電影分頁上方的切換：上映中／票房排行 */
   movieMode: "box" | "soon" | "year" | "fest" = "box"; // box = 現正上映（含票房排行）；year = 歷年電影（某幾年上映的片，含已下檔）
   movieModeChips(): string {
@@ -1297,7 +1322,11 @@ class App {
     if (this.movieMode === "fest") return this.festivalListView();
     if (this.movieMode === "box" || this.movieMode === "year") return this.boxOfficeView();
     // 即將上映：場次通已經有場次的片＋還沒有場次的片（伺服器整理的近期上映片單），依上映月份分段
-    const board = await loadSoonBoard(this.movieQuery);
+    const board = await loadSoonBoard(this.movieQuery, { when: this.soonWhen, state: this.soonState });
+    // 兩個篩選收合成兩行（跟影展、歷年電影同一種樣式），點了才展開；選好就自動收起來
+    const fold = (id: string, title: string, summary: string) => (
+      <Item kv title={title} right={`${summary} ${this.soonOpen === id ? "▾" : "▸"}`} chevron={false} onTap={() => { this.soonOpen = this.soonOpen === id ? "" : id; }} />
+    );
     const list = board.groups.flatMap((g) => g.items);
     prefetchPosters(list.filter((e) => e.m).map((e) => e.m as TwMovie)); // 背景先抓海報，進電影頁就不用等
     // 每一列的小海報：手機上記過、伺服器查好的立刻有；要上網找的最多等 0.6 秒，其餘每好一批就在原位補畫
@@ -1315,6 +1344,7 @@ class App {
       if (src && src === u) cachePoster(u);
       thumbOf.set(e, { src, url: u });
     });
+    const monthKey = (title: string) => title.replace(/（\d+）$/, "");
     const item = (e: SoonEntry) => {
       const m = e.m, u = e.u;
       return (
@@ -1330,7 +1360,30 @@ class App {
       <Page title="依電影找場次" subtitle={`即將上映 ${board.total} 部｜${board.open} 部可查場次`} onBack={() => this.back()}>
         {this.movieModeChips()}
         <Search value={this.movieQuery} placeholder="搜尋片名（中文或英文）" onInput={(t) => { this.movieQuery = t; }} />
-        {board.groups.map((g, i) => <Section title={g.title} hint={i === board.groups.length - 1 ? board.footer : ""}>{g.items.map(item)}</Section>)}
+        <Section hint={this.soonOpen === "when" && board.whens.length > 4 ? "可以左右滑動" : ""}>
+          {fold("when", "上映時間", board.whenLabel)}
+          {this.soonOpen === "when" ? (
+            <Chips scroll>
+              {board.whens.map((w) => <Chip label={w.label} sub={`${w.count} 部`} muted={w.id !== board.when} onTap={() => { this.soonWhen = w.id; this.soonOpen = ""; }} />)}
+            </Chips>
+          ) : null}
+          {fold("state", "場次", board.stateLabel)}
+          {this.soonOpen === "state" ? (
+            <Chips scroll>
+              {board.states.map((s) => <Chip label={s.label} sub={`${s.count} 部`} muted={s.id !== board.state} onTap={() => { this.soonState = s.id; this.soonOpen = ""; }} />)}
+            </Chips>
+          ) : null}
+        </Section>
+        {/* 每個月份一段，點月份那一列可以收合 */}
+        {board.groups.map((g, i) => {
+          const shut = this.soonShut.indexOf(monthKey(g.title)) >= 0;
+          return (
+            <Section hint={i === board.groups.length - 1 ? board.footer : ""}>
+              <Item kv title={g.title} right={shut ? "展開 ▸" : "收合 ▾"} chevron={false} onTap={() => { const k = monthKey(g.title); this.soonShut = shut ? this.soonShut.filter((x) => x !== k) : [...this.soonShut, k]; }} />
+              {shut ? null : g.items.map(item)}
+            </Section>
+          );
+        })}
         {list.length ? null : <Empty icon="🎞" text="找不到相符的電影" />}
       </Page>
     );
