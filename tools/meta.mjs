@@ -81,8 +81,15 @@ async function tmdbIdentify(title, en, releaseYear) {
     const found = await call(`/search/movie?language=zh-TW&query=${encodeURIComponent(q)}`);
     const hits = (found.results || []).filter((x) => want.indexOf(same(x.title)) >= 0 || want.indexOf(same(x.original_title)) >= 0);
     if (!hits.length) continue;
-    // 同名多部：有已知上映年就挑最接近的（重映片的上映年是今年，原片只有一部時不受影響）
-    const hit = hits.length > 1 && releaseYear ? hits.slice().sort((x, y) => Math.abs(yearOf(x) - releaseYear) - Math.abs(yearOf(y) - releaseYear))[0] : hits[0];
+    // 同名多部時怎麼挑：
+    // 1) 有一部的年份跟已知上映年只差一年以內 → 是今年的新片，挑它（《冠軍之路》2025 台灣紀錄片，不是 2024 的印度片）
+    // 2) 但那一部在 TMDB 上完全沒人評分、而另一部同名的很有名（100 票以上）→ 多半是舊片重映被人另外建了一筆，挑有名的那部（《超人再起》2006）
+    // 3) 沒有年份接近的 → 是舊片重映，挑最多人評分的（《讓子彈飛》2010，不是 2019 的同名印度片）
+    const votes = (x) => Number(x.vote_count) || 0;
+    const byVotes = (list) => list.slice().sort((x, y) => votes(y) - votes(x))[0];
+    const near = releaseYear ? hits.filter((x) => yearOf(x) && Math.abs(yearOf(x) - releaseYear) <= 1) : [];
+    const famousOther = hits.some((x) => near.indexOf(x) < 0 && votes(x) >= 100);
+    const hit = near.length && (votes(byVotes(near)) >= 1 || !famousOther) ? byVotes(near) : byVotes(hits);
     const d = await call(`/movie/${hit.id}?language=en-US&append_to_response=external_ids`);
     const rt = Number(d.runtime) || 0;
     const img = hit.poster_path || d.poster_path || "";
@@ -106,12 +113,13 @@ async function refresh(m) {
   const e = (movies[k] ||= {});
   e.seen = now;
   // 先確認是哪一部片（TMDB，中文片名完全相同）。確認過就記著不再問（im）；找不到的 14 天再試，試過 3 次就 60 天一次
-  if (TMDB_TOKEN && !(e.im && e.im.id) && (!e.ima || recheck || now - e.ima > ((e.imn || 0) >= 3 ? 60 : 14) * DAY)) {
+  if (TMDB_TOKEN && (recheck || !(e.im && e.im.id)) && (!e.ima || recheck || now - e.ima > ((e.imn || 0) >= 3 ? 60 : 14) * DAY)) {
     try {
       const who = await tmdbIdentify(m.title, m.en, Number(core.releaseOf(m.title).slice(0, 4)) || 0);
       e.ima = now;
       e.imn = (e.imn || 0) + 1;
       stat.tmdbAsked = (stat.tmdbAsked || 0) + 1;
+      delete e.im; delete e.imp; // 重新確認時先清掉上次的結果
       if (who) {
         if (who.id) e.im = { id: who.id, name: who.name, year: who.year };
         if (who.poster) e.imp = who.poster;
