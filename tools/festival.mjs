@@ -5,6 +5,7 @@
 // 用法：node tools/festival.mjs <輸出檔> [上一次的 festival.json]
 //       也可以 import { parseGoldenHorseDay, goldenHorseDates } 單獨測解析
 import fs from "node:fs";
+import path from "node:path";
 
 const UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1";
 const unescape = (s) => String(s || "").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#0?39;/g, "'");
@@ -727,6 +728,48 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     console.log(`  劇照 ${f.name}：${n}／${f.films.length}${n ? "" : "　← 一張都沒有"}`);
     for (const st of Object.values(status)) for (const x of st.festivals || []) if (x.id === f.id) { x.films = f.films.length; x.posters = n; } // 每週的檢查會看：有圖的比例突然掉下來＝官網改版
   }
+  // 劇照備份：官網換屆、改版後舊圖會被撤掉，所以每張劇照下載一次、縮成清單用的小圖，存到專案自己的 img 分支，
+  // App 讀的是這份備份（poster 換成備份的網址，原本的網址留在 posterFrom）。備份過的不再抓；TMDB、YouTube 的圖很穩，不備份。
+  // 對照表 festival-images.json：原圖網址 → { f: 備份檔路徑 } 或 { fail: 失敗次數 }（失敗 5 次就不再試）
+  const IMG_BASE = (process.env.FESTIVAL_IMG_BASE || "").replace(/\/$/, "");
+  let imageMap = null;
+  if (IMG_BASE && process.env.FESTIVAL_BASE) {
+    try {
+      const r = await fetch(`${process.env.FESTIVAL_BASE}/festival-images.json?t=${Date.now()}`, { signal: AbortSignal.timeout(30000) });
+      if (r.status === 404) imageMap = {};
+      else if (r.ok) imageMap = (await r.json()).images || {};
+    } catch (_) {}
+    if (!imageMap) console.log("劇照備份：對照表讀不到，這次不備份（免得整批重抓）");
+  }
+  if (imageMap) {
+    const { default: sharp } = await import("sharp");
+    const { createHash } = await import("node:crypto");
+    const dir = path.join(path.dirname(outPath), "fest-img");
+    let saved = 0, failed = 0, budget = Number(process.env.FESTIVAL_IMG_MAX) || 250;
+    for (const f of [...got, ...prev]) for (const film of f.films || []) {
+      const u = film.poster || "";
+      if (!/^https:\/\//.test(u) || u.startsWith(IMG_BASE) || /^https:\/\/(?:image\.tmdb\.org|img\.youtube\.com|i\.ytimg\.com)\//.test(u)) continue;
+      let m = imageMap[u];
+      if (!(m && m.f) && budget > 0 && !(m && m.fail >= 5)) {
+        budget--;
+        await new Promise((r) => setTimeout(r, 120));
+        try {
+          const r = await fetch(u, { headers: { "User-Agent": UA, Referer: new URL(u).origin + "/" }, signal: AbortSignal.timeout(30000) });
+          if (!r.ok) throw new Error(String(r.status));
+          const small = await sharp(Buffer.from(await r.arrayBuffer())).rotate().resize({ width: 400, height: 600, fit: "inside", withoutEnlargement: true }).flatten({ background: "#ffffff" }).jpeg({ quality: 78, mozjpeg: true }).toBuffer();
+          const file = `fest/${String(f.id).replace(/[^\w-]/g, "")}/${createHash("sha1").update(u).digest("hex").slice(0, 16)}.jpg`;
+          fs.mkdirSync(path.dirname(path.join(dir, file)), { recursive: true });
+          fs.writeFileSync(path.join(dir, file), small);
+          m = imageMap[u] = { f: file };
+          saved++;
+        } catch (_) { imageMap[u] = { fail: ((m && m.fail) || 0) + 1 }; failed++; m = null; }
+      }
+      if (m && m.f) { film.posterFrom = u; film.poster = `${IMG_BASE}/${m.f}`; }
+    }
+    fs.writeFileSync(outPath.replace(/festival\.json$/, "festival-images.json"), JSON.stringify({ images: Object.fromEntries(Object.keys(imageMap).sort().map((k) => [k, imageMap[k]])) }) + "\n");
+    const left = [...got, ...prev].reduce((n, f) => n + (f.films || []).filter((x) => /^https:\/\//.test(x.poster || "") && !x.poster.startsWith(IMG_BASE) && !/image\.tmdb\.org|youtube\.com|ytimg\.com/.test(x.poster)).length, 0);
+    console.log(`劇照備份：這次新備份 ${saved} 張、失敗 ${failed} 張；對照表共 ${Object.values(imageMap).filter((x) => x.f).length} 張；還沒備份的 ${left} 張${left ? "（下一輪繼續）" : ""}`);
+  }
   // 這次讀到的蓋掉舊的；沒讀到的（官網換屆了、或暫時讀不到）沿用上一次存的。
   // 只留「今年」的影展（結束日在今年），跨年後舊的自動清掉
   const year = todayTPE().slice(0, 4);
@@ -756,7 +799,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     let changed = false;
     for (const f of got.filter((x) => String(x.end).slice(0, 4) === y)) {
       const i = list.findIndex((x) => x.id === f.id);
-      const pics = (x) => (x.films || []).reduce((n, m) => n + (m.poster ? 1 : 0) + (m.intro ? 1 : 0), 0); // 有圖、有介紹的越多越完整
+      const pics = (x) => (x.films || []).reduce((n, m) => n + (m.poster ? 1 : 0) + (m.intro ? 1 : 0) + (m.posterFrom ? 1 : 0), 0); // 有圖、有介紹、劇照已備份的越多越完整
       if (i >= 0 && f.sessions.length <= list[i].sessions.length && !(f.sessions.length === list[i].sessions.length && pics(f) > pics(list[i]))) continue; // 已經有、而且沒有比較完整（場次沒變多、圖也沒變多）
       if (i >= 0) list[i] = f; else list.push(f);
       changed = true;
