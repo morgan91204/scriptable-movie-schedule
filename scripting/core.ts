@@ -1911,10 +1911,13 @@ export function multiDetail(dates: string[], winIds: string[]): string {
 
 /** 把結果依電影分組，場次多的排前面 */
 export function groupByMovie(hits: Hit[]): { title: string; runtime: number; rating?: string; hits: Hit[] }[] {
+  // 同一部片各來源的片名寫法不同（半形／全形冒號、空白、異體字）：用去掉標點空白的片名歸組，不然會被拆成兩部
   const map: Record<string, { title: string; runtime: number; rating?: string; hits: Hit[] }> = {};
   for (const h of hits) {
-    const g = map[h.movie.title] || (map[h.movie.title] = { title: h.movie.title, runtime: h.movie.runtime, rating: h.movie.rating, hits: [] });
+    const key = normTitle(h.movie.title) || h.movie.title;
+    const g = map[key] || (map[key] = { title: h.movie.title, runtime: h.movie.runtime, rating: h.movie.rating, hits: [] });
     if (!g.runtime && h.movie.runtime) g.runtime = h.movie.runtime;
+    if (!g.rating && h.movie.rating) g.rating = h.movie.rating;
     g.hits.push(h);
   }
   return Object.values(map).sort((a, b) => b.hits.length - a.hits.length || showMinute(a.hits[0].time) - showMinute(b.hits[0].time));
@@ -1924,11 +1927,31 @@ export function groupByMovie(hits: Hit[]): { title: string; runtime: number; rat
  *  片名對不上（官網來源的戲院用的片名不同）或清單讀不到的，就沒有 movie */
 export async function linkMovies<T extends { title: string }>(groups: T[]): Promise<(T & { movie?: TwMovie })[]> {
   const list = await loadMovies().catch(() => [] as TwMovie[]);
-  return groups.map((g) => {
+  const linked = groups.map((g) => {
     const k = normTitle(g.title), b = normTitle(baseTitle(g.title));
     const movie = list.find((m) => normTitle(m.title) === k) || list.find((m) => normTitle(baseTitle(m.title)) === b);
     return movie ? { ...g, movie } : g;
-  });
+  }) as (T & { movie?: TwMovie; hits?: Hit[]; runtime?: number; rating?: string })[];
+  // 對到電影清單上「同一部片」的幾組合成一組（片名帶「特別場」「4K修復版」之類的字，場次通當成同一部）：
+  // 片名、片長、分級一律用電影清單上那一筆，大家看到的都一樣；場次合在一起照時間排
+  const out: typeof linked = [];
+  const bySlug: Record<string, (typeof linked)[number]> = {};
+  for (const g of linked) {
+    const m = g.movie;
+    if (!m) { out.push(g); continue; }
+    const first = bySlug[m.slug];
+    if (first) {
+      if (first.hits && g.hits) first.hits = first.hits.concat(g.hits).sort((a, b) => (a.day || a.date).localeCompare(b.day || b.date) || showMinute(a.time) - showMinute(b.time));
+      if (!first.runtime && g.runtime) first.runtime = g.runtime;
+      if (!first.rating && g.rating) first.rating = g.rating;
+      continue;
+    }
+    const one = { ...g, title: m.title, ...(m.runtime ? { runtime: m.runtime } : {}), ...(m.rating ? { rating: m.rating } : {}) };
+    bySlug[m.slug] = one;
+    out.push(one);
+  }
+  if (out.every((g) => g.hits)) out.sort((a, b) => (b.hits as Hit[]).length - (a.hits as Hit[]).length || showMinute((a.hits as Hit[])[0].time) - showMinute((b.hits as Hit[])[0].time));
+  return out as (T & { movie?: TwMovie })[];
 }
 /** 「現在有什麼可以看」每部片標題列的說明：幾場｜片長｜分級 */
 export const nowGroupLine = (g: { hits: unknown[]; runtime?: number; rating?: string }): string =>

@@ -1408,6 +1408,8 @@ class App {
     );
   }
 
+  nowFolded: string[] = []; // 「現在有什麼可以看」結果裡收合起來的片（只留片名列）
+  nowFoldFor = ""; // 上面那份收合狀態是哪一次查詢的
   async nowResultsView(dates: string[], winIds: string[]): Promise<string> {
     // 範圍複選：各範圍的影城合在一起，同一間只查一次（有距離的保留距離）
     const byId = new Map<string, { cinema: Cinema; km: number | null }>();
@@ -1437,6 +1439,11 @@ class App {
     };
     const scopeLabel = this.nowScopes.map((sc) => (sc === "all" ? "全台影城" : sc === "fav" ? "常去影城" : sc === "near" ? "附近 10 間" : sc)).join("、");
     const many = dates.length > 1; // 複選多天：每一場前面標日期
+    // 收合：換了查詢條件就全部重新展開
+    const foldKey = [dates.join(","), winIds.join(","), this.nowScopes.join(","), this.nowFormats.join(",")].join("|");
+    if (this.nowFoldFor !== foldKey) { this.nowFoldFor = foldKey; this.nowFolded = []; }
+    const folded = (t: string) => this.nowFolded.indexOf(t) >= 0;
+    const allFolded = groups.length > 0 && groups.every((g) => folded(g.title));
     const open = (hit: Hit) => {
       this.runtime = hit.movie.runtime;
       this.seat = hallOf(hit.version.label);
@@ -1447,6 +1454,13 @@ class App {
         {/* 完整的查詢條件放在內文（標題列只有一行，複選多了會被截掉） */}
         <Note text={`${multiDetail(dates, winIds)}\n影城：${scopeLabel}${this.nowFormats.length ? `\n特殊廳：${this.nowFormats.join("、")}` : ""}`} />
         {groups.length ? null : <Empty icon="🍿" text="沒有符合的場次，換個時段或範圍試試。" />}
+        {groups.length > 1 ? (
+          <Button
+            label={allFolded ? "▸ 全部展開場次" : "▾ 全部收合，只看片名"}
+            kind="secondary"
+            onTap={() => { this.nowFolded = allFolded ? [] : groups.map((g) => g.title); }}
+          />
+        ) : null}
         {groups.map((g, gi) => (
           <Section>
             {/* 片名獨立一列（海報、大字、有底色），點下去是電影頁：簡介、預告、所有影城的場次 */}
@@ -1454,10 +1468,11 @@ class App {
               head
               thumb={thumbOf(gi)}
               title={g.title}
-              subtitle={nowGroupLine(g) + (g.movie ? "\n看電影介紹與所有場次" : "")}
+              subtitle={nowGroupLine(g) + (g.movie ? "\n點片名看電影介紹與所有場次" : "")}
               onTap={g.movie ? () => this.go(() => this.movieView(g.movie as TwMovie, ""), `讀取《${g.title}》…`) : undefined}
+              action={{ label: folded(g.title) ? "▸" : "▾", hint: folded(g.title) ? "展開這部片的場次" : "收合這部片的場次", onTap: () => { this.nowFolded = folded(g.title) ? this.nowFolded.filter((t) => t !== g.title) : [...this.nowFolded, g.title]; } }}
             />
-            {g.hits.map((hit) => (
+            {(folded(g.title) ? [] : g.hits).map((hit) => (
               <Item
                 title={`${many && hit.day ? dateLabel(hit.day).replace(/ .*$/, "") + " " : ""}${hit.time}${isLate(hit.time) ? "（凌晨）" : ""}　${hit.cinema.name}`}
                 subtitle={[hit.version.label, kmLabel(hit.km)].filter(Boolean).join("｜")}

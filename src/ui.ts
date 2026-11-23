@@ -98,6 +98,8 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .step-s{font-size:13px;color:var(--fg2);margin-top:2px}
 .note.version{padding:6px 0;-webkit-user-select:none;user-select:none}
 .note.version:active{opacity:.5}
+.item .act{flex:none;width:40px;height:40px;margin:-4px -6px -4px 0;border-radius:20px;font-size:17px;color:var(--fg2);background:transparent}
+.item .act:active{background:var(--line)}
 .item.head{background:var(--chip)}
 .item.head .title{font-size:18px;font-weight:700}
 .para{padding:12px 14px;font-size:15px;line-height:1.6;white-space:pre-line}

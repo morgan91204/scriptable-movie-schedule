@@ -63,6 +63,7 @@ struct HomeView: View {
 
 /// 現在有什麼可以看：選日期、時段、範圍，一次列出所有場次
 struct NowView: View {
+    @State private var folded: Set<String> = [] // 搜尋結果裡收合起來的片（只留片名列）
     let cinemas: [Cinema]
     @ObservedObject private var settings = SettingsStore.shared
     // 四個條件都可以複選
@@ -104,6 +105,13 @@ struct NowView: View {
                 Text(info).font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
             }
             Spacer(minLength: 4)
+            // 最右邊的收合鈕：跟整列（點了進電影頁）分開按
+            Button {
+                if folded.contains(g.title) { folded.remove(g.title) } else { folded.insert(g.title) }
+            } label: {
+                Image(systemName: folded.contains(g.title) ? "chevron.right.circle" : "chevron.down.circle").font(.title3).foregroundStyle(Color.secondary)
+            }
+            .buttonStyle(.borderless)
         }
     }
 
@@ -174,6 +182,16 @@ struct NowView: View {
                 if r.groups.isEmpty {
                     Section { Text("沒有符合的場次，換個時段或範圍試試。").foregroundStyle(.secondary) }
                 }
+                if r.groups.count > 1 {
+                    let all = r.groups.allSatisfy { folded.contains($0.title) }
+                    Section {
+                        Button {
+                            folded = all ? [] : Set(r.groups.map { $0.title })
+                        } label: {
+                            Label(all ? "全部展開場次" : "全部收合，只看片名", systemImage: all ? "chevron.down.circle" : "chevron.right.circle")
+                        }
+                    }
+                }
                 ForEach(r.groups) { g in
                     Section {
                         // 片名獨立一列（海報、粗體大字），點下去是電影頁：簡介、預告、所有影城的場次
@@ -182,7 +200,7 @@ struct NowView: View {
                         } else {
                             groupHead(g)
                         }
-                        ForEach(g.hits, id: \.self) { h in
+                        ForEach(folded.contains(g.title) ? [] : g.hits, id: \.self) { h in
                             NavigationLink {
                                 ConfirmView(pick: ShowPick(title: h.movie.title, versionLabel: h.version.label, cinemaName: h.cinema.name, address: h.ctx?.address ?? h.cinema.address ?? "", date: h.date, time: h.time, runtime: h.movie.runtime ?? g.runtime ?? 0, bookingUrl: h.ctx?.booking ?? "", cinema: h.cinema))
                             } label: {

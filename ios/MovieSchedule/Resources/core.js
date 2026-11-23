@@ -2200,19 +2200,42 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   function groupByMovie(hits) {
     const map = {};
     for (const h of hits) {
-      const g = map[h.movie.title] || (map[h.movie.title] = { title: h.movie.title, runtime: h.movie.runtime, rating: h.movie.rating, hits: [] });
+      const key = normTitle(h.movie.title) || h.movie.title;
+      const g = map[key] || (map[key] = { title: h.movie.title, runtime: h.movie.runtime, rating: h.movie.rating, hits: [] });
       if (!g.runtime && h.movie.runtime) g.runtime = h.movie.runtime;
+      if (!g.rating && h.movie.rating) g.rating = h.movie.rating;
       g.hits.push(h);
     }
     return Object.values(map).sort((a, b) => b.hits.length - a.hits.length || showMinute(a.hits[0].time) - showMinute(b.hits[0].time));
   }
   async function linkMovies(groups) {
     const list = await loadMovies().catch(() => []);
-    return groups.map((g) => {
+    const linked = groups.map((g) => {
       const k = normTitle(g.title), b = normTitle(baseTitle(g.title));
       const movie = list.find((m) => normTitle(m.title) === k) || list.find((m) => normTitle(baseTitle(m.title)) === b);
       return movie ? { ...g, movie } : g;
     });
+    const out = [];
+    const bySlug = {};
+    for (const g of linked) {
+      const m = g.movie;
+      if (!m) {
+        out.push(g);
+        continue;
+      }
+      const first = bySlug[m.slug];
+      if (first) {
+        if (first.hits && g.hits) first.hits = first.hits.concat(g.hits).sort((a, b) => (a.day || a.date).localeCompare(b.day || b.date) || showMinute(a.time) - showMinute(b.time));
+        if (!first.runtime && g.runtime) first.runtime = g.runtime;
+        if (!first.rating && g.rating) first.rating = g.rating;
+        continue;
+      }
+      const one = { ...g, title: m.title, ...m.runtime ? { runtime: m.runtime } : {}, ...m.rating ? { rating: m.rating } : {} };
+      bySlug[m.slug] = one;
+      out.push(one);
+    }
+    if (out.every((g) => g.hits)) out.sort((a, b) => b.hits.length - a.hits.length || showMinute(a.hits[0].time) - showMinute(b.hits[0].time));
+    return out;
   }
   var nowGroupLine = (g) => [`${g.hits.length} 場`, g.runtime ? `${g.runtime} 分鐘` : "", g.rating || ""].filter(Boolean).join("｜");
   var errText = (e) => {

@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.23-1414
+// @movie-schedule-app 電影行程 v2026.11.23-1425
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/parsers.gen.ts
@@ -1982,19 +1982,42 @@ function multiDetail(dates, winIds) {
 function groupByMovie(hits) {
   const map = {};
   for (const h2 of hits) {
-    const g = map[h2.movie.title] || (map[h2.movie.title] = { title: h2.movie.title, runtime: h2.movie.runtime, rating: h2.movie.rating, hits: [] });
+    const key = normTitle(h2.movie.title) || h2.movie.title;
+    const g = map[key] || (map[key] = { title: h2.movie.title, runtime: h2.movie.runtime, rating: h2.movie.rating, hits: [] });
     if (!g.runtime && h2.movie.runtime) g.runtime = h2.movie.runtime;
+    if (!g.rating && h2.movie.rating) g.rating = h2.movie.rating;
     g.hits.push(h2);
   }
   return Object.values(map).sort((a, b) => b.hits.length - a.hits.length || showMinute(a.hits[0].time) - showMinute(b.hits[0].time));
 }
 async function linkMovies(groups) {
   const list = await loadMovies().catch(() => []);
-  return groups.map((g) => {
+  const linked = groups.map((g) => {
     const k = normTitle(g.title), b = normTitle(baseTitle(g.title));
     const movie = list.find((m) => normTitle(m.title) === k) || list.find((m) => normTitle(baseTitle(m.title)) === b);
     return movie ? { ...g, movie } : g;
   });
+  const out = [];
+  const bySlug = {};
+  for (const g of linked) {
+    const m = g.movie;
+    if (!m) {
+      out.push(g);
+      continue;
+    }
+    const first = bySlug[m.slug];
+    if (first) {
+      if (first.hits && g.hits) first.hits = first.hits.concat(g.hits).sort((a, b) => (a.day || a.date).localeCompare(b.day || b.date) || showMinute(a.time) - showMinute(b.time));
+      if (!first.runtime && g.runtime) first.runtime = g.runtime;
+      if (!first.rating && g.rating) first.rating = g.rating;
+      continue;
+    }
+    const one = { ...g, title: m.title, ...m.runtime ? { runtime: m.runtime } : {}, ...m.rating ? { rating: m.rating } : {} };
+    bySlug[m.slug] = one;
+    out.push(one);
+  }
+  if (out.every((g) => g.hits)) out.sort((a, b) => b.hits.length - a.hits.length || showMinute(a.hits[0].time) - showMinute(b.hits[0].time));
+  return out;
 }
 var nowGroupLine = (g) => [`${g.hits.length} 場`, g.runtime ? `${g.runtime} 分鐘` : "", g.rating || ""].filter(Boolean).join("｜");
 var errText = (e) => {
@@ -2494,7 +2517,7 @@ function Section(props) {
 function Item(props) {
   const cls = ["item", props.head ? "head" : "", props.onTap ? "tap" : "", props.muted ? "muted" : "", props.accent ? "accent" : "", props.onLongPress ? "long" : ""].join(" ");
   const fallback = "if(this.dataset.url&&this.src!==this.dataset.url){this.src=this.dataset.url}else{this.remove()}";
-  return /* @__PURE__ */ h("div", { class: cls, onTap: props.onTap, onLongPress: props.onLongPress }, props.rank ? /* @__PURE__ */ h("span", { class: "rank" + (props.rank <= 3 ? " top" : "") + (props.rank >= 1e3 ? " d4" : props.rank >= 100 ? " d3" : "") }, props.rank) : null, props.thumb ? props.thumb.pending && !props.thumb.src ? /* @__PURE__ */ h("span", { class: "thumb none" }) : /* @__PURE__ */ h(GenPoster, { cls: "thumb", title: props.title }, props.thumb.src ? /* @__PURE__ */ h("img", { src: props.thumb.src, "data-url": props.thumb.url && props.thumb.url !== props.thumb.src ? props.thumb.url : void 0, alt: "", loading: "lazy", onerror: fallback }) : null) : null, props.icon ? /* @__PURE__ */ h("span", { class: "ico" }, props.icon) : null, /* @__PURE__ */ h("div", { class: "body" }, /* @__PURE__ */ h("div", { class: "title" }, esc(props.title)), props.subtitle ? props.subtitle.includes("\n") ? props.subtitle.split("\n").map((l, i) => /* @__PURE__ */ h("div", { class: "sub one" + (i ? " dim" : "") }, esc(l))) : /* @__PURE__ */ h("div", { class: "sub" }, esc(props.subtitle)) : null), props.badge ? /* @__PURE__ */ h("span", { class: "badge" }, esc(props.badge)) : null, props.right ? /* @__PURE__ */ h("span", { class: "right" }, esc(props.right)) : null, props.onTap && props.chevron !== false ? /* @__PURE__ */ h("span", { class: "chev" }, "›") : null);
+  return /* @__PURE__ */ h("div", { class: cls, onTap: props.onTap, onLongPress: props.onLongPress }, props.rank ? /* @__PURE__ */ h("span", { class: "rank" + (props.rank <= 3 ? " top" : "") + (props.rank >= 1e3 ? " d4" : props.rank >= 100 ? " d3" : "") }, props.rank) : null, props.thumb ? props.thumb.pending && !props.thumb.src ? /* @__PURE__ */ h("span", { class: "thumb none" }) : /* @__PURE__ */ h(GenPoster, { cls: "thumb", title: props.title }, props.thumb.src ? /* @__PURE__ */ h("img", { src: props.thumb.src, "data-url": props.thumb.url && props.thumb.url !== props.thumb.src ? props.thumb.url : void 0, alt: "", loading: "lazy", onerror: fallback }) : null) : null, props.icon ? /* @__PURE__ */ h("span", { class: "ico" }, props.icon) : null, /* @__PURE__ */ h("div", { class: "body" }, /* @__PURE__ */ h("div", { class: "title" }, esc(props.title)), props.subtitle ? props.subtitle.includes("\n") ? props.subtitle.split("\n").map((l, i) => /* @__PURE__ */ h("div", { class: "sub one" + (i ? " dim" : "") }, esc(l))) : /* @__PURE__ */ h("div", { class: "sub" }, esc(props.subtitle)) : null), props.badge ? /* @__PURE__ */ h("span", { class: "badge" }, esc(props.badge)) : null, props.right ? /* @__PURE__ */ h("span", { class: "right" }, esc(props.right)) : null, props.onTap && props.chevron !== false && !props.action ? /* @__PURE__ */ h("span", { class: "chev" }, "›") : null, props.action ? /* @__PURE__ */ h("button", { class: "act", "aria-label": props.action.hint || props.action.label, onTap: props.action.onTap }, esc(props.action.label)) : null);
 }
 function Chips(props) {
   return /* @__PURE__ */ h("div", { class: props.tabs ? "chips tabs" : props.scroll ? "chips scroll" : "chips" }, props.children);
@@ -2627,6 +2650,8 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .step-s{font-size:13px;color:var(--fg2);margin-top:2px}
 .note.version{padding:6px 0;-webkit-user-select:none;user-select:none}
 .note.version:active{opacity:.5}
+.item .act{flex:none;width:40px;height:40px;margin:-4px -6px -4px 0;border-radius:20px;font-size:17px;color:var(--fg2);background:transparent}
+.item .act:active{background:var(--line)}
 .item.head{background:var(--chip)}
 .item.head .title{font-size:18px;font-weight:700}
 .para{padding:12px 14px;font-size:15px;line-height:1.6;white-space:pre-line}
@@ -3017,6 +3042,9 @@ var App = class {
     this.nowScopes = ["fav"];
     // fav / near / 縣市名稱
     this.nowFormats = [];
+    this.nowFolded = [];
+    // 「現在有什麼可以看」結果裡收合起來的片（只留片名列）
+    this.nowFoldFor = "";
   }
   go(view, loading = "讀取中…") {
     this.loadingText = loading;
@@ -3042,14 +3070,14 @@ var App = class {
   }
   /** 最新版本是多少。網頁版問的是自己網站現在上線的版本（重新整理就會拿到的那一版），不是 GitHub 上的 */
   checkVersion() {
-    if (true) return checkLatest("2026.11.23-1414");
+    if (true) return checkLatest("2026.11.23-1425");
     return (async () => {
       try {
         const r = await globalThis.fetch("/api/version?t=" + Date.now(), { cache: "no-store" });
         const latest = String((await r.json()).version || "");
         if (!latest) return null;
         const num = (v) => Number(v.replace(/\D/g, "")) || 0;
-        return { latest, isLatest: num("2026.11.23-1414") >= num(latest) };
+        return { latest, isLatest: num("2026.11.23-1425") >= num(latest) };
       } catch (_) {
         return null;
       }
@@ -3146,11 +3174,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.23-1414"}`);
+          Pasteboard.copy(`版本 ${"2026.11.23-1425"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.23-1414"}`,
+      `版本 ${"2026.11.23-1425"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -3492,7 +3520,7 @@ var App = class {
     if (false) {
       if (!r) return /* @__PURE__ */ h(Note, { text: "（無法確認是否為最新版：連不到網站）" });
       if (r.isLatest) return /* @__PURE__ */ h(Note, { text: "✅ 已是最新版" });
-      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.23-1414"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
+      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.23-1425"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
         globalThis.location.reload();
       } }));
     }
@@ -3898,6 +3926,7 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
       this.nowFormats = toggle(this.nowFormats, f);
     } })))), /* @__PURE__ */ h(Button, { label: "🔍 找場次", onTap: () => this.go(() => this.nowResultsView(selDates, selWins), "正在查詢各影城的場次…") }));
   }
+  // 上面那份收合狀態是哪一次查詢的
   async nowResultsView(dates, winIds) {
     const byId = /* @__PURE__ */ new Map();
     const add = (list) => list.forEach((x) => {
@@ -3928,6 +3957,13 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
     };
     const scopeLabel = this.nowScopes.map((sc) => sc === "all" ? "全台影城" : sc === "fav" ? "常去影城" : sc === "near" ? "附近 10 間" : sc).join("、");
     const many = dates.length > 1;
+    const foldKey = [dates.join(","), winIds.join(","), this.nowScopes.join(","), this.nowFormats.join(",")].join("|");
+    if (this.nowFoldFor !== foldKey) {
+      this.nowFoldFor = foldKey;
+      this.nowFolded = [];
+    }
+    const folded = (t) => this.nowFolded.indexOf(t) >= 0;
+    const allFolded = groups.length > 0 && groups.every((g) => folded(g.title));
     const open = (hit) => {
       this.runtime = hit.movie.runtime;
       this.seat = hallOf(hit.version.label);
@@ -3935,16 +3971,28 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
     };
     return /* @__PURE__ */ h(Page, { title: multiLabel(dates, winIds), subtitle: `${hits.length} 場｜${groups.length} 部電影`, onBack: () => this.back() }, /* @__PURE__ */ h(Note, { text: `${multiDetail(dates, winIds)}
 影城：${scopeLabel}${this.nowFormats.length ? `
-特殊廳：${this.nowFormats.join("、")}` : ""}` }), groups.length ? null : /* @__PURE__ */ h(Empty, { icon: "🍿", text: "沒有符合的場次，換個時段或範圍試試。" }), groups.map((g, gi) => /* @__PURE__ */ h(Section, null, /* @__PURE__ */ h(
+特殊廳：${this.nowFormats.join("、")}` : ""}` }), groups.length ? null : /* @__PURE__ */ h(Empty, { icon: "🍿", text: "沒有符合的場次，換個時段或範圍試試。" }), groups.length > 1 ? /* @__PURE__ */ h(
+      Button,
+      {
+        label: allFolded ? "▸ 全部展開場次" : "▾ 全部收合，只看片名",
+        kind: "secondary",
+        onTap: () => {
+          this.nowFolded = allFolded ? [] : groups.map((g) => g.title);
+        }
+      }
+    ) : null, groups.map((g, gi) => /* @__PURE__ */ h(Section, null, /* @__PURE__ */ h(
       Item,
       {
         head: true,
         thumb: thumbOf(gi),
         title: g.title,
-        subtitle: nowGroupLine(g) + (g.movie ? "\n看電影介紹與所有場次" : ""),
-        onTap: g.movie ? () => this.go(() => this.movieView(g.movie, ""), `讀取《${g.title}》…`) : void 0
+        subtitle: nowGroupLine(g) + (g.movie ? "\n點片名看電影介紹與所有場次" : ""),
+        onTap: g.movie ? () => this.go(() => this.movieView(g.movie, ""), `讀取《${g.title}》…`) : void 0,
+        action: { label: folded(g.title) ? "▸" : "▾", hint: folded(g.title) ? "展開這部片的場次" : "收合這部片的場次", onTap: () => {
+          this.nowFolded = folded(g.title) ? this.nowFolded.filter((t) => t !== g.title) : [...this.nowFolded, g.title];
+        } }
       }
-    ), g.hits.map((hit) => /* @__PURE__ */ h(
+    ), (folded(g.title) ? [] : g.hits).map((hit) => /* @__PURE__ */ h(
       Item,
       {
         title: `${many && hit.day ? dateLabel(hit.day).replace(/ .*$/, "") + " " : ""}${hit.time}${isLate(hit.time) ? "（凌晨）" : ""}　${hit.cinema.name}`,

@@ -1417,6 +1417,10 @@ function NowResultsPage({ dates, winIds, scopes, formats }: { dates: string[]; w
   useEffect(() => { if (res.data) prefetchPosters(groups) }, [res.data]) // 背景先抓海報，進電影頁就不用等
   const scopeLabel = scopes.map((x) => (x === "all" ? "全台影城" : x === "fav" ? "常去影城" : x === "near" ? "附近 10 間" : x)).join("、")
   const many = dates.length > 1 // 複選多天：每一場前面標日期
+  const [folded, setFolded] = useState<string[]>([]) // 收合起來的片（只留片名列）
+  const isFolded = (t: string) => folded.indexOf(t) >= 0
+  const toggleFold = (t: string) => setFolded(isFolded(t) ? folded.filter((x) => x !== t) : [...folded, t])
+  const allFolded = groups.length > 0 && groups.every((g) => isFolded(g.title))
   return <List navigationTitle={multiLabel(dates, winIds)} navigationBarTitleDisplayMode={"inline"} refreshable={res.reload}>
     {res.error ? <ErrorRow error={res.error} retry={res.reload} /> : null}
     {!res.data && !res.error ? <Section><Loading text={`查詢${scopeLabel}的場次…`} /></Section> : null}
@@ -1425,6 +1429,11 @@ function NowResultsPage({ dates, winIds, scopes, formats }: { dates: string[]; w
       <Text foregroundStyle={"secondaryLabel"}>{`${res.data.hits.length} 場｜${groups.length} 部電影`}</Text>
     </Section> : null}
     {res.data && !groups.length ? <Section><Text foregroundStyle={"secondaryLabel"}>沒有符合的場次，換個時段或範圍試試。</Text></Section> : null}
+    {groups.length > 1 ? <Section>
+      <Button action={() => setFolded(allFolded ? [] : groups.map((g) => g.title))}>
+        <Label title={allFolded ? "全部展開場次" : "全部收合，只看片名"} systemImage={allFolded ? "chevron.down.circle" : "chevron.right.circle"} />
+      </Button>
+    </Section> : null}
     {groups.map((g) =>
       <Section key={g.title}>
         {/* 片名獨立一列（海報、粗體大字），點下去是電影頁：簡介、預告、所有影城的場次 */}
@@ -1437,10 +1446,14 @@ function NowResultsPage({ dates, winIds, scopes, formats }: { dates: string[]; w
               <Text font={"subheadline"} foregroundStyle={"secondaryLabel"} lineLimit={1}>{nowGroupLine(g)}</Text>
             </VStack>
             <Spacer />
+            {/* 最右邊的收合鈕：跟整列（點了進電影頁）分開按 */}
+            <Button action={() => toggleFold(g.title)} buttonStyle={"borderless"}>
+              <Image systemName={isFolded(g.title) ? "chevron.right.circle" : "chevron.down.circle"} font={"title3"} foregroundStyle={"secondaryLabel"} />
+            </Button>
           </HStack>
           return g.movie ? <NavigationLink destination={<MoviePage movie={g.movie} />}>{head}</NavigationLink> : head
         })()}
-        {g.hits.map((hit: Hit) =>
+        {(isFolded(g.title) ? [] : g.hits).map((hit: Hit) =>
           <NavigationLink key={`${hit.cinema.id}-${hit.date}-${hit.version.label}-${hit.time}`} destination={
             <ConfirmPage pick={{ cinema: hit.cinema, date: hit.date, movie: hit.movie, version: hit.version, time: hit.time, ...hit.ctx }} />
           }>
