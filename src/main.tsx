@@ -1177,9 +1177,24 @@ class App {
   boxRate = ""; // 依評分排時用哪一種評分（空 = IMDb）
   pickQuery = ""; // 「選出品國別／發行商」那一頁的搜尋字
   /** 出品國別／發行商的選擇頁：一列一個、標出部數，可以搜尋、可以複選；選好按返回 */
-  async boxPickView(kind: "country" | "issuer"): Promise<string> {
+  async boxPickView(kind: "country" | "issuer" | "year"): Promise<string> {
     const sc = this.movieMode === "year" ? "year" : "now";
     const board = await loadMovieBoard({ scope: sc, sort: this.sortBy[sc], years: this.boxYears, week: this.boxWeek, countries: this.boxCountry, query: this.movieQuery.trim().toLowerCase(), asc: this.ascBy[sc], rate: this.boxRate, fewLast: this.boxFewLast, issuers: this.boxIssuer });
+    if (kind === "year") {
+      // 年份：新的在上面；至少要留一年
+      const ys = board.years, on = board.selYears;
+      const lo = ys.reduce((a, b) => (a < b ? a : b), ys[0]), hi = ys.reduce((a, b) => (a > b ? a : b), ys[0]);
+      return (
+        <Page title="選年份" subtitle={on.length === ys.length ? `全部（${lo}–${hi}）` : `已選 ${on.length} 年`} onBack={() => this.back()}>
+          <Section>
+            <Item icon={on.length === ys.length ? "✅" : "⬜️"} title="全部" subtitle={`${lo} 到 ${hi} 年`} chevron={false} onTap={() => { this.boxYears = on.length === ys.length ? [] : ys.slice(); }} />
+          </Section>
+          <Section title="可以選好幾年" hint="至少要選一年。選好之後按左上角的返回。">
+            {ys.map((y) => <Item icon={on.indexOf(y) >= 0 ? "✅" : "⬜️"} title={`${y} 年`} chevron={false} onTap={() => { this.boxYears = on.indexOf(y) < 0 ? [...on, y] : on.length > 1 ? on.filter((z) => z !== y) : on; }} />)}
+          </Section>
+        </Page>
+      );
+    }
     const isC = kind === "country";
     const all = isC ? board.countries : board.issuers;
     const sel = isC ? board.selCountries : board.selIssuers;
@@ -1270,19 +1285,6 @@ class App {
         {this.movieModeChips()}
         {/* 搜尋放最上面；下面一排是排序（兩種範圍各自的排法） */}
         <Search value={this.movieQuery} placeholder="搜尋片名（中文或英文）" onInput={(t) => { this.movieQuery = t; }} />
-        {/* 歷年電影：年份直接攤開成一排（可複選），一進來就看得到有哪些年份 */}
-        {board.scope === "year" && years.length > 1 ? (
-          <div class="bar">
-            <span class="lbl">年份</span>
-            <Chips scroll>
-              {years.map((y) => (
-                <Chip label={y} muted={selYears.indexOf(y) < 0} onTap={() => { this.boxYears = selYears.indexOf(y) < 0 ? [...selYears, y] : selYears.length > 1 ? selYears.filter((z) => z !== y) : selYears; }} />
-              ))}
-              <Chip label="全部" muted={selYears.length !== years.length} onTap={() => { this.boxYears = selYears.length === years.length ? [] : years.slice(); }} />
-            </Chips>
-            <span class="more-hint" aria-hidden="true">›</span>
-          </div>
-        ) : null}
         {/* 排序：前面標「排序」，最右邊一顆按鈕寫出方向（高→低），點一下反過來；再點一次選中的排法也會反向 */}
         {board.orders.length > 1 ? (
           <div class="bar">
@@ -1297,6 +1299,8 @@ class App {
         {/* 評分來源、週次、出品國別預設收合成一行，點了才展開 */}
         {board.weeks.length > 1 || countries.length > 1 || board.rates.length > 1 || board.issuers.length > 1 ? (
           <Section hint={this.boxOpen === "week" ? "可以回頭看過去幾週的排行。" : this.boxOpen === "rate" ? "番茄指數是影評的分數、爆米花指數是觀眾的分數（都來自爛番茄）；觀眾評分是這個 App 的使用者打的。" : ""}>
+            {/* 年份、出品國別、發行商都是點了進一頁清單（可複選） */}
+            {board.scope === "year" && years.length > 1 ? <Item kv title="年份" right={selYears.length === years.length ? `全部（${years[years.length - 1]}–${years[0]}）` : selYears.length > 4 ? `已選 ${selYears.length} 年` : selYears.join("、")} onTap={() => this.go(() => this.boxPickView("year"))} /> : null}
             {board.rates.length > 1 ? fold("rate", "評分來源", board.rateSummary) : null}
             {board.rates.length > 1 && this.boxOpen === "rate" ? (
               <Chips scroll>

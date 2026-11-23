@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.24-0213
+// @movie-schedule-app 電影行程 v2026.11.24-0219
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/parsers.gen.ts
@@ -3987,14 +3987,14 @@ var App = class {
   }
   /** 最新版本是多少。網頁版問的是自己網站現在上線的版本（重新整理就會拿到的那一版），不是 GitHub 上的 */
   checkVersion() {
-    if (true) return checkLatest("2026.11.24-0213");
+    if (true) return checkLatest("2026.11.24-0219");
     return (async () => {
       try {
         const r = await globalThis.fetch("/api/version?t=" + Date.now(), { cache: "no-store" });
         const latest = String((await r.json()).version || "");
         if (!latest) return null;
         const num = (v) => Number(v.replace(/\D/g, "")) || 0;
-        return { latest, isLatest: num("2026.11.24-0213") >= num(latest) };
+        return { latest, isLatest: num("2026.11.24-0219") >= num(latest) };
       } catch (_) {
         return null;
       }
@@ -4182,11 +4182,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.24-0213"}`);
+          Pasteboard.copy(`版本 ${"2026.11.24-0219"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.24-0213"}`,
+      `版本 ${"2026.11.24-0219"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -4526,7 +4526,7 @@ var App = class {
     if (false) {
       if (!r) return /* @__PURE__ */ h(Note, { text: "（無法確認是否為最新版：連不到網站）" });
       if (r.isLatest) return /* @__PURE__ */ h(Note, { text: "✅ 已是最新版" });
-      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.24-0213"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
+      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.24-0219"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
         globalThis.location.reload();
       } }));
     }
@@ -4715,6 +4715,15 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
   async boxPickView(kind) {
     const sc = this.movieMode === "year" ? "year" : "now";
     const board = await loadMovieBoard({ scope: sc, sort: this.sortBy[sc], years: this.boxYears, week: this.boxWeek, countries: this.boxCountry, query: this.movieQuery.trim().toLowerCase(), asc: this.ascBy[sc], rate: this.boxRate, fewLast: this.boxFewLast, issuers: this.boxIssuer });
+    if (kind === "year") {
+      const ys = board.years, on = board.selYears;
+      const lo = ys.reduce((a, b) => a < b ? a : b, ys[0]), hi = ys.reduce((a, b) => a > b ? a : b, ys[0]);
+      return /* @__PURE__ */ h(Page, { title: "選年份", subtitle: on.length === ys.length ? `全部（${lo}–${hi}）` : `已選 ${on.length} 年`, onBack: () => this.back() }, /* @__PURE__ */ h(Section, null, /* @__PURE__ */ h(Item, { icon: on.length === ys.length ? "✅" : "⬜️", title: "全部", subtitle: `${lo} 到 ${hi} 年`, chevron: false, onTap: () => {
+        this.boxYears = on.length === ys.length ? [] : ys.slice();
+      } })), /* @__PURE__ */ h(Section, { title: "可以選好幾年", hint: "至少要選一年。選好之後按左上角的返回。" }, ys.map((y) => /* @__PURE__ */ h(Item, { icon: on.indexOf(y) >= 0 ? "✅" : "⬜️", title: `${y} 年`, chevron: false, onTap: () => {
+        this.boxYears = on.indexOf(y) < 0 ? [...on, y] : on.length > 1 ? on.filter((z) => z !== y) : on;
+      } }))));
+    }
     const isC = kind === "country";
     const all = isC ? board.countries : board.issuers;
     const sel = isC ? board.selCountries : board.selIssuers;
@@ -4779,11 +4788,7 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
     };
     return /* @__PURE__ */ h(Page, { title: "依電影找場次", subtitle: board.title, onBack: () => this.back() }, this.movieModeChips(), /* @__PURE__ */ h(Search, { value: this.movieQuery, placeholder: "搜尋片名（中文或英文）", onInput: (t) => {
       this.movieQuery = t;
-    } }), board.scope === "year" && years.length > 1 ? /* @__PURE__ */ h("div", { class: "bar" }, /* @__PURE__ */ h("span", { class: "lbl" }, "年份"), /* @__PURE__ */ h(Chips, { scroll: true }, years.map((y) => /* @__PURE__ */ h(Chip, { label: y, muted: selYears.indexOf(y) < 0, onTap: () => {
-      this.boxYears = selYears.indexOf(y) < 0 ? [...selYears, y] : selYears.length > 1 ? selYears.filter((z) => z !== y) : selYears;
-    } })), /* @__PURE__ */ h(Chip, { label: "全部", muted: selYears.length !== years.length, onTap: () => {
-      this.boxYears = selYears.length === years.length ? [] : years.slice();
-    } })), /* @__PURE__ */ h("span", { class: "more-hint", "aria-hidden": "true" }, "›")) : null, board.orders.length > 1 ? /* @__PURE__ */ h("div", { class: "bar" }, /* @__PURE__ */ h("span", { class: "lbl" }, "排序"), /* @__PURE__ */ h(Chips, { scroll: true }, board.orders.map((x) => /* @__PURE__ */ h(Chip, { label: x.label, muted: board.order !== x.id, onTap: () => {
+    } }), board.orders.length > 1 ? /* @__PURE__ */ h("div", { class: "bar" }, /* @__PURE__ */ h("span", { class: "lbl" }, "排序"), /* @__PURE__ */ h(Chips, { scroll: true }, board.orders.map((x) => /* @__PURE__ */ h(Chip, { label: x.label, muted: board.order !== x.id, onTap: () => {
       if (board.order === x.id) this.ascBy[sc] = !this.ascBy[sc];
       else {
         this.sortBy[sc] = x.id;
@@ -4791,7 +4796,7 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
       }
     } }))), /* @__PURE__ */ h("span", { class: "more-hint", "aria-hidden": "true" }, "›"), /* @__PURE__ */ h("button", { class: "dir", "aria-label": "切換排序方向", onTap: () => {
       this.ascBy[sc] = !this.ascBy[sc];
-    } }, esc((board.asc ? board.dirs[1].label : board.dirs[0].label).replace("到", "→")))) : null, board.weeks.length > 1 || countries.length > 1 || board.rates.length > 1 || board.issuers.length > 1 ? /* @__PURE__ */ h(Section, { hint: this.boxOpen === "week" ? "可以回頭看過去幾週的排行。" : this.boxOpen === "rate" ? "番茄指數是影評的分數、爆米花指數是觀眾的分數（都來自爛番茄）；觀眾評分是這個 App 的使用者打的。" : "" }, board.rates.length > 1 ? fold("rate", "評分來源", board.rateSummary) : null, board.rates.length > 1 && this.boxOpen === "rate" ? /* @__PURE__ */ h(Chips, { scroll: true }, board.rates.map((r) => /* @__PURE__ */ h(Chip, { label: r.label, muted: board.rate !== r.id, onTap: () => {
+    } }, esc((board.asc ? board.dirs[1].label : board.dirs[0].label).replace("到", "→")))) : null, board.weeks.length > 1 || countries.length > 1 || board.rates.length > 1 || board.issuers.length > 1 ? /* @__PURE__ */ h(Section, { hint: this.boxOpen === "week" ? "可以回頭看過去幾週的排行。" : this.boxOpen === "rate" ? "番茄指數是影評的分數、爆米花指數是觀眾的分數（都來自爛番茄）；觀眾評分是這個 App 的使用者打的。" : "" }, board.scope === "year" && years.length > 1 ? /* @__PURE__ */ h(Item, { kv: true, title: "年份", right: selYears.length === years.length ? `全部（${years[years.length - 1]}–${years[0]}）` : selYears.length > 4 ? `已選 ${selYears.length} 年` : selYears.join("、"), onTap: () => this.go(() => this.boxPickView("year")) }) : null, board.rates.length > 1 ? fold("rate", "評分來源", board.rateSummary) : null, board.rates.length > 1 && this.boxOpen === "rate" ? /* @__PURE__ */ h(Chips, { scroll: true }, board.rates.map((r) => /* @__PURE__ */ h(Chip, { label: r.label, muted: board.rate !== r.id, onTap: () => {
       this.boxRate = r.id;
     } }))) : null, board.fewOption ? /* @__PURE__ */ h(Item, { kv: true, title: "評分人數少的片", right: board.fewLast ? "排在後面 ⇄" : "照分數一起排 ⇄", chevron: false, onTap: () => {
       this.boxFewLast = !this.boxFewLast;
