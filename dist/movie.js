@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.23-1720
+// @movie-schedule-app 電影行程 v2026.11.23-1721
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/parsers.gen.ts
@@ -981,6 +981,19 @@ async function moviesOf(c, date) {
 var VARIANTS = { 祕: "秘", 臺: "台", 裏: "裡", 艶: "艷", 羣: "群", 峯: "峰", 砲: "炮" };
 var normTitle = (t) => String(t || "").toLowerCase().replace(/[\s:：·・\-–—_＿!！?？,，.。'"’‘“”「」『』《》〈〉＜＞<>()（）\[\]【】／/]/g, "").replace(/[祕臺裏艶羣峯砲]/g, (c) => VARIANTS[c] || c);
 var looseTitle = (t) => normTitle(baseTitle(t)).replace(/^(?:劇場版|電影版|動畫電影)/, "") || normTitle(t);
+function searchTitles(title) {
+  const out = [];
+  const add = (x) => {
+    const t = x.replace(/\s+/g, " ").trim();
+    if (t && out.indexOf(t) < 0) out.push(t);
+  };
+  const plain = (x) => x.replace(/[『』「」〈〉《》【】\[\]（）()＜＞<>]/g, " ");
+  add(baseTitle(title));
+  const first = baseTitle(String(title || "").split(/\s*[+＋]\s*/)[0]);
+  add(plain(first));
+  add(plain(first).replace(/劇場版/g, " "));
+  return out;
+}
 var REISSUE_WORDS = "全新|加碼|數位|[248]K|修復|重映|重製|再映|經典|紀念|[\\d一二三四五六七八九十百]*週年";
 var isReissue = (t) => new RegExp(REISSUE_WORDS, "i").test(String(t || ""));
 var DECOR_LEAD = /^\s*(?:[（(\[【][^）)\]】]{1,12}[）)\]】]|[A-Z]\d?-|(?:法文|中文|英文|日文|韓文|台語|國語|粵語)版[-－:：]?)\s*/;
@@ -1312,16 +1325,19 @@ function posterLight(title, release) {
     const rerun = /修復|重映|重製|再映|經典|紀念|週年|[48]K/i.test(title);
     const year = rerun ? 0 : Number((release || "").slice(0, 4)) || 0;
     const quick = await posterLane(async () => {
-      try {
-        const q = baseTitle(title).toLowerCase().replace(/[\\/?#%]/g, " ").trim();
-        const r = await platform().fetchText(`https://v3.sg.media-imdb.com/suggestion/x/${encodeURIComponent(q)}.json`, { "User-Agent": UA });
-        const d = JSON.parse(r.body).d || [];
-        const x = d.find((v) => /^tt/.test(v.id) && (v.qid === "movie" || v.qid === "tvMovie" || v.qid === "video") && v.i?.imageUrl && (!year || !v.y || Math.abs(Number(v.y) - year) <= 1));
-        const u = String(x?.i?.imageUrl || "");
-        return /^https:\/\/m\.media-amazon\.com\//.test(u) ? u.replace(/\._V1_.*?(\.\w+)$/, "._V1_UX300_$1") : "";
-      } catch (_) {
-        return "";
+      for (const t of searchTitles(title)) {
+        try {
+          const q = t.toLowerCase().replace(/[\\/?#%]/g, " ").trim();
+          const r = await platform().fetchText(`https://v3.sg.media-imdb.com/suggestion/x/${encodeURIComponent(q)}.json`, { "User-Agent": UA });
+          const d = JSON.parse(r.body).d || [];
+          const x = d.find((v) => /^tt/.test(v.id) && (v.qid === "movie" || v.qid === "tvMovie" || v.qid === "video") && v.i?.imageUrl && (!year || !v.y || Math.abs(Number(v.y) - year) <= 1));
+          const u = String(x?.i?.imageUrl || "");
+          if (/^https:\/\/m\.media-amazon\.com\//.test(u)) return u.replace(/\._V1_.*?(\.\w+)$/, "._V1_UX300_$1");
+        } catch (_) {
+          return "";
+        }
       }
+      return "";
     });
     const poster = quick || await moviePoster(title).catch(() => "");
     const latest = readExtras();
@@ -2069,7 +2085,7 @@ async function identify(title, en, errs, yearHint = 0) {
   const token = ((await loadSettings()).tmdbToken || "").trim();
   const okYear = (y) => !yearHint || !y || Math.abs(y - yearHint) <= 1;
   const viaImdb = (async () => {
-    for (const q of [en, baseTitle(title)].filter(Boolean)) {
+    for (const q of [en, ...searchTitles(title)].filter(Boolean)) {
       const key = q.toLowerCase().replace(/[\\/?#%]/g, " ").trim();
       try {
         const r = await platform().fetchText(`https://v3.sg.media-imdb.com/suggestion/x/${encodeURIComponent(key)}.json`, { "User-Agent": UA });
@@ -3118,14 +3134,14 @@ var App = class {
   }
   /** 最新版本是多少。網頁版問的是自己網站現在上線的版本（重新整理就會拿到的那一版），不是 GitHub 上的 */
   checkVersion() {
-    if (true) return checkLatest("2026.11.23-1720");
+    if (true) return checkLatest("2026.11.23-1721");
     return (async () => {
       try {
         const r = await globalThis.fetch("/api/version?t=" + Date.now(), { cache: "no-store" });
         const latest = String((await r.json()).version || "");
         if (!latest) return null;
         const num = (v) => Number(v.replace(/\D/g, "")) || 0;
-        return { latest, isLatest: num("2026.11.23-1720") >= num(latest) };
+        return { latest, isLatest: num("2026.11.23-1721") >= num(latest) };
       } catch (_) {
         return null;
       }
@@ -3226,11 +3242,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.23-1720"}`);
+          Pasteboard.copy(`版本 ${"2026.11.23-1721"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.23-1720"}`,
+      `版本 ${"2026.11.23-1721"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -3572,7 +3588,7 @@ var App = class {
     if (false) {
       if (!r) return /* @__PURE__ */ h(Note, { text: "（無法確認是否為最新版：連不到網站）" });
       if (r.isLatest) return /* @__PURE__ */ h(Note, { text: "✅ 已是最新版" });
-      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.23-1720"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
+      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.23-1721"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
         globalThis.location.reload();
       } }));
     }

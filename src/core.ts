@@ -559,6 +559,19 @@ export const normTitle = (t: string) =>
     .replace(/[祕臺裏艶羣峯砲]/g, (c) => VARIANTS[c] || c);
 /** 更寬鬆的比對用：再去掉開頭的「劇場版」「電影版」（場次通寫「劇場版《XXX》」、開眼只寫「XXX」） */
 export const looseTitle = (t: string) => normTitle(baseTitle(t)).replace(/^(?:劇場版|電影版|動畫電影)/, "") || normTitle(t);
+/** 拿片名去別的網站搜尋時要試的幾種寫法（最像原樣的排前面）。票房排行和戲院常把片名寫得很長：
+ *  「劇場版『鏈鋸人 蕾潔篇』」帶引號、「A＋B」是兩部連映、「XX劇場版 [新篇] YY＋五分鐘開頭影像」加了附帶內容——照原樣搜尋會什麼都找不到。
+ *  做法：連映、附帶內容只留「＋」前面那一部；引號括號換成空白（裡面的字留著）；再試一次拿掉「劇場版」的 */
+export function searchTitles(title: string): string[] {
+  const out: string[] = [];
+  const add = (x: string) => { const t = x.replace(/\s+/g, " ").trim(); if (t && out.indexOf(t) < 0) out.push(t); };
+  const plain = (x: string) => x.replace(/[『』「」〈〉《》【】\[\]（）()＜＞<>]/g, " ");
+  add(baseTitle(title));
+  const first = baseTitle(String(title || "").split(/\s*[+＋]\s*/)[0]);
+  add(plain(first));
+  add(plain(first).replace(/劇場版/g, " "));
+  return out;
+}
 /** 去掉「4K重映」「全新4K修復版」「(4K修復)」「加碼重映」等字，查原片 */
 const REISSUE_WORDS = "全新|加碼|數位|[248]K|修復|重映|重製|再映|經典|紀念|[\\d一二三四五六七八九十百]*週年";
 /** 片名是重映、修復版（查原片時用；比對年份時不能拿重映日來比） */
@@ -1008,16 +1021,20 @@ export function posterLight(title: string, release?: string): Promise<string> {
     const rerun = /修復|重映|重製|再映|經典|紀念|週年|[48]K/i.test(title);
     const year = rerun ? 0 : Number((release || "").slice(0, 4)) || 0;
     const quick = await posterLane(async () => {
-      try {
-        const q = baseTitle(title).toLowerCase().replace(/[\\/?#%]/g, " ").trim();
-        const r = await platform().fetchText(`https://v3.sg.media-imdb.com/suggestion/x/${encodeURIComponent(q)}.json`, { "User-Agent": UA });
-        const d = (JSON.parse(r.body).d || []) as any[];
-        const x = d.find((v) => /^tt/.test(v.id) && (v.qid === "movie" || v.qid === "tvMovie" || v.qid === "video") && v.i?.imageUrl && (!year || !v.y || Math.abs(Number(v.y) - year) <= 1));
-        const u = String(x?.i?.imageUrl || "");
-        return /^https:\/\/m\.media-amazon\.com\//.test(u) ? u.replace(/\._V1_.*?(\.\w+)$/, "._V1_UX300_$1") : "";
-      } catch (_) {
-        return "";
+      // 片名的幾種寫法依序試（帶引號、連映、附帶內容的長片名，原樣搜尋找不到），找到就停
+      for (const t of searchTitles(title)) {
+        try {
+          const q = t.toLowerCase().replace(/[\\/?#%]/g, " ").trim();
+          const r = await platform().fetchText(`https://v3.sg.media-imdb.com/suggestion/x/${encodeURIComponent(q)}.json`, { "User-Agent": UA });
+          const d = (JSON.parse(r.body).d || []) as any[];
+          const x = d.find((v) => /^tt/.test(v.id) && (v.qid === "movie" || v.qid === "tvMovie" || v.qid === "video") && v.i?.imageUrl && (!year || !v.y || Math.abs(Number(v.y) - year) <= 1));
+          const u = String(x?.i?.imageUrl || "");
+          if (/^https:\/\/m\.media-amazon\.com\//.test(u)) return u.replace(/\._V1_.*?(\.\w+)$/, "._V1_UX300_$1");
+        } catch (_) {
+          return "";
+        }
       }
+      return "";
     });
     // 快查找不到（大約四分之一的舊片）：改用跟電影頁一樣的完整查法，清單不用點進去也會有海報。
     // 比較慢、請求也多，所以只在快查失敗時才做，而且同時最多 4 部（moviePoster 自己會排隊）；查過的記在手機上
@@ -2036,7 +2053,7 @@ async function identify(title: string, en: string | undefined, errs: string[], y
   const okYear = (y: number) => !yearHint || !y || Math.abs(y - yearHint) <= 1;
   // IMDb 搜尋建議：一次請求、很小，手機上最快
   const viaImdb = (async (): Promise<Ident | null> => {
-    for (const q of [en, baseTitle(title)].filter(Boolean) as string[]) {
+    for (const q of [en, ...searchTitles(title)].filter(Boolean) as string[]) {
       const key = q.toLowerCase().replace(/[\\/?#%]/g, " ").trim();
       try {
         const r = await platform().fetchText(`https://v3.sg.media-imdb.com/suggestion/x/${encodeURIComponent(key)}.json`, { "User-Agent": UA });

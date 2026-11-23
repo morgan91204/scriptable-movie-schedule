@@ -75,9 +75,10 @@ async function tmdbIdentify(title, en, releaseYear) {
     if (!r.ok) throw new Error("TMDB " + r.status);
     return r.json();
   };
-  const want = [same(title), same(core.baseTitle(title))].filter(Boolean);
+  const tries = core.searchTitles(title); // 片名的幾種寫法（去引號、連映只留第一部…）
+  const want = Array.from(new Set([same(title), ...tries.map(same)].filter(Boolean)));
   const yearOf = (x) => Number(String(x.release_date || "").slice(0, 4)) || 0;
-  for (const q of Array.from(new Set([core.baseTitle(title), title].filter(Boolean)))) {
+  for (const q of Array.from(new Set([...tries, title].filter(Boolean)))) {
     const found = await call(`/search/movie?language=zh-TW&query=${encodeURIComponent(q)}`);
     const hits = (found.results || []).filter((x) => want.indexOf(same(x.title)) >= 0 || want.indexOf(same(x.original_title)) >= 0);
     if (!hits.length) continue;

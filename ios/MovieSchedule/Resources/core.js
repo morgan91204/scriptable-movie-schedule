@@ -152,6 +152,7 @@
     releaseLabel: () => releaseLabel,
     releaseOf: () => releaseOf,
     saveSettings: () => saveSettings,
+    searchTitles: () => searchTitles,
     setMetaEnabled: () => setMetaEnabled,
     shareText: () => shareText,
     showDay: () => showDay,
@@ -1143,6 +1144,19 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   var VARIANTS = { 祕: "秘", 臺: "台", 裏: "裡", 艶: "艷", 羣: "群", 峯: "峰", 砲: "炮" };
   var normTitle = (t) => String(t || "").toLowerCase().replace(/[\s:：·・\-–—_＿!！?？,，.。'"’‘“”「」『』《》〈〉＜＞<>()（）\[\]【】／/]/g, "").replace(/[祕臺裏艶羣峯砲]/g, (c) => VARIANTS[c] || c);
   var looseTitle = (t) => normTitle(baseTitle(t)).replace(/^(?:劇場版|電影版|動畫電影)/, "") || normTitle(t);
+  function searchTitles(title) {
+    const out = [];
+    const add = (x) => {
+      const t = x.replace(/\s+/g, " ").trim();
+      if (t && out.indexOf(t) < 0) out.push(t);
+    };
+    const plain = (x) => x.replace(/[『』「」〈〉《》【】\[\]（）()＜＞<>]/g, " ");
+    add(baseTitle(title));
+    const first = baseTitle(String(title || "").split(/\s*[+＋]\s*/)[0]);
+    add(plain(first));
+    add(plain(first).replace(/劇場版/g, " "));
+    return out;
+  }
   var REISSUE_WORDS = "全新|加碼|數位|[248]K|修復|重映|重製|再映|經典|紀念|[\\d一二三四五六七八九十百]*週年";
   var isReissue = (t) => new RegExp(REISSUE_WORDS, "i").test(String(t || ""));
   var DECOR_LEAD = /^\s*(?:[（(\[【][^）)\]】]{1,12}[）)\]】]|[A-Z]\d?-|(?:法文|中文|英文|日文|韓文|台語|國語|粵語)版[-－:：]?)\s*/;
@@ -1492,16 +1506,19 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
       const rerun = /修復|重映|重製|再映|經典|紀念|週年|[48]K/i.test(title);
       const year = rerun ? 0 : Number((release || "").slice(0, 4)) || 0;
       const quick = await posterLane(async () => {
-        try {
-          const q = baseTitle(title).toLowerCase().replace(/[\\/?#%]/g, " ").trim();
-          const r = await platform().fetchText(`https://v3.sg.media-imdb.com/suggestion/x/${encodeURIComponent(q)}.json`, { "User-Agent": UA });
-          const d = JSON.parse(r.body).d || [];
-          const x = d.find((v) => /^tt/.test(v.id) && (v.qid === "movie" || v.qid === "tvMovie" || v.qid === "video") && v.i?.imageUrl && (!year || !v.y || Math.abs(Number(v.y) - year) <= 1));
-          const u = String(x?.i?.imageUrl || "");
-          return /^https:\/\/m\.media-amazon\.com\//.test(u) ? u.replace(/\._V1_.*?(\.\w+)$/, "._V1_UX300_$1") : "";
-        } catch (_) {
-          return "";
+        for (const t of searchTitles(title)) {
+          try {
+            const q = t.toLowerCase().replace(/[\\/?#%]/g, " ").trim();
+            const r = await platform().fetchText(`https://v3.sg.media-imdb.com/suggestion/x/${encodeURIComponent(q)}.json`, { "User-Agent": UA });
+            const d = JSON.parse(r.body).d || [];
+            const x = d.find((v) => /^tt/.test(v.id) && (v.qid === "movie" || v.qid === "tvMovie" || v.qid === "video") && v.i?.imageUrl && (!year || !v.y || Math.abs(Number(v.y) - year) <= 1));
+            const u = String(x?.i?.imageUrl || "");
+            if (/^https:\/\/m\.media-amazon\.com\//.test(u)) return u.replace(/\._V1_.*?(\.\w+)$/, "._V1_UX300_$1");
+          } catch (_) {
+            return "";
+          }
         }
+        return "";
       });
       const poster = quick || await moviePoster(title).catch(() => "");
       const latest = readExtras();
@@ -2289,7 +2306,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     const token = ((await loadSettings()).tmdbToken || "").trim();
     const okYear = (y) => !yearHint || !y || Math.abs(y - yearHint) <= 1;
     const viaImdb = (async () => {
-      for (const q of [en, baseTitle(title)].filter(Boolean)) {
+      for (const q of [en, ...searchTitles(title)].filter(Boolean)) {
         const key = q.toLowerCase().replace(/[\\/?#%]/g, " ").trim();
         try {
           const r = await platform().fetchText(`https://v3.sg.media-imdb.com/suggestion/x/${encodeURIComponent(key)}.json`, { "User-Agent": UA });
@@ -2813,7 +2830,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   var extra = { boxOffice, nowShowing, nowShowingMulti, movieBoard, festivalBoard, festivalFilm, nearby, patchSettings, fillMovie, formatList };
   var BRIDGE_LEVEL = 2;
   globalThis.MS = {
-    version: "2026.11.23-1720",
+    version: "2026.11.23-1721",
     level: BRIDGE_LEVEL,
     init(saved) {
       cache = saved || {};
