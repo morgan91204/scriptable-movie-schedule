@@ -1004,6 +1004,7 @@ function FestivalSections({ list: first, query }: { list: Festival[]; query: str
   const [festId, setFestId] = useState("")
   const [pickedDate, setPickedDate] = useState("")
   const [pickedYear, setPickedYear] = useState(0) // 0 = 今年（今年還沒有就是最近有資料的那一年）
+  const [showPast, setShowPast] = useState(false) // 已結束的影展清單有沒有展開
   const old = useLoad(() => (pickedYear ? loadFestivals(pickedYear) : Promise.resolve(null as Festival[] | null)), [pickedYear])
   const list = pickedYear && old.data && old.data.length ? old.data : first
   const years = festivalYears()
@@ -1038,8 +1039,16 @@ function FestivalSections({ list: first, query }: { list: Festival[]; query: str
       </Picker>
     </Section> : null}
     {/* 還沒結束的和已經結束的分成兩區，各自一個清單，選中的打勾 */}
+    {/* 已結束的預設收起來（只留一列可以展開，和目前選中的那一個）：不然十幾個已結束的會把上面選的影展和下面它的日期、片單隔開 */}
     {festivalGroups(list).map((g) => <Section key={g.title} header={<Text>{`${g.title}｜${g.items.length} 個影展`}</Text>}>
-      {g.items.map((x) => <Button key={x.id} action={() => { setFestId(x.id); setPickedDate("") }}>
+      {g.past && g.items.length > 3 ? <Button action={() => setShowPast(!showPast)}>
+        <HStack spacing={8}>
+          <Image systemName={showPast ? "chevron.down" : "chevron.right"} foregroundStyle={"secondaryLabel"} />
+          <Text foregroundStyle={"label"}>{showPast ? "收合已結束的影展" : `顯示全部 ${g.items.length} 個已結束的影展`}</Text>
+          <Spacer />
+        </HStack>
+      </Button> : null}
+      {g.items.filter((x) => !g.past || g.items.length <= 3 || showPast || x.id === f.id).map((x) => <Button key={x.id} action={() => { setFestId(x.id); setPickedDate("") }}>
         <HStack spacing={8}>
           <Image systemName={g.past ? "checkmark.seal" : "film"} foregroundStyle={g.past ? "secondaryLabel" : "systemOrange"} />
           <VStack alignment={"leading"} spacing={2}>

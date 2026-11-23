@@ -6,6 +6,7 @@ struct FestivalSection: View {
     @State private var board: Loadable<FestivalBoard> = .loading
     @State private var festId = ""
     @State private var date = ""
+    @State private var showPast = false // 已結束的影展清單有沒有展開
     @State private var year = 0 // 0 = 今年（今年還沒有就是最近有資料的那一年）
 
     /// 選的東西有變就重讀（用陣列接起來：一長串字串相加編譯器會算不出型別）
@@ -67,8 +68,20 @@ struct FestivalSection: View {
     // 還沒結束的和已經結束的分成兩區，各自一個清單，選中的打勾
     @ViewBuilder private func groupSections(_ b: FestivalBoard) -> some View {
         ForEach(b.groups ?? []) { g in
+            let fold = g.past && g.items.count > 3 // 已結束的很多個：預設收起來，只留展開鈕和目前選中的那一個
             Section {
-                ForEach(g.items) { x in
+                if fold {
+                    Button {
+                        showPast.toggle()
+                    } label: {
+                        HStack(spacing: 8) {
+                            Image(systemName: showPast ? "chevron.down" : "chevron.right").foregroundStyle(Color.secondary)
+                            Text(showPast ? "收合已結束的影展" : "顯示全部 \(g.items.count) 個已結束的影展").foregroundStyle(Color.primary)
+                            Spacer(minLength: 4)
+                        }
+                    }
+                }
+                ForEach(g.items.filter { !fold || showPast || $0.id == b.id }) { x in
                     groupRow(x, past: g.past, picked: x.id == b.id)
                 }
             } header: {
