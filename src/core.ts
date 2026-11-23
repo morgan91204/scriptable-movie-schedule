@@ -46,24 +46,30 @@ export interface Settings {
 export interface NotifyPrefs {
   open: boolean; rel: boolean; end: boolean; fest: boolean;
   endMax?: number; // 快下檔：放映的影城剩下幾間以下才通知（自己填，1 到 30；預設 3）
-  endScope?: "all" | "city" | "fav"; // 算哪些影城：全台／指定的縣市（可以好幾個）／收藏的影城
-  endCities?: string[];
+  endScope?: "all" | "city" | "fav"; // 舊的寫法（只能三選一）；現在看 endFav 和 endCities
+  endFav?: boolean; // 算收藏的影城
+  endCities?: string[]; // 算這些縣市（可以好幾個）；跟收藏的影城可以一起選，兩邊合起來算；都沒選 = 全台
 }
-/** 「快下檔」算哪些影城的說法：「全台」「台北市、新北市」「收藏的影城」 */
+/** 「快下檔」算哪些影城：收藏的影城要不要算、哪些縣市（都沒有 = 全台） */
+export function notifyEndPick(p: NotifyPrefs): { fav: boolean; cities: string[] } {
+  const fav = p.endFav !== undefined ? !!p.endFav : p.endScope === "fav";
+  return { fav, cities: p.endFav === undefined && p.endScope === "fav" ? [] : p.endCities || [] };
+}
+/** 「快下檔」算哪些影城的說法：「全台」「台北市、新北市」「收藏的影城」「收藏的影城＋台北市」 */
 export function notifyEndScope(p: NotifyPrefs): string {
-  if (p.endScope === "fav") return "收藏的影城";
-  const cs = p.endCities || [];
-  if (p.endScope === "city" && cs.length) return cs.length > 3 ? `${cs.slice(0, 2).join("、")}等 ${cs.length} 個縣市` : cs.join("、");
-  return "全台";
+  const { fav, cities: cs } = notifyEndPick(p);
+  const ct = cs.length > 3 ? `${cs.slice(0, 2).join("、")}等 ${cs.length} 個縣市` : cs.join("、");
+  return [fav ? "收藏的影城" : "", ct].filter(Boolean).join("＋") || "全台";
 }
 /** 交給通知伺服器的整包設定：要哪幾種、快下檔的門檻與範圍、收藏的片（只有片名鍵、片名、影展代碼）。
- *  收藏的影城只有在範圍選「收藏的影城」時才傳 */
+ *  收藏的影城只有在範圍有選「收藏的影城」時才傳 */
 export function notifyPayload(s: Settings): { prefs: Record<string, boolean>; endCfg: { max: number; scope: string; cities: string[]; cinemas: string[] }; favs: ReturnType<typeof notifyFavs> } {
   const p = notifyPrefs(s);
-  const scope = p.endScope === "fav" ? "fav" : p.endScope === "city" && (p.endCities || []).length ? "city" : "all";
+  const pick = notifyEndPick(p);
+  const scope = pick.fav && pick.cities.length ? "mix" : pick.fav ? "fav" : pick.cities.length ? "city" : "all";
   return {
     prefs: { open: p.open, rel: p.rel, end: p.end, fest: p.fest },
-    endCfg: { max: Math.min(30, Math.max(1, p.endMax || 3)), scope, cities: scope === "city" ? p.endCities || [] : [], cinemas: scope === "fav" ? s.favorites.slice(0, 80) : [] },
+    endCfg: { max: Math.min(30, Math.max(1, p.endMax || 3)), scope, cities: pick.cities, cinemas: pick.fav ? s.favorites.slice(0, 80) : [] },
     favs: notifyFavs(s),
   };
 }

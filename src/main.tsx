@@ -12,7 +12,7 @@ import {
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
   loadSettings, saveSettings, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, TW,
   FORMATS, formatsOf, filterVersions, filterVersionsAny, movieRows, movieDays, nearest, kmLabel, WINDOWS, findShowtimes, findShowtimesMulti, multiLabel, multiDetail, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText,
-  hallOf, tmdbTest, movieExtras, moviePoster, movieRuntime, posterSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxCountries, boxByCountry, boxInfo, boxInfoRows, boxCountryText, BOX_COUNTRY_NOTE, boxCountryTag, boxCountriesPicked, loadMovieBoard, loadSoonBoard, notifyPrefs, notifyPayload, notifyEndScope, NOTIFY_KINDS, boxStatus, STATUS_LABEL, boxInfoBy, isFavMovie, toggleFavMovie, favMovieRows, favMovieBox, soonGroups, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityCached, communityVote, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalsReady, festivalNote, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, festivalDefaultDate, festivalStateLabel, festivalState, festivalFooter, linkMovies, nowGroupLine, nowFilter, festivalPick, movieAbout, festivalSearch, festivalSearchLines, festivalTrailer, festivalYears, festivalsAny, festivalGroups, festivalChipNote, festivalStatusLine, movieRatings, ratingTier,
+  hallOf, tmdbTest, movieExtras, moviePoster, movieRuntime, posterSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxCountries, boxByCountry, boxInfo, boxInfoRows, boxCountryText, BOX_COUNTRY_NOTE, boxCountryTag, boxCountriesPicked, loadMovieBoard, loadSoonBoard, notifyPrefs, notifyPayload, notifyEndScope, notifyEndPick, NOTIFY_KINDS, boxStatus, STATUS_LABEL, boxInfoBy, isFavMovie, toggleFavMovie, favMovieRows, favMovieBox, soonGroups, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityCached, communityVote, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalsReady, festivalNote, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, festivalDefaultDate, festivalStateLabel, festivalState, festivalFooter, linkMovies, nowGroupLine, nowFilter, festivalPick, movieAbout, festivalSearch, festivalSearchLines, festivalTrailer, festivalYears, festivalsAny, festivalGroups, festivalChipNote, festivalStatusLine, movieRatings, ratingTier,
 } from "./core";
 import type { MovieExtras, Ratings, Community, BoxOfficeItem, BoxSort, MovieEntry, SoonEntry, UpcomingFilm, FavMovie, FavRow, NotifyPrefs, Festival, FestivalFilm, FestivalSession } from "./core";
 import { setTabBar, setBackGuard, esc } from "./jsx";
@@ -311,18 +311,19 @@ class App {
     const toggle = (id: "open" | "rel" | "end" | "fest") => set({ [id]: !prefs[id] });
     // 快下檔的細項：剩下幾間以下、算哪些影城（全台／指定縣市，可複選／收藏的影城）
     const max = prefs.endMax || 3;
-    const scope = prefs.endScope === "fav" ? "fav" : prefs.endScope === "city" && (prefs.endCities || []).length ? "city" : "all";
-    const picked = scope === "city" ? prefs.endCities || [] : [];
+    const pick = notifyEndPick(prefs);
+    const picked = pick.cities;
+    const pickSet = (fav: boolean, cs: string[]) => set({ endFav: fav, endCities: cs, endScope: undefined });
     if (!this.cinemas.length) this.cinemas = await loadCinemas().catch(() => [] as Cinema[]);
     const cities = Array.from(new Set(this.cinemas.map((c) => c.city))).sort((a, b) => (CITY_ORDER.indexOf(a) + 1 || 99) - (CITY_ORDER.indexOf(b) + 1 || 99));
-    const endNote = scope === "fav" ? `你收藏的影城裡，還在放映的從比較多變成剩下 ${max} 間以下` : `${notifyEndScope(prefs)}放映的影城，從比較多變成剩下 ${max} 間以下`;
+    const endNote = `${pick.fav && !picked.length ? "你收藏的影城裡" : notifyEndScope(prefs) + "合計"}，還在放映的影城從比較多變成剩下 ${max} 間以下`;
     return (
       <>
         <Section title="什麼時候通知" hint="點一下開或關。晚上十點到早上九點不會發通知，留到早上再發。">
           {NOTIFY_KINDS.map((k) => <Item icon={prefs[k.id] ? "✅" : "⬜️"} title={k.label} subtitle={k.id === "end" ? endNote : k.note} chevron={false} onTap={() => toggle(k.id)} />)}
         </Section>
         {prefs.end ? (
-          <Section title="快下檔的條件" hint={this.notifyOpen ? "縣市可以選好幾個；可以左右滑動" : ""}>
+          <Section title="快下檔的條件" hint={this.notifyOpen ? "收藏的影城和縣市可以一起選、縣市可以選好幾個，合起來算；可以左右滑動" : ""}>
             <Item kv title="剩下幾間以下" right={`${max} 間以下 ✎`} chevron={false} onTap={async () => {
               // 通知只有網頁版有：直接用瀏覽器的輸入框填數字
               const ask = (globalThis as any).prompt;
@@ -335,9 +336,9 @@ class App {
             <Item kv title="算哪些影城" right={`${notifyEndScope(prefs)} ${this.notifyOpen ? "▾" : "▸"}`} chevron={false} onTap={() => { this.notifyOpen = !this.notifyOpen; }} />
             {this.notifyOpen ? (
               <Chips scroll>
-            <Chip label="全台" muted={scope !== "all"} onTap={() => set({ endScope: "all", endCities: [] })} />
-            <Chip label="收藏的影城" sub={`${this.settings.favorites.length} 間`} muted={scope !== "fav"} onTap={() => set({ endScope: "fav", endCities: [] })} />
-            {cities.map((c) => <Chip label={c} muted={picked.indexOf(c) < 0} onTap={() => { const next = picked.indexOf(c) < 0 ? [...picked, c] : picked.filter((z) => z !== c); set(next.length ? { endScope: "city", endCities: next } : { endScope: "all", endCities: [] }); }} />)}
+            <Chip label="全台" muted={pick.fav || picked.length > 0} onTap={() => pickSet(false, [])} />
+                <Chip label="收藏的影城" sub={`${this.settings.favorites.length} 間`} muted={!pick.fav} onTap={() => pickSet(!pick.fav, picked)} />
+                {cities.map((c) => <Chip label={c} muted={picked.indexOf(c) < 0} onTap={() => pickSet(pick.fav, picked.indexOf(c) < 0 ? [...picked, c] : picked.filter((z) => z !== c))} />)}
               </Chips>
             ) : null}
           </Section>

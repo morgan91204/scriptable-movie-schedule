@@ -171,6 +171,7 @@
     nearest: () => nearest,
     normImageUrl: () => normImageUrl,
     normTitle: () => normTitle,
+    notifyEndPick: () => notifyEndPick,
     notifyEndScope: () => notifyEndScope,
     notifyFavs: () => notifyFavs,
     notifyPayload: () => notifyPayload,
@@ -788,18 +789,22 @@ function parseTwMovieDay(doc) {
   };
 
   // src/core.ts
+  function notifyEndPick(p) {
+    const fav = p.endFav !== void 0 ? !!p.endFav : p.endScope === "fav";
+    return { fav, cities: p.endFav === void 0 && p.endScope === "fav" ? [] : p.endCities || [] };
+  }
   function notifyEndScope(p) {
-    if (p.endScope === "fav") return "收藏的影城";
-    const cs = p.endCities || [];
-    if (p.endScope === "city" && cs.length) return cs.length > 3 ? `${cs.slice(0, 2).join("、")}等 ${cs.length} 個縣市` : cs.join("、");
-    return "全台";
+    const { fav, cities: cs } = notifyEndPick(p);
+    const ct = cs.length > 3 ? `${cs.slice(0, 2).join("、")}等 ${cs.length} 個縣市` : cs.join("、");
+    return [fav ? "收藏的影城" : "", ct].filter(Boolean).join("＋") || "全台";
   }
   function notifyPayload(s) {
     const p = notifyPrefs(s);
-    const scope = p.endScope === "fav" ? "fav" : p.endScope === "city" && (p.endCities || []).length ? "city" : "all";
+    const pick = notifyEndPick(p);
+    const scope = pick.fav && pick.cities.length ? "mix" : pick.fav ? "fav" : pick.cities.length ? "city" : "all";
     return {
       prefs: { open: p.open, rel: p.rel, end: p.end, fest: p.fest },
-      endCfg: { max: Math.min(30, Math.max(1, p.endMax || 3)), scope, cities: scope === "city" ? p.endCities || [] : [], cinemas: scope === "fav" ? s.favorites.slice(0, 80) : [] },
+      endCfg: { max: Math.min(30, Math.max(1, p.endMax || 3)), scope, cities: pick.cities, cinemas: pick.fav ? s.favorites.slice(0, 80) : [] },
       favs: notifyFavs(s)
     };
   }
@@ -3648,7 +3653,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   var extra = { boxOffice, filmList, soonList, nowShowing, nowShowingMulti, movieBoard: movieBoard2, festivalBoard, festivalFilm, nearby, patchSettings, fillMovie, formatList };
   var BRIDGE_LEVEL = 2;
   globalThis.MS = {
-    version: "2026.11.24-0159",
+    version: "2026.11.24-0201",
     level: BRIDGE_LEVEL,
     init(saved) {
       cache = saved || {};

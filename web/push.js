@@ -68,12 +68,12 @@ const idOf = async (endpoint) => b64u(await crypto.subtle.digest("SHA-256", enc.
 const todayTPE = () => new Date(Date.now() + 8 * 3600e3).toISOString().slice(0, 10);
 const hourTPE = () => new Date(Date.now() + 8 * 3600e3).getUTCHours();
 
-/** 「快下檔」的設定：剩下幾間以下（max）、算哪些影城（scope：all 全台／city 指定的縣市，可以好幾個／fav 收藏的影城） */
+/** 「快下檔」的設定：剩下幾間以下（max）、算哪些影城（scope：all 全台／city 指定的縣市，可以好幾個／fav 收藏的影城／mix 縣市加上收藏的影城，兩邊合起來算） */
 function endConfig(raw) {
   const max = Math.min(30, Math.max(1, Math.round(Number(raw && raw.max) || 3)));
-  const scope = raw && (raw.scope === "city" || raw.scope === "fav") ? raw.scope : "all";
-  const cities = scope === "city" ? (Array.isArray(raw.cities) ? raw.cities : []).slice(0, 25).map((c) => String(c).slice(0, 12)).filter(Boolean) : [];
-  const cinemas = scope === "fav" ? (Array.isArray(raw.cinemas) ? raw.cinemas : []).slice(0, 80).map((c) => String(c).slice(0, 60)).filter(Boolean) : [];
+  const scope = raw && (raw.scope === "city" || raw.scope === "fav" || raw.scope === "mix") ? raw.scope : "all";
+  const cities = scope === "city" || scope === "mix" ? (Array.isArray(raw.cities) ? raw.cities : []).slice(0, 25).map((c) => String(c).slice(0, 12)).filter(Boolean) : [];
+  const cinemas = scope === "fav" || scope === "mix" ? (Array.isArray(raw.cinemas) ? raw.cinemas : []).slice(0, 80).map((c) => String(c).slice(0, 60)).filter(Boolean) : [];
   return { max, scope, cities, cinemas };
 }
 /** 這部片今天在「使用者選的範圍」裡有幾間影城放映；資料不夠判斷（片單上沒有、或沒有各影城的明細）回傳 null */
@@ -81,8 +81,7 @@ function countIn(m, cfg, data) {
   if (!m || m.s !== 1) return null;
   if (cfg.scope === "all") return m.c;
   if (!Array.isArray(m.i) || !Array.isArray(data.cs)) return null;
-  if (cfg.scope === "city") return m.i.filter((x) => cfg.cities.indexOf((data.cc || [])[x]) >= 0).length;
-  return m.i.filter((x) => cfg.cinemas.indexOf(data.cs[x]) >= 0).length;
+  return m.i.filter((x) => cfg.cities.indexOf((data.cc || [])[x]) >= 0 || cfg.cinemas.indexOf(data.cs[x]) >= 0).length; // 縣市和收藏的影城合起來算（同一間不重複）
 }
 /** 現在這部片的各種條件成不成立（data = notify.json；mark = 這部片的紀錄，hi 是看過最多的影城數）。
  *  快下檔：在選的範圍裡，放映的影城曾經比門檻多、現在降到門檻以下（一開始就很少的片不會通知） */
@@ -103,7 +102,8 @@ function message(kind, fav, c, cfg) {
   if (kind === "open") return { title: `${t}開放場次了`, body: "已經可以查場次，點這裡看哪些影城有放。" };
   if (kind === "rel") return { title: `${t}上映了`, body: c.m && c.m.c ? `今天有 ${c.m.c} 間影城放映，點這裡找場次。` : "點這裡找場次。" };
   if (kind === "end") {
-    const where = cfg.scope === "city" ? (cfg.cities.length > 2 ? `${cfg.cities.slice(0, 2).join("、")}等 ${cfg.cities.length} 個縣市` : cfg.cities.join("、")) : cfg.scope === "fav" ? "你收藏的影城" : "全台";
+    const cityText = cfg.cities.length > 2 ? `${cfg.cities.slice(0, 2).join("、")}等 ${cfg.cities.length} 個縣市` : cfg.cities.join("、");
+    const where = cfg.scope === "city" ? cityText : cfg.scope === "fav" ? "你收藏的影城" : cfg.scope === "mix" ? `${cityText}和你收藏的影城` : "全台";
     return { title: `${t}快下檔了`, body: c.n > 0 ? `${where}只剩 ${c.n} 間影城還有場次，想看要把握。` : `${where}今天已經沒有場次了。` };
   }
   return { title: `${(c.f && c.f.name) || (fav.fest && fav.fest.name) || "影展"}開始了`, body: `你收藏的${t}在這個影展放映，點這裡看場次。` };

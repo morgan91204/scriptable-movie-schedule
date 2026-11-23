@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.24-0159
+// @movie-schedule-app 電影行程 v2026.11.24-0201
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/parsers.gen.ts
@@ -583,18 +583,22 @@ var AT_REGIONS = {
 };
 
 // src/core.ts
+function notifyEndPick(p) {
+  const fav = p.endFav !== void 0 ? !!p.endFav : p.endScope === "fav";
+  return { fav, cities: p.endFav === void 0 && p.endScope === "fav" ? [] : p.endCities || [] };
+}
 function notifyEndScope(p) {
-  if (p.endScope === "fav") return "收藏的影城";
-  const cs = p.endCities || [];
-  if (p.endScope === "city" && cs.length) return cs.length > 3 ? `${cs.slice(0, 2).join("、")}等 ${cs.length} 個縣市` : cs.join("、");
-  return "全台";
+  const { fav, cities: cs } = notifyEndPick(p);
+  const ct = cs.length > 3 ? `${cs.slice(0, 2).join("、")}等 ${cs.length} 個縣市` : cs.join("、");
+  return [fav ? "收藏的影城" : "", ct].filter(Boolean).join("＋") || "全台";
 }
 function notifyPayload(s) {
   const p = notifyPrefs(s);
-  const scope = p.endScope === "fav" ? "fav" : p.endScope === "city" && (p.endCities || []).length ? "city" : "all";
+  const pick = notifyEndPick(p);
+  const scope = pick.fav && pick.cities.length ? "mix" : pick.fav ? "fav" : pick.cities.length ? "city" : "all";
   return {
     prefs: { open: p.open, rel: p.rel, end: p.end, fest: p.fest },
-    endCfg: { max: Math.min(30, Math.max(1, p.endMax || 3)), scope, cities: scope === "city" ? p.endCities || [] : [], cinemas: scope === "fav" ? s.favorites.slice(0, 80) : [] },
+    endCfg: { max: Math.min(30, Math.max(1, p.endMax || 3)), scope, cities: pick.cities, cinemas: pick.fav ? s.favorites.slice(0, 80) : [] },
     favs: notifyFavs(s)
   };
 }
@@ -3975,14 +3979,14 @@ var App = class {
   }
   /** 最新版本是多少。網頁版問的是自己網站現在上線的版本（重新整理就會拿到的那一版），不是 GitHub 上的 */
   checkVersion() {
-    if (true) return checkLatest("2026.11.24-0159");
+    if (true) return checkLatest("2026.11.24-0201");
     return (async () => {
       try {
         const r = await globalThis.fetch("/api/version?t=" + Date.now(), { cache: "no-store" });
         const latest = String((await r.json()).version || "");
         if (!latest) return null;
         const num = (v) => Number(v.replace(/\D/g, "")) || 0;
-        return { latest, isLatest: num("2026.11.24-0159") >= num(latest) };
+        return { latest, isLatest: num("2026.11.24-0201") >= num(latest) };
       } catch (_) {
         return null;
       }
@@ -4138,12 +4142,13 @@ var App = class {
     };
     const toggle = (id) => set({ [id]: !prefs[id] });
     const max = prefs.endMax || 3;
-    const scope = prefs.endScope === "fav" ? "fav" : prefs.endScope === "city" && (prefs.endCities || []).length ? "city" : "all";
-    const picked = scope === "city" ? prefs.endCities || [] : [];
+    const pick = notifyEndPick(prefs);
+    const picked = pick.cities;
+    const pickSet = (fav, cs) => set({ endFav: fav, endCities: cs, endScope: void 0 });
     if (!this.cinemas.length) this.cinemas = await loadCinemas().catch(() => []);
     const cities = Array.from(new Set(this.cinemas.map((c) => c.city))).sort((a, b) => (CITY_ORDER.indexOf(a) + 1 || 99) - (CITY_ORDER.indexOf(b) + 1 || 99));
-    const endNote = scope === "fav" ? `你收藏的影城裡，還在放映的從比較多變成剩下 ${max} 間以下` : `${notifyEndScope(prefs)}放映的影城，從比較多變成剩下 ${max} 間以下`;
-    return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Section, { title: "什麼時候通知", hint: "點一下開或關。晚上十點到早上九點不會發通知，留到早上再發。" }, NOTIFY_KINDS.map((k) => /* @__PURE__ */ h(Item, { icon: prefs[k.id] ? "✅" : "⬜️", title: k.label, subtitle: k.id === "end" ? endNote : k.note, chevron: false, onTap: () => toggle(k.id) }))), prefs.end ? /* @__PURE__ */ h(Section, { title: "快下檔的條件", hint: this.notifyOpen ? "縣市可以選好幾個；可以左右滑動" : "" }, /* @__PURE__ */ h(Item, { kv: true, title: "剩下幾間以下", right: `${max} 間以下 ✎`, chevron: false, onTap: async () => {
+    const endNote = `${pick.fav && !picked.length ? "你收藏的影城裡" : notifyEndScope(prefs) + "合計"}，還在放映的影城從比較多變成剩下 ${max} 間以下`;
+    return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Section, { title: "什麼時候通知", hint: "點一下開或關。晚上十點到早上九點不會發通知，留到早上再發。" }, NOTIFY_KINDS.map((k) => /* @__PURE__ */ h(Item, { icon: prefs[k.id] ? "✅" : "⬜️", title: k.label, subtitle: k.id === "end" ? endNote : k.note, chevron: false, onTap: () => toggle(k.id) }))), prefs.end ? /* @__PURE__ */ h(Section, { title: "快下檔的條件", hint: this.notifyOpen ? "收藏的影城和縣市可以一起選、縣市可以選好幾個，合起來算；可以左右滑動" : "" }, /* @__PURE__ */ h(Item, { kv: true, title: "剩下幾間以下", right: `${max} 間以下 ✎`, chevron: false, onTap: async () => {
       const ask = globalThis.prompt;
       const raw = typeof ask === "function" ? ask("放映的影城剩下幾間以下時通知？（1 到 30）", String(max)) : null;
       if (raw === null || raw === void 0) return;
@@ -4152,10 +4157,7 @@ var App = class {
       set({ endMax: n2 });
     } }), /* @__PURE__ */ h(Item, { kv: true, title: "算哪些影城", right: `${notifyEndScope(prefs)} ${this.notifyOpen ? "▾" : "▸"}`, chevron: false, onTap: () => {
       this.notifyOpen = !this.notifyOpen;
-    } }), this.notifyOpen ? /* @__PURE__ */ h(Chips, { scroll: true }, /* @__PURE__ */ h(Chip, { label: "全台", muted: scope !== "all", onTap: () => set({ endScope: "all", endCities: [] }) }), /* @__PURE__ */ h(Chip, { label: "收藏的影城", sub: `${this.settings.favorites.length} 間`, muted: scope !== "fav", onTap: () => set({ endScope: "fav", endCities: [] }) }), cities.map((c) => /* @__PURE__ */ h(Chip, { label: c, muted: picked.indexOf(c) < 0, onTap: () => {
-      const next = picked.indexOf(c) < 0 ? [...picked, c] : picked.filter((z) => z !== c);
-      set(next.length ? { endScope: "city", endCities: next } : { endScope: "all", endCities: [] });
-    } }))) : null) : null, /* @__PURE__ */ h(Section, { hint: `已開啟${n ? `，目前收藏了 ${n} 部` : "；還沒有收藏的電影，到電影頁點愛心收藏"}。你收藏的片名存在我們的伺服器上，只用來判斷什麼時候通知；關閉通知時會一起刪掉。` }, /* @__PURE__ */ h(Item, { icon: "📨", title: "傳一則測試通知", subtitle: "確認這台裝置收得到", chevron: false, onTap: async () => {
+    } }), this.notifyOpen ? /* @__PURE__ */ h(Chips, { scroll: true }, /* @__PURE__ */ h(Chip, { label: "全台", muted: pick.fav || picked.length > 0, onTap: () => pickSet(false, []) }), /* @__PURE__ */ h(Chip, { label: "收藏的影城", sub: `${this.settings.favorites.length} 間`, muted: !pick.fav, onTap: () => pickSet(!pick.fav, picked) }), cities.map((c) => /* @__PURE__ */ h(Chip, { label: c, muted: picked.indexOf(c) < 0, onTap: () => pickSet(pick.fav, picked.indexOf(c) < 0 ? [...picked, c] : picked.filter((z) => z !== c)) }))) : null) : null, /* @__PURE__ */ h(Section, { hint: `已開啟${n ? `，目前收藏了 ${n} 部` : "；還沒有收藏的電影，到電影頁點愛心收藏"}。你收藏的片名存在我們的伺服器上，只用來判斷什麼時候通知；關閉通知時會一起刪掉。` }, /* @__PURE__ */ h(Item, { icon: "📨", title: "傳一則測試通知", subtitle: "確認這台裝置收得到", chevron: false, onTap: async () => {
       await this.ui.toast(await p.test() ? "已送出，幾秒內應該會收到" : "送不出去，請關閉通知後重新開啟");
     } }), /* @__PURE__ */ h(Item, { icon: "🔕", title: "關閉通知", subtitle: "停止通知，並刪除伺服器上的資料", chevron: false, onTap: async () => {
       await p.disable();
@@ -4172,11 +4174,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.24-0159"}`);
+          Pasteboard.copy(`版本 ${"2026.11.24-0201"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.24-0159"}`,
+      `版本 ${"2026.11.24-0201"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -4516,7 +4518,7 @@ var App = class {
     if (false) {
       if (!r) return /* @__PURE__ */ h(Note, { text: "（無法確認是否為最新版：連不到網站）" });
       if (r.isLatest) return /* @__PURE__ */ h(Note, { text: "✅ 已是最新版" });
-      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.24-0159"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
+      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.24-0201"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
         globalThis.location.reload();
       } }));
     }
