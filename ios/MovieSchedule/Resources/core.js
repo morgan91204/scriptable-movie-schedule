@@ -1363,15 +1363,16 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   }
   async function atYearHint(title, slug, en) {
     if (isReissue(title)) return 0;
+    const known = () => Number(releaseOf(title).slice(0, 4)) || 0;
     try {
       const poster = await Promise.race([moviePoster(title, slug, en), delay(1500).then(() => "")]);
       const id = await atMovieId(title, poster || "");
-      if (!id) return 0;
+      if (!id) return known();
       const html = await Promise.race([atPage(id), delay(3500).then(() => "")]);
       const m = html.match(/上映日期[:：]?(?:\s|<[^>]*>|&nbsp;)*(\d{4})/);
-      return m ? Number(m[1]) : 0;
+      return m ? Number(m[1]) : known();
     } catch (_) {
-      return 0;
+      return known();
     }
   }
   var runtimeMem = {};
@@ -2283,7 +2284,8 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
         try {
           const r = await platform().fetchText(`https://v3.sg.media-imdb.com/suggestion/x/${encodeURIComponent(key)}.json`, { "User-Agent": UA });
           const d = JSON.parse(r.body).d || [];
-          const hit = d.find((x) => /^tt/.test(x.id) && (x.qid === "movie" || x.qid === "tvMovie" || x.qid === "video") && okYear(Number(x.y) || 0));
+          const sameName = (x) => !!en && q === en && normEn(String(x.l || "")) === normEn(en);
+          const hit = d.find((x) => /^tt/.test(x.id) && (x.qid === "movie" || x.qid === "tvMovie" || x.qid === "video") && (okYear(Number(x.y) || 0) || sameName(x)));
           if (hit) return { id: hit.id, name: String(hit.l || en || ""), year: Number(hit.y) || 0 };
         } catch (e) {
           errs.push("IMDb 搜尋暫時讀不到");
@@ -2800,7 +2802,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   var extra = { boxOffice, nowShowing, nowShowingMulti, movieBoard, festivalBoard, festivalFilm, nearby, patchSettings, fillMovie, formatList };
   var BRIDGE_LEVEL = 2;
   globalThis.MS = {
-    version: "2026.11.23-1518",
+    version: "2026.11.23-1532",
     level: BRIDGE_LEVEL,
     init(saved) {
       cache = saved || {};

@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.23-1518
+// @movie-schedule-app 電影行程 v2026.11.23-1532
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/parsers.gen.ts
@@ -1199,15 +1199,16 @@ async function atPoster(title) {
 }
 async function atYearHint(title, slug, en) {
   if (isReissue(title)) return 0;
+  const known = () => Number(releaseOf(title).slice(0, 4)) || 0;
   try {
     const poster = await Promise.race([moviePoster(title, slug, en), delay(1500).then(() => "")]);
     const id = await atMovieId(title, poster || "");
-    if (!id) return 0;
+    if (!id) return known();
     const html = await Promise.race([atPage(id), delay(3500).then(() => "")]);
     const m = html.match(/上映日期[:：]?(?:\s|<[^>]*>|&nbsp;)*(\d{4})/);
-    return m ? Number(m[1]) : 0;
+    return m ? Number(m[1]) : known();
   } catch (_) {
-    return 0;
+    return known();
   }
 }
 var runtimeMem = {};
@@ -2064,7 +2065,8 @@ async function identify(title, en, errs, yearHint = 0) {
       try {
         const r = await platform().fetchText(`https://v3.sg.media-imdb.com/suggestion/x/${encodeURIComponent(key)}.json`, { "User-Agent": UA });
         const d = JSON.parse(r.body).d || [];
-        const hit = d.find((x) => /^tt/.test(x.id) && (x.qid === "movie" || x.qid === "tvMovie" || x.qid === "video") && okYear(Number(x.y) || 0));
+        const sameName = (x) => !!en && q === en && normEn(String(x.l || "")) === normEn(en);
+        const hit = d.find((x) => /^tt/.test(x.id) && (x.qid === "movie" || x.qid === "tvMovie" || x.qid === "video") && (okYear(Number(x.y) || 0) || sameName(x)));
         if (hit) return { id: hit.id, name: String(hit.l || en || ""), year: Number(hit.y) || 0 };
       } catch (e) {
         errs.push("IMDb 搜尋暫時讀不到");
@@ -3107,14 +3109,14 @@ var App = class {
   }
   /** 最新版本是多少。網頁版問的是自己網站現在上線的版本（重新整理就會拿到的那一版），不是 GitHub 上的 */
   checkVersion() {
-    if (true) return checkLatest("2026.11.23-1518");
+    if (true) return checkLatest("2026.11.23-1532");
     return (async () => {
       try {
         const r = await globalThis.fetch("/api/version?t=" + Date.now(), { cache: "no-store" });
         const latest = String((await r.json()).version || "");
         if (!latest) return null;
         const num = (v) => Number(v.replace(/\D/g, "")) || 0;
-        return { latest, isLatest: num("2026.11.23-1518") >= num(latest) };
+        return { latest, isLatest: num("2026.11.23-1532") >= num(latest) };
       } catch (_) {
         return null;
       }
@@ -3215,11 +3217,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.23-1518"}`);
+          Pasteboard.copy(`版本 ${"2026.11.23-1532"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.23-1518"}`,
+      `版本 ${"2026.11.23-1532"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -3561,7 +3563,7 @@ var App = class {
     if (false) {
       if (!r) return /* @__PURE__ */ h(Note, { text: "（無法確認是否為最新版：連不到網站）" });
       if (r.isLatest) return /* @__PURE__ */ h(Note, { text: "✅ 已是最新版" });
-      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.23-1518"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
+      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.23-1532"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
         globalThis.location.reload();
       } }));
     }

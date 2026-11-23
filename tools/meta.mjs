@@ -66,7 +66,7 @@ if (todo.length < 20) throw new Error("片單太短（" + todo.length + "），�
 // TMDB 金鑰（GitHub Actions 的密鑰 TMDB_TOKEN）：只用來查片長，只放在送給 TMDB 的請求標頭裡，不印出來、不寫進任何檔案
 const TMDB_TOKEN = (process.env.TMDB_TOKEN || "").trim();
 /** 用片名到 TMDB 查片長。比手機版嚴格：片名要完全相符才採用（不拿「搜尋結果第一筆」），寧可沒有也不要配錯 */
-async function tmdbRuntimeStrict(title, en) {
+async function tmdbStrict(title, en) {
   const same = (s) => core.normTitle(String(s || "")).replace(/臺/g, "台").replace(/祕/g, "秘").replace(/爲/g, "為");
   const call = async (path) => {
     const r = await fetch("https://api.themoviedb.org/3" + path, { headers: { accept: "application/json", Authorization: "Bearer " + TMDB_TOKEN }, signal: AbortSignal.timeout(25000) });
@@ -78,10 +78,12 @@ async function tmdbRuntimeStrict(title, en) {
     const want = [same(title), same(core.baseTitle(title)), same(en)].filter(Boolean);
     const hit = (found.results || []).find((x) => want.indexOf(same(x.title)) >= 0 || want.indexOf(same(x.original_title)) >= 0);
     if (!hit) continue;
-    const rt = Number((await call(`/movie/${hit.id}?language=zh-TW`)).runtime) || 0;
-    if (rt >= 20 && rt <= 400) return rt;
+    const d = await call(`/movie/${hit.id}?language=zh-TW`);
+    const rt = Number(d.runtime) || 0;
+    const img = d.poster_path || hit.poster_path || "";
+    return { runtime: rt >= 20 && rt <= 400 ? rt : 0, poster: /^\/[\w.-]+$/.test(img) ? "https://image.tmdb.org/t/p/w500" + img : "" };
   }
-  return 0;
+  return { runtime: 0, poster: "" };
 }
 
 const noTrailer = [];
@@ -108,13 +110,21 @@ async function refresh(m) {
     } catch (_) { stat.fail++; }
   }
   // 評分：有分數的 1 天查一次，沒有的 12 小時再試；連線出錯就保留舊資料
-  if (!e.ra || now - e.ra > (has(e.r) ? DAY : 12 * HOUR)) {
+  if (!e.ra || recheck || now - e.ra > (has(e.r) ? DAY : 12 * HOUR)) {
     try {
       const r = await core.movieRatings(m.title, m.en, m.slug);
       // 「暫時讀不到」是連線問題，下次再試；其他（例如 IMDb 上沒有這部片）是確定的結果，記下來
       if (!r.err || has(r) || !/暫時讀不到/.test(r.err)) {
         const { err: _e, ...keep } = r;
-        if (has(keep) || !has(e.r)) e.r = keep; // 這次查不到分數時，不蓋掉以前查到的
+        // 以前有 IMDb 分數、這次確定對不到 IMDb（不是連線問題）：以前那筆是配錯片，連同從 IMDb 拿的海報一起拿掉。
+        // 其他情況這次查不到分數時，不蓋掉以前查到的
+        const wrong = !!(e.r && e.r.imdb) && !keep.imdb && !/讀不到|連線|回應 \d/.test(r.err || "");
+        if (wrong) {
+          e.r = keep;
+          if (/m\.media-amazon\.com/.test(e.p || "")) { delete e.p; delete e.xa; }
+          stat.unmatched = (stat.unmatched || 0) + 1;
+          console.log(`配錯片的評分與海報已拿掉：${m.title}`);
+        } else if (has(keep) || !has(e.r)) e.r = keep;
         e.ra = now;
         stat.ratings++;
       } else stat.fail++;
@@ -140,10 +150,13 @@ async function refresh(m) {
   }
   // 開眼也沒有片長的（演唱會、動畫劇場版、重映片）：再用 TMDB 查。盡量少問：查到的不再查；
   // 查不到的 7 天再試一次，試過 3 次還是沒有就 30 天才看一次（tmn = 試過幾次）
-  if (TMDB_TOKEN && !m.runtime && !e.rt && (!e.tma || now - e.tma > ((e.tmn || 0) >= 3 ? 30 : 7) * DAY)) {
+  // 同一次查詢順便補海報：其他來源都找不到海報（或只有預告縮圖）的片才用。片長、海報都有了就不問
+  const noPoster = !e.p || /ytimg\.com/.test(e.p);
+  if (TMDB_TOKEN && ((!m.runtime && !e.rt) || noPoster) && (!e.tma || now - e.tma > ((e.tmn || 0) >= 3 ? 30 : 7) * DAY)) {
     try {
-      const r = await tmdbRuntimeStrict(m.title, m.en);
-      if (r) { e.rt = r; e.rf = "TMDB"; stat.tmdb = (stat.tmdb || 0) + 1; }
+      const r = await tmdbStrict(m.title, m.en);
+      if (r.runtime && !m.runtime && !e.rt) { e.rt = r.runtime; e.rf = "TMDB"; stat.tmdb = (stat.tmdb || 0) + 1; }
+      if (r.poster && noPoster) { e.p = r.poster; stat.tmdbPoster = (stat.tmdbPoster || 0) + 1; }
       e.tma = now;
       e.tmn = (e.tmn || 0) + 1;
       stat.tmdbAsked = (stat.tmdbAsked || 0) + 1;
@@ -175,7 +188,7 @@ for (const [k, e] of Object.entries(movies)) if (!e.seen || now - e.seen > 14 * 
 const sorted = Object.fromEntries(Object.keys(movies).sort().map((k) => [k, movies[k]]));
 fs.writeFileSync(outPath, JSON.stringify({ updated: now, movies: sorted }) + "\n");
 const all = Object.values(sorted);
-console.log(`片單 ${todo.length} 部；這次查了 海報／預告 ${stat.extras}、評分 ${stat.ratings}、片長 ${stat.runtime}（TMDB 問了 ${stat.tmdbAsked || 0} 部、補到 ${stat.tmdb || 0}${TMDB_TOKEN ? "" : "，沒有金鑰"}）、上映日期 ${stat.release}、手動指定預告 ${stat.pins || 0}，失敗 ${stat.fail}`);
+console.log(`片單 ${todo.length} 部；這次查了 海報／預告 ${stat.extras}、評分 ${stat.ratings}、片長 ${stat.runtime}（TMDB 問了 ${stat.tmdbAsked || 0} 部、補到片長 ${stat.tmdb || 0}、海報 ${stat.tmdbPoster || 0}${TMDB_TOKEN ? "" : "，沒有金鑰"}）、上映日期 ${stat.release}、手動指定預告 ${stat.pins || 0}，失敗 ${stat.fail}`);
 console.log(`總表 ${all.length} 部：有海報 ${all.filter((e) => e.p).length}、有預告 ${all.filter((e) => e.tn).length}、有評分 ${all.filter((e) => has(e.r)).length}；檔案 ${Math.round(fs.statSync(outPath).size / 1024)}KB`);
 if (noTrailer.length) console.log("找不到預告的例子：\n" + noTrailer.join("\n"));
 process.exit(0);

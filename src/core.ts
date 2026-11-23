@@ -856,15 +856,18 @@ async function atPoster(title: string): Promise<string> {
 /** 開眼電影頁上的上映年份（用來確認 IMDb／TMDB 對到的是同一部片；重映、修復版不適用，回傳 0）。最多等 3.5 秒 */
 async function atYearHint(title: string, slug?: string, en?: string): Promise<number> {
   if (isReissue(title)) return 0; // 重映片：開眼頁的日期是重映日，不能拿來比
+  // 開眼查不到年份時，改用已經知道的上映日期（電影清單、票房排行）。
+  // 沒有年份可以比的話，同名的外國舊片會被當成這部（《冠軍之路》2026 台灣紀錄片曾被配到 2023 的美國片 Champions）
+  const known = () => Number(releaseOf(title).slice(0, 4)) || 0;
   try {
     const poster = await Promise.race([moviePoster(title, slug, en), delay(1500).then(() => "")]);
     const id = await atMovieId(title, poster || "");
-    if (!id) return 0;
+    if (!id) return known();
     const html = await Promise.race([atPage(id), delay(3500).then(() => "")]);
     const m = html.match(/上映日期[:：]?(?:\s|<[^>]*>|&nbsp;)*(\d{4})/); // 開眼頁是「上映日期：<a …>2026/11/06</a>」
-    return m ? Number(m[1]) : 0;
+    return m ? Number(m[1]) : known();
   } catch (_) {
-    return 0;
+    return known();
   }
 }
 
@@ -2018,7 +2021,9 @@ async function identify(title: string, en: string | undefined, errs: string[], y
       try {
         const r = await platform().fetchText(`https://v3.sg.media-imdb.com/suggestion/x/${encodeURIComponent(key)}.json`, { "User-Agent": UA });
         const d = (JSON.parse(r.body).d || []) as any[];
-        const hit = d.find((x) => /^tt/.test(x.id) && (x.qid === "movie" || x.qid === "tvMovie" || x.qid === "video") && okYear(Number(x.y) || 0));
+        // 年份對不上、但英文片名一字不差的也算（沒標「重映」字樣的舊片重映：《超人再起》2006 年的片 2026 年重映）
+        const sameName = (x: any) => !!en && q === en && normEn(String(x.l || "")) === normEn(en);
+        const hit = d.find((x) => /^tt/.test(x.id) && (x.qid === "movie" || x.qid === "tvMovie" || x.qid === "video") && (okYear(Number(x.y) || 0) || sameName(x)));
         if (hit) return { id: hit.id, name: String(hit.l || en || ""), year: Number(hit.y) || 0 };
       } catch (e) {
         errs.push("IMDb 搜尋暫時讀不到");
