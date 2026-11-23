@@ -12,7 +12,7 @@ import {
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
   loadSettings, saveSettings, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, TW,
   FORMATS, formatsOf, filterVersions, filterVersionsAny, movieRows, movieDays, nearest, kmLabel, WINDOWS, findShowtimes, findShowtimesMulti, multiLabel, multiDetail, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText,
-  hallOf, tmdbTest, movieExtras, moviePoster, movieRuntime, posterSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityCached, communityVote, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalsReady, festivalNote, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, festivalDefaultDate, festivalStateLabel, festivalState, festivalFooter, movieAbout, festivalSearch, festivalSearchLines, festivalTrailer, festivalYears, festivalsAny, festivalGroups, festivalChipNote, festivalStatusLine, movieRatings, ratingTier,
+  hallOf, tmdbTest, movieExtras, moviePoster, movieRuntime, posterSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityCached, communityVote, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalsReady, festivalNote, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, festivalDefaultDate, festivalStateLabel, festivalState, festivalFooter, festivalPick, movieAbout, festivalSearch, festivalSearchLines, festivalTrailer, festivalYears, festivalsAny, festivalGroups, festivalChipNote, festivalStatusLine, movieRatings, ratingTier,
 } from "./core";
 import type { MovieExtras, Ratings, Community, BoxOfficeItem, BoxSort, Festival, FestivalFilm, FestivalSession } from "./core";
 import { setTabBar, setBackGuard, esc } from "./jsx";
@@ -928,6 +928,7 @@ class App {
   festId = ""; // 看哪一個影展（同時有兩個以上時可以切換）
   festDate = ""; // 看哪一天（空 = 今天或影展第一天）
   festQuery = ""; // 影展裡搜尋片名（搜這一年的所有影展）
+  festTab = ""; // 看「進行中・即將開始」(live) 還是「已結束」(past)；空的 = 自動
   festYear = 0; // 看哪一年（0 = 今年；今年還沒有就是最近有資料的那一年）
   async festivalListView(): Promise<string> {
     const list = await loadFestivals(this.festYear || undefined);
@@ -938,7 +939,8 @@ class App {
       return this.movieListView();
     }
     const year = Number(list[0].end.slice(0, 4));
-    const f = list.find((x) => x.id === this.festId) || list[0];
+    const pick = festivalPick(list, this.festTab, this.festId);
+    const f = pick.f || list[0];
     const dates = festivalDates(f);
     const date = dates.indexOf(this.festDate) >= 0 ? this.festDate : festivalDefaultDate(f);
     const day = festivalDay(f, date);
@@ -951,17 +953,21 @@ class App {
         {years.length > 1 ? (
           <Section title="年份">
             <Chips scroll>
-              {years.map((y) => <Chip label={`${y}`} sub={y === Number(todayTPE().slice(0, 4)) ? "今年" : ""} muted={y !== year} onTap={() => { this.festYear = y; this.festId = ""; this.festDate = ""; }} />)}
+              {years.map((y) => <Chip label={`${y}`} sub={y === Number(todayTPE().slice(0, 4)) ? "今年" : ""} muted={y !== year} onTap={() => { this.festYear = y; this.festTab = ""; this.festId = ""; this.festDate = ""; }} />)}
             </Chips>
           </Section>
         ) : null}
-        {festivalGroups(list).map((g) => (
-          <Section title={`${g.title}｜${g.items.length} 個影展`} hint={g.items.length > 3 ? "可以左右滑動" : ""}>
-            <Chips scroll>
-              {g.items.map((x) => <Chip label={x.name} sub={festivalChipNote(x)} muted={x.id !== f.id} onTap={() => { this.festId = x.id; this.festDate = ""; }} />)}
-            </Chips>
-          </Section>
-        ))}
+        {/* 進行中和已結束分成兩頁，一次只列一頁的影展 */}
+        {pick.tabs.length > 1 ? (
+          <Chips tabs>
+            {pick.tabs.map((t) => <Chip label={t.label} sub={`${t.count} 個影展`} muted={t.id !== pick.tab} onTap={() => { this.festTab = t.id; this.festId = ""; this.festDate = ""; }} />)}
+          </Chips>
+        ) : null}
+        <Section title={`${pick.tabs.find((t) => t.id === pick.tab)?.label || "影展"}｜${pick.items.length} 個影展`} hint={pick.items.length > 3 ? "可以左右滑動" : ""}>
+          <Chips scroll>
+            {pick.items.map((x) => <Chip label={x.name} sub={festivalChipNote(x)} muted={x.id !== f.id} onTap={() => { this.festId = x.id; this.festDate = ""; }} />)}
+          </Chips>
+        </Section>
         {hits ? (
           <Section title={`「${this.festQuery.trim()}」｜${hits.length} 部`} hint="搜尋這一年所有影展的片名，不分日期。清空搜尋欄再按搜尋，就回到每天的片單。">
             {hits.map(({ f: hf, film, sessions }) => (

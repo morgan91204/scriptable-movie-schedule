@@ -80,16 +80,18 @@ async function movieBoard(slug: string, dates: string[], cities: string[], forma
   return { title: base.title, rating: base.rating, runtime: base.runtime, release: base.release || "", intro: core.movieAbout(base).text, credits: core.movieAbout(base).credits, total: base.cinemas.length, dates: allDates, selDates, cities: allCities, formats: available, rows };
 }
 /** 影展分類要的資料：有哪些影展、選中的那一個、可選的日期、那一天的片單 */
-async function festivalBoard(festId: string, date: string, year = 0, query = "") {
+async function festivalBoard(festId: string, date: string, year = 0, query = "", tab = "") {
   const list = await core.loadFestivals(year || undefined);
   const years = core.festivalYears();
-  const f = list.find((x) => x.id === festId) || list[0];
-  if (!f) return { festivals: [], groups: [], years, year: 0, note: "", id: "", name: "", range: "", footer: "", dates: [], date: "", day: [] };
+  const pick = core.festivalPick(list, tab, festId);
+  const f = pick.f || list[0];
+  if (!f) return { festivals: [], groups: [], tabs: [], tab: "", items: [], years, year: 0, note: "", id: "", name: "", range: "", footer: "", dates: [], date: "", day: [] };
   const dates = core.festivalDates(f);
   const d = dates.indexOf(date) >= 0 ? date : core.festivalDefaultDate(f);
   const item = (x: core.Festival) => ({ id: x.id, name: `${x.name}（${core.festivalChipNote(x)}）` });
   return {
     festivals: list.map(item), groups: core.festivalGroups(list).map((g) => ({ title: g.title, past: g.past, items: g.items.map(item) })),
+    tabs: pick.tabs.map((t) => ({ id: t.id, label: `${t.label}（${t.count}）` })), tab: pick.tab, items: pick.items.map(item),
     years, year: Number(list[0].end.slice(0, 4)), note: core.festivalNote(list),
     id: f.id, name: f.name, range: core.festivalStatusLine(f), past: core.festivalState(f) === "past",
     footer: core.festivalFooter(f),

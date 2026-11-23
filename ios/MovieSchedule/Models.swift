@@ -253,6 +253,10 @@ struct FestivalBoard: Codable {
     var year: Int?          // 現在看的是哪一年
     var past: Bool?         // 選中的影展已經結束
     struct Hit: Codable, Hashable, Identifiable { var festId: String; var film: FestivalFilm; var lines: [String]; var id: String { festId + "|" + film.id } }
+    struct Tab: Codable, Hashable, Identifiable { var id: String; var label: String }
+    var tabs: [Tab]?        // 「進行中・即將開始」「已結束」兩頁（只有一頁有影展時就只有一個）
+    var tab: String?        // 現在看的是哪一頁
+    var items: [Item]?      // 這一頁的影展
     var hits: [Hit]?        // 搜尋片名的結果（這一年所有影展，不分日期）
     var note: String        // 「進行中」或「幾月幾日開始」
     var id: String

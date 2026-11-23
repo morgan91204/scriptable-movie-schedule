@@ -80,6 +80,7 @@
     festivalLines: () => festivalLines,
     festivalNote: () => festivalNote,
     festivalPeriod: () => festivalPeriod,
+    festivalPick: () => festivalPick,
     festivalPlace: () => festivalPlace,
     festivalSearch: () => festivalSearch,
     festivalSearchLines: () => festivalSearchLines,
@@ -1989,6 +1990,19 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
       { title: "已結束（回顧）", past: true, items: past }
     ].filter((g) => g.items.length > 0);
   }
+  function festivalPick(list, tab, festId) {
+    const live = list.filter((f) => festivalState(f) !== "past");
+    const past = list.filter((f) => festivalState(f) === "past");
+    const tabs = [
+      { id: "live", label: "進行中・即將開始", count: live.length },
+      { id: "past", label: "已結束", count: past.length }
+    ].filter((t) => t.count > 0);
+    const picked = list.find((f) => f.id === festId) || null;
+    const where = (f) => festivalState(f) === "past" ? "past" : "live";
+    const at = tabs.some((t) => t.id === tab) ? tab : picked ? where(picked) : live.length ? "live" : "past";
+    const items = at === "past" ? past : live;
+    return { tabs, tab: at, items, f: (picked && items.indexOf(picked) >= 0 ? picked : items[0]) || null };
+  }
   var festivalChipNote = (f) => festivalState(f) === "past" ? festivalPeriod(f) : festivalStateLabel(f);
   var festivalStatusLine = (f) => `${festivalStateLabel(f)}｜${f.start.slice(0, 4)}/${festivalPeriod(f)}`;
   var festivalsReady = () => festivalsNow;
@@ -2675,17 +2689,21 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     const rows = movieRows(days, { cities: selCities, formats: selFormats, favIds }).map((r) => ({ date: r.date, cinema: r.cinema }));
     return { title: base.title, rating: base.rating, runtime: base.runtime, release: base.release || "", intro: movieAbout(base).text, credits: movieAbout(base).credits, total: base.cinemas.length, dates: allDates, selDates, cities: allCities, formats: available, rows };
   }
-  async function festivalBoard(festId, date, year = 0, query = "") {
+  async function festivalBoard(festId, date, year = 0, query = "", tab = "") {
     const list = await loadFestivals(year || void 0);
     const years = festivalYears();
-    const f = list.find((x) => x.id === festId) || list[0];
-    if (!f) return { festivals: [], groups: [], years, year: 0, note: "", id: "", name: "", range: "", footer: "", dates: [], date: "", day: [] };
+    const pick = festivalPick(list, tab, festId);
+    const f = pick.f || list[0];
+    if (!f) return { festivals: [], groups: [], tabs: [], tab: "", items: [], years, year: 0, note: "", id: "", name: "", range: "", footer: "", dates: [], date: "", day: [] };
     const dates = festivalDates(f);
     const d = dates.indexOf(date) >= 0 ? date : festivalDefaultDate(f);
     const item = (x) => ({ id: x.id, name: `${x.name}（${festivalChipNote(x)}）` });
     return {
       festivals: list.map(item),
       groups: festivalGroups(list).map((g) => ({ title: g.title, past: g.past, items: g.items.map(item) })),
+      tabs: pick.tabs.map((t) => ({ id: t.id, label: `${t.label}（${t.count}）` })),
+      tab: pick.tab,
+      items: pick.items.map(item),
       years,
       year: Number(list[0].end.slice(0, 4)),
       note: festivalNote(list),

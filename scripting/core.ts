@@ -1617,6 +1617,22 @@ export function festivalGroups(list: Festival[]): { title: string; past: boolean
     { title: "已結束（回顧）", past: true, items: past },
   ].filter((g) => g.items.length > 0);
 }
+/** 影展分成「進行中・即將開始」和「已結束」兩頁，一次只看一頁（已結束的不跟進行中的排在一起）。
+ *  tab：使用者點的那一頁（空的 = 看選中的影展在哪一頁；都沒選就先看還沒結束的，沒有才看已結束的）。
+ *  回傳兩頁的名稱與個數、現在在哪一頁、這一頁的影展、選中的那一個 */
+export function festivalPick(list: Festival[], tab: string, festId: string): { tabs: { id: string; label: string; count: number }[]; tab: string; items: Festival[]; f: Festival | null } {
+  const live = list.filter((f) => festivalState(f) !== "past");
+  const past = list.filter((f) => festivalState(f) === "past");
+  const tabs = [
+    { id: "live", label: "進行中・即將開始", count: live.length },
+    { id: "past", label: "已結束", count: past.length },
+  ].filter((t) => t.count > 0);
+  const picked = list.find((f) => f.id === festId) || null;
+  const where = (f: Festival) => (festivalState(f) === "past" ? "past" : "live");
+  const at = tabs.some((t) => t.id === tab) ? tab : picked ? where(picked) : live.length ? "live" : "past";
+  const items = at === "past" ? past : live;
+  return { tabs, tab: at, items, f: (picked && items.indexOf(picked) >= 0 ? picked : items[0]) || null };
+}
 /** 選單上一個影展的說明：還沒結束的寫狀態（進行中／幾月幾日開始），已結束的寫期間 */
 export const festivalChipNote = (f: Festival): string => (festivalState(f) === "past" ? festivalPeriod(f) : festivalStateLabel(f));
 /** 選中的影展那一行狀態：「已結束｜2026/6/26–7/7」「進行中｜2026/11/6–11/22」 */

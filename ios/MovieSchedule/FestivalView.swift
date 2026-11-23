@@ -6,11 +6,11 @@ struct FestivalSection: View {
     @State private var board: Loadable<FestivalBoard> = .loading
     @State private var festId = ""
     @State private var date = ""
-    @State private var showPast = false // 已結束的影展清單有沒有展開
+    @State private var tab = "" // 看「進行中・即將開始」(live) 還是「已結束」(past)；空的 = 自動
     @State private var year = 0 // 0 = 今年（今年還沒有就是最近有資料的那一年）
 
     /// 選的東西有變就重讀（用陣列接起來：一長串字串相加編譯器會算不出型別）
-    private var loadKey: String { [festId, date, String(year), query].joined(separator: "|") }
+    private var loadKey: String { [festId, date, String(year), query, tab].joined(separator: "|") }
 
     var body: some View {
         Group {
@@ -35,7 +35,6 @@ struct FestivalSection: View {
             Section { Text("目前沒有影展資料").foregroundStyle(.secondary) }
         } else {
             yearSection(b)
-            groupSections(b)
             dateSection(b)
             daySection(b)
         }
@@ -58,58 +57,29 @@ struct FestivalSection: View {
     @ViewBuilder private func yearSection(_ b: FestivalBoard) -> some View {
         if let years = b.years, years.count > 1 {
             Section {
-                Picker("年份", selection: Binding(get: { b.year ?? 0 }, set: { year = $0; festId = ""; date = "" })) {
+                Picker("年份", selection: Binding(get: { b.year ?? 0 }, set: { year = $0; tab = ""; festId = ""; date = "" })) {
                     ForEach(years, id: \.self) { Text(String($0)).tag($0) }
                 }
             }
         }
     }
 
-    // 還沒結束的和已經結束的分成兩區，各自一個清單，選中的打勾
-    @ViewBuilder private func groupSections(_ b: FestivalBoard) -> some View {
-        ForEach(b.groups ?? []) { g in
-            let fold = g.past && g.items.count > 3 // 已結束的很多個：預設收起來，只留展開鈕和目前選中的那一個
-            Section {
-                if fold {
-                    Button {
-                        showPast.toggle()
-                    } label: {
-                        HStack(spacing: 8) {
-                            Image(systemName: showPast ? "chevron.down" : "chevron.right").foregroundStyle(Color.secondary)
-                            Text(showPast ? "收合已結束的影展" : "顯示全部 \(g.items.count) 個已結束的影展").foregroundStyle(Color.primary)
-                            Spacer(minLength: 4)
-                        }
-                    }
-                }
-                ForEach(g.items.filter { !fold || showPast || $0.id == b.id }) { x in
-                    groupRow(x, past: g.past, picked: x.id == b.id)
-                }
-            } header: {
-                Text("\(g.title)｜\(g.items.count) 個影展")
-            }
-        }
-    }
-
-    private func groupRow(_ x: FestivalBoard.Item, past: Bool, picked: Bool) -> some View {
-        Button {
-            festId = x.id; date = ""
-        } label: {
-            HStack(spacing: 8) {
-                Image(systemName: past ? "checkmark.seal" : "film").foregroundStyle(past ? Color.secondary : Color.orange)
-                Text(x.name).foregroundStyle(past ? Color.secondary : Color.primary)
-                Spacer(minLength: 4)
-                if picked { Image(systemName: "checkmark").foregroundStyle(Color.accentColor) }
-            }
-        }
-    }
-
+    // 進行中和已結束分成兩頁（切換列），一次只列一頁的影展；影展和日期都用選單，緊接著就是片單
     @ViewBuilder private func dateSection(_ b: FestivalBoard) -> some View {
+        let tabs = b.tabs ?? []
         Section {
+            if tabs.count > 1 {
+                Picker("狀態", selection: Binding(get: { b.tab ?? "" }, set: { tab = $0; festId = ""; date = "" })) {
+                    ForEach(tabs) { Text($0.label).tag($0.id) }
+                }
+                .pickerStyle(.segmented)
+            }
+            Picker("影展", selection: Binding(get: { b.id }, set: { festId = $0; date = "" })) {
+                ForEach(b.items ?? b.festivals) { Text($0.name).tag($0.id) }
+            }
             Picker("日期", selection: Binding(get: { b.date }, set: { date = $0 })) {
                 ForEach(b.dates, id: \.self) { Text(Fmt.dateLabel($0)).tag($0) }
             }
-        } header: {
-            Text(b.name)
         } footer: {
             Text(b.range + ((b.past ?? false) ? "｜場次僅供回顧" : ""))
         }
@@ -131,7 +101,7 @@ struct FestivalSection: View {
 
     private func load() async {
         do {
-            board = .loaded(try await Bridge.shared.call("festivalBoard", [festId, date, year, query]))
+            board = .loaded(try await Bridge.shared.call("festivalBoard", [festId, date, year, query, tab]))
         } catch {
             if board.value == nil { board = .failed(errorText(error)) }
         }

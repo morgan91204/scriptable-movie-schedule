@@ -14,7 +14,7 @@ import {
   Cinema, Movie, Settings, Version, TwMovie, TwMovieCinema, CITY_ORDER, TW,
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
   loadSettings, saveSettings, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, cinemaAddress,
-  FORMATS, formatsOf, filterVersions, filterVersionsAny, movieRows, movieDays, nearest, kmLabel, WINDOWS, findShowtimes, findShowtimesMulti, multiLabel, multiDetail, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText, hallOf, tmdbTest, movieExtras, moviePoster, posterReady, posterTint, POSTER_TINTS, normImageUrl, movieRuntime, posterSrc, isLocalSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityVote, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, SCRIPTING_IMPORT_URL, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, festivalDefaultDate, festivalStateLabel, festivalState, festivalFooter, movieAbout, festivalSearch, festivalSearchLines, festivalTrailer, festivalYears, festivalGroups, festivalChipNote, festivalStatusLine, movieRatings, ratingTier,
+  FORMATS, formatsOf, filterVersions, filterVersionsAny, movieRows, movieDays, nearest, kmLabel, WINDOWS, findShowtimes, findShowtimesMulti, multiLabel, multiDetail, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText, hallOf, tmdbTest, movieExtras, moviePoster, posterReady, posterTint, POSTER_TINTS, normImageUrl, movieRuntime, posterSrc, isLocalSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityVote, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, SCRIPTING_IMPORT_URL, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, festivalDefaultDate, festivalStateLabel, festivalState, festivalFooter, festivalPick, movieAbout, festivalSearch, festivalSearchLines, festivalTrailer, festivalYears, festivalGroups, festivalChipNote, festivalStatusLine, movieRatings, ratingTier,
 } from "./core"
 import type { Format, LatLng, Hit, Community, BoxOfficeItem, BoxSort, Festival, FestivalFilm, FestivalSession } from "./core"
 
@@ -1004,11 +1004,12 @@ function FestivalSections({ list: first, query }: { list: Festival[]; query: str
   const [festId, setFestId] = useState("")
   const [pickedDate, setPickedDate] = useState("")
   const [pickedYear, setPickedYear] = useState(0) // 0 = 今年（今年還沒有就是最近有資料的那一年）
-  const [showPast, setShowPast] = useState(false) // 已結束的影展清單有沒有展開
+  const [tab, setTab] = useState("") // 看「進行中・即將開始」(live) 還是「已結束」(past)；空的 = 自動
   const old = useLoad(() => (pickedYear ? loadFestivals(pickedYear) : Promise.resolve(null as Festival[] | null)), [pickedYear])
   const list = pickedYear && old.data && old.data.length ? old.data : first
   const years = festivalYears()
-  const f = list.find((x) => x.id === festId) || list[0]
+  const pick = festivalPick(list, tab, festId)
+  const f = pick.f || list[0]
   if (!f) return <Section><Text foregroundStyle={"secondaryLabel"}>目前沒有影展資料</Text></Section>
   const year = Number(list[0].end.slice(0, 4))
   const dates = festivalDates(f)
@@ -1034,33 +1035,19 @@ function FestivalSections({ list: first, query }: { list: Festival[]; query: str
   </Section>
   return <>
     {years.length > 1 ? <Section>
-      <Picker title={"年份"} value={String(year)} onChanged={(v: string) => { setPickedYear(Number(v)); setFestId(""); setPickedDate("") }}>
+      <Picker title={"年份"} value={String(year)} onChanged={(v: string) => { setPickedYear(Number(v)); setTab(""); setFestId(""); setPickedDate("") }}>
         {years.map((y) => <Text key={String(y)} tag={String(y)}>{`${y}`}</Text>)}
       </Picker>
     </Section> : null}
     {/* 還沒結束的和已經結束的分成兩區，各自一個清單，選中的打勾 */}
-    {/* 已結束的預設收起來（只留一列可以展開，和目前選中的那一個）：不然十幾個已結束的會把上面選的影展和下面它的日期、片單隔開 */}
-    {festivalGroups(list).map((g) => <Section key={g.title} header={<Text>{`${g.title}｜${g.items.length} 個影展`}</Text>}>
-      {g.past && g.items.length > 3 ? <Button action={() => setShowPast(!showPast)}>
-        <HStack spacing={8}>
-          <Image systemName={showPast ? "chevron.down" : "chevron.right"} foregroundStyle={"secondaryLabel"} />
-          <Text foregroundStyle={"label"}>{showPast ? "收合已結束的影展" : `顯示全部 ${g.items.length} 個已結束的影展`}</Text>
-          <Spacer />
-        </HStack>
-      </Button> : null}
-      {g.items.filter((x) => !g.past || g.items.length <= 3 || showPast || x.id === f.id).map((x) => <Button key={x.id} action={() => { setFestId(x.id); setPickedDate("") }}>
-        <HStack spacing={8}>
-          <Image systemName={g.past ? "checkmark.seal" : "film"} foregroundStyle={g.past ? "secondaryLabel" : "systemOrange"} />
-          <VStack alignment={"leading"} spacing={2}>
-            <Text foregroundStyle={g.past ? "secondaryLabel" : "label"}>{x.name}</Text>
-            <Text font={"caption"} foregroundStyle={"secondaryLabel"}>{festivalChipNote(x)}</Text>
-          </VStack>
-          <Spacer />
-          {x.id === f.id ? <Image systemName={"checkmark"} foregroundStyle={"accentColor"} /> : null}
-        </HStack>
-      </Button>)}
-    </Section>)}
-    <Section header={<Text>{f.name}</Text>} footer={<Text>{festivalStatusLine(f) + (past ? "｜場次僅供回顧" : "")}</Text>}>
+    {/* 進行中和已結束分成兩頁（上面的切換列），一次只列一頁的影展；影展和日期都用選單，緊接著就是片單 */}
+    <Section footer={<Text>{festivalStatusLine(f) + (past ? "｜場次僅供回顧" : "")}</Text>}>
+      {pick.tabs.length > 1 ? <Picker title={"狀態"} value={pick.tab} onChanged={(v: string) => { setTab(v); setFestId(""); setPickedDate("") }} pickerStyle={"segmented"}>
+        {pick.tabs.map((t) => <Text key={t.id} tag={t.id}>{`${t.label}（${t.count}）`}</Text>)}
+      </Picker> : null}
+      <Picker title={"影展"} value={f.id} onChanged={(v: string) => { setFestId(v); setPickedDate("") }}>
+        {pick.items.map((x) => <Text key={x.id} tag={x.id}>{`${x.name}（${festivalChipNote(x)}）`}</Text>)}
+      </Picker>
       <Picker title={"日期"} value={date} onChanged={(v: string) => setPickedDate(v)}>
         {dates.map((d) => <Text key={d} tag={d}>{dateLabel(d)}</Text>)}
       </Picker>
