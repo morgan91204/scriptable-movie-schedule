@@ -950,7 +950,7 @@ class App {
     const tabNow = pick.tabs.find((t) => t.id === pick.tab);
     // 收合的篩選：一行「名稱　目前選的 ▸」，點了展開（一次只展開一個）；只有一個選項的不能展開
     const fold = (id: string, title: string, summary: string, can = true) => (
-      <Item title={title} right={can ? `${summary} ${this.festOpen === id ? "▾" : "▸"}` : summary} chevron={false} onTap={can ? () => { this.festOpen = this.festOpen === id ? "" : id; } : undefined} />
+      <Item kv title={title} right={can ? `${summary} ${this.festOpen === id ? "▾" : "▸"}` : summary} chevron={false} onTap={can ? () => { this.festOpen = this.festOpen === id ? "" : id; } : undefined} />
     );
     return (
       <Page title="依電影找場次" subtitle={`${f.name}｜${festivalStatusLine(f)}`} onBack={() => this.back()}>
@@ -1097,7 +1097,7 @@ class App {
     };
     // 收合的篩選：一行「名稱　目前選的 ▸」，點了展開（一次只展開一個）
     const fold = (id: string, title: string, summary: string) => (
-      <Item title={title} right={`${summary} ${this.boxOpen === id ? "▾" : "▸"}`} chevron={false} onTap={() => { this.boxOpen = this.boxOpen === id ? "" : id; }} />
+      <Item kv title={title} right={`${summary} ${this.boxOpen === id ? "▾" : "▸"}`} chevron={false} onTap={() => { this.boxOpen = this.boxOpen === id ? "" : id; }} />
     );
     const item = (e: MovieEntry, i: number) => {
       const m = e.m, x = e.x;
