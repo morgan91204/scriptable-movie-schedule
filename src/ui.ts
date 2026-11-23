@@ -104,7 +104,10 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .bar .lbl{flex:none;font-size:13px;font-weight:600;color:var(--fg2)}
 .bar .chips{flex:1;min-width:0;padding:6px 0}
 .bar .chips.scroll .chip{min-width:0;padding:7px 12px}
-.bar .dir{flex:none;padding:7px 10px;border-radius:12px;background:var(--card);color:var(--accent);font-size:14px;font-weight:600;white-space:nowrap}
+.bar .dir{flex:none;display:flex;align-items:center;gap:5px;padding:7px 9px 7px 11px;border-radius:12px;background:var(--card);color:var(--accent);font-size:14px;font-weight:600;white-space:nowrap;box-shadow:0 0 0 1px rgba(128,128,128,.25)}
+.bar .dir .arrows{display:flex;flex-direction:column;line-height:1;font-size:9px;gap:1px}
+.bar .dir .arrows i{font-style:normal;color:var(--fg2);opacity:.35}
+.bar .dir.asc .up,.bar .dir.desc .down{color:var(--accent);opacity:1}
 .bar .dir:active{opacity:.6}
 .bar.more .chips{-webkit-mask-image:linear-gradient(to right,#000 calc(100% - 30px),transparent);mask-image:linear-gradient(to right,#000 calc(100% - 30px),transparent)}
 .bar .more-hint{display:none;flex:none;margin-left:-4px;font-size:17px;font-weight:700;line-height:1;color:var(--fg2)}

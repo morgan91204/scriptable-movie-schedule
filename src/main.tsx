@@ -1262,6 +1262,7 @@ class App {
       return { src, url: u };
     };
     // 收合的篩選：一行「名稱　目前選的 ▸」，點了展開（一次只展開一個）
+    const dirNow = (board.asc ? board.dirs[1].label : board.dirs[0].label), dirNext = (board.asc ? board.dirs[0].label : board.dirs[1].label);
     const fold = (id: string, title: string, summary: string) => (
       <Item kv title={title} right={`${summary} ${this.boxOpen === id ? "▾" : "▸"}`} chevron={false} onTap={() => { this.boxOpen = this.boxOpen === id ? "" : id; }} />
     );
@@ -1288,12 +1289,15 @@ class App {
         {/* 排序：前面標「排序」，最右邊一顆按鈕寫出方向（高→低），點一下反過來；再點一次選中的排法也會反向 */}
         {board.orders.length > 1 ? (
           <div class="bar">
-            <span class="lbl">排序</span>
+            {/* 「排序」本身就是按鈕：點一下切換方向；兩個箭頭亮的那個是目前的方向（▲ 小到大、▼ 大到小） */}
+            <button class={"dir " + (board.asc ? "asc" : "desc")} aria-label={`排序方向：目前${dirNow}，點一下切換`} onTap={async () => { this.ascBy[sc] = !this.ascBy[sc]; await this.ui.toast(`改成${dirNext}`); }}>
+              <span>排序</span>
+              <span class="arrows" aria-hidden="true"><i class="up">▲</i><i class="down">▼</i></span>
+            </button>
             <Chips scroll>
               {board.orders.map((x) => <Chip label={x.label} muted={board.order !== x.id} onTap={() => { if (board.order === x.id) this.ascBy[sc] = !this.ascBy[sc]; else { this.sortBy[sc] = x.id; this.ascBy[sc] = false; } }} />)}
             </Chips>
             <span class="more-hint" aria-hidden="true">›</span>
-            <button class="dir" aria-label="切換排序方向" onTap={() => { this.ascBy[sc] = !this.ascBy[sc]; }}>{esc((board.asc ? board.dirs[1].label : board.dirs[0].label).replace("到", "→"))}</button>
           </div>
         ) : null}
         {/* 評分來源、週次、出品國別預設收合成一行，點了才展開 */}
