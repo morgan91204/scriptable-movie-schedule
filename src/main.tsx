@@ -12,7 +12,7 @@ import {
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
   loadSettings, saveSettings, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, TW,
   FORMATS, formatsOf, filterVersions, filterVersionsAny, movieRows, movieDays, nearest, kmLabel, WINDOWS, findShowtimes, findShowtimesMulti, multiLabel, multiDetail, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText,
-  hallOf, tmdbTest, movieExtras, moviePoster, movieRuntime, posterSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityCached, communityVote, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalsReady, festivalNote, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, festivalDefaultDate, festivalStateLabel, festivalState, festivalFooter, linkMovies, nowGroupLine, nowFilter, festivalPick, movieAbout, festivalSearch, festivalSearchLines, festivalTrailer, festivalYears, festivalsAny, festivalGroups, festivalChipNote, festivalStatusLine, movieRatings, ratingTier,
+  hallOf, tmdbTest, movieExtras, moviePoster, movieRuntime, posterSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxCountries, boxByCountry, boxInfo, boxInfoRows, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityCached, communityVote, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalsReady, festivalNote, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, festivalDefaultDate, festivalStateLabel, festivalState, festivalFooter, linkMovies, nowGroupLine, nowFilter, festivalPick, movieAbout, festivalSearch, festivalSearchLines, festivalTrailer, festivalYears, festivalsAny, festivalGroups, festivalChipNote, festivalStatusLine, movieRatings, ratingTier,
 } from "./core";
 import type { MovieExtras, Ratings, Community, BoxOfficeItem, BoxSort, Festival, FestivalFilm, FestivalSession } from "./core";
 import { setTabBar, setBackGuard, esc } from "./jsx";
@@ -1049,6 +1049,7 @@ class App {
   boxSort: BoxSort = "week"; // 票房排行的排法：本週／累計／年度
   boxYears: string[] = []; // 年度排行選了哪幾年（空 = 最新的一年）
   boxWeek = ""; // 週票房看哪一週（空 = 最新）
+  boxCountry = ""; // 只看哪個國別（空 = 全部）
   boxLimit = 100; // 年度排行目前顯示幾列
   boxPageKey = "";
   async boxOfficeView(): Promise<string> {
@@ -1063,10 +1064,13 @@ class App {
     const weekOptions = boxWeekOptions(b);
     const week = boxWeekPicked(b, this.boxWeek); // 週票房看哪一週（預設最新）
     const match = boxMatcher(all);
-    const found = boxOfficeBy(b, by, years, week.id).map((x) => ({ x, m: match(x.name) })).filter(({ x, m }) => !k || `${x.name} ${m?.en || ""}`.toLowerCase().includes(k));
+    const everyone = boxOfficeBy(b, by, years, week.id);
+    const countries = boxCountries(everyone); // 這份排行裡有哪些國別（多的在前）
+    const country = countries.some((c) => c.id === this.boxCountry) ? this.boxCountry : ""; // 換了排法，原本選的國別不在裡面就回到全部
+    const found = boxByCountry(everyone, country).map((x) => ({ x, m: match(x.name) })).filter(({ x, m }) => !k || `${x.name} ${m?.en || ""}`.toLowerCase().includes(k));
     // 年度排行一年有六百部左右、全選是好幾千部：先畫 100 列，快滑到底時自動接著載入（不用按）。換了排法、年份或搜尋字就從頭開始
     const paged = by === "year";
-    const pageKey = `${by}|${years.join(",")}|${week.id}|${k}`;
+    const pageKey = `${by}|${years.join(",")}|${week.id}|${k}|${country}`;
     if (this.boxPageKey !== pageKey) {
       this.boxPageKey = pageKey;
       this.boxLimit = BOX_PAGE;
@@ -1105,8 +1109,16 @@ class App {
             </Chips>
           </Section>
         ) : null}
+        {countries.length > 1 ? (
+          <Section title="國別" hint="選了國別，名次會在那個國別裡重排。可以左右滑動。">
+            <Chips scroll>
+              <Chip label="全部" sub={`${everyone.length} 部`} muted={!!country} onTap={() => { this.boxCountry = ""; }} />
+              {countries.map((c) => <Chip label={c.id} sub={`${c.count} 部`} muted={country !== c.id} onTap={() => { this.boxCountry = c.id; }} />)}
+            </Chips>
+          </Section>
+        ) : null}
         {by === "year" && yearOptions.length > 1 ? (
-          <Section title="年份" hint="可以複選，選了幾年就合在一起排。">
+          <Section title="年份" hint="可以複選，選了幾年就合在一起排；全選就是 2016 年至今的總排行。">
             <Chips>
               {/* 全選：再點一次回到只看最新的一年 */}
               <Chip label="全選" muted={years.length !== yearOptions.length} onTap={() => { this.boxYears = years.length === yearOptions.length ? [] : yearOptions.slice(); }} />
@@ -1143,16 +1155,14 @@ class App {
 
   /** 票房排行上、場次通已經沒有場次的片：海報、評分、預告、觀眾評分與票房 */
   async boxMovieView(x: BoxOfficeItem): Promise<string> {
-    const e = await this.extras(x.name);
+    const [e, info] = await Promise.all([this.extras(x.name), boxInfo(x).catch(() => null)]);
     const date = x.release.replace(/-/g, "/");
     return (
       <Page title={x.name} subtitle={`票房第 ${x.rank} 名`} onBack={() => this.back()}>
         {this.hero(e, x.name, [x.country, `${date} 上映`])}
-        <Section title="票房" hint="資料來源：國家電影及視聽文化中心「全國電影票房統計」。">
-          {x.week !== null && !x.since ? <Item title="本週票房" right={money(x.week)} /> : null}
-          <Item title="累計票房" right={money(x.total)} />
-          {x.theaters ? <Item title="上映戲院" right={`${x.theaters} 間`} /> : null}
-          <Item title="上映日期" right={date} />
+        {/* 個別資訊：跟官方網站列的欄位一樣（國別、發行、出品、上映日期、院數、票數、金額） */}
+        <Section title="票房資訊" hint="資料來源：國家電影及視聽文化中心「全國電影票房統計」。">
+          {boxInfoRows(x, info).map(([label, value]) => <Item title={label} right={value} />)}
         </Section>
         <Note text="場次通目前沒有這部片的場次，可能已經下檔，或只在少數戲院放映。" />
       </Page>

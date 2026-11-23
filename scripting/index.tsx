@@ -14,7 +14,7 @@ import {
   Cinema, Movie, Settings, Version, TwMovie, TwMovieCinema, CITY_ORDER, TW,
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
   loadSettings, saveSettings, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, cinemaAddress,
-  FORMATS, formatsOf, filterVersions, filterVersionsAny, movieRows, movieDays, nearest, kmLabel, WINDOWS, findShowtimes, findShowtimesMulti, multiLabel, multiDetail, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText, hallOf, tmdbTest, movieExtras, moviePoster, posterReady, posterTint, POSTER_TINTS, normImageUrl, movieRuntime, posterSrc, isLocalSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityVote, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, SCRIPTING_IMPORT_URL, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, festivalDefaultDate, festivalStateLabel, festivalState, festivalFooter, linkMovies, nowGroupLine, nowFilter, festivalPick, movieAbout, festivalSearch, festivalSearchLines, festivalTrailer, festivalYears, festivalGroups, festivalChipNote, festivalStatusLine, movieRatings, ratingTier,
+  FORMATS, formatsOf, filterVersions, filterVersionsAny, movieRows, movieDays, nearest, kmLabel, WINDOWS, findShowtimes, findShowtimesMulti, multiLabel, multiDetail, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText, hallOf, tmdbTest, movieExtras, moviePoster, posterReady, posterTint, POSTER_TINTS, normImageUrl, movieRuntime, posterSrc, isLocalSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxCountries, boxByCountry, boxInfo, boxInfoRows, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityVote, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, SCRIPTING_IMPORT_URL, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, festivalDefaultDate, festivalStateLabel, festivalState, festivalFooter, linkMovies, nowGroupLine, nowFilter, festivalPick, movieAbout, festivalSearch, festivalSearchLines, festivalTrailer, festivalYears, festivalGroups, festivalChipNote, festivalStatusLine, movieRatings, ratingTier,
 } from "./core"
 import type { Format, LatLng, Hit, Community, BoxOfficeItem, BoxSort, Festival, FestivalFilm, FestivalSession } from "./core"
 
@@ -942,13 +942,12 @@ function ConfirmPage({ pick }: { pick: Pick }) {
 /** 票房排行上、場次通已經沒有場次的片：海報、評分、預告、觀眾評分與票房 */
 function BoxOfficeMoviePage({ item: x }: { item: BoxOfficeItem }) {
   const date = x.release.replace(/-/g, "/")
+  const info = useLoad(() => boxInfo(x), [x.name, x.release]) // 發行、出品、累計票數（點進來才下載）
   return <List navigationTitle={x.name} navigationBarTitleDisplayMode={"inline"}>
     <MovieHero title={x.name} lines={[x.country, `${date} 上映`]} />
+    {/* 個別資訊：跟官方網站列的欄位一樣（國別、發行、出品、上映日期、院數、票數、金額） */}
     <Section header={<Text>{`票房第 ${x.rank} 名`}</Text>} footer={<Text>資料來源：國家電影及視聽文化中心「全國電影票房統計」。場次通目前沒有這部片的場次，可能已經下檔，或只在少數戲院放映。</Text>}>
-      {x.week !== null && !x.since ? <LabeledContent title={"本週票房"} value={money(x.week)} /> : null}
-      <LabeledContent title={"累計票房"} value={money(x.total)} />
-      {x.theaters ? <LabeledContent title={"上映戲院"} value={`${x.theaters} 間`} /> : null}
-      <LabeledContent title={"上映日期"} value={date} />
+      {boxInfoRows(x, info.data || null).map(([label, value]) => <LabeledContent key={label} title={label} value={value} />)}
     </Section>
   </List>
 }
@@ -973,10 +972,14 @@ function BoxOfficeSections({ movies, query }: { movies: TwMovie[]; query: string
   const pastWeek = sort === "week" && week.past
   const match = useMemo(() => boxMatcher(movies), [movies.length])
   // 搜尋片名：中文片名或對得到的英文片名
-  const found = (b ? boxOfficeBy(b, sort, years, week.id) : []).filter((x) => !query || `${x.name} ${match(x.name)?.en || ""}`.toLowerCase().includes(query))
+  const everyone = b ? boxOfficeBy(b, sort, years, week.id) : []
+  const countries = boxCountries(everyone) // 這份排行裡有哪些國別（多的在前）
+  const [pickedCountry, setPickedCountry] = useState("") // 只看哪個國別（空 = 全部）
+  const country = countries.some((c) => c.id === pickedCountry) ? pickedCountry : ""
+  const found = boxByCountry(everyone, country).filter((x) => !query || `${x.name} ${match(x.name)?.en || ""}`.toLowerCase().includes(query))
   // 年度排行一年有六百部左右、全選是好幾千部：先顯示 100 列，滑到底自動接著載入（不用按）。換了排法、年份或搜尋字就從頭開始
   const paged = sort === "year"
-  const pageKey = `${sort}|${years.join(",")}|${week.id}|${query}`
+  const pageKey = `${sort}|${years.join(",")}|${week.id}|${query}|${country}`
   const [page, setPage] = useState<{ key: string; n: number }>({ key: "", n: BOX_PAGE })
   const limit = page.key === pageKey ? page.n : BOX_PAGE
   const shown = paged ? found.slice(0, limit) : found
@@ -999,6 +1002,12 @@ function BoxOfficeSections({ movies, query }: { movies: TwMovie[]; query: string
   {sort === "week" && weekOptions.length > 1 ? <Section footer={<Text>可以回頭看過去幾週的排行。</Text>}>
     <Picker title={"週次"} value={week.id} onChanged={(v: string) => setPickedWeek(v === b.end ? "" : v)}>
       {weekOptions.map((o) => <Text key={o.id} tag={o.id}>{`${o.label}（${o.note}）`}</Text>)}
+    </Picker>
+  </Section> : null}
+  {countries.length > 1 ? <Section footer={<Text>選了國別，名次會在那個國別裡重排。</Text>}>
+    <Picker title={"國別"} value={country} onChanged={(v: string) => setPickedCountry(v)}>
+      <Text tag={""}>{`全部（${everyone.length} 部）`}</Text>
+      {countries.map((c) => <Text key={c.id} tag={c.id}>{`${c.id}（${c.count} 部）`}</Text>)}
     </Picker>
   </Section> : null}
   {sort === "year" && yearOptions.length > 1 ? multiPick({

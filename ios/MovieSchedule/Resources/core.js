@@ -14,6 +14,7 @@
     AD_STEPS: () => AD_STEPS,
     AT_DATA_URL: () => AT_DATA_URL,
     AT_SUPPLEMENT: () => AT_SUPPLEMENT,
+    BOXOFFICE_INFO_URL: () => BOXOFFICE_INFO_URL,
     BOXOFFICE_URL: () => BOXOFFICE_URL,
     BOXOFFICE_WEEKS_URL: () => BOXOFFICE_WEEKS_URL,
     BOXOFFICE_YEARS_URL: () => BOXOFFICE_YEARS_URL,
@@ -43,6 +44,10 @@
     atDayLive: () => atDayLive,
     baseTitle: () => baseTitle,
     bookingUrl: () => bookingUrl,
+    boxByCountry: () => boxByCountry,
+    boxCountries: () => boxCountries,
+    boxInfo: () => boxInfo,
+    boxInfoRows: () => boxInfoRows,
     boxMatcher: () => boxMatcher,
     boxOfficeBy: () => boxOfficeBy,
     boxOfficeFooter: () => boxOfficeFooter,
@@ -1856,7 +1861,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
       // 排的是哪一種，就把那個數字放前面
       by === "year" ? total : by === "total" ? [total, week].filter(Boolean).join("｜") : x.since ? `上映至${past ? "當時" : "今"} ${money(x.total)}` : [week, total].filter(Boolean).join("｜"),
       // 年度排行混著已經下檔的片：還在上映的標出來
-      [by === "year" && x.showing ? "上映中" : "", releaseLabel(x.release), x.theaters ? `${x.theaters} 間戲院` : ""].filter(Boolean).join("｜")
+      [by === "year" && x.showing ? "上映中" : "", x.country, releaseLabel(x.release), x.theaters ? `${x.theaters} 間戲院` : ""].filter(Boolean).join("｜")
     ];
   }
   function boxSorts(b) {
@@ -1889,6 +1894,47 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     }
     if (by !== "total") return b.list;
     return b.list.slice().sort((x, y) => y.total - x.total).map((x, i) => ({ ...x, rank: i + 1 }));
+  }
+  function boxCountries(list) {
+    const n = {};
+    for (const x of list) if (x.country) n[x.country] = (n[x.country] || 0) + 1;
+    return Object.keys(n).map((id) => ({ id, count: n[id] })).sort((a, b) => b.count - a.count || a.id.localeCompare(b.id));
+  }
+  function boxByCountry(list, country) {
+    if (!country) return list;
+    return list.filter((x) => x.country === country).map((x, i) => ({ ...x, rank: i + 1 }));
+  }
+  var BOXOFFICE_INFO_URL = "https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/main/dist/boxoffice-info-";
+  var boxInfoMem = {};
+  async function boxInfo(x) {
+    const y = (x.release || "").slice(0, 4);
+    if (!/^20\d\d$/.test(y)) return null;
+    const all = await (boxInfoMem[y] ||= (async () => {
+      const r = await platform().fetchText(`${BOXOFFICE_INFO_URL}${y}.json?t=${Math.floor(Date.now() / 36e5)}`, { accept: "application/json" });
+      const d = r.status === 200 ? JSON.parse(r.body) : null;
+      return d && d.info || {};
+    })().catch(() => {
+      delete boxInfoMem[y];
+      return {};
+    }));
+    const v = all[x.name + "|" + x.release];
+    return v ? { issue: v[0] || "", produce: v[1] || "", tickets: Number(v[2]) || 0 } : null;
+  }
+  function boxInfoRows(x, info) {
+    const num = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    const rows = [];
+    if (x.country) rows.push(["國別", x.country]);
+    if (info && info.issue) rows.push(["發行", info.issue]);
+    if (info && info.produce) rows.push(["出品", info.produce]);
+    rows.push(["上映日期", x.release.replace(/-/g, "/")]);
+    if (x.theaters) rows.push(["上映戲院", `${x.theaters} 間`]);
+    if (x.week !== null && !x.since) rows.push(["本週票房", money(x.week)]);
+    rows.push(["累計票房", `${money(x.total)}（${num(x.total)} 元）`]);
+    if (info && info.tickets) {
+      rows.push(["累計票數", `${num(info.tickets)} 張`]);
+      rows.push(["平均票價", `${num(x.total / info.tickets)} 元`]);
+    }
+    return rows;
   }
   function boxOfficeTitle(b, by, years, week) {
     const md = (d) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`;
@@ -2608,9 +2654,13 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     return boxYearsMem ||= (async () => {
       const b = await loadBoxOffice();
       let years = null;
+      let countries = [];
       try {
-        const c = JSON.parse(cacheGet("boxoffice-years.json") || "null");
-        if (c && c.years && c.end === b.end && Date.now() - c.at < 6 * 36e5) years = c.years;
+        const c = JSON.parse(cacheGet("boxoffice-years2.json") || "null");
+        if (c && c.years && c.end === b.end && Date.now() - c.at < 6 * 36e5) {
+          years = c.years;
+          countries = c.countries || [];
+        }
       } catch (_) {
       }
       if (!years) {
@@ -2619,10 +2669,11 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
         const d = JSON.parse(r.body);
         if (!d || typeof d.years !== "object") throw new Error("年度排行格式不對");
         years = d.years;
-        cacheSet("boxoffice-years.json", JSON.stringify({ at: Date.now(), end: d.end, years }));
+        countries = Array.isArray(d.countries) ? d.countries : [];
+        cacheSet("boxoffice-years2.json", JSON.stringify({ at: Date.now(), end: d.end, years, countries }));
       }
       const full = {};
-      for (const y of Object.keys(years)) full[y] = years[y].map((x) => ({ ...x, week: null, country: x.country || "" }));
+      for (const y of Object.keys(years)) full[y] = years[y].map((x) => ({ ...x, week: null, country: x.country || countries[x.c ?? -1] || "" }));
       return { ...b, years: { ...b.years || {}, ...full } };
     })().catch(async (e) => {
       boxYearsMem = null;
@@ -2743,7 +2794,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   // ios/bridge.ts
   var native = (name, payload = {}) => webkit.messageHandlers.native.postMessage({ name, ...payload });
   var cache = {};
-  async function boxOffice(by, years, query, limit, week) {
+  async function boxOffice(by, years, query, limit, week, country) {
     const load = by === "year" ? loadBoxOfficeFull() : (by || "week") === "week" && week ? loadBoxOfficeWeeks() : loadBoxOffice();
     const [b, all] = await Promise.all([load, loadMovies().catch(() => [])]);
     const sorts = boxSorts(b);
@@ -2753,7 +2804,10 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     const pastWeek = sort === "week" && wk.past;
     const match = boxMatcher(all);
     const k = (query || "").trim().toLowerCase();
-    const found = boxOfficeBy(b, sort, picked, wk.id).map((x) => ({ x, m: match(x.name) || null })).filter(({ x, m }) => !k || `${x.name} ${m?.en || ""}`.toLowerCase().includes(k));
+    const everyone = boxOfficeBy(b, sort, picked, wk.id);
+    const countries = boxCountries(everyone);
+    const land = countries.some((c) => c.id === country) ? country : "";
+    const found = boxByCountry(everyone, land).map((x) => ({ x, m: match(x.name) || null })).filter(({ x, m }) => !k || `${x.name} ${m?.en || ""}`.toLowerCase().includes(k));
     const paged = sort === "year";
     const rows = (paged ? found.slice(0, limit || BOX_PAGE) : found).map(({ x, m }) => ({ x, m, lines: boxOfficeLines(x, sort, pastWeek), light: (paged || pastWeek) && !m }));
     return {
@@ -2768,6 +2822,10 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
       weeks: boxWeekOptions(b),
       selWeek: wk.id,
       // 週票房可以選的週次、實際採用的那一週
+      countries: countries.map((c) => ({ id: c.id, label: `${c.id}（${c.count} 部）` })),
+      selCountry: land,
+      everyone: everyone.length,
+      // 國別篩選
       total: found.length,
       // 符合條件的總數（比 rows 多的話還有下一批）
       rows
@@ -2861,7 +2919,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   var extra = { boxOffice, nowShowing, nowShowingMulti, movieBoard, festivalBoard, festivalFilm, nearby, patchSettings, fillMovie, formatList };
   var BRIDGE_LEVEL = 2;
   globalThis.MS = {
-    version: "2026.11.23-1733",
+    version: "2026.11.23-1932",
     level: BRIDGE_LEVEL,
     init(saved) {
       cache = saved || {};

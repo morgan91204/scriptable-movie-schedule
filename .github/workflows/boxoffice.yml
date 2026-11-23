@@ -31,7 +31,7 @@ jobs:
           FORCE: ${{ inputs.force && '1' || '' }}
       - name: 有變化才提交
         run: |
-          git add dist/boxoffice.json dist/boxoffice-years.json dist/boxoffice-weeks.json data/boxoffice-snapshot.json
+          git add dist/boxoffice.json dist/boxoffice-years.json dist/boxoffice-weeks.json dist/boxoffice-info-*.json data/boxoffice-snapshot.json
           if git diff --cached --quiet; then
             echo "官方資料沒有更新"
             exit 0

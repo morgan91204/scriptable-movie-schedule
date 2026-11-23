@@ -75,19 +75,25 @@ if (base) {
 // 年度總排行：各年上映的片依累計票房排（已經下檔的也算），有票房的全部列出；這週還有賣出票的標記「上映中」
 const year = end.slice(0, 4);
 const showing = new Set(mode === "week" ? list.map(key) : []);
+const names = (v) => String(v || "").split("##").map((t) => t.trim()).filter(Boolean).join("、"); // 多家公司官方用 ## 隔開
 const everything = src.List.filter((x) => x.Name && day(x.ReleaseDate)).map((x) => ({
   name: String(x.Name).trim(),
-  country: x.Country || "",
+  country: String(x.Country || "").trim(),
   release: day(x.ReleaseDate),
   theaters: Number(x.TheaterCount) || 0,
   total: Math.round(Number(x.TotalAmounts) || 0),
+  tickets: Math.round(Number(x.TotalTickets) || 0),
+  issue: names(x.Issue), // 發行
+  produce: names(x.Produce), // 出品
 }));
+// 國別：年度排行每一筆只存編號（c），名稱放在檔案開頭的 countries，檔案才不會多出一大截
+const countries = Array.from(new Set(everything.map((f) => f.country).filter(Boolean))).sort();
 const yearOf = (y) =>
   everything
     .filter((f) => f.release.slice(0, 4) === y && f.total > 0)
     .sort((a, b) => b.total - a.total)
     // 全部列出（一年大約六百部）；欄位只留畫面用得到的，檔案才不會太大
-    .map((f, i) => ({ rank: i + 1, name: f.name, release: f.release, theaters: f.theaters, total: f.total, ...(showing.has(key(f)) ? { showing: true } : {}) }));
+    .map((f, i) => ({ rank: i + 1, name: f.name, release: f.release, theaters: f.theaters, total: f.total, ...(f.country ? { c: countries.indexOf(f.country) } : {}), ...(showing.has(key(f)) ? { showing: true } : {}) }));
 // 官方開放資料從 2016 年起：每一年都列。這些另外存成一個檔（dist/boxoffice-years.json），App 切到「年度」才下載，
 // 平常看本週／累計不用多下載這一包
 const years = {};
@@ -138,7 +144,14 @@ fs.mkdirSync("data", { recursive: true });
 // 快照：這週的累計，順便記住上一份（同一週重跑時用）
 fs.writeFileSync(SNAP, JSON.stringify({ end, films, prev: base ? { end: base.end, films: base.films } : null }) + "\n");
 fs.writeFileSync(OUT, JSON.stringify(result, null, 1) + "\n");
-fs.writeFileSync(YEARS_OUT, JSON.stringify({ updated: result.updated, end, years }) + "\n");
+fs.writeFileSync(YEARS_OUT, JSON.stringify({ updated: result.updated, end, countries, years }) + "\n");
+// 每部片的個別資訊（發行、出品、累計票數）：只有點進去才看，所以依上映年份另外存（dist/boxoffice-info-<年>.json），要看才下載。
+// 格式：「片名|上映日」→ [發行, 出品, 累計票數]
+for (let y = Number(year); y >= 2016; y--) {
+  const info = {};
+  for (const f of everything) if (f.release.slice(0, 4) === String(y) && f.total > 0) info[f.name + "|" + f.release] = [f.issue, f.produce, f.tickets];
+  if (Object.keys(info).length) fs.writeFileSync(`dist/boxoffice-info-${y}.json`, JSON.stringify({ end, info }) + "\n");
+}
 fs.writeFileSync(WEEKS_OUT, JSON.stringify({ updated: result.updated, weeks: weeksHistory }) + "\n");
 console.log(`已更新：${mode === "week" ? `週票房 ${start}～${end}` : `累計（近 8 週上映，截至 ${end}）`}，前 ${result.list.length} 名；年度排行 ${Object.entries(years).map(([y, l]) => `${y}:${l.length}`).join(" ")}`);
 for (const f of result.list.slice(0, 10)) console.log(f.rank, f.name, f.week ?? "", f.total);

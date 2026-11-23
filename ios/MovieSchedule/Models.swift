@@ -155,6 +155,10 @@ struct BoxOfficeBoard: Codable {
     struct Week: Codable, Hashable, Identifiable { var id: String; var label: String; var note: String }
     var weeks: [Week]?       // 週票房可以選的週次（新的在前）
     var selWeek: String?     // 實際採用的那一週
+    struct Country: Codable, Hashable, Identifiable { var id: String; var label: String }
+    var countries: [Country]? // 這份排行裡有哪些國別（多的在前）
+    var selCountry: String?   // 實際採用的國別（空 = 全部）
+    var everyone: Int?        // 不分國別的總數
     var rows: [BoxOfficeRow]
 }
 

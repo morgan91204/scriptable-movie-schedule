@@ -117,6 +117,7 @@ struct BoxOfficeSection: View {
     @State private var years: Set<String> = [] // 年度排行選了哪幾年（空 = 最新的一年）
     @State private var limit = 100 // 年度排行目前顯示幾列（一年六百部左右，分批顯示）
     @State private var week = "" // 週票房看哪一週（空 = 最新）
+    @State private var country = "" // 只看哪個國別（空 = 全部）
 
     var body: some View {
         Group {
@@ -140,6 +141,16 @@ struct BoxOfficeSection: View {
                     }
                 } footer: {
                     Text("可以回頭看過去幾週的排行。")
+                }
+            }
+            if let lands = board.value?.countries, lands.count > 1 {
+                Section {
+                    Picker("國別", selection: Binding(get: { board.value?.selCountry ?? "" }, set: { country = $0 })) {
+                        Text("全部（\(board.value?.everyone ?? 0) 部）").tag("")
+                        ForEach(lands) { Text($0.label).tag($0.id) }
+                    }
+                } footer: {
+                    Text("選了國別，名次會在那個國別裡重排。")
                 }
             }
             if sort == "year", let options = board.value?.years, options.count > 1 {
@@ -205,10 +216,11 @@ struct BoxOfficeSection: View {
                 }
             }
         }
-        .task(id: [sort, years.sorted().joined(separator: ","), query, String(limit), week].joined(separator: "|")) { await load() }
+        .task(id: [sort, years.sorted().joined(separator: ","), query, String(limit), week, country].joined(separator: "|")) { await load() }
         .onChange(of: sort) { _, _ in limit = 100 }
         .onChange(of: years) { _, _ in limit = 100 }
         .onChange(of: query) { _, _ in limit = 100 }
+        .onChange(of: country) { _, _ in limit = 100 }
     }
 
     private func rowLabel(_ r: BoxOfficeRow) -> some View {
@@ -235,7 +247,7 @@ struct BoxOfficeSection: View {
 
     private func load() async {
         do {
-            board = .loaded(try await Bridge.shared.call("boxOffice", [sort, years.sorted(), query.trimmingCharacters(in: .whitespaces), limit, week]))
+            board = .loaded(try await Bridge.shared.call("boxOffice", [sort, years.sorted(), query.trimmingCharacters(in: .whitespaces), limit, week, country]))
         } catch {
             board = .failed(errorText(error))
         }
