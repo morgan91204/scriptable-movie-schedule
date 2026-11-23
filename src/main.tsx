@@ -1175,6 +1175,32 @@ class App {
   }
 
   boxRate = ""; // 依評分排時用哪一種評分（空 = IMDb）
+  pickQuery = ""; // 「選出品國別／發行商」那一頁的搜尋字
+  /** 出品國別／發行商的選擇頁：一列一個、標出部數，可以搜尋、可以複選；選好按返回 */
+  async boxPickView(kind: "country" | "issuer"): Promise<string> {
+    const sc = this.movieMode === "year" ? "year" : "now";
+    const board = await loadMovieBoard({ scope: sc, sort: this.sortBy[sc], years: this.boxYears, week: this.boxWeek, countries: this.boxCountry, query: this.movieQuery.trim().toLowerCase(), asc: this.ascBy[sc], rate: this.boxRate, fewLast: this.boxFewLast, issuers: this.boxIssuer });
+    const isC = kind === "country";
+    const all = isC ? board.countries : board.issuers;
+    const sel = isC ? board.selCountries : board.selIssuers;
+    const set = (next: string[]) => { if (isC) this.boxCountry = next; else this.boxIssuer = next; };
+    const k = this.pickQuery.trim().toLowerCase();
+    // 已經選的排最前面，其餘照部數多到少
+    const list = all.filter((c) => !k || c.id.toLowerCase().includes(k)).sort((a, b) => Number(sel.indexOf(b.id) >= 0) - Number(sel.indexOf(a.id) >= 0) || b.count - a.count);
+    const name = isC ? "出品國別" : "發行商";
+    return (
+      <Page title={`選${name}`} subtitle={sel.length ? `已選 ${sel.length} 個｜${board.entries.length + board.rest.length} 部` : `全部（${board.everyone} 部）`} onBack={() => this.back()}>
+        <Search value={this.pickQuery} placeholder={`搜尋${name}（共 ${all.length} 個）`} onInput={(t) => { this.pickQuery = t; }} />
+        <Section hint={isC ? BOX_COUNTRY_NOTE : "發行商來自官方票房資料；聯合發行的片算第一家。"}>
+          <Item icon={sel.length ? "⬜️" : "✅"} title="全部" subtitle={sel.length ? "點這裡清除已選的" : ""} right={`${board.everyone} 部`} chevron={false} onTap={() => set([])} />
+        </Section>
+        <Section title={`可以選好幾個${k ? `｜符合「${this.pickQuery.trim()}」的 ${list.length} 個` : ""}`} hint="選好之後按左上角的返回。">
+          {list.map((c) => <Item icon={sel.indexOf(c.id) >= 0 ? "✅" : "⬜️"} title={c.id} right={`${c.count} 部`} chevron={false} onTap={() => set(sel.indexOf(c.id) < 0 ? [...sel, c.id] : sel.filter((z) => z !== c.id))} />)}
+        </Section>
+        {list.length ? null : <Empty icon="🔎" text={`找不到相符的${name}`} />}
+      </Page>
+    );
+  }
   boxIssuer: string[] = []; // 只看哪幾家發行商（可以複選；空 = 全部）
   boxFewLast = true; // 依 IMDb 排時，評分人數少的片排在後面（關掉就照分數一起排）
   boxOpen = ""; // 目前展開哪一組篩選（週次／年份／出品國別；空 = 都收合）
@@ -1270,7 +1296,7 @@ class App {
         ) : null}
         {/* 評分來源、週次、出品國別預設收合成一行，點了才展開 */}
         {board.weeks.length > 1 || countries.length > 1 || board.rates.length > 1 || board.issuers.length > 1 ? (
-          <Section hint={this.boxOpen === "country" ? BOX_COUNTRY_NOTE + "可以左右滑動。" : this.boxOpen === "issuer" ? "發行商來自官方票房資料，可複選、可以左右滑動；聯合發行的片算第一家。" : this.boxOpen === "week" ? "可以回頭看過去幾週的排行。" : this.boxOpen === "rate" ? "番茄指數是影評的分數、爆米花指數是觀眾的分數（都來自爛番茄）；觀眾評分是這個 App 的使用者打的。" : ""}>
+          <Section hint={this.boxOpen === "week" ? "可以回頭看過去幾週的排行。" : this.boxOpen === "rate" ? "番茄指數是影評的分數、爆米花指數是觀眾的分數（都來自爛番茄）；觀眾評分是這個 App 的使用者打的。" : ""}>
             {board.rates.length > 1 ? fold("rate", "評分來源", board.rateSummary) : null}
             {board.rates.length > 1 && this.boxOpen === "rate" ? (
               <Chips scroll>
@@ -1285,20 +1311,9 @@ class App {
                 {board.weeks.map((o) => <Chip label={o.label} sub={o.note} muted={board.selWeek !== o.id} onTap={() => { this.boxWeek = o.note === "最新" ? "" : o.id; }} />)}
               </Chips>
             ) : null}
-            {countries.length > 1 ? fold("country", "出品國別", board.countrySummary) : null}
-            {countries.length > 1 && this.boxOpen === "country" ? (
-              <Chips scroll>
-                <Chip label="全部" sub={`${board.everyone} 部`} muted={country.length > 0} onTap={() => { this.boxCountry = []; }} />
-                {countries.map((c) => <Chip label={c.id} sub={`${c.count} 部`} muted={country.indexOf(c.id) < 0} onTap={() => { this.boxCountry = country.indexOf(c.id) < 0 ? [...country, c.id] : country.filter((z) => z !== c.id); }} />)}
-              </Chips>
-            ) : null}
-            {board.issuers.length > 1 ? fold("issuer", "發行商", board.issuerSummary) : null}
-            {board.issuers.length > 1 && this.boxOpen === "issuer" ? (
-              <Chips scroll>
-                <Chip label="全部" sub={`${board.everyone} 部`} muted={board.selIssuers.length > 0} onTap={() => { this.boxIssuer = []; }} />
-                {board.issuers.map((c) => <Chip label={c.id} sub={`${c.count} 部`} muted={board.selIssuers.indexOf(c.id) < 0} onTap={() => { this.boxIssuer = board.selIssuers.indexOf(c.id) < 0 ? [...board.selIssuers, c.id] : board.selIssuers.filter((z) => z !== c.id); }} />)}
-              </Chips>
-            ) : null}
+            {/* 出品國別、發行商選項很多：點了進一頁清單（可搜尋、可複選），不用橫向滑 */}
+            {countries.length > 1 ? <Item kv title="出品國別" right={board.countrySummary} onTap={() => { this.pickQuery = ""; this.go(() => this.boxPickView("country")); }} /> : null}
+            {board.issuers.length > 1 ? <Item kv title="發行商" right={board.issuerSummary} onTap={() => { this.pickQuery = ""; this.go(() => this.boxPickView("issuer")); }} /> : null}
           </Section>
         ) : null}
         {every.length ? null : <Empty icon="🎞" text="找不到相符的電影" />}

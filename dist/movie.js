@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.24-0209
+// @movie-schedule-app 電影行程 v2026.11.24-0213
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/parsers.gen.ts
@@ -3912,6 +3912,7 @@ var App = class {
     this.festYear = 0;
     this.boxRate = "";
     // 依評分排時用哪一種評分（空 = IMDb）
+    this.pickQuery = "";
     this.boxIssuer = [];
     // 只看哪幾家發行商（可以複選；空 = 全部）
     this.boxFewLast = true;
@@ -3986,14 +3987,14 @@ var App = class {
   }
   /** 最新版本是多少。網頁版問的是自己網站現在上線的版本（重新整理就會拿到的那一版），不是 GitHub 上的 */
   checkVersion() {
-    if (true) return checkLatest("2026.11.24-0209");
+    if (true) return checkLatest("2026.11.24-0213");
     return (async () => {
       try {
         const r = await globalThis.fetch("/api/version?t=" + Date.now(), { cache: "no-store" });
         const latest = String((await r.json()).version || "");
         if (!latest) return null;
         const num = (v) => Number(v.replace(/\D/g, "")) || 0;
-        return { latest, isLatest: num("2026.11.24-0209") >= num(latest) };
+        return { latest, isLatest: num("2026.11.24-0213") >= num(latest) };
       } catch (_) {
         return null;
       }
@@ -4181,11 +4182,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.24-0209"}`);
+          Pasteboard.copy(`版本 ${"2026.11.24-0213"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.24-0209"}`,
+      `版本 ${"2026.11.24-0213"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -4525,7 +4526,7 @@ var App = class {
     if (false) {
       if (!r) return /* @__PURE__ */ h(Note, { text: "（無法確認是否為最新版：連不到網站）" });
       if (r.isLatest) return /* @__PURE__ */ h(Note, { text: "✅ 已是最新版" });
-      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.24-0209"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
+      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.24-0213"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
         globalThis.location.reload();
       } }));
     }
@@ -4709,6 +4710,25 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
       }
     ))), sessions.length ? null : /* @__PURE__ */ h(Empty, { icon: "🎞", text: "找不到這部片的場次" }), /* @__PURE__ */ h(Button, { label: "🌐 官網的影片介紹", kind: "secondary", onTap: () => Safari.open(film.url) }));
   }
+  // 「選出品國別／發行商」那一頁的搜尋字
+  /** 出品國別／發行商的選擇頁：一列一個、標出部數，可以搜尋、可以複選；選好按返回 */
+  async boxPickView(kind) {
+    const sc = this.movieMode === "year" ? "year" : "now";
+    const board = await loadMovieBoard({ scope: sc, sort: this.sortBy[sc], years: this.boxYears, week: this.boxWeek, countries: this.boxCountry, query: this.movieQuery.trim().toLowerCase(), asc: this.ascBy[sc], rate: this.boxRate, fewLast: this.boxFewLast, issuers: this.boxIssuer });
+    const isC = kind === "country";
+    const all = isC ? board.countries : board.issuers;
+    const sel = isC ? board.selCountries : board.selIssuers;
+    const set = (next) => {
+      if (isC) this.boxCountry = next;
+      else this.boxIssuer = next;
+    };
+    const k = this.pickQuery.trim().toLowerCase();
+    const list = all.filter((c) => !k || c.id.toLowerCase().includes(k)).sort((a, b) => Number(sel.indexOf(b.id) >= 0) - Number(sel.indexOf(a.id) >= 0) || b.count - a.count);
+    const name = isC ? "出品國別" : "發行商";
+    return /* @__PURE__ */ h(Page, { title: `選${name}`, subtitle: sel.length ? `已選 ${sel.length} 個｜${board.entries.length + board.rest.length} 部` : `全部（${board.everyone} 部）`, onBack: () => this.back() }, /* @__PURE__ */ h(Search, { value: this.pickQuery, placeholder: `搜尋${name}（共 ${all.length} 個）`, onInput: (t) => {
+      this.pickQuery = t;
+    } }), /* @__PURE__ */ h(Section, { hint: isC ? BOX_COUNTRY_NOTE : "發行商來自官方票房資料；聯合發行的片算第一家。" }, /* @__PURE__ */ h(Item, { icon: sel.length ? "⬜️" : "✅", title: "全部", subtitle: sel.length ? "點這裡清除已選的" : "", right: `${board.everyone} 部`, chevron: false, onTap: () => set([]) })), /* @__PURE__ */ h(Section, { title: `可以選好幾個${k ? `｜符合「${this.pickQuery.trim()}」的 ${list.length} 個` : ""}`, hint: "選好之後按左上角的返回。" }, list.map((c) => /* @__PURE__ */ h(Item, { icon: sel.indexOf(c.id) >= 0 ? "✅" : "⬜️", title: c.id, right: `${c.count} 部`, chevron: false, onTap: () => set(sel.indexOf(c.id) < 0 ? [...sel, c.id] : sel.filter((z) => z !== c.id)) }))), list.length ? null : /* @__PURE__ */ h(Empty, { icon: "🔎", text: `找不到相符的${name}` }));
+  }
   /** 「電影」清單：上映中與票房排行合成一份（範圍、排序、出品國別都在這裡選） */
   async boxOfficeView() {
     const k = this.movieQuery.trim().toLowerCase();
@@ -4771,21 +4791,19 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
       }
     } }))), /* @__PURE__ */ h("span", { class: "more-hint", "aria-hidden": "true" }, "›"), /* @__PURE__ */ h("button", { class: "dir", "aria-label": "切換排序方向", onTap: () => {
       this.ascBy[sc] = !this.ascBy[sc];
-    } }, esc((board.asc ? board.dirs[1].label : board.dirs[0].label).replace("到", "→")))) : null, board.weeks.length > 1 || countries.length > 1 || board.rates.length > 1 || board.issuers.length > 1 ? /* @__PURE__ */ h(Section, { hint: this.boxOpen === "country" ? BOX_COUNTRY_NOTE + "可以左右滑動。" : this.boxOpen === "issuer" ? "發行商來自官方票房資料，可複選、可以左右滑動；聯合發行的片算第一家。" : this.boxOpen === "week" ? "可以回頭看過去幾週的排行。" : this.boxOpen === "rate" ? "番茄指數是影評的分數、爆米花指數是觀眾的分數（都來自爛番茄）；觀眾評分是這個 App 的使用者打的。" : "" }, board.rates.length > 1 ? fold("rate", "評分來源", board.rateSummary) : null, board.rates.length > 1 && this.boxOpen === "rate" ? /* @__PURE__ */ h(Chips, { scroll: true }, board.rates.map((r) => /* @__PURE__ */ h(Chip, { label: r.label, muted: board.rate !== r.id, onTap: () => {
+    } }, esc((board.asc ? board.dirs[1].label : board.dirs[0].label).replace("到", "→")))) : null, board.weeks.length > 1 || countries.length > 1 || board.rates.length > 1 || board.issuers.length > 1 ? /* @__PURE__ */ h(Section, { hint: this.boxOpen === "week" ? "可以回頭看過去幾週的排行。" : this.boxOpen === "rate" ? "番茄指數是影評的分數、爆米花指數是觀眾的分數（都來自爛番茄）；觀眾評分是這個 App 的使用者打的。" : "" }, board.rates.length > 1 ? fold("rate", "評分來源", board.rateSummary) : null, board.rates.length > 1 && this.boxOpen === "rate" ? /* @__PURE__ */ h(Chips, { scroll: true }, board.rates.map((r) => /* @__PURE__ */ h(Chip, { label: r.label, muted: board.rate !== r.id, onTap: () => {
       this.boxRate = r.id;
     } }))) : null, board.fewOption ? /* @__PURE__ */ h(Item, { kv: true, title: "評分人數少的片", right: board.fewLast ? "排在後面 ⇄" : "照分數一起排 ⇄", chevron: false, onTap: () => {
       this.boxFewLast = !this.boxFewLast;
     } }) : null, board.weeks.length > 1 ? fold("week", "週次", board.weekSummary) : null, board.weeks.length > 1 && this.boxOpen === "week" ? /* @__PURE__ */ h(Chips, null, board.weeks.map((o) => /* @__PURE__ */ h(Chip, { label: o.label, sub: o.note, muted: board.selWeek !== o.id, onTap: () => {
       this.boxWeek = o.note === "最新" ? "" : o.id;
-    } }))) : null, countries.length > 1 ? fold("country", "出品國別", board.countrySummary) : null, countries.length > 1 && this.boxOpen === "country" ? /* @__PURE__ */ h(Chips, { scroll: true }, /* @__PURE__ */ h(Chip, { label: "全部", sub: `${board.everyone} 部`, muted: country.length > 0, onTap: () => {
-      this.boxCountry = [];
-    } }), countries.map((c) => /* @__PURE__ */ h(Chip, { label: c.id, sub: `${c.count} 部`, muted: country.indexOf(c.id) < 0, onTap: () => {
-      this.boxCountry = country.indexOf(c.id) < 0 ? [...country, c.id] : country.filter((z) => z !== c.id);
-    } }))) : null, board.issuers.length > 1 ? fold("issuer", "發行商", board.issuerSummary) : null, board.issuers.length > 1 && this.boxOpen === "issuer" ? /* @__PURE__ */ h(Chips, { scroll: true }, /* @__PURE__ */ h(Chip, { label: "全部", sub: `${board.everyone} 部`, muted: board.selIssuers.length > 0, onTap: () => {
-      this.boxIssuer = [];
-    } }), board.issuers.map((c) => /* @__PURE__ */ h(Chip, { label: c.id, sub: `${c.count} 部`, muted: board.selIssuers.indexOf(c.id) < 0, onTap: () => {
-      this.boxIssuer = board.selIssuers.indexOf(c.id) < 0 ? [...board.selIssuers, c.id] : board.selIssuers.filter((z) => z !== c.id);
-    } }))) : null) : null, every.length ? null : /* @__PURE__ */ h(Empty, { icon: "🎞", text: "找不到相符的電影" }), rows.length ? /* @__PURE__ */ h(Section, { title: board.title, hint: board.footer }, rows.map(item)) : null, paged && board.entries.length > rows.length ? (
+    } }))) : null, countries.length > 1 ? /* @__PURE__ */ h(Item, { kv: true, title: "出品國別", right: board.countrySummary, onTap: () => {
+      this.pickQuery = "";
+      this.go(() => this.boxPickView("country"));
+    } }) : null, board.issuers.length > 1 ? /* @__PURE__ */ h(Item, { kv: true, title: "發行商", right: board.issuerSummary, onTap: () => {
+      this.pickQuery = "";
+      this.go(() => this.boxPickView("issuer"));
+    } }) : null) : null, every.length ? null : /* @__PURE__ */ h(Empty, { icon: "🎞", text: "找不到相符的電影" }), rows.length ? /* @__PURE__ */ h(Section, { title: board.title, hint: board.footer }, rows.map(item)) : null, paged && board.entries.length > rows.length ? (
       // 不用按：快滑到底時自動接著載入下一批（一次全部畫出好幾千列會卡住，所以還是分批，只是自動）
       /* @__PURE__ */ h("button", { class: "auto-more", onTap: () => {
         this.boxLimit += BOX_PAGE * 2;
