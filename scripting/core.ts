@@ -755,7 +755,8 @@ export async function movieExtras(title: string, slug?: string): Promise<MovieEx
     // 伺服器查好的預告優先，手機自己以前搜到的排後面：這樣每個版本、每支手機看到的都是同一支，
     // 不會因為各自搜尋的結果不同而不一樣
     const me = await metaOf(title);
-    if (me && me.tn && me.t) return { poster: normImageUrl(me.p || hit?.poster || ""), trailer: me.t, trailerName: me.tn };
+    // 海報也一樣：伺服器有就用伺服器的；伺服器查得比手機新、卻沒有海報，手機記的那張就不用（可能是已經被修正掉的錯圖）
+    if (me && me.tn && me.t) return { poster: normImageUrl(me.p || (hit && !(me.xa && me.xa > hit.at) ? hit.poster : "") || ""), trailer: me.t, trailerName: me.tn };
     // 伺服器沒有的：手機自己搜，用同一套嚴格規則（標題要有台灣片名、看得出是預告）。
     // 伺服器在國外，只在台灣看得到的影片（片商鎖地區的官方預告）它搜不到，手機才搜得到；找不到就開搜尋頁
     if (hit && Date.now() - hit.at < ttl) return { poster: hit.poster, trailer: hit.trailer, trailerName: hit.trailerName };
@@ -1023,12 +1024,16 @@ export function moviePoster(title: string, slug?: string, en?: string): Promise<
     const all = readExtras();
     const hit = all["t|" + nk] || all["n|" + nk];
     const isThumb = (u: string) => /ytimg\.com/.test(u); // 預告縮圖只是暫代：一天後再找一次真的海報
-    if (hit?.poster && !isThumb(hit.poster)) return normImageUrl(hit.poster);
+    // 伺服器有海報就用伺服器的；伺服器查的時間比手機記的新，手機記的就不算數
+    //（伺服器修正過配錯的海報時，各版本下次讀資料就會換掉，不會一直顯示手機上記著的那張舊的）
+    const me = await metaOf(title);
+    if (me && me.p && !isThumb(me.p)) return normImageUrl(me.p);
+    const stale = (at: number) => !!(me && me.xa && me.xa > at);
+    if (hit?.poster && !isThumb(hit.poster) && !stale((hit as { at?: number }).at || 0)) return normImageUrl(hit.poster);
     const own = all["p|" + nk] as (MovieExtras & { at: number; v?: number }) | undefined; // 只查過海報的紀錄
     // 找到的記 7 天；沒找到的記 1 天，但舊版（比對規則改了）記下的「沒找到」一律重查
-    if (own && Date.now() - own.at < (own.poster && !isThumb(own.poster) ? 7 : own.v === EXTRAS_V ? 1 : 0) * 86400e3) return own.poster;
-    const me = await metaOf(title);
-    if (me && me.p) return normImageUrl(me.p); // 伺服器已經查好海報
+    if (own && !stale(own.at) && Date.now() - own.at < (own.poster && !isThumb(own.poster) ? 7 : own.v === EXTRAS_V ? 1 : 0) * 86400e3) return own.poster;
+    if (me && me.p) return normImageUrl(me.p); // 伺服器只有預告縮圖：先用著
     // 要上網找的同時最多 4 部：整份清單一起要海報時不會一次打出上百個請求
     const poster = await posterLane(async () => {
       const found = normImageUrl(await findPoster(title, slug, en).catch(() => ""));
@@ -2172,8 +2177,9 @@ export function movieRatings(title: string, en?: string, slug?: string): Promise
     const has = (x: Ratings) => !!(x.imdb || x.tomato || x.popcorn);
     // 有分數記 7 天；查過但沒有任何評分（新片、演唱會）記 1 天，不用每次進電影頁都重查。
     // 舊版（比對規則改了，例如加了年份檢查）記下的一律重查，避免手機上留著對錯片的分數
-    if (hit && hit.v === RATINGS_V && Date.now() - hit.at < (has(hit) ? 7 : 1) * 86400e3) return hit;
     const me = await metaOf(title);
+    // 伺服器查的時間比手機記的新：一律用伺服器的（伺服器修正過配錯的片時，手機上記著的舊分數才會跟著換掉）
+    if (hit && hit.v === RATINGS_V && Date.now() - hit.at < (has(hit) ? 7 : 1) * 86400e3 && !(me && me.r && me.ra && me.ra > hit.at)) return hit;
     if (me && me.r && me.ra) return me.r; // 伺服器已經查好評分（空物件 = 查過、沒有評分）
     const r = await findRatings(title, en, slug);
     // 有錯（連線失敗）：不寫進手機快取（下次啟動再試），但這次執行內記住結果，重畫時不用再查

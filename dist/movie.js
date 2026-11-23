@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.23-1532
+// @movie-schedule-app 電影行程 v2026.11.23-1536
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/parsers.gen.ts
@@ -1115,7 +1115,7 @@ async function movieExtras(title, slug) {
     const stale = hit && hit.v !== EXTRAS_V && true;
     const ttl = stale ? 0 : !hit?.trailerName ? 36e5 : hit?.poster ? 7 * 864e5 : 864e5;
     const me = await metaOf(title);
-    if (me && me.tn && me.t) return { poster: normImageUrl(me.p || hit?.poster || ""), trailer: me.t, trailerName: me.tn };
+    if (me && me.tn && me.t) return { poster: normImageUrl(me.p || (hit && !(me.xa && me.xa > hit.at) ? hit.poster : "") || ""), trailer: me.t, trailerName: me.tn };
     if (hit && Date.now() - hit.at < ttl) return { poster: hit.poster, trailer: hit.trailer, trailerName: hit.trailerName };
     const out = await findExtras(title, slug);
     const all = read();
@@ -1333,10 +1333,12 @@ function moviePoster(title, slug, en) {
     const all = readExtras();
     const hit = all["t|" + nk] || all["n|" + nk];
     const isThumb = (u) => /ytimg\.com/.test(u);
-    if (hit?.poster && !isThumb(hit.poster)) return normImageUrl(hit.poster);
-    const own = all["p|" + nk];
-    if (own && Date.now() - own.at < (own.poster && !isThumb(own.poster) ? 7 : own.v === EXTRAS_V ? 1 : 0) * 864e5) return own.poster;
     const me = await metaOf(title);
+    if (me && me.p && !isThumb(me.p)) return normImageUrl(me.p);
+    const stale = (at) => !!(me && me.xa && me.xa > at);
+    if (hit?.poster && !isThumb(hit.poster) && !stale(hit.at || 0)) return normImageUrl(hit.poster);
+    const own = all["p|" + nk];
+    if (own && !stale(own.at) && Date.now() - own.at < (own.poster && !isThumb(own.poster) ? 7 : own.v === EXTRAS_V ? 1 : 0) * 864e5) return own.poster;
     if (me && me.p) return normImageUrl(me.p);
     const poster = await posterLane(async () => {
       const found = normImageUrl(await findPoster(title, slug, en).catch(() => ""));
@@ -2195,8 +2197,8 @@ function movieRatings(title, en, slug) {
     };
     const hit = read()[k];
     const has = (x) => !!(x.imdb || x.tomato || x.popcorn);
-    if (hit && hit.v === RATINGS_V && Date.now() - hit.at < (has(hit) ? 7 : 1) * 864e5) return hit;
     const me = await metaOf(title);
+    if (hit && hit.v === RATINGS_V && Date.now() - hit.at < (has(hit) ? 7 : 1) * 864e5 && !(me && me.r && me.ra && me.ra > hit.at)) return hit;
     if (me && me.r && me.ra) return me.r;
     const r = await findRatings(title, en, slug);
     if (!r.err || has(r)) {
@@ -3109,14 +3111,14 @@ var App = class {
   }
   /** 最新版本是多少。網頁版問的是自己網站現在上線的版本（重新整理就會拿到的那一版），不是 GitHub 上的 */
   checkVersion() {
-    if (true) return checkLatest("2026.11.23-1532");
+    if (true) return checkLatest("2026.11.23-1536");
     return (async () => {
       try {
         const r = await globalThis.fetch("/api/version?t=" + Date.now(), { cache: "no-store" });
         const latest = String((await r.json()).version || "");
         if (!latest) return null;
         const num = (v) => Number(v.replace(/\D/g, "")) || 0;
-        return { latest, isLatest: num("2026.11.23-1532") >= num(latest) };
+        return { latest, isLatest: num("2026.11.23-1536") >= num(latest) };
       } catch (_) {
         return null;
       }
@@ -3217,11 +3219,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.23-1532"}`);
+          Pasteboard.copy(`版本 ${"2026.11.23-1536"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.23-1532"}`,
+      `版本 ${"2026.11.23-1536"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -3563,7 +3565,7 @@ var App = class {
     if (false) {
       if (!r) return /* @__PURE__ */ h(Note, { text: "（無法確認是否為最新版：連不到網站）" });
       if (r.isLatest) return /* @__PURE__ */ h(Note, { text: "✅ 已是最新版" });
-      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.23-1532"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
+      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.23-1536"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
         globalThis.location.reload();
       } }));
     }

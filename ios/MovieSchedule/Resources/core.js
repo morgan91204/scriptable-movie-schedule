@@ -1279,7 +1279,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
       const stale = hit && hit.v !== EXTRAS_V && true;
       const ttl = stale ? 0 : !hit?.trailerName ? 36e5 : hit?.poster ? 7 * 864e5 : 864e5;
       const me = await metaOf(title);
-      if (me && me.tn && me.t) return { poster: normImageUrl(me.p || hit?.poster || ""), trailer: me.t, trailerName: me.tn };
+      if (me && me.tn && me.t) return { poster: normImageUrl(me.p || (hit && !(me.xa && me.xa > hit.at) ? hit.poster : "") || ""), trailer: me.t, trailerName: me.tn };
       if (hit && Date.now() - hit.at < ttl) return { poster: hit.poster, trailer: hit.trailer, trailerName: hit.trailerName };
       const out = await findExtras(title, slug);
       const all = read();
@@ -1512,10 +1512,12 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
       const all = readExtras();
       const hit = all["t|" + nk] || all["n|" + nk];
       const isThumb = (u) => /ytimg\.com/.test(u);
-      if (hit?.poster && !isThumb(hit.poster)) return normImageUrl(hit.poster);
-      const own = all["p|" + nk];
-      if (own && Date.now() - own.at < (own.poster && !isThumb(own.poster) ? 7 : own.v === EXTRAS_V ? 1 : 0) * 864e5) return own.poster;
       const me = await metaOf(title);
+      if (me && me.p && !isThumb(me.p)) return normImageUrl(me.p);
+      const stale = (at) => !!(me && me.xa && me.xa > at);
+      if (hit?.poster && !isThumb(hit.poster) && !stale(hit.at || 0)) return normImageUrl(hit.poster);
+      const own = all["p|" + nk];
+      if (own && !stale(own.at) && Date.now() - own.at < (own.poster && !isThumb(own.poster) ? 7 : own.v === EXTRAS_V ? 1 : 0) * 864e5) return own.poster;
       if (me && me.p) return normImageUrl(me.p);
       const poster = await posterLane(async () => {
         const found = normImageUrl(await findPoster(title, slug, en).catch(() => ""));
@@ -2414,8 +2416,8 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
       };
       const hit = read()[k];
       const has = (x) => !!(x.imdb || x.tomato || x.popcorn);
-      if (hit && hit.v === RATINGS_V && Date.now() - hit.at < (has(hit) ? 7 : 1) * 864e5) return hit;
       const me = await metaOf(title);
+      if (hit && hit.v === RATINGS_V && Date.now() - hit.at < (has(hit) ? 7 : 1) * 864e5 && !(me && me.r && me.ra && me.ra > hit.at)) return hit;
       if (me && me.r && me.ra) return me.r;
       const r = await findRatings(title, en, slug);
       if (!r.err || has(r)) {
@@ -2802,7 +2804,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   var extra = { boxOffice, nowShowing, nowShowingMulti, movieBoard, festivalBoard, festivalFilm, nearby, patchSettings, fillMovie, formatList };
   var BRIDGE_LEVEL = 2;
   globalThis.MS = {
-    version: "2026.11.23-1532",
+    version: "2026.11.23-1536",
     level: BRIDGE_LEVEL,
     init(saved) {
       cache = saved || {};
