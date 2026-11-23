@@ -2,7 +2,7 @@
 // 執行環境：Scriptable（iOS）。原始碼用 TSX 撰寫，編譯後的 .js 放進 Scriptable 執行。
 // 畫面：WebView（HTML/CSS），事件迴圈在 run()。資料層在 core.ts，網頁解析在 parsers.ts。
 
-import { h, Fragment, Page, Section, Item, Chips, Chip, Button, Note, Para, Loading, Empty, Hero, Steps } from "./jsx";
+import { h, Fragment, Page, Section, Item, Chips, Chip, Button, Search, Note, Para, Loading, Empty, Hero, Steps } from "./jsx";
 import type { RatingBadge } from "./jsx";
 import { UI } from "./ui";
 import { setPlatform } from "./platform";
@@ -282,8 +282,7 @@ class App {
       : [];
     return (
       <Page title="搜尋影城" onBack={() => this.back()}>
-        <input class="field" name="q" value={this.query} placeholder="例如：松仁、西門、in89、台南" autofocus />
-        <Button label="搜尋" enter onTap={(v) => { this.query = v.q || ""; }} />
+        <Search value={this.query} placeholder="搜尋影城，例如：松仁、西門、in89、台南" autofocus onInput={(t) => { this.query = t; }} />
         {k ? (
           <Section title={`結果 ${hits.length} 間`}>
             {hits.length ? null : <Note text="找不到相符的影城，換個關鍵字試試。" />}
@@ -949,8 +948,7 @@ class App {
     return (
       <Page title="依電影找場次" subtitle={`${f.name}｜${festivalStatusLine(f)}`} onBack={() => this.back()}>
         {this.movieModeChips()}
-        <input class="field" name="q" value={this.festQuery} placeholder={`搜尋 ${year} 年影展的片名`} />
-        <Button label="搜尋" kind="secondary" enter onTap={(v) => { this.festQuery = v.q || ""; }} />
+        <Search value={this.festQuery} placeholder={`搜尋 ${year} 年影展的片名`} onInput={(t) => { this.festQuery = t; }} />
         {years.length > 1 ? (
           <Section title="年份">
             <Chips scroll>
@@ -970,7 +968,7 @@ class App {
           </Chips>
         </Section>
         {hits ? (
-          <Section title={`「${this.festQuery.trim()}」｜${hits.length} 部`} hint="搜尋這一年所有影展的片名，不分日期。清空搜尋欄再按搜尋，就回到每天的片單。">
+          <Section title={`「${this.festQuery.trim()}」｜${hits.length} 部`} hint="搜尋這一年所有影展的片名，不分日期。清空搜尋欄就回到每天的片單。">
             {hits.map(({ f: hf, film, sessions }) => (
               <Item
                 thumb={{ src: film.poster || "" }}
@@ -1107,8 +1105,7 @@ class App {
       <Page title="依電影找場次" subtitle={board.title} onBack={() => this.back()}>
         {this.movieModeChips()}
         {/* 搜尋放最上面；範圍和排序併成一排（最後一項是年度排行） */}
-        <input class="field" name="q" value={this.movieQuery} placeholder="搜尋片名" />
-        <Button label="搜尋" kind="secondary" enter onTap={(v) => { this.movieQuery = v.q || ""; }} />
+        <Search value={this.movieQuery} placeholder="搜尋片名（中文或英文）" onInput={(t) => { this.movieQuery = t; }} />
         {board.orders.length > 1 ? (
           <Chips scroll>
             {board.orders.map((x) => <Chip label={x.id === "year" ? "年度排行（含已下檔）" : x.label} muted={board.order !== x.id} onTap={() => { this.boxSort = x.id; }} />)}
@@ -1203,8 +1200,7 @@ class App {
     return (
       <Page title="依電影找場次" subtitle={`即將上映 ${list.length} 部`} onBack={() => this.back()}>
         {this.movieModeChips()}
-        <input class="field" name="q" value={this.movieQuery} placeholder="搜尋片名" />
-        <Button label="搜尋" kind="secondary" enter onTap={(v) => { this.movieQuery = v.q || ""; }} />
+        <Search value={this.movieQuery} placeholder="搜尋片名（中文或英文）" onInput={(t) => { this.movieQuery = t; }} />
         {groups.map((g, i) => <Section title={g.title} hint={i === groups.length - 1 ? "還沒上映、但已經可以查到場次的片，依上映日期排序。" : ""}>{g.items.map(item)}</Section>)}
         {list.length ? null : <Empty icon="🎞" text="找不到相符的電影" />}
       </Page>
@@ -1470,9 +1466,8 @@ class App {
         {/* 完整的查詢條件放在內文（標題列只有一行，複選多了會被截掉） */}
         <Note text={`${multiDetail(dates, winIds)}\n影城：${scopeLabel}${this.nowFormats.length ? `\n特殊廳：${this.nowFormats.join("、")}` : ""}`} />
         {groups.length ? null : <Empty icon="🍿" text="沒有符合的場次，換個時段或範圍試試。" />}
-        {groups.length > 1 ? <input class="field" name="q" value={this.nowQuery} placeholder="在結果裡搜尋片名、影城或廳別" /> : null}
-        {groups.length > 1 ? <Button label="搜尋" kind="secondary" enter onTap={(v) => { this.nowQuery = v.q || ""; }} /> : null}
-        {this.nowQuery.trim() ? <Note text={shown.length ? `「${this.nowQuery.trim()}」：${shown.reduce((n, g) => n + g.hits.length, 0)} 場｜${shown.length} 部電影。清空搜尋欄再按搜尋，就回到全部結果。` : `結果裡找不到「${this.nowQuery.trim()}」。清空搜尋欄再按搜尋，就回到全部結果。`} /> : null}
+        {groups.length > 1 ? <Search value={this.nowQuery} placeholder="在結果裡搜尋片名、影城或廳別" onInput={(t) => { this.nowQuery = t; }} /> : null}
+        {this.nowQuery.trim() ? <Note text={shown.length ? `「${this.nowQuery.trim()}」：${shown.reduce((n, g) => n + g.hits.length, 0)} 場｜${shown.length} 部電影。清空搜尋欄就回到全部結果。` : `結果裡找不到「${this.nowQuery.trim()}」。清空搜尋欄就回到全部結果。`} /> : null}
         {shown.length > 1 ? (
           <Button
             label={allFolded ? "▸ 全部展開場次" : "▾ 全部收合，只看片名"}

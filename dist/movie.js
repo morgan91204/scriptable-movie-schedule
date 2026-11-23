@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.23-2126
+// @movie-schedule-app 電影行程 v2026.11.23-2131
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/parsers.gen.ts
@@ -2708,6 +2708,10 @@ function h(type, props, ...children) {
       attrs += ` data-act="${register(v)}"`;
       continue;
     }
+    if (k === "onInput") {
+      attrs += ` data-live="${register(v)}"`;
+      continue;
+    }
     if (k === "onLongPress") {
       attrs += ` data-long="${register(v)}"`;
       continue;
@@ -2767,6 +2771,9 @@ function Chips(props) {
 }
 function Chip(props) {
   return /* @__PURE__ */ h("button", { class: ["chip", props.muted ? "muted" : "", props.warn ? "warn" : ""].join(" "), onTap: props.onTap }, /* @__PURE__ */ h("span", { class: "l" }, esc(props.label)), props.sub ? /* @__PURE__ */ h("span", { class: "s" }, esc(props.sub)) : null);
+}
+function Search(props) {
+  return /* @__PURE__ */ h("input", { class: "field", name: "q", type: "search", enterkeyhint: "search", autocomplete: "off", value: props.value, placeholder: props.placeholder, autofocus: props.autofocus, onInput: (v) => props.onInput(v.q || "") });
 }
 function Button(props) {
   return /* @__PURE__ */ h("button", { class: "btn " + (props.kind || "primary"), onTap: props.onTap, "data-enter": props.enter ? "" : void 0 }, esc(props.label));
@@ -2904,7 +2911,7 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .para .dim{margin-top:8px;font-size:13px;color:var(--fg2)}
 .note.warn{color:var(--orange)}
 .note.error{color:var(--red)}
-.field{display:block;width:100%;padding:12px 14px;border:0;border-radius:12px;background:var(--card);color:var(--fg);font-size:17px;margin-top:8px;outline:none}
+.field{display:block;width:100%;padding:12px 14px;border:0;border-radius:12px;background:var(--card);color:var(--fg);font-size:17px;margin-top:8px;outline:none;-webkit-appearance:none;appearance:none}
 .field:focus{box-shadow:0 0 0 2px var(--accent)}
 .hero{display:flex;gap:14px;align-items:flex-end;margin:12px 4px 4px}
 .hero .poster{width:112px;aspect-ratio:2/3;object-fit:cover;border-radius:12px;background:var(--chip);box-shadow:0 4px 14px rgba(0,0,0,.25);flex:none}
@@ -2998,7 +3005,31 @@ function fitText(){var a=document.querySelectorAll('.item.kv .right');for(var i=
   while(el.scrollWidth>el.clientWidth+1&&size>10){size-=0.5;el.style.fontSize=size+'px';}
   if(el.scrollWidth>el.clientWidth+1){el.style.whiteSpace='normal';el.style.overflow='visible';}}}
 setTimeout(autoMore,300);setTimeout(fitText,50);window.addEventListener('resize',fitText);
-window.__render=function(html,to){var y=window.scrollY;document.getElementById('root').innerHTML=html;stripSync();autoMore();fitText();scrollKeep(to<0?y:to);var f=document.querySelector('input[autofocus]');if(f)setTimeout(function(){f.focus()},50);syncHist();};
+// 搜尋欄（data-live）：打字停 0.3 秒就送出，結果跟著變，不用按搜尋。輸入法還在選字（注音、拼音）時不送
+var liveT=null,composing=false,held=null;
+function liveGo(el){clearTimeout(liveT);var go=function(){if(composing||!document.contains(el))return;var id=el.getAttribute('data-live');if(!id)return;
+  if(!window.__pending){liveT=setTimeout(go,150);return;} // 上一次的結果還在畫：等一下再送
+  send(id);};liveT=setTimeout(go,300);}
+function isLive(el){return !!(el&&el.getAttribute&&el.getAttribute('data-live'));}
+document.addEventListener('compositionstart',function(){composing=true;});
+document.addEventListener('compositionend',function(e){composing=false;if(held){var x=held;held=null;window.__render(x[0],x[1]);}if(isLive(e.target))liveGo(e.target);});
+document.addEventListener('input',function(e){if(isLive(e.target)&&!composing)liveGo(e.target);});
+function copyAttrs(from,to){var i,a=to.attributes;for(i=a.length-1;i>=0;i--)to.removeAttribute(a[i].name);a=from.attributes;for(i=0;i<a.length;i++)to.setAttribute(a[i].name,a[i].value);}
+// 正在搜尋欄裡打字時重畫：搜尋欄和它外面那幾層留在原地（整個換掉的話游標和鍵盤會不見），只換掉周圍的內容
+function renderAround(root,cur,html){var box=document.createElement('div');box.innerHTML=html;
+  var neu=box.querySelector('input[data-live][name="'+cur.name+'"]');if(!neu)return false;
+  var o=cur,m=neu;while(o!==root&&m!==box){if(o.tagName!==m.tagName)return false;o=o.parentNode;m=m.parentNode;}
+  if(o!==root||m!==box)return false; // 新舊畫面的層數不一樣：照一般方式整個重畫
+  o=cur;m=neu;copyAttrs(m,o);
+  while(o!==root){var po=o.parentNode,pm=m.parentNode;
+    while(o.previousSibling)po.removeChild(o.previousSibling);while(o.nextSibling)po.removeChild(o.nextSibling);
+    while(pm.firstChild!==m)po.insertBefore(pm.firstChild,o);while(m.nextSibling)po.appendChild(m.nextSibling);
+    if(po!==root)copyAttrs(pm,po);o=po;m=pm;}
+  return true;}
+window.__render=function(html,to){var y=window.scrollY,root=document.getElementById('root'),cur=document.activeElement,typing=isLive(cur)&&root.contains(cur);
+  if(typing&&composing){held=[html,to];return;} // 還在選字：選完再畫
+  var kept=typing&&renderAround(root,cur,html);if(!kept)root.innerHTML=html;
+  stripSync();autoMore();fitText();scrollKeep(to<0?y:to);var f=kept?null:document.querySelector('input[autofocus]');if(f)setTimeout(function(){f.focus()},50);syncHist();};
 // 從螢幕左緣往右滑：回上一頁（等於點左上角的「返回」）。內容會跟著手指稍微移動，放開時滑得夠遠才算
 var sw=null;
 function swReset(now){sw=null;var c=document.querySelector('.content');if(c){c.style.transition=now?'none':'transform .15s';c.style.transform='';}}
@@ -3021,7 +3052,7 @@ function syncHist(){if(!histOn||document.querySelector('.loading'))return; // �
       else if(!has&&histGuard){histGuard=false;histSkip=true;history.back();}}catch(_){histOn=false;}}
 window.addEventListener('popstate',function(){if(histSkip){histSkip=false;return;}
   if(!histGuard)return;histGuard=false;var b=document.querySelector('.back');if(b)b.click();});
-document.addEventListener('keydown',function(e){if(e.key==='Enter'){var b=document.querySelector('[data-enter]');if(b)b.click();}});
+document.addEventListener('keydown',function(e){if(e.key==='Enter'){if(isLive(e.target)){e.target.blur();return;}var b=document.querySelector('[data-enter]');if(b)b.click();}}); // 搜尋欄按 Enter：收起鍵盤（結果早就出來了）
 <\/script></body></html>`;
 var UI = class {
   constructor() {
@@ -3337,14 +3368,14 @@ var App = class {
   }
   /** 最新版本是多少。網頁版問的是自己網站現在上線的版本（重新整理就會拿到的那一版），不是 GitHub 上的 */
   checkVersion() {
-    if (true) return checkLatest("2026.11.23-2126");
+    if (true) return checkLatest("2026.11.23-2131");
     return (async () => {
       try {
         const r = await globalThis.fetch("/api/version?t=" + Date.now(), { cache: "no-store" });
         const latest = String((await r.json()).version || "");
         if (!latest) return null;
         const num = (v) => Number(v.replace(/\D/g, "")) || 0;
-        return { latest, isLatest: num("2026.11.23-2126") >= num(latest) };
+        return { latest, isLatest: num("2026.11.23-2131") >= num(latest) };
       } catch (_) {
         return null;
       }
@@ -3445,11 +3476,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.23-2126"}`);
+          Pasteboard.copy(`版本 ${"2026.11.23-2131"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.23-2126"}`,
+      `版本 ${"2026.11.23-2131"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -3463,8 +3494,8 @@ var App = class {
   searchView() {
     const k = this.query.trim().toLowerCase().replace(/臺/g, "台");
     const hits = k ? this.cinemas.filter((c) => `${c.name} ${c.city} ${c.district} ${c.id} ${c.aliases || ""}`.toLowerCase().replace(/臺/g, "台").includes(k)) : [];
-    return /* @__PURE__ */ h(Page, { title: "搜尋影城", onBack: () => this.back() }, /* @__PURE__ */ h("input", { class: "field", name: "q", value: this.query, placeholder: "例如：松仁、西門、in89、台南", autofocus: true }), /* @__PURE__ */ h(Button, { label: "搜尋", enter: true, onTap: (v) => {
-      this.query = v.q || "";
+    return /* @__PURE__ */ h(Page, { title: "搜尋影城", onBack: () => this.back() }, /* @__PURE__ */ h(Search, { value: this.query, placeholder: "搜尋影城，例如：松仁、西門、in89、台南", autofocus: true, onInput: (t) => {
+      this.query = t;
     } }), k ? /* @__PURE__ */ h(Section, { title: `結果 ${hits.length} 間` }, hits.length ? null : /* @__PURE__ */ h(Note, { text: "找不到相符的影城，換個關鍵字試試。" }), hits.map((c) => this.cinemaItem(c))) : null);
   }
   cinemaItem(c) {
@@ -3791,7 +3822,7 @@ var App = class {
     if (false) {
       if (!r) return /* @__PURE__ */ h(Note, { text: "（無法確認是否為最新版：連不到網站）" });
       if (r.isLatest) return /* @__PURE__ */ h(Note, { text: "✅ 已是最新版" });
-      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.23-2126"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
+      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.23-2131"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
         globalThis.location.reload();
       } }));
     }
@@ -3904,8 +3935,8 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
     const date = dates.indexOf(this.festDate) >= 0 ? this.festDate : festivalDefaultDate(f);
     const day = festivalDay(f, date);
     const hits = this.festQuery.trim() ? festivalSearch(list, this.festQuery) : null;
-    return /* @__PURE__ */ h(Page, { title: "依電影找場次", subtitle: `${f.name}｜${festivalStatusLine(f)}`, onBack: () => this.back() }, this.movieModeChips(), /* @__PURE__ */ h("input", { class: "field", name: "q", value: this.festQuery, placeholder: `搜尋 ${year} 年影展的片名` }), /* @__PURE__ */ h(Button, { label: "搜尋", kind: "secondary", enter: true, onTap: (v) => {
-      this.festQuery = v.q || "";
+    return /* @__PURE__ */ h(Page, { title: "依電影找場次", subtitle: `${f.name}｜${festivalStatusLine(f)}`, onBack: () => this.back() }, this.movieModeChips(), /* @__PURE__ */ h(Search, { value: this.festQuery, placeholder: `搜尋 ${year} 年影展的片名`, onInput: (t) => {
+      this.festQuery = t;
     } }), years.length > 1 ? /* @__PURE__ */ h(Section, { title: "年份" }, /* @__PURE__ */ h(Chips, { scroll: true }, years.map((y) => /* @__PURE__ */ h(Chip, { label: `${y}`, sub: y === Number(todayTPE().slice(0, 4)) ? "今年" : "", muted: y !== year, onTap: () => {
       this.festYear = y;
       this.festTab = "";
@@ -3918,7 +3949,7 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
     } }))) : null, /* @__PURE__ */ h(Section, { title: `${pick.tabs.find((t) => t.id === pick.tab)?.label || "影展"}｜${pick.items.length} 個影展`, hint: pick.items.length > 3 ? "可以左右滑動" : "" }, /* @__PURE__ */ h(Chips, { scroll: true }, pick.items.map((x) => /* @__PURE__ */ h(Chip, { label: x.name, sub: festivalChipNote(x), muted: x.id !== f.id, onTap: () => {
       this.festId = x.id;
       this.festDate = "";
-    } })))), hits ? /* @__PURE__ */ h(Section, { title: `「${this.festQuery.trim()}」｜${hits.length} 部`, hint: "搜尋這一年所有影展的片名，不分日期。清空搜尋欄再按搜尋，就回到每天的片單。" }, hits.map(({ f: hf, film, sessions }) => /* @__PURE__ */ h(
+    } })))), hits ? /* @__PURE__ */ h(Section, { title: `「${this.festQuery.trim()}」｜${hits.length} 部`, hint: "搜尋這一年所有影展的片名，不分日期。清空搜尋欄就回到每天的片單。" }, hits.map(({ f: hf, film, sessions }) => /* @__PURE__ */ h(
       Item,
       {
         thumb: { src: film.poster || "" },
@@ -4006,8 +4037,8 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
         }
       );
     };
-    return /* @__PURE__ */ h(Page, { title: "依電影找場次", subtitle: board.title, onBack: () => this.back() }, this.movieModeChips(), /* @__PURE__ */ h("input", { class: "field", name: "q", value: this.movieQuery, placeholder: "搜尋片名" }), /* @__PURE__ */ h(Button, { label: "搜尋", kind: "secondary", enter: true, onTap: (v) => {
-      this.movieQuery = v.q || "";
+    return /* @__PURE__ */ h(Page, { title: "依電影找場次", subtitle: board.title, onBack: () => this.back() }, this.movieModeChips(), /* @__PURE__ */ h(Search, { value: this.movieQuery, placeholder: "搜尋片名（中文或英文）", onInput: (t) => {
+      this.movieQuery = t;
     } }), board.orders.length > 1 ? /* @__PURE__ */ h(Chips, { scroll: true }, board.orders.map((x) => /* @__PURE__ */ h(Chip, { label: x.id === "year" ? "年度排行（含已下檔）" : x.label, muted: board.order !== x.id, onTap: () => {
       this.boxSort = x.id;
     } }))) : null, board.weeks.length > 1 || countries.length > 1 || board.scope === "year" && years.length > 1 ? /* @__PURE__ */ h(Section, { hint: this.boxOpen === "country" ? BOX_COUNTRY_NOTE + "可以左右滑動。" : this.boxOpen === "year" ? "可以複選，選了幾年就合在一起排；全選就是 2016 年至今的總排行。" : this.boxOpen === "week" ? "可以回頭看過去幾週的排行。" : "" }, board.weeks.length > 1 ? fold("week", "週次", board.weekSummary) : null, board.weeks.length > 1 && this.boxOpen === "week" ? /* @__PURE__ */ h(Chips, null, board.weeks.map((o) => /* @__PURE__ */ h(Chip, { label: o.label, sub: o.note, muted: board.selWeek !== o.id, onTap: () => {
@@ -4064,8 +4095,8 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
       }
     );
     const groups = soonGroups(list);
-    return /* @__PURE__ */ h(Page, { title: "依電影找場次", subtitle: `即將上映 ${list.length} 部`, onBack: () => this.back() }, this.movieModeChips(), /* @__PURE__ */ h("input", { class: "field", name: "q", value: this.movieQuery, placeholder: "搜尋片名" }), /* @__PURE__ */ h(Button, { label: "搜尋", kind: "secondary", enter: true, onTap: (v) => {
-      this.movieQuery = v.q || "";
+    return /* @__PURE__ */ h(Page, { title: "依電影找場次", subtitle: `即將上映 ${list.length} 部`, onBack: () => this.back() }, this.movieModeChips(), /* @__PURE__ */ h(Search, { value: this.movieQuery, placeholder: "搜尋片名（中文或英文）", onInput: (t) => {
+      this.movieQuery = t;
     } }), groups.map((g, i) => /* @__PURE__ */ h(Section, { title: g.title, hint: i === groups.length - 1 ? "還沒上映、但已經可以查到場次的片，依上映日期排序。" : "" }, g.items.map(item))), list.length ? null : /* @__PURE__ */ h(Empty, { icon: "🎞", text: "找不到相符的電影" }));
   }
   // 只看常去影城
@@ -4250,9 +4281,9 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
     };
     return /* @__PURE__ */ h(Page, { title: multiLabel(dates, winIds), subtitle: `${hits.length} 場｜${groups.length} 部電影`, onBack: () => this.back() }, /* @__PURE__ */ h(Note, { text: `${multiDetail(dates, winIds)}
 影城：${scopeLabel}${this.nowFormats.length ? `
-特殊廳：${this.nowFormats.join("、")}` : ""}` }), groups.length ? null : /* @__PURE__ */ h(Empty, { icon: "🍿", text: "沒有符合的場次，換個時段或範圍試試。" }), groups.length > 1 ? /* @__PURE__ */ h("input", { class: "field", name: "q", value: this.nowQuery, placeholder: "在結果裡搜尋片名、影城或廳別" }) : null, groups.length > 1 ? /* @__PURE__ */ h(Button, { label: "搜尋", kind: "secondary", enter: true, onTap: (v) => {
-      this.nowQuery = v.q || "";
-    } }) : null, this.nowQuery.trim() ? /* @__PURE__ */ h(Note, { text: shown.length ? `「${this.nowQuery.trim()}」：${shown.reduce((n, g) => n + g.hits.length, 0)} 場｜${shown.length} 部電影。清空搜尋欄再按搜尋，就回到全部結果。` : `結果裡找不到「${this.nowQuery.trim()}」。清空搜尋欄再按搜尋，就回到全部結果。` }) : null, shown.length > 1 ? /* @__PURE__ */ h(
+特殊廳：${this.nowFormats.join("、")}` : ""}` }), groups.length ? null : /* @__PURE__ */ h(Empty, { icon: "🍿", text: "沒有符合的場次，換個時段或範圍試試。" }), groups.length > 1 ? /* @__PURE__ */ h(Search, { value: this.nowQuery, placeholder: "在結果裡搜尋片名、影城或廳別", onInput: (t) => {
+      this.nowQuery = t;
+    } }) : null, this.nowQuery.trim() ? /* @__PURE__ */ h(Note, { text: shown.length ? `「${this.nowQuery.trim()}」：${shown.reduce((n, g) => n + g.hits.length, 0)} 場｜${shown.length} 部電影。清空搜尋欄就回到全部結果。` : `結果裡找不到「${this.nowQuery.trim()}」。清空搜尋欄就回到全部結果。` }) : null, shown.length > 1 ? /* @__PURE__ */ h(
       Button,
       {
         label: allFolded ? "▸ 全部展開場次" : "▾ 全部收合，只看片名",

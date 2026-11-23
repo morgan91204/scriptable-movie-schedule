@@ -109,7 +109,7 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .para .dim{margin-top:8px;font-size:13px;color:var(--fg2)}
 .note.warn{color:var(--orange)}
 .note.error{color:var(--red)}
-.field{display:block;width:100%;padding:12px 14px;border:0;border-radius:12px;background:var(--card);color:var(--fg);font-size:17px;margin-top:8px;outline:none}
+.field{display:block;width:100%;padding:12px 14px;border:0;border-radius:12px;background:var(--card);color:var(--fg);font-size:17px;margin-top:8px;outline:none;-webkit-appearance:none;appearance:none}
 .field:focus{box-shadow:0 0 0 2px var(--accent)}
 .hero{display:flex;gap:14px;align-items:flex-end;margin:12px 4px 4px}
 .hero .poster{width:112px;aspect-ratio:2/3;object-fit:cover;border-radius:12px;background:var(--chip);box-shadow:0 4px 14px rgba(0,0,0,.25);flex:none}
@@ -204,7 +204,31 @@ function fitText(){var a=document.querySelectorAll('.item.kv .right');for(var i=
   while(el.scrollWidth>el.clientWidth+1&&size>10){size-=0.5;el.style.fontSize=size+'px';}
   if(el.scrollWidth>el.clientWidth+1){el.style.whiteSpace='normal';el.style.overflow='visible';}}}
 setTimeout(autoMore,300);setTimeout(fitText,50);window.addEventListener('resize',fitText);
-window.__render=function(html,to){var y=window.scrollY;document.getElementById('root').innerHTML=html;stripSync();autoMore();fitText();scrollKeep(to<0?y:to);var f=document.querySelector('input[autofocus]');if(f)setTimeout(function(){f.focus()},50);syncHist();};
+// 搜尋欄（data-live）：打字停 0.3 秒就送出，結果跟著變，不用按搜尋。輸入法還在選字（注音、拼音）時不送
+var liveT=null,composing=false,held=null;
+function liveGo(el){clearTimeout(liveT);var go=function(){if(composing||!document.contains(el))return;var id=el.getAttribute('data-live');if(!id)return;
+  if(!window.__pending){liveT=setTimeout(go,150);return;} // 上一次的結果還在畫：等一下再送
+  send(id);};liveT=setTimeout(go,300);}
+function isLive(el){return !!(el&&el.getAttribute&&el.getAttribute('data-live'));}
+document.addEventListener('compositionstart',function(){composing=true;});
+document.addEventListener('compositionend',function(e){composing=false;if(held){var x=held;held=null;window.__render(x[0],x[1]);}if(isLive(e.target))liveGo(e.target);});
+document.addEventListener('input',function(e){if(isLive(e.target)&&!composing)liveGo(e.target);});
+function copyAttrs(from,to){var i,a=to.attributes;for(i=a.length-1;i>=0;i--)to.removeAttribute(a[i].name);a=from.attributes;for(i=0;i<a.length;i++)to.setAttribute(a[i].name,a[i].value);}
+// 正在搜尋欄裡打字時重畫：搜尋欄和它外面那幾層留在原地（整個換掉的話游標和鍵盤會不見），只換掉周圍的內容
+function renderAround(root,cur,html){var box=document.createElement('div');box.innerHTML=html;
+  var neu=box.querySelector('input[data-live][name="'+cur.name+'"]');if(!neu)return false;
+  var o=cur,m=neu;while(o!==root&&m!==box){if(o.tagName!==m.tagName)return false;o=o.parentNode;m=m.parentNode;}
+  if(o!==root||m!==box)return false; // 新舊畫面的層數不一樣：照一般方式整個重畫
+  o=cur;m=neu;copyAttrs(m,o);
+  while(o!==root){var po=o.parentNode,pm=m.parentNode;
+    while(o.previousSibling)po.removeChild(o.previousSibling);while(o.nextSibling)po.removeChild(o.nextSibling);
+    while(pm.firstChild!==m)po.insertBefore(pm.firstChild,o);while(m.nextSibling)po.appendChild(m.nextSibling);
+    if(po!==root)copyAttrs(pm,po);o=po;m=pm;}
+  return true;}
+window.__render=function(html,to){var y=window.scrollY,root=document.getElementById('root'),cur=document.activeElement,typing=isLive(cur)&&root.contains(cur);
+  if(typing&&composing){held=[html,to];return;} // 還在選字：選完再畫
+  var kept=typing&&renderAround(root,cur,html);if(!kept)root.innerHTML=html;
+  stripSync();autoMore();fitText();scrollKeep(to<0?y:to);var f=kept?null:document.querySelector('input[autofocus]');if(f)setTimeout(function(){f.focus()},50);syncHist();};
 // 從螢幕左緣往右滑：回上一頁（等於點左上角的「返回」）。內容會跟著手指稍微移動，放開時滑得夠遠才算
 var sw=null;
 function swReset(now){sw=null;var c=document.querySelector('.content');if(c){c.style.transition=now?'none':'transform .15s';c.style.transform='';}}
@@ -227,7 +251,7 @@ function syncHist(){if(!histOn||document.querySelector('.loading'))return; // �
       else if(!has&&histGuard){histGuard=false;histSkip=true;history.back();}}catch(_){histOn=false;}}
 window.addEventListener('popstate',function(){if(histSkip){histSkip=false;return;}
   if(!histGuard)return;histGuard=false;var b=document.querySelector('.back');if(b)b.click();});
-document.addEventListener('keydown',function(e){if(e.key==='Enter'){var b=document.querySelector('[data-enter]');if(b)b.click();}});
+document.addEventListener('keydown',function(e){if(e.key==='Enter'){if(isLive(e.target)){e.target.blur();return;}var b=document.querySelector('[data-enter]');if(b)b.click();}}); // 搜尋欄按 Enter：收起鍵盤（結果早就出來了）
 </script></body></html>`;
 
 export class UI {

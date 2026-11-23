@@ -63,6 +63,10 @@ export function h(type: string | ((props: any) => string), props: any, ...childr
       attrs += ` data-act="${register(v)}"`;
       continue;
     }
+    if (k === "onInput") { // 搜尋欄：打字停一下就觸發（見 ui.ts 的 data-live）
+      attrs += ` data-live="${register(v)}"`;
+      continue;
+    }
     if (k === "onLongPress") {
       attrs += ` data-long="${register(v)}"`;
       continue;
@@ -244,6 +248,11 @@ export function Chip(props: { label: string; sub?: string; onTap?: Handler; mute
       {props.sub ? <span class="s">{esc(props.sub)}</span> : null}
     </button>
   );
+}
+
+/** 搜尋欄：沒有「搜尋」按鈕，打字停一下結果就跟著變（輸入法還在選字時不會動）。清空就回到全部 */
+export function Search(props: { value: string; placeholder: string; onInput: (text: string) => void; autofocus?: boolean }): string {
+  return <input class="field" name="q" type="search" enterkeyhint="search" autocomplete="off" value={props.value} placeholder={props.placeholder} autofocus={props.autofocus} onInput={(v: Record<string, string>) => props.onInput(v.q || "")} />;
 }
 
 export function Button(props: { label: string; onTap?: Handler; kind?: "primary" | "secondary" | "danger"; enter?: boolean }): string {
