@@ -929,6 +929,7 @@ class App {
   festDate = ""; // 看哪一天（空 = 今天或影展第一天）
   festQuery = ""; // 影展裡搜尋片名（搜這一年的所有影展）
   festTab = ""; // 看「進行中・即將開始」(live) 還是「已結束」(past)；空的 = 自動
+  festOpen = ""; // 目前展開哪一組篩選（年份／狀態／影展；空 = 都收合）
   festYear = 0; // 看哪一年（0 = 今年；今年還沒有就是最近有資料的那一年）
   async festivalListView(): Promise<string> {
     const list = await loadFestivals(this.festYear || undefined);
@@ -945,27 +946,36 @@ class App {
     const date = dates.indexOf(this.festDate) >= 0 ? this.festDate : festivalDefaultDate(f);
     const day = festivalDay(f, date);
     const hits = this.festQuery.trim() ? festivalSearch(list, this.festQuery) : null;
+    const thisYear = Number(todayTPE().slice(0, 4));
+    const tabNow = pick.tabs.find((t) => t.id === pick.tab);
+    // 收合的篩選：一行「名稱　目前選的 ▸」，點了展開（一次只展開一個）；只有一個選項的不能展開
+    const fold = (id: string, title: string, summary: string, can = true) => (
+      <Item title={title} right={can ? `${summary} ${this.festOpen === id ? "▾" : "▸"}` : summary} chevron={false} onTap={can ? () => { this.festOpen = this.festOpen === id ? "" : id; } : undefined} />
+    );
     return (
       <Page title="依電影找場次" subtitle={`${f.name}｜${festivalStatusLine(f)}`} onBack={() => this.back()}>
         {this.movieModeChips()}
         <Search value={this.festQuery} placeholder={`搜尋 ${year} 年影展的片名`} onInput={(t) => { this.festQuery = t; }} />
-        {years.length > 1 ? (
-          <Section title="年份">
+        {/* 年份、狀態、影展收合成三行（跟年度排行的篩選同一種樣式），點了才展開；選好就自動收起來 */}
+        <Section hint={this.festOpen === "fest" && pick.items.length > 3 ? "可以左右滑動" : ""}>
+          {years.length > 1 ? fold("year", "年份", `${year}${year === thisYear ? "（今年）" : ""}`) : null}
+          {years.length > 1 && this.festOpen === "year" ? (
             <Chips scroll>
-              {years.map((y) => <Chip label={`${y}`} sub={y === Number(todayTPE().slice(0, 4)) ? "今年" : ""} muted={y !== year} onTap={() => { this.festYear = y; this.festTab = ""; this.festId = ""; this.festDate = ""; }} />)}
+              {years.map((y) => <Chip label={`${y}`} sub={y === thisYear ? "今年" : ""} muted={y !== year} onTap={() => { this.festYear = y; this.festTab = ""; this.festId = ""; this.festDate = ""; this.festOpen = ""; }} />)}
             </Chips>
-          </Section>
-        ) : null}
-        {/* 進行中和已結束分成兩頁，一次只列一頁的影展 */}
-        {pick.tabs.length > 1 ? (
-          <Chips tabs>
-            {pick.tabs.map((t) => <Chip label={t.label} sub={`${t.count} 個影展`} muted={t.id !== pick.tab} onTap={() => { this.festTab = t.id; this.festId = ""; this.festDate = ""; }} />)}
-          </Chips>
-        ) : null}
-        <Section title={`${pick.tabs.find((t) => t.id === pick.tab)?.label || "影展"}｜${pick.items.length} 個影展`} hint={pick.items.length > 3 ? "可以左右滑動" : ""}>
-          <Chips scroll>
-            {pick.items.map((x) => <Chip label={x.name} sub={festivalChipNote(x)} muted={x.id !== f.id} onTap={() => { this.festId = x.id; this.festDate = ""; }} />)}
-          </Chips>
+          ) : null}
+          {pick.tabs.length > 1 ? fold("tab", "狀態", `${tabNow ? tabNow.label : ""}（${tabNow ? tabNow.count : 0} 個）`) : null}
+          {pick.tabs.length > 1 && this.festOpen === "tab" ? (
+            <Chips>
+              {pick.tabs.map((t) => <Chip label={t.label} sub={`${t.count} 個影展`} muted={t.id !== pick.tab} onTap={() => { this.festTab = t.id; this.festId = ""; this.festDate = ""; this.festOpen = pick.tabs.find((x) => x.id === t.id)!.count > 1 ? "fest" : ""; }} />)}
+            </Chips>
+          ) : null}
+          {fold("fest", "影展", pick.items.length > 1 ? `${f.name}（${festivalChipNote(f)}）` : `${f.name}（${festivalChipNote(f)}）`, pick.items.length > 1)}
+          {pick.items.length > 1 && this.festOpen === "fest" ? (
+            <Chips scroll>
+              {pick.items.map((x) => <Chip label={x.name} sub={festivalChipNote(x)} muted={x.id !== f.id} onTap={() => { this.festId = x.id; this.festDate = ""; this.festOpen = ""; }} />)}
+            </Chips>
+          ) : null}
         </Section>
         {hits ? (
           <Section title={`「${this.festQuery.trim()}」｜${hits.length} 部`} hint="搜尋這一年所有影展的片名，不分日期。清空搜尋欄就回到每天的片單。">
