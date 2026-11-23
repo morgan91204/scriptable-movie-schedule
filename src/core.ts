@@ -1722,7 +1722,7 @@ export function movieBoard(b: BoxOffice | null, movies: TwMovie[], opt: { scope?
   if (yearOptions.length) scopes.push({ id: "year", label: "年度", sub: "含已下檔" });
   const scope: MovieScope = (opt.scope === "year" || opt.sort === "year") && yearOptions.length ? "year" : "now"; // 舊版畫面把「年度排行」放在排序裡：sort 是 year 也算範圍是年度
   // 範圍是年度（那幾年上映的片，含已下檔）時的排法：票房只有累計；影城數是官方資料的「上映院數」
-  const yearSorts: MovieBoard["sorts"] = [{ id: "total", label: "累計票房" }, { id: "date", label: "上映日期" }, { id: "rating", label: "評分" }, { id: "cinemas", label: "上映院數" }];
+  const yearSorts: MovieBoard["sorts"] = [{ id: "total", label: "票房" }, { id: "date", label: "上映日期" }, { id: "rating", label: "評分" }, { id: "cinemas", label: "上映院數" }];
   const sortsAll: MovieBoard["sorts"] = [];
   if (b) sortsAll.push({ id: "week", label: b.mode === "week" ? "本週票房" : "近期票房" });
   if (b && b.mode === "week") sortsAll.push({ id: "total", label: "累計票房" });
@@ -1782,14 +1782,14 @@ export function movieBoard(b: BoxOffice | null, movies: TwMovie[], opt: { scope?
         if (rate === "popcorn") return p !== undefined ? { tier: 2, v: p, hi: { kind: "popcorn", text: `${p}%`, tier: ratingTier("pct", p) } } : { tier: 0, v: 0, hi: noneHi("popcorn") };
         return i ? { tier: i.few && fewLast ? 1 : 2, v: i.s, hi: { kind: "imdb", text: i.s.toFixed(1), tier: ratingTier("imdb", i.s), ...(i.few ? { note: "評分人數少" } : {}) } } : { tier: 0, v: 0, hi: noneHi("imdb") };
       }
-      return { tier: 1, v: x.total, hi: { kind: "money", text: money(x.total), tier: "none", note: "累計" } };
+      return { tier: 1, v: x.total, hi: { kind: "money", text: money(x.total), tier: "none" } }; // 歷年只有一種票房（上映以來的累計），不用另外標
     };
     const keyed = pool.map((x) => { const m = match(x.name) || null; return { x, m, k: keyOf(x, m), rank: sort === "total" ? x.rank : (null as number | null) }; }).filter((e) => hit(e.x.name, e.m?.en));
     if (sort === "rating" || sort === "cinemas") keyed.slice().sort((a, c) => c.k.tier - a.k.tier || c.k.v - a.k.v).forEach((e, i) => { if (e.k.tier > 0) e.rank = i + 1; });
     keyed.sort((a, c) => c.k.tier - a.k.tier || (asc ? a.k.v - c.k.v : c.k.v - a.k.v));
     const entries = keyed.map(({ x, m, k: kk, rank }): MovieEntry => {
       const info = [x.showing ? "上映中" : "", boxMainCountry(x.country), sort === "date" ? "" : releaseLabel(x.release), x.theaters && sort !== "cinemas" ? `${x.theaters} 間戲院` : ""].filter(Boolean).join("｜");
-      return { key: `${x.name}|${x.release}`, rank, name: x.name, x, m, lines: sort === "total" ? [info, ""] : [`累計 ${money(x.total)}`, info], light: !m, hi: kk.hi };
+      return { key: `${x.name}|${x.release}`, rank, name: x.name, x, m, lines: sort === "total" ? [info, ""] : [`票房 ${money(x.total)}`, info], light: !m, hi: kk.hi };
     });
     const rateName = rates.find((r) => r.id === rate)!.label;
     const md = (d: string) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`;
@@ -1799,7 +1799,7 @@ export function movieBoard(b: BoxOffice | null, movies: TwMovie[], opt: { scope?
     return {
       ...base, sorts: yearSorts, weeks: [], weekSummary: "",
       countries, selCountries: land, everyone: everyone.length, countrySummary: landText(land, everyone.length), entries, rest: [],
-      title: (sort === "total" ? `${yt} 年度票房排行（截至 ${md(b.end)}）${dirTag}` : `${yt} 年上映 ${entries.length} 部｜${sort === "date" ? (asc ? "最早上映在前" : "最新上映在前") : sort === "rating" ? `${rateName}${asc ? "低到高" : "高到低"}` : `上映院數${asc ? "少到多" : "多到少"}`}`) + boxCountryTag(land),
+      title: (sort === "total" ? `${yt} 年票房排行（截至 ${md(b.end)}）${dirTag}` : `${yt} 年上映 ${entries.length} 部｜${sort === "date" ? (asc ? "最早上映在前" : "最新上映在前") : sort === "rating" ? `${rateName}${asc ? "低到高" : "高到低"}` : `上映院數${asc ? "少到多" : "多到少"}`}`) + boxCountryTag(land),
       footer: sort === "total" ? boxOfficeFooter(b, "year", selYears, wk.id)
         : `${yt} 年上映、有票房紀錄的電影（已經下檔的也在裡面）${sort === "date" ? "依上映日期排序" : sort === "rating" ? `依${rateName}排序。${rate === "community" ? `評分不到 ${COMMUNITY_MIN} 人的不列入。` : cov}` : "依上映院數排序（官方票房資料裡的戲院數，不是今天有場次的影城數）"}。${src}`.replace("。。", "。"),
       restTitle: "", restFooter: "", paged: true,

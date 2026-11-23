@@ -990,8 +990,8 @@ function SoonMoviePage({ film: u }: { film: UpcomingFilm }) {
 }
 
 /** 「電影」清單：上映中與票房排行合成一份（範圍、排序、出品國別都在這裡選）。每一部都可以點：有場次的進電影頁，沒有的進精簡頁 */
-function BoxOfficeSections({ movies, query }: { movies: TwMovie[]; query: string }) {
-  const [pickedScope, setScope] = useState<string>("now") // 範圍：now 上映中／year 某幾年上映的片（含已下檔）
+function BoxOfficeSections({ movies, query, scope: pickedScope }: { movies: TwMovie[]; query: string; scope: "now" | "year" }) {
+  // 看哪些片由上面的頁籤決定：now = 現正上映，year = 歷年電影（某幾年上映的片，含已下檔）
   const [pickedSort, setSort] = useState<string>("") // 排法（空 = 第一種）
   const [asc, setAsc] = useState(false) // 反過來排（低到高、舊到新、少到多）；換一種排法就回到預設方向
   const [pickedRate, setRate] = useState<string>("") // 依評分排時用哪一種評分（空 = IMDb）
@@ -1007,7 +1007,7 @@ function BoxOfficeSections({ movies, query }: { movies: TwMovie[]; query: string
   const needWeeks = pickedScope !== "year" && (pickedSort || "week") === "week" && !!pickedWeek
   const box = useLoad(() => loadBoxFor(pickedScope, pickedSort || "week", pickedWeek).then((b) => ({ b: b as BoxOffice | null }), () => ({ b: null as BoxOffice | null })), [pickedScope === "year" ? 1 : needWeeks ? 2 : 0])
   const [pickedYears, setPickedYears] = useState<string[]>([]) // 年度可以複選（空 = 最新的一年）
-  const [yearOpen, setYearOpen] = useState(false)
+  const [yearOpen, setYearOpen] = useState(true) // 歷年電影：年份清單預設展開，一進來就看得到有哪些年份
   const [pickedCountry, setPickedCountry] = useState<string[]>([]) // 只看哪幾個出品國別（可以複選；空 = 全部）
   const [countryOpen, setCountryOpen] = useState(false)
   const b = box.data ? box.data.b : null
@@ -1050,11 +1050,6 @@ function BoxOfficeSections({ movies, query }: { movies: TwMovie[]; query: string
   }
   return <>
   <Section>
-    {/* 範圍：上映中，或某幾年上映的片（含已下檔；年份在下面選） */}
-    {board.years.length ? <Picker title={"範圍"} value={board.scope} onChanged={(v: string) => { setScope(v); setAsc(false); if (v === "year" && (pickedSort === "week" || !pickedSort)) setSort("total") }} pickerStyle={"segmented"}>
-      <Text tag={"now"}>上映中</Text>
-      <Text tag={"year"}>年度（含已下檔）</Text>
-    </Picker> : null}
     {board.orders.length > 1 ? <Picker title={"排序"} value={board.order} onChanged={(v: string) => { setSort(v); setAsc(false) }}>
       {board.orders.map((x) => <Text key={x.id} tag={x.id}>{x.label}</Text>)}
     </Picker> : null}
@@ -1284,12 +1279,13 @@ function MoviesPage() {
   >
     <Section>
       <Picker title={"顯示"} value={mode} onChanged={(v: string) => setMode(v)} pickerStyle={"segmented"}>
-        <Text tag={"box"}>已上映</Text>
+        <Text tag={"box"}>現正上映</Text>
         <Text tag={"soon"}>即將上映</Text>
+        <Text tag={"year"}>歷年電影</Text>
         {festList.length ? <Text tag={"fest"}>影展</Text> : null}
       </Picker>
     </Section>
-    {mode === "fest" ? <FestivalSections list={festList} query={k} /> : mode === "box" ? <BoxOfficeSections movies={movies.data || []} query={k} /> : <>
+    {mode === "fest" ? <FestivalSections list={festList} query={k} /> : mode === "box" ? <BoxOfficeSections key={"now"} movies={movies.data || []} query={k} scope={"now"} /> : mode === "year" ? <BoxOfficeSections key={"year"} movies={movies.data || []} query={k} scope={"year"} /> : <>
       {movies.error ? <ErrorRow error={movies.error} retry={movies.reload} /> : null}
       {!movies.data && !movies.error ? <Section><Loading text={"讀取電影清單…"} /></Section> : null}
       {/* 依上映月份分段 */}

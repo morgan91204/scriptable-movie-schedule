@@ -92,6 +92,12 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .chips.scroll::-webkit-scrollbar{display:none}
 .chips.scroll .chip{flex:0 0 auto;min-width:72px}
 .chips.scroll .chip .l{white-space:nowrap}
+.bar{display:flex;align-items:center;gap:6px;padding:0 14px 0 16px;margin-top:6px}
+.bar .lbl{flex:none;font-size:13px;font-weight:600;color:var(--fg2)}
+.bar .chips{flex:1;min-width:0;padding:6px 0}
+.bar .chips.scroll .chip{min-width:0;padding:7px 12px}
+.bar .dir{flex:none;padding:7px 10px;border-radius:12px;background:var(--card);color:var(--accent);font-size:14px;font-weight:600;white-space:nowrap}
+.bar .dir:active{opacity:.6}
 .chips.tabs{flex-wrap:nowrap;gap:6px}
 .chips.tabs .chip{flex:1 1 0;min-width:0;padding:9px 2px}
 .chips.tabs .chip .l{font-size:15px;white-space:nowrap}
