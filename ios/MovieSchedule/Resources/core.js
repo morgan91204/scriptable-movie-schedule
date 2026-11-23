@@ -30,7 +30,6 @@
     FORMATS: () => FORMATS,
     MAPS_LABEL: () => MAPS_LABEL,
     META_URL: () => META_URL,
-    NOTIFY_END_STEPS: () => NOTIFY_END_STEPS,
     NOTIFY_KINDS: () => NOTIFY_KINDS,
     OFFICIAL_URL: () => OFFICIAL_URL,
     POSTERS_URL: () => POSTERS_URL,
@@ -789,7 +788,6 @@ function parseTwMovieDay(doc) {
   };
 
   // src/core.ts
-  var NOTIFY_END_STEPS = [1, 3, 5, 10];
   function notifyEndScope(p) {
     if (p.endScope === "fav") return "收藏的影城";
     const cs = p.endCities || [];
@@ -801,7 +799,7 @@ function parseTwMovieDay(doc) {
     const scope = p.endScope === "fav" ? "fav" : p.endScope === "city" && (p.endCities || []).length ? "city" : "all";
     return {
       prefs: { open: p.open, rel: p.rel, end: p.end, fest: p.fest },
-      endCfg: { max: p.endMax || 3, scope, cities: scope === "city" ? p.endCities || [] : [], cinemas: scope === "fav" ? s.favorites.slice(0, 80) : [] },
+      endCfg: { max: Math.min(30, Math.max(1, p.endMax || 3)), scope, cities: scope === "city" ? p.endCities || [] : [], cinemas: scope === "fav" ? s.favorites.slice(0, 80) : [] },
       favs: notifyFavs(s)
     };
   }
@@ -3650,7 +3648,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   var extra = { boxOffice, filmList, soonList, nowShowing, nowShowingMulti, movieBoard: movieBoard2, festivalBoard, festivalFilm, nearby, patchSettings, fillMovie, formatList };
   var BRIDGE_LEVEL = 2;
   globalThis.MS = {
-    version: "2026.11.24-0157",
+    version: "2026.11.24-0158",
     level: BRIDGE_LEVEL,
     init(saved) {
       cache = saved || {};

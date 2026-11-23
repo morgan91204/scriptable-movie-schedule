@@ -45,12 +45,10 @@ export interface Settings {
 /** 收藏電影的通知種類：open 開放場次了、rel 上映了、end 快下檔了、fest 影展開始了 */
 export interface NotifyPrefs {
   open: boolean; rel: boolean; end: boolean; fest: boolean;
-  endMax?: number; // 快下檔：放映的影城剩下幾間以下才通知（預設 3）
+  endMax?: number; // 快下檔：放映的影城剩下幾間以下才通知（自己填，1 到 30；預設 3）
   endScope?: "all" | "city" | "fav"; // 算哪些影城：全台／指定的縣市（可以好幾個）／收藏的影城
   endCities?: string[];
 }
-/** 「剩下幾間以下」可以選的數字 */
-export const NOTIFY_END_STEPS = [1, 3, 5, 10];
 /** 「快下檔」算哪些影城的說法：「全台」「台北市、新北市」「收藏的影城」 */
 export function notifyEndScope(p: NotifyPrefs): string {
   if (p.endScope === "fav") return "收藏的影城";
@@ -65,7 +63,7 @@ export function notifyPayload(s: Settings): { prefs: Record<string, boolean>; en
   const scope = p.endScope === "fav" ? "fav" : p.endScope === "city" && (p.endCities || []).length ? "city" : "all";
   return {
     prefs: { open: p.open, rel: p.rel, end: p.end, fest: p.fest },
-    endCfg: { max: p.endMax || 3, scope, cities: scope === "city" ? p.endCities || [] : [], cinemas: scope === "fav" ? s.favorites.slice(0, 80) : [] },
+    endCfg: { max: Math.min(30, Math.max(1, p.endMax || 3)), scope, cities: scope === "city" ? p.endCities || [] : [], cinemas: scope === "fav" ? s.favorites.slice(0, 80) : [] },
     favs: notifyFavs(s),
   };
 }
