@@ -12,9 +12,9 @@ import {
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
   loadSettings, saveSettings, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, TW,
   FORMATS, formatsOf, filterVersions, filterVersionsAny, movieRows, movieDays, nearest, kmLabel, WINDOWS, findShowtimes, findShowtimesMulti, multiLabel, multiDetail, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText,
-  hallOf, tmdbTest, movieExtras, moviePoster, movieRuntime, posterSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxCountries, boxByCountry, boxInfo, boxInfoRows, boxCountryText, BOX_COUNTRY_NOTE, boxCountryTag, boxCountriesPicked, loadMovieBoard, soonGroups, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityCached, communityVote, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalsReady, festivalNote, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, festivalDefaultDate, festivalStateLabel, festivalState, festivalFooter, linkMovies, nowGroupLine, nowFilter, festivalPick, movieAbout, festivalSearch, festivalSearchLines, festivalTrailer, festivalYears, festivalsAny, festivalGroups, festivalChipNote, festivalStatusLine, movieRatings, ratingTier,
+  hallOf, tmdbTest, movieExtras, moviePoster, movieRuntime, posterSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxCountries, boxByCountry, boxInfo, boxInfoRows, boxCountryText, BOX_COUNTRY_NOTE, boxCountryTag, boxCountriesPicked, loadMovieBoard, loadSoonBoard, soonGroups, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityCached, communityVote, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalsReady, festivalNote, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, festivalDefaultDate, festivalStateLabel, festivalState, festivalFooter, linkMovies, nowGroupLine, nowFilter, festivalPick, movieAbout, festivalSearch, festivalSearchLines, festivalTrailer, festivalYears, festivalsAny, festivalGroups, festivalChipNote, festivalStatusLine, movieRatings, ratingTier,
 } from "./core";
-import type { MovieExtras, Ratings, Community, BoxOfficeItem, BoxSort, MovieEntry, Festival, FestivalFilm, FestivalSession } from "./core";
+import type { MovieExtras, Ratings, Community, BoxOfficeItem, BoxSort, MovieEntry, SoonEntry, UpcomingFilm, Festival, FestivalFilm, FestivalSession } from "./core";
 import { setTabBar, setBackGuard, esc } from "./jsx";
 import type { TwMovie, TwMovieCinema, Format, LatLng, Hit } from "./core";
 
@@ -1176,40 +1176,55 @@ class App {
   async movieListView(): Promise<string> {
     if (this.movieMode === "fest") return this.festivalListView();
     if (this.movieMode === "box") return this.boxOfficeView();
-    const all = await loadMovies();
-    const k = this.movieQuery.trim().toLowerCase();
-    const list = all.filter((m) => m.comingSoon && (!k || `${m.title} ${m.en}`.toLowerCase().includes(k)));
-    prefetchPosters(list); // 背景先抓海報，進電影頁就不用等
+    // 即將上映：場次通已經有場次的片＋還沒有場次的片（伺服器整理的近期上映片單），依上映月份分段
+    const board = await loadSoonBoard(this.movieQuery);
+    const list = board.groups.flatMap((g) => g.items);
+    prefetchPosters(list.filter((e) => e.m).map((e) => e.m as TwMovie)); // 背景先抓海報，進電影頁就不用等
     // 每一列的小海報：手機上記過、伺服器查好的立刻有；要上網找的最多等 0.6 秒，其餘每好一批就在原位補畫
-    const jobs = list.map((m) => moviePoster(m.title, m.slug, m.en).catch(() => ""));
+    const jobs = list.map((e) => (e.m ? moviePoster(e.m.title, e.m.slug, e.m.en) : moviePoster(e.title)).catch(() => ""));
     const got = await Promise.all(jobs.map((p) => Promise.race([p, sleep(this.rerendering ? 0 : 600).then(() => undefined)])));
     const pending = jobs.filter((_, i) => got[i] === undefined);
     const late: Promise<unknown>[] = [];
     for (let i = 0; i < pending.length; i += 8) late.push(Promise.all(pending.slice(i, i + 8)));
     if (late.length) this.late = late;
-    const thumbOf = new Map<TwMovie, { src: string; url?: string; pending?: boolean }>();
-    list.forEach((m, i) => {
+    const thumbOf = new Map<SoonEntry, { src: string; url?: string; pending?: boolean }>();
+    list.forEach((e, i) => {
       const u = got[i];
-      if (u === undefined) return void thumbOf.set(m, { src: "", pending: true });
+      if (u === undefined) return void thumbOf.set(e, { src: "", pending: true });
       const src = posterSrc(u);
       if (src && src === u) cachePoster(u);
-      thumbOf.set(m, { src, url: u });
+      thumbOf.set(e, { src, url: u });
     });
-    const item = (m: TwMovie) => (
-      <Item
-        thumb={thumbOf.get(m)}
-        title={m.title}
-        subtitle={movieLines(m).filter(Boolean).join("\n")}
-        onTap={() => this.go(() => this.movieView(m, ""), `讀取《${m.title}》的放映影城…`)}
-      />
-    );
-    const groups = soonGroups(list); // 依上映月份分段
+    const item = (e: SoonEntry) => {
+      const m = e.m, u = e.u;
+      return (
+        <Item
+          thumb={thumbOf.get(e)}
+          title={e.title}
+          subtitle={e.lines.filter(Boolean).join("\n")}
+          onTap={m ? () => this.go(() => this.movieView(m, ""), `讀取《${m.title}》的放映影城…`) : u ? () => this.go(() => this.soonMovieView(u), `讀取《${u.title}》…`) : undefined}
+        />
+      );
+    };
     return (
-      <Page title="依電影找場次" subtitle={`即將上映 ${list.length} 部`} onBack={() => this.back()}>
+      <Page title="依電影找場次" subtitle={`即將上映 ${board.total} 部｜${board.open} 部可查場次`} onBack={() => this.back()}>
         {this.movieModeChips()}
         <Search value={this.movieQuery} placeholder="搜尋片名（中文或英文）" onInput={(t) => { this.movieQuery = t; }} />
-        {groups.map((g, i) => <Section title={g.title} hint={i === groups.length - 1 ? "還沒上映、但已經可以查到場次的片，依上映日期排序。" : ""}>{g.items.map(item)}</Section>)}
+        {board.groups.map((g, i) => <Section title={g.title} hint={i === board.groups.length - 1 ? board.footer : ""}>{g.items.map(item)}</Section>)}
         {list.length ? null : <Empty icon="🎞" text="找不到相符的電影" />}
+      </Page>
+    );
+  }
+
+  /** 還沒有場次的即將上映片：海報、評分、預告，加上映日期 */
+  async soonMovieView(u: UpcomingFilm): Promise<string> {
+    const e = await this.extras(u.title, undefined, u.en);
+    const date = u.release.replace(/-/g, "/");
+    return (
+      <Page title={u.title} subtitle={`${date} 上映`} onBack={() => this.back()}>
+        {this.hero(e, u.title, [u.en, [`${date} 上映`, u.rating, u.runtime ? `${u.runtime} 分` : ""].filter(Boolean).join("｜")].filter(Boolean))}
+        <Note text="戲院還沒有排這部片的場次。通常上映前一到兩週會開放，到時候這裡會自動變成可以查場次。上映日期可能再調整。" />
+        <Button label="🌐 開眼電影網的介紹" kind="secondary" onTap={() => Safari.open(u.url)} />
       </Page>
     );
   }

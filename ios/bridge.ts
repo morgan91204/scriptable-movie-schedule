@@ -47,6 +47,10 @@ async function filmList(scope?: string, sort?: string, years?: string[], query?:
     entries: board.paged ? board.entries.slice(0, limit || core.BOX_PAGE) : board.entries, // 年度有好幾千列：一次只回傳 limit 列
   };
 }
+/** 「即將上映」：場次通已經有場次的片＋還沒有場次的片，依上映月份分段 */
+async function soonList(query?: string) {
+  return core.loadSoonBoard(query || "");
+}
 /** 現在有什麼可以看：在指定的影城裡找某天某時段的場次，依電影分組 */
 async function nowShowing(scope: { cinema: core.Cinema; km: number | null }[], date: string, winId: string, format: string) {
   const win = core.WINDOWS.find((w) => w.id === winId) || core.WINDOWS[core.WINDOWS.length - 1];
@@ -128,7 +132,7 @@ async function festivalFilm(festId: string, filmId: string) {
 }
 /** 特殊廳清單（跟其他版本同一份） */
 const formatList = () => core.FORMATS;
-const extra: Record<string, (...a: any[]) => any> = { boxOffice, filmList, nowShowing, nowShowingMulti, movieBoard, festivalBoard, festivalFilm, nearby, patchSettings, fillMovie, formatList };
+const extra: Record<string, (...a: any[]) => any> = { boxOffice, filmList, soonList, nowShowing, nowShowingMulti, movieBoard, festivalBoard, festivalFilm, nearby, patchSettings, fillMovie, formatList };
 
 declare const APP_VERSION: string;
 /** 橋接層的相容等級：App（Swift 端）只會自動換用「等級相同」的新版資料層。

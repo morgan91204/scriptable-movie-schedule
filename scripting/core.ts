@@ -1695,6 +1695,74 @@ export async function loadMovieBoard(opt: { sort?: string; years?: string[]; wee
   if (!b && !all.length) throw new Error("讀不到電影清單，請稍後再試");
   return movieBoard(b, all, { ...opt, community });
 }
+// ───────────────────────── 即將上映：場次通（已經排了場次）＋開眼的近期上映（還沒有場次） ─────────────────────────
+export const UPCOMING_URL = "https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/data/upcoming.json";
+/** 還沒有場次的即將上映片（伺服器每六小時從開眼電影網的「近期上映」整理，海報用 TMDB 查好；見 tools/upcoming.mjs） */
+export interface UpcomingFilm { title: string; release: string; rating: string; runtime: number; en: string; poster: string; url: string }
+let upcomingMem: { at: number; job: Promise<UpcomingFilm[]> } | null = null;
+/** 讀即將上映的片單（記憶體 30 分鐘、手機 6 小時）；讀不到回傳空的（清單就只剩場次通有場次的片） */
+export function loadUpcoming(): Promise<UpcomingFilm[]> {
+  if (upcomingMem && Date.now() - upcomingMem.at < 1800e3) return upcomingMem.job;
+  const job = (async (): Promise<UpcomingFilm[]> => {
+    let disk: { at: number; films: UpcomingFilm[] } | null = null;
+    try {
+      disk = JSON.parse(cacheGet("upcoming.json") || "null");
+    } catch (_) {}
+    let films = disk && Array.isArray(disk.films) ? disk.films : [];
+    if (!disk || Date.now() - disk.at > 6 * 3600e3) {
+      try {
+        const r = await platform().fetchText(UPCOMING_URL + "?t=" + Math.floor(Date.now() / 3600e3), { accept: "application/json" });
+        const d = r.status === 200 ? JSON.parse(r.body) : null;
+        if (d && Array.isArray(d.films)) {
+          films = d.films.filter((f: UpcomingFilm) => f && typeof f.title === "string" && /^\d{4}-\d{2}-\d{2}$/.test(f.release || ""));
+          cacheSet("upcoming.json", JSON.stringify({ at: Date.now(), films }));
+        }
+      } catch (_) {}
+    }
+    // 伺服器查好的海報：清單和電影頁直接用（不用手機再上網猜）
+    for (const f of films) if (/^https:\/\/image\.tmdb\.org\//.test(f.poster || "")) yearPosterSeen[normTitle(f.title)] ||= f.poster;
+    return films;
+  })();
+  upcomingMem = { at: Date.now(), job };
+  return job;
+}
+/** 「即將上映」的一列：m = 場次通已經有場次的片；u = 還沒有場次、只知道上映日期的片（兩個不會同時是 null） */
+export interface SoonEntry { key: string; title: string; m: TwMovie | null; u: UpcomingFilm | null; lines: [string, string] }
+export interface SoonBoard { total: number; open: number; groups: { title: string; items: SoonEntry[] }[]; footer: string }
+/** 把場次通「已經可以查場次」的片和「還沒有場次」的片合在一起，依上映月份分段 */
+export function soonBoard(movies: TwMovie[], upcoming: UpcomingFilm[], query?: string): SoonBoard {
+  const k = (query || "").trim().toLowerCase();
+  const hit = (name: string, en?: string) => !k || `${name} ${en || ""}`.toLowerCase().includes(k);
+  const today = todayTPE();
+  const upOf: Record<string, UpcomingFilm> = {};
+  for (const u of upcoming) upOf[communityKey(u.title)] ||= u;
+  const known: Record<string, boolean> = {}; // 場次通已經有的片（上映中的也算：開眼的日期偶爾比實際晚）
+  for (const m of movies) known[communityKey(m.title)] = true;
+  const rows: (SoonEntry & { release?: string })[] = [];
+  for (const m of movies) {
+    if (!m.comingSoon || !hit(m.title, m.en)) continue;
+    const u = upOf[communityKey(m.title)];
+    const release = m.release || (u ? u.release : ""); // 場次通沒寫上映日期的，用開眼的補
+    const mm = release && !m.release ? { ...m, release } : m;
+    const [a, b] = movieLines(mm);
+    rows.push({ key: m.slug, title: m.title, m, u: null, lines: [[a, "可查場次"].filter(Boolean).join("｜"), b], release });
+  }
+  const open = rows.length;
+  for (const u of upcoming) {
+    if (known[communityKey(u.title)] || u.release <= today || !hit(u.title, u.en)) continue;
+    rows.push({ key: "u|" + u.title + "|" + u.release, title: u.title, m: null, u, lines: [[`${mdOf(u.release)} 上映`, u.rating, u.runtime ? `${u.runtime} 分` : "", "尚未開放場次"].filter(Boolean).join("｜"), u.en || ""], release: u.release });
+  }
+  rows.sort((a, b) => (a.release || "9999").localeCompare(b.release || "9999")); // 穩定排序：同一天有場次的在前
+  return {
+    total: rows.length, open, groups: soonGroups(rows).map((g) => ({ title: g.title, items: g.items.map(({ release: _r, ...e }) => e) })),
+    footer: `標「可查場次」的已經可以找場次（資料來自場次通）；標「尚未開放場次」的是之後要上映、戲院還沒排場次的片${upcoming.length ? "（片單與上映日期來自開眼電影網，日期可能再調整）" : ""}。`,
+  };
+}
+/** 「即將上映」要的資料一次讀好 */
+export async function loadSoonBoard(query?: string): Promise<SoonBoard> {
+  const [movies, upcoming] = await Promise.all([loadMovies(), loadUpcoming().catch(() => [] as UpcomingFilm[])]);
+  return soonBoard(movies, upcoming, query);
+}
 /** 「即將上映」依上映月份分段：「11 月（3）」「12 月（5）」…，不知道上映日期的放最後一段 */
 export function soonGroups<T extends { release?: string }>(list: T[]): { title: string; items: T[] }[] {
   const out: { key: string; items: T[] }[] = [];

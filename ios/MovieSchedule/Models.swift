@@ -208,6 +208,33 @@ struct FilmList: Codable {
     var total: Int             // 符合條件的總數（比 entries 多的話還有下一批）
 }
 
+/// 還沒有場次的即將上映片（伺服器整理的近期上映片單）
+struct UpcomingFilm: Codable, Hashable {
+    var title: String
+    var release: String
+    var rating: String?
+    var runtime: Int?
+    var en: String?
+    var poster: String?
+    var url: String?
+}
+/// 「即將上映」的一列：m = 已經有場次的片，u = 還沒有場次的片
+struct SoonEntry: Codable, Identifiable {
+    var key: String
+    var title: String
+    var m: TwMovie?
+    var u: UpcomingFilm?
+    var lines: [String]
+    var id: String { key }
+}
+struct SoonBoard: Codable {
+    struct Group: Codable, Identifiable { var title: String; var items: [SoonEntry]; var id: String { title } }
+    var total: Int
+    var open: Int
+    var groups: [Group]
+    var footer: String
+}
+
 /// 選好的一場，交給確認頁
 struct ShowPick: Hashable {
     var title: String

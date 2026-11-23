@@ -2,7 +2,7 @@ import SwiftUI
 
 /// 「電影」分頁：電影（上映中與票房排行合成一份）／即將上映／影展
 struct MoviesView: View {
-    @State private var movies: Loadable<[TwMovie]> = .loading
+    @State private var soon: Loadable<SoonBoard> = .loading // 即將上映
     @State private var mode = "box" // box = 「電影」清單
     @State private var hasFestival = false // 有進行中或即將開始的影展
     @State private var query = ""
@@ -29,89 +29,66 @@ struct MoviesView: View {
             .navigationTitle("依電影找場次")
             .searchable(text: $query, prompt: "搜尋片名")
             .refreshable { await load() }
-            .task { if movies.value == nil { await load() } }
+            .task(id: query) { await load() }
             .task {
                 if let b = try? await Bridge.shared.call("festivalBoard", ["", ""], as: FestivalBoard.self) { hasFestival = !b.festivals.isEmpty }
             }
         }
     }
 
+    /// 即將上映：場次通已經有場次的片＋還沒有場次的片，依上映月份分段（合併與分段由共用資料層處理）
     @ViewBuilder private var nowSections: some View {
-        switch movies {
+        switch soon {
         case .loading:
             Section { LoadingRow(text: "讀取電影清單…") }
         case .failed(let message):
             Section { ErrorRow(message: message) { Task { await load() } } }
-        case .loaded(let all):
-            let k = query.trimmingCharacters(in: .whitespaces).lowercased()
-            let list = all.filter { k.isEmpty || "\($0.title) \($0.en ?? "")".lowercased().contains(k) }
-            let soon = list.filter { $0.comingSoon ?? false }
-            let groups = soonGroups(soon)
-            ForEach(Array(groups.enumerated()), id: \.offset) { i, g in
+        case .loaded(let b):
+            ForEach(Array(b.groups.enumerated()), id: \.offset) { i, g in
                 Section {
                     ForEach(g.items) { row($0) }
                 } header: {
                     Text(g.title)
                 } footer: {
-                    if i == groups.count - 1 { Text("還沒上映、但已經可以查到場次的片，依上映日期排序。") }
+                    if i == b.groups.count - 1 { Text(b.footer) }
                 }
             }
+            if b.groups.isEmpty { Section { Text("找不到相符的電影。").foregroundStyle(.secondary) } }
         }
     }
 
-    /// 「即將上映」依上映月份分段：「11 月（3）」…，不知道上映日期的放最後一段（清單本來就依上映日期排好）
-    private func soonGroups(_ list: [TwMovie]) -> [(title: String, items: [TwMovie])] {
-        var out: [(key: String, items: [TwMovie])] = []
-        for m in list {
-            let d = m.release ?? ""
-            let key = d.count >= 7 ? String(d.prefix(7)) : ""
-            if let i = out.firstIndex(where: { $0.key == key }) { out[i].items.append(m) } else { out.append((key, [m])) }
-        }
-        out.sort { ($0.key.isEmpty ? "9999" : $0.key) < ($1.key.isEmpty ? "9999" : $1.key) }
-        let thisYear = String(Calendar.current.component(.year, from: Date()))
-        return out.map { g in
-            guard !g.key.isEmpty else { return ("日期未定（\(g.items.count)）", g.items) }
-            let y = String(g.key.prefix(4)), mo = Int(g.key.suffix(2)) ?? 0
-            return ("\(y == thisYear ? "" : y + " 年 ")\(mo) 月（\(g.items.count)）", g.items)
+    @ViewBuilder private func row(_ e: SoonEntry) -> some View {
+        if let m = e.m {
+            NavigationLink { MovieDetailView(movie: m) } label: { rowLabel(e) }.accessibilityIdentifier("soon-row")
+        } else {
+            rowLabel(e) // 還沒有場次：只列出來，不能點進去找場次
         }
     }
 
-    /// 說明文字開頭：已上映但今天沒排片的標「今天沒有場次」，還沒上映的標上映日期
-    private func head(_ m: TwMovie) -> String {
-        if m.noShowToday ?? false { return "今天無場次" }
-        guard m.comingSoon ?? false, let d = m.release, d.count >= 10 else { return "" }
-        let p = d.split(separator: "-").compactMap { Int($0) }
-        return p.count == 3 ? "\(p[1])/\(p[2]) 上映" : ""
-    }
-
-    private func row(_ m: TwMovie) -> some View {
-        NavigationLink {
-            MovieDetailView(movie: m)
-        } label: {
-            HStack(spacing: 10) {
-                PosterView(title: m.title, slug: m.slug, en: m.en)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(m.title).lineLimit(2)
-                    // 兩行說明各自一行不換行，跟票房排行同一種排版
-                    let first = [head(m), m.rating ?? "", (m.runtime ?? 0) > 0 ? "\(m.runtime ?? 0) 分" : "", (m.cinemaCount ?? 0) > 0 ? "\(m.cinemaCount ?? 0) 間影城" : ""].filter { !$0.isEmpty }.joined(separator: "｜")
-                    if !first.isEmpty {
-                        Text(first).font(.subheadline).foregroundStyle(.secondary).lineLimit(1).minimumScaleFactor(0.8)
-                    }
-                    if let en = m.en, !en.isEmpty {
-                        Text(en).font(.caption).foregroundStyle(.tertiary).lineLimit(1)
-                    }
+    private func rowLabel(_ e: SoonEntry) -> some View {
+        HStack(spacing: 10) {
+            PosterView(title: e.title, slug: e.m?.slug, en: e.m?.en ?? e.u?.en)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(e.title).lineLimit(2)
+                // 兩行說明各自一行不換行，跟票房排行同一種排版
+                let first = e.lines.first ?? ""
+                let second = e.lines.count > 1 ? e.lines[1] : ""
+                if !first.isEmpty {
+                    Text(first).font(.subheadline).foregroundStyle(.secondary).lineLimit(1).minimumScaleFactor(0.8)
                 }
-                Spacer(minLength: 4)
+                if !second.isEmpty {
+                    Text(second).font(.caption).foregroundStyle(.tertiary).lineLimit(1)
+                }
             }
+            Spacer(minLength: 4)
         }
-        .accessibilityIdentifier("soon-row")
     }
 
     private func load() async {
         do {
-            movies = .loaded(try await Bridge.shared.call("loadMovies"))
+            soon = .loaded(try await Bridge.shared.call("soonList", [query.trimmingCharacters(in: .whitespaces)]))
         } catch {
-            if movies.value == nil { movies = .failed(errorText(error)) }
+            if soon.value == nil { soon = .failed(errorText(error)) }
         }
     }
 }

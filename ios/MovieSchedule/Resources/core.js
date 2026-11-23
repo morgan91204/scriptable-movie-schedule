@@ -41,6 +41,7 @@
     TW: () => TW,
     TW_FAR_URL: () => TW_FAR_URL,
     TW_NEAR_URL: () => TW_NEAR_URL,
+    UPCOMING_URL: () => UPCOMING_URL,
     WEEK: () => WEEK,
     WINDOWS: () => WINDOWS,
     addDays: () => addDays,
@@ -132,6 +133,8 @@
     loadMovieBoard: () => loadMovieBoard,
     loadMovies: () => loadMovies,
     loadSettings: () => loadSettings,
+    loadSoonBoard: () => loadSoonBoard,
+    loadUpcoming: () => loadUpcoming,
     looseTitle: () => looseTitle,
     mapsUrl: () => mapsUrl,
     matchBoxOffice: () => matchBoxOffice,
@@ -174,6 +177,7 @@
     shareText: () => shareText,
     showDay: () => showDay,
     showMinute: () => showMinute,
+    soonBoard: () => soonBoard,
     soonGroups: () => soonGroups,
     tmdbRuntime: () => tmdbRuntime,
     tmdbTest: () => tmdbTest,
@@ -2107,6 +2111,68 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     if (!b && !all.length) throw new Error("讀不到電影清單，請稍後再試");
     return movieBoard(b, all, { ...opt, community });
   }
+  var UPCOMING_URL = "https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/data/upcoming.json";
+  var upcomingMem = null;
+  function loadUpcoming() {
+    if (upcomingMem && Date.now() - upcomingMem.at < 18e5) return upcomingMem.job;
+    const job = (async () => {
+      let disk = null;
+      try {
+        disk = JSON.parse(cacheGet("upcoming.json") || "null");
+      } catch (_) {
+      }
+      let films = disk && Array.isArray(disk.films) ? disk.films : [];
+      if (!disk || Date.now() - disk.at > 6 * 36e5) {
+        try {
+          const r = await platform().fetchText(UPCOMING_URL + "?t=" + Math.floor(Date.now() / 36e5), { accept: "application/json" });
+          const d = r.status === 200 ? JSON.parse(r.body) : null;
+          if (d && Array.isArray(d.films)) {
+            films = d.films.filter((f) => f && typeof f.title === "string" && /^\d{4}-\d{2}-\d{2}$/.test(f.release || ""));
+            cacheSet("upcoming.json", JSON.stringify({ at: Date.now(), films }));
+          }
+        } catch (_) {
+        }
+      }
+      for (const f of films) if (/^https:\/\/image\.tmdb\.org\//.test(f.poster || "")) yearPosterSeen[normTitle(f.title)] ||= f.poster;
+      return films;
+    })();
+    upcomingMem = { at: Date.now(), job };
+    return job;
+  }
+  function soonBoard(movies, upcoming, query) {
+    const k = (query || "").trim().toLowerCase();
+    const hit = (name, en) => !k || `${name} ${en || ""}`.toLowerCase().includes(k);
+    const today = todayTPE();
+    const upOf = {};
+    for (const u of upcoming) upOf[communityKey(u.title)] ||= u;
+    const known = {};
+    for (const m of movies) known[communityKey(m.title)] = true;
+    const rows = [];
+    for (const m of movies) {
+      if (!m.comingSoon || !hit(m.title, m.en)) continue;
+      const u = upOf[communityKey(m.title)];
+      const release = m.release || (u ? u.release : "");
+      const mm = release && !m.release ? { ...m, release } : m;
+      const [a, b] = movieLines(mm);
+      rows.push({ key: m.slug, title: m.title, m, u: null, lines: [[a, "可查場次"].filter(Boolean).join("｜"), b], release });
+    }
+    const open = rows.length;
+    for (const u of upcoming) {
+      if (known[communityKey(u.title)] || u.release <= today || !hit(u.title, u.en)) continue;
+      rows.push({ key: "u|" + u.title + "|" + u.release, title: u.title, m: null, u, lines: [[`${mdOf(u.release)} 上映`, u.rating, u.runtime ? `${u.runtime} 分` : "", "尚未開放場次"].filter(Boolean).join("｜"), u.en || ""], release: u.release });
+    }
+    rows.sort((a, b) => (a.release || "9999").localeCompare(b.release || "9999"));
+    return {
+      total: rows.length,
+      open,
+      groups: soonGroups(rows).map((g) => ({ title: g.title, items: g.items.map(({ release: _r, ...e }) => e) })),
+      footer: `標「可查場次」的已經可以找場次（資料來自場次通）；標「尚未開放場次」的是之後要上映、戲院還沒排場次的片${upcoming.length ? "（片單與上映日期來自開眼電影網，日期可能再調整）" : ""}。`
+    };
+  }
+  async function loadSoonBoard(query) {
+    const [movies, upcoming] = await Promise.all([loadMovies(), loadUpcoming().catch(() => [])]);
+    return soonBoard(movies, upcoming, query);
+  }
   function soonGroups(list) {
     const out = [];
     for (const m of list) {
@@ -3006,6 +3072,9 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
       // 年度有好幾千列：一次只回傳 limit 列
     };
   }
+  async function soonList(query) {
+    return loadSoonBoard(query || "");
+  }
   async function nowShowing(scope, date, winId, format) {
     const win = WINDOWS.find((w) => w.id === winId) || WINDOWS[WINDOWS.length - 1];
     const { hits, failed, noData } = await findShowtimes(scope, date, win, format || "");
@@ -3091,10 +3160,10 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     };
   }
   var formatList = () => FORMATS;
-  var extra = { boxOffice, filmList, nowShowing, nowShowingMulti, movieBoard: movieBoard2, festivalBoard, festivalFilm, nearby, patchSettings, fillMovie, formatList };
+  var extra = { boxOffice, filmList, soonList, nowShowing, nowShowingMulti, movieBoard: movieBoard2, festivalBoard, festivalFilm, nearby, patchSettings, fillMovie, formatList };
   var BRIDGE_LEVEL = 2;
   globalThis.MS = {
-    version: "2026.11.23-2138",
+    version: "2026.11.23-2147",
     level: BRIDGE_LEVEL,
     init(saved) {
       cache = saved || {};
