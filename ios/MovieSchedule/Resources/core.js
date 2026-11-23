@@ -1909,7 +1909,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     const parts = String(country || "").split(/##|[\/、,，;；]/).map((c) => c.trim()).filter(Boolean).map((c) => COUNTRY_ALIAS[c] || c);
     return parts.filter((c, i) => parts.indexOf(c) === i).join("、");
   }
-  var BOX_COUNTRY_NOTE = "這是全台灣戲院的票房排行。「出品國別」是電影的出品國，可以複選：選了只是把那幾個國家出品的片篩出來、名次在裡面重排，票房一樣是在台灣賣出的。";
+  var BOX_COUNTRY_NOTE = "全台灣票房，只篩選出品國，可複選。";
   var boxCountryTag = (picked) => !picked.length ? "" : `｜${picked.length > 3 ? `${picked.slice(0, 2).join("、")} 等 ${picked.length} 國` : picked.join("、")}出品`;
   var boxCountriesPicked = (options, picked) => options.map((c) => c.id).filter((id) => picked.indexOf(id) >= 0);
   function boxCountries(list) {
@@ -2940,7 +2940,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   var extra = { boxOffice, nowShowing, nowShowingMulti, movieBoard, festivalBoard, festivalFilm, nearby, patchSettings, fillMovie, formatList };
   var BRIDGE_LEVEL = 2;
   globalThis.MS = {
-    version: "2026.11.23-1956",
+    version: "2026.11.23-1959",
     level: BRIDGE_LEVEL,
     init(saved) {
       cache = saved || {};

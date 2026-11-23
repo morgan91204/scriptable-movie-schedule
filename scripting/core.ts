@@ -1477,7 +1477,7 @@ export function boxCountryText(country: string): string {
   return parts.filter((c, i) => parts.indexOf(c) === i).join("、");
 }
 /** 「出品國別」篩選底下的說明：排行是台灣的票房，國別只是把某國出品的片篩出來 */
-export const BOX_COUNTRY_NOTE = "這是全台灣戲院的票房排行。「出品國別」是電影的出品國，可以複選：選了只是把那幾個國家出品的片篩出來、名次在裡面重排，票房一樣是在台灣賣出的。";
+export const BOX_COUNTRY_NOTE = "全台灣票房，只篩選出品國，可複選。";
 /** 排行標題後面接的篩選說明：「｜日本出品」「｜日本、美國出品」（沒篩選是空字串；超過三個就寫「等 N 國」） */
 export const boxCountryTag = (picked: string[]): string =>
   !picked.length ? "" : `｜${picked.length > 3 ? `${picked.slice(0, 2).join("、")} 等 ${picked.length} 國` : picked.join("、")}出品`;

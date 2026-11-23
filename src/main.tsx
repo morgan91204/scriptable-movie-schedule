@@ -1110,7 +1110,7 @@ class App {
           </Section>
         ) : null}
         {countries.length > 1 ? (
-          <Section title="出品國別（全台票房，可篩選出品國）" hint={BOX_COUNTRY_NOTE + "可以左右滑動。"}>
+          <Section title="出品國別（全台票房，可篩選出品國）" hint="可複選，可以左右滑動">
             <Chips scroll>
               <Chip label="全部" sub={`${everyone.length} 部`} muted={country.length > 0} onTap={() => { this.boxCountry = []; }} />
               {countries.map((c) => <Chip label={c.id} sub={`${c.count} 部`} muted={country.indexOf(c.id) < 0} onTap={() => { this.boxCountry = country.indexOf(c.id) < 0 ? [...country, c.id] : country.filter((z) => z !== c.id); }} />)}

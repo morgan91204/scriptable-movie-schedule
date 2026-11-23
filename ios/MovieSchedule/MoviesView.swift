@@ -172,7 +172,7 @@ struct BoxOfficeSection: View {
                     }
                     .menuActionDismissBehavior(.disabled)
                 } footer: {
-                    Text(board.value?.countryNote ?? "這是全台灣戲院的票房排行，出品國別只是篩選。")
+                    Text(board.value?.countryNote ?? "全台灣票房，只篩選出品國，可複選。")
                 }
             }
             if sort == "year", let options = board.value?.years, options.count > 1 {
