@@ -1,0 +1,35 @@
+# 年度票房排行的三大評分：每小時慢慢查幾十部（一部一部隔開），幾天查完七千多部；查過的固定存在 data 分支的 ratings-years.json
+name: 建立年度排行的評分
+on:
+  schedule:
+    - cron: "13 * * * *"
+  workflow_dispatch:
+    inputs:
+      max:
+        description: 這一輪查幾部（預設 60）
+        default: "60"
+permissions:
+  contents: write
+concurrency:
+  group: data-branch
+  cancel-in-progress: false
+jobs:
+  ratings:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: 取上一次的評分紀錄
+        run: curl -fsSL "https://raw.githubusercontent.com/${{ github.repository }}/data/ratings-years.json?t=$(date +%s)" -o "$RUNNER_TEMP/prev-ratings.json" || echo "還沒有評分紀錄，從頭查"
+      - name: 查評分（慢慢查，連續讀不到就提早結束）
+        run: node tools/ratings-years.mjs "$RUNNER_TEMP/prev-ratings.json" "$RUNNER_TEMP/ratings-years.json"
+        env:
+          TMDB_TOKEN: ${{ secrets.TMDB_TOKEN }}
+          RATINGS_MAX: ${{ inputs.max || '60' }}
+      - name: 發佈到 data 分支
+        run: tools/publish-data.sh "$RUNNER_TEMP/ratings-years.json" ratings-years.json "更新資料"
