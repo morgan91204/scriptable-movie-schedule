@@ -206,7 +206,7 @@ class App {
     const favRows = this.favMovOpen && favMovies.length ? await favMovieRows(this.settings).catch(() => [] as FavRow[]) : [];
     const openFav = (r: FavRow) => this.openFavRow(r);
     return (
-      <Page title="🎬 片刻" subtitle={`${this.cinemas.length} 間影城｜選影城 → 日期 → 電影 → 場次`}>
+      <Page title="🎬 片刻" subtitle={`全台 ${this.cinemas.length} 間影城場次一次查`}>
         <Section>
           <Item icon="🕘" title="現在有什麼可以看" subtitle="依時段找收藏、附近或各縣市的場次" onTap={() => this.go(() => this.nowView())} />
           <Item icon="🎞️" title="依電影找場次" subtitle="先選電影，再看哪些影城有放映" onTap={() => this.go(() => this.movieListView(), "讀取電影清單…")} />
