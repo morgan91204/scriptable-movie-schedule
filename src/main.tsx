@@ -950,14 +950,14 @@ class App {
         <Button label="搜尋" kind="secondary" enter onTap={(v) => { this.festQuery = v.q || ""; }} />
         {years.length > 1 ? (
           <Section title="年份">
-            <Chips>
+            <Chips scroll>
               {years.map((y) => <Chip label={`${y}`} sub={y === Number(todayTPE().slice(0, 4)) ? "今年" : ""} muted={y !== year} onTap={() => { this.festYear = y; this.festId = ""; this.festDate = ""; }} />)}
             </Chips>
           </Section>
         ) : null}
         {festivalGroups(list).map((g) => (
-          <Section title={`${g.title}｜${g.items.length} 個影展`}>
-            <Chips>
+          <Section title={`${g.title}｜${g.items.length} 個影展`} hint={g.items.length > 3 ? "可以左右滑動" : ""}>
+            <Chips scroll>
               {g.items.map((x) => <Chip label={x.name} sub={festivalChipNote(x)} muted={x.id !== f.id} onTap={() => { this.festId = x.id; this.festDate = ""; }} />)}
             </Chips>
           </Section>
@@ -978,7 +978,7 @@ class App {
         {hits ? null : (
           <>
           <Section title="日期">
-            <Chips>
+            <Chips scroll>
               {dates.map((d) => (
                 <Chip label={dateLabel(d).replace(/（.）.*$/, "")} sub={d === todayTPE() ? "今天" : dateLabel(d).match(/（(.)）/)?.[1] || ""} muted={d !== date} onTap={() => { this.festDate = d; }} />
               ))}

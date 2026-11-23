@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.22-2311
+// @movie-schedule-app 電影行程 v2026.11.23-1109
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/parsers.gen.ts
@@ -2483,7 +2483,7 @@ function Item(props) {
   return /* @__PURE__ */ h("div", { class: cls, onTap: props.onTap, onLongPress: props.onLongPress }, props.rank ? /* @__PURE__ */ h("span", { class: "rank" + (props.rank <= 3 ? " top" : "") + (props.rank >= 1e3 ? " d4" : props.rank >= 100 ? " d3" : "") }, props.rank) : null, props.thumb ? props.thumb.pending && !props.thumb.src ? /* @__PURE__ */ h("span", { class: "thumb none" }) : /* @__PURE__ */ h(GenPoster, { cls: "thumb", title: props.title }, props.thumb.src ? /* @__PURE__ */ h("img", { src: props.thumb.src, "data-url": props.thumb.url && props.thumb.url !== props.thumb.src ? props.thumb.url : void 0, alt: "", loading: "lazy", onerror: fallback }) : null) : null, props.icon ? /* @__PURE__ */ h("span", { class: "ico" }, props.icon) : null, /* @__PURE__ */ h("div", { class: "body" }, /* @__PURE__ */ h("div", { class: "title" }, esc(props.title)), props.subtitle ? props.subtitle.includes("\n") ? props.subtitle.split("\n").map((l, i) => /* @__PURE__ */ h("div", { class: "sub one" + (i ? " dim" : "") }, esc(l))) : /* @__PURE__ */ h("div", { class: "sub" }, esc(props.subtitle)) : null), props.badge ? /* @__PURE__ */ h("span", { class: "badge" }, esc(props.badge)) : null, props.right ? /* @__PURE__ */ h("span", { class: "right" }, esc(props.right)) : null, props.onTap && props.chevron !== false ? /* @__PURE__ */ h("span", { class: "chev" }, "›") : null);
 }
 function Chips(props) {
-  return /* @__PURE__ */ h("div", { class: props.tabs ? "chips tabs" : "chips" }, props.children);
+  return /* @__PURE__ */ h("div", { class: props.tabs ? "chips tabs" : props.scroll ? "chips scroll" : "chips" }, props.children);
 }
 function Chip(props) {
   return /* @__PURE__ */ h("button", { class: ["chip", props.muted ? "muted" : "", props.warn ? "warn" : ""].join(" "), onTap: props.onTap }, /* @__PURE__ */ h("span", { class: "l" }, esc(props.label)), props.sub ? /* @__PURE__ */ h("span", { class: "s" }, esc(props.sub)) : null);
@@ -2588,6 +2588,10 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .chip .s{font-size:11px;color:var(--fg2);margin-top:2px}
 .chip.muted{opacity:.45}
 .chip.warn{outline:1.5px solid var(--orange)}
+.chips.scroll{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.chips.scroll::-webkit-scrollbar{display:none}
+.chips.scroll .chip{flex:0 0 auto;min-width:72px}
+.chips.scroll .chip .l{white-space:nowrap}
 .chips.tabs{flex-wrap:nowrap;gap:6px}
 .chips.tabs .chip{flex:1 1 0;min-width:0;padding:9px 2px}
 .chips.tabs .chip .l{font-size:15px;white-space:nowrap}
@@ -2693,12 +2697,14 @@ document.addEventListener('click',function(e){
 function scrollKeep(to){window.scrollTo(0,to);if(to>0){var again=function(){if(Math.abs(window.scrollY-to)>2)window.scrollTo(0,to);};
   (window.requestAnimationFrame||setTimeout)(again);setTimeout(again,120);}}
 try{if('scrollRestoration' in history)history.scrollRestoration='manual';}catch(_){} // 位置由我們自己還原，瀏覽器不要插手
-window.__render=function(html,to){var y=window.scrollY;document.getElementById('root').innerHTML=html;scrollKeep(to<0?y:to);var f=document.querySelector('input[autofocus]');if(f)setTimeout(function(){f.focus()},50);syncHist();};
+function stripSync(){var a=document.querySelectorAll('.chips.scroll');for(var i=0;i<a.length;i++){var on=a[i].querySelector('.chip:not(.muted)');if(on)a[i].scrollLeft=Math.max(0,on.offsetLeft-a[i].offsetLeft-(a[i].clientWidth-on.offsetWidth)/2);}}
+window.__render=function(html,to){var y=window.scrollY;document.getElementById('root').innerHTML=html;stripSync();scrollKeep(to<0?y:to);var f=document.querySelector('input[autofocus]');if(f)setTimeout(function(){f.focus()},50);syncHist();};
 // 從螢幕左緣往右滑：回上一頁（等於點左上角的「返回」）。內容會跟著手指稍微移動，放開時滑得夠遠才算
 var sw=null;
 function swReset(now){sw=null;var c=document.querySelector('.content');if(c){c.style.transition=now?'none':'transform .15s';c.style.transform='';}}
 document.addEventListener('touchstart',function(e){var t=e.touches[0];
-  sw=(e.touches.length===1&&t.clientX<32&&document.querySelector('.back'))?{x:t.clientX,y:t.clientY,t:Date.now()}:null;},{passive:true});
+  var strip=e.target.closest&&e.target.closest('.chips.scroll'); // 在可左右滑的選項列上、而且還能往回捲：那是捲選項，不是返回
+  sw=(e.touches.length===1&&t.clientX<32&&document.querySelector('.back')&&!(strip&&strip.scrollLeft>0))?{x:t.clientX,y:t.clientY,t:Date.now()}:null;},{passive:true});
 document.addEventListener('touchmove',function(e){if(!sw)return;var t=e.touches[0],dx=t.clientX-sw.x,dy=t.clientY-sw.y;
   if(Math.abs(dy)>60&&Math.abs(dy)>dx){swReset();return;}
   var c=document.querySelector('.content');if(c&&dx>8){c.style.transition='none';c.style.transform='translateX('+Math.min(dx*0.4,70)+'px)';}},{passive:true});
@@ -3018,14 +3024,14 @@ var App = class {
   }
   /** 最新版本是多少。網頁版問的是自己網站現在上線的版本（重新整理就會拿到的那一版），不是 GitHub 上的 */
   checkVersion() {
-    if (true) return checkLatest("2026.11.22-2311");
+    if (true) return checkLatest("2026.11.23-1109");
     return (async () => {
       try {
         const r = await globalThis.fetch("/api/version?t=" + Date.now(), { cache: "no-store" });
         const latest = String((await r.json()).version || "");
         if (!latest) return null;
         const num = (v) => Number(v.replace(/\D/g, "")) || 0;
-        return { latest, isLatest: num("2026.11.22-2311") >= num(latest) };
+        return { latest, isLatest: num("2026.11.23-1109") >= num(latest) };
       } catch (_) {
         return null;
       }
@@ -3122,11 +3128,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.22-2311"}`);
+          Pasteboard.copy(`版本 ${"2026.11.23-1109"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.22-2311"}`,
+      `版本 ${"2026.11.23-1109"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -3468,7 +3474,7 @@ var App = class {
     if (false) {
       if (!r) return /* @__PURE__ */ h(Note, { text: "（無法確認是否為最新版：連不到網站）" });
       if (r.isLatest) return /* @__PURE__ */ h(Note, { text: "✅ 已是最新版" });
-      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.22-2311"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
+      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.23-1109"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
         globalThis.location.reload();
       } }));
     }
@@ -3583,11 +3589,11 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
     const hits = this.festQuery.trim() ? festivalSearch(list, this.festQuery) : null;
     return /* @__PURE__ */ h(Page, { title: "依電影找場次", subtitle: `${f.name}｜${festivalStatusLine(f)}`, onBack: () => this.back() }, this.movieModeChips(), /* @__PURE__ */ h("input", { class: "field", name: "q", value: this.festQuery, placeholder: `搜尋 ${year} 年影展的片名` }), /* @__PURE__ */ h(Button, { label: "搜尋", kind: "secondary", enter: true, onTap: (v) => {
       this.festQuery = v.q || "";
-    } }), years.length > 1 ? /* @__PURE__ */ h(Section, { title: "年份" }, /* @__PURE__ */ h(Chips, null, years.map((y) => /* @__PURE__ */ h(Chip, { label: `${y}`, sub: y === Number(todayTPE().slice(0, 4)) ? "今年" : "", muted: y !== year, onTap: () => {
+    } }), years.length > 1 ? /* @__PURE__ */ h(Section, { title: "年份" }, /* @__PURE__ */ h(Chips, { scroll: true }, years.map((y) => /* @__PURE__ */ h(Chip, { label: `${y}`, sub: y === Number(todayTPE().slice(0, 4)) ? "今年" : "", muted: y !== year, onTap: () => {
       this.festYear = y;
       this.festId = "";
       this.festDate = "";
-    } })))) : null, festivalGroups(list).map((g) => /* @__PURE__ */ h(Section, { title: `${g.title}｜${g.items.length} 個影展` }, /* @__PURE__ */ h(Chips, null, g.items.map((x) => /* @__PURE__ */ h(Chip, { label: x.name, sub: festivalChipNote(x), muted: x.id !== f.id, onTap: () => {
+    } })))) : null, festivalGroups(list).map((g) => /* @__PURE__ */ h(Section, { title: `${g.title}｜${g.items.length} 個影展`, hint: g.items.length > 3 ? "可以左右滑動" : "" }, /* @__PURE__ */ h(Chips, { scroll: true }, g.items.map((x) => /* @__PURE__ */ h(Chip, { label: x.name, sub: festivalChipNote(x), muted: x.id !== f.id, onTap: () => {
       this.festId = x.id;
       this.festDate = "";
     } }))))), hits ? /* @__PURE__ */ h(Section, { title: `「${this.festQuery.trim()}」｜${hits.length} 部`, hint: "搜尋這一年所有影展的片名，不分日期。清空搜尋欄再按搜尋，就回到每天的片單。" }, hits.map(({ f: hf, film, sessions }) => /* @__PURE__ */ h(
@@ -3598,7 +3604,7 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
         subtitle: festivalSearchLines(hf, film, sessions).filter(Boolean).join("\n"),
         onTap: () => this.go(() => this.festivalFilmView(hf, film))
       }
-    ))) : null, hits && !hits.length ? /* @__PURE__ */ h(Empty, { icon: "🎞", text: "這一年的影展裡找不到這個片名" }) : null, hits ? null : /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Section, { title: "日期" }, /* @__PURE__ */ h(Chips, null, dates.map((d) => /* @__PURE__ */ h(Chip, { label: dateLabel(d).replace(/（.）.*$/, ""), sub: d === todayTPE() ? "今天" : dateLabel(d).match(/（(.)）/)?.[1] || "", muted: d !== date, onTap: () => {
+    ))) : null, hits && !hits.length ? /* @__PURE__ */ h(Empty, { icon: "🎞", text: "這一年的影展裡找不到這個片名" }) : null, hits ? null : /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Section, { title: "日期" }, /* @__PURE__ */ h(Chips, { scroll: true }, dates.map((d) => /* @__PURE__ */ h(Chip, { label: dateLabel(d).replace(/（.）.*$/, ""), sub: d === todayTPE() ? "今天" : dateLabel(d).match(/（(.)）/)?.[1] || "", muted: d !== date, onTap: () => {
       this.festDate = d;
     } })))), /* @__PURE__ */ h(Section, { title: `${f.name}｜${dateLabel(date).replace(/ .*$/, "")}｜${day.length} 部、${day.reduce((n, x) => n + x.sessions.length, 0)} 場`, hint: festivalFooter(f) }, day.map(({ film, sessions }) => /* @__PURE__ */ h(
       Item,

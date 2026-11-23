@@ -227,8 +227,9 @@ export function Item(props: {
   );
 }
 
-export function Chips(props: { children?: Children; tabs?: boolean }): string {
-  return <div class={props.tabs ? "chips tabs" : "chips"}>{props.children}</div>; // tabs：分類列，平分寬度排成一行不換行
+export function Chips(props: { children?: Children; tabs?: boolean; scroll?: boolean }): string {
+  // scroll：選項很多時排成一行、可左右滑（選中的那一顆會自動捲到中間），不往下疊好幾行
+  return <div class={props.tabs ? "chips tabs" : props.scroll ? "chips scroll" : "chips"}>{props.children}</div>; // tabs：分類列，平分寬度排成一行不換行
 }
 
 export function Chip(props: { label: string; sub?: string; onTap?: Handler; muted?: boolean; warn?: boolean }): string {
