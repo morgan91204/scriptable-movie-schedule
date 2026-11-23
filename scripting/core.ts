@@ -992,12 +992,15 @@ export function posterLight(title: string, release?: string): Promise<string> {
   return (posterLightMem[k] ||= (async () => {
     const nk = normTitle(title);
     const all = readExtras();
-    const hit = all["t|" + nk] || all["n|" + nk] || all["p|" + nk];
-    if (hit?.poster && !/ytimg\.com/.test(hit.poster)) return normImageUrl(hit.poster);
+    // 進過這部片的電影頁、那邊找到的海報（來源比較多：開眼、場次通…）：清單直接沿用，兩邊才會一致
+    const hits = [all["t|" + nk], all["n|" + nk], all["p|" + nk]].filter((x) => x && x.poster);
+    const hit = hits.find((x) => !/ytimg\.com/.test(x.poster));
+    if (hit) return normImageUrl(hit.poster);
+    const thumb = hits.length ? normImageUrl(hits[0].poster) : ""; // 電影頁只找到預告縮圖：清單自己也找不到時就用它（跟電影頁顯示同一張）
     const me = await metaOf(title);
     if (me && me.p) return normImageUrl(me.p);
     const own = all["l|" + nk] as (MovieExtras & { at: number }) | undefined;
-    if (own && Date.now() - own.at < (own.poster ? 30 : 3) * 86400e3) return own.poster;
+    if (own && Date.now() - own.at < (own.poster ? 30 : 3) * 86400e3) return own.poster || thumb;
     const year = Number((release || "").slice(0, 4)) || 0;
     const poster = await posterLane(async () => {
       try {
@@ -1014,8 +1017,12 @@ export function posterLight(title: string, release?: string): Promise<string> {
     const latest = readExtras();
     latest["l|" + nk] = { poster, trailer: "", trailerName: "", at: Date.now() } as MovieExtras & { at: number };
     cacheSet("extras.json", JSON.stringify(latest));
-    return poster;
-  })().then((u) => (posterDone[k] = u)));
+    return poster || thumb;
+  })().then((u) => {
+    // 沒找到的不記在這次執行裡：之後進電影頁找到了海報，回到清單再問一次就拿得到（查過的結果記在手機上，不會重複上網）
+    if (!u) delete posterLightMem[k];
+    return (posterDone[k] = u);
+  }));
 }
 export function moviePoster(title: string, slug?: string, en?: string): Promise<string> {
   const k = (slug || "") + "|" + title;

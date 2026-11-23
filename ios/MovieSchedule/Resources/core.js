@@ -1481,12 +1481,14 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     return posterLightMem[k] ||= (async () => {
       const nk = normTitle(title);
       const all = readExtras();
-      const hit = all["t|" + nk] || all["n|" + nk] || all["p|" + nk];
-      if (hit?.poster && !/ytimg\.com/.test(hit.poster)) return normImageUrl(hit.poster);
+      const hits = [all["t|" + nk], all["n|" + nk], all["p|" + nk]].filter((x) => x && x.poster);
+      const hit = hits.find((x) => !/ytimg\.com/.test(x.poster));
+      if (hit) return normImageUrl(hit.poster);
+      const thumb = hits.length ? normImageUrl(hits[0].poster) : "";
       const me = await metaOf(title);
       if (me && me.p) return normImageUrl(me.p);
       const own = all["l|" + nk];
-      if (own && Date.now() - own.at < (own.poster ? 30 : 3) * 864e5) return own.poster;
+      if (own && Date.now() - own.at < (own.poster ? 30 : 3) * 864e5) return own.poster || thumb;
       const year = Number((release || "").slice(0, 4)) || 0;
       const poster = await posterLane(async () => {
         try {
@@ -1503,8 +1505,11 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
       const latest = readExtras();
       latest["l|" + nk] = { poster, trailer: "", trailerName: "", at: Date.now() };
       cacheSet("extras.json", JSON.stringify(latest));
-      return poster;
-    })().then((u) => posterDone[k] = u);
+      return poster || thumb;
+    })().then((u) => {
+      if (!u) delete posterLightMem[k];
+      return posterDone[k] = u;
+    });
   }
   function moviePoster(title, slug, en) {
     const k = (slug || "") + "|" + title;
@@ -2806,7 +2811,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   var extra = { boxOffice, nowShowing, nowShowingMulti, movieBoard, festivalBoard, festivalFilm, nearby, patchSettings, fillMovie, formatList };
   var BRIDGE_LEVEL = 2;
   globalThis.MS = {
-    version: "2026.11.23-1542",
+    version: "2026.11.23-1620",
     level: BRIDGE_LEVEL,
     init(saved) {
       cache = saved || {};
