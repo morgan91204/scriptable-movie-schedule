@@ -138,6 +138,7 @@
     nearest: () => nearest,
     normImageUrl: () => normImageUrl,
     normTitle: () => normTitle,
+    nowFilter: () => nowFilter,
     nowGroupLine: () => nowGroupLine,
     nowHM: () => nowHM,
     posterKnown: () => posterKnown,
@@ -2235,6 +2236,21 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
       out.push(one);
     }
     if (out.every((g) => g.hits)) out.sort((a, b) => b.hits.length - a.hits.length || showMinute(a.hits[0].time) - showMinute(b.hits[0].time));
+    return out;
+  }
+  function nowFilter(groups, query) {
+    const k = query.trim().toLowerCase().replace(/臺/g, "台");
+    if (!k) return groups;
+    const has = (s) => String(s || "").toLowerCase().replace(/臺/g, "台").indexOf(k) >= 0;
+    const out = [];
+    for (const g of groups) {
+      if (has(g.title) || has(g.movie?.en || "")) {
+        out.push(g);
+        continue;
+      }
+      const hits = g.hits.filter((h) => has(h.cinema.name) || has(h.version.label) || has(h.cinema.city || ""));
+      if (hits.length) out.push({ ...g, hits });
+    }
     return out;
   }
   var nowGroupLine = (g) => [`${g.hits.length} 場`, g.runtime ? `${g.runtime} 分鐘` : "", g.rating || ""].filter(Boolean).join("｜");

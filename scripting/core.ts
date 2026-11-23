@@ -1953,6 +1953,20 @@ export async function linkMovies<T extends { title: string }>(groups: T[]): Prom
   if (out.every((g) => g.hits)) out.sort((a, b) => (b.hits as Hit[]).length - (a.hits as Hit[]).length || showMinute((a.hits as Hit[])[0].time) - showMinute((b.hits as Hit[])[0].time));
   return out as (T & { movie?: TwMovie })[];
 }
+/** 在「現在有什麼可以看」的結果裡再搜尋：片名（或英文片名）符合的整部留下；
+ *  片名不符合的，只留影城名稱或廳別版本符合的那幾場（例如打「信義」「IMAX」）。空字串 = 不篩 */
+export function nowFilter<T extends { title: string; hits: Hit[]; movie?: TwMovie }>(groups: T[], query: string): T[] {
+  const k = query.trim().toLowerCase().replace(/臺/g, "台");
+  if (!k) return groups;
+  const has = (s: string) => String(s || "").toLowerCase().replace(/臺/g, "台").indexOf(k) >= 0;
+  const out: T[] = [];
+  for (const g of groups) {
+    if (has(g.title) || has(g.movie?.en || "")) { out.push(g); continue; }
+    const hits = g.hits.filter((h) => has(h.cinema.name) || has(h.version.label) || has(h.cinema.city || ""));
+    if (hits.length) out.push({ ...g, hits });
+  }
+  return out;
+}
 /** 「現在有什麼可以看」每部片標題列的說明：幾場｜片長｜分級 */
 export const nowGroupLine = (g: { hits: unknown[]; runtime?: number; rating?: string }): string =>
   [`${g.hits.length} 場`, g.runtime ? `${g.runtime} 分鐘` : "", g.rating || ""].filter(Boolean).join("｜");

@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.23-1425
+// @movie-schedule-app 電影行程 v2026.11.23-1436
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/parsers.gen.ts
@@ -2019,6 +2019,21 @@ async function linkMovies(groups) {
   if (out.every((g) => g.hits)) out.sort((a, b) => b.hits.length - a.hits.length || showMinute(a.hits[0].time) - showMinute(b.hits[0].time));
   return out;
 }
+function nowFilter(groups, query) {
+  const k = query.trim().toLowerCase().replace(/臺/g, "台");
+  if (!k) return groups;
+  const has = (s) => String(s || "").toLowerCase().replace(/臺/g, "台").indexOf(k) >= 0;
+  const out = [];
+  for (const g of groups) {
+    if (has(g.title) || has(g.movie?.en || "")) {
+      out.push(g);
+      continue;
+    }
+    const hits = g.hits.filter((h2) => has(h2.cinema.name) || has(h2.version.label) || has(h2.cinema.city || ""));
+    if (hits.length) out.push({ ...g, hits });
+  }
+  return out;
+}
 var nowGroupLine = (g) => [`${g.hits.length} 場`, g.runtime ? `${g.runtime} 分鐘` : "", g.rating || ""].filter(Boolean).join("｜");
 var errText = (e) => {
   const m = String(e?.message || e || "");
@@ -3045,6 +3060,8 @@ var App = class {
     this.nowFolded = [];
     // 「現在有什麼可以看」結果裡收合起來的片（只留片名列）
     this.nowFoldFor = "";
+    // 上面那份收合狀態是哪一次查詢的
+    this.nowQuery = "";
   }
   go(view, loading = "讀取中…") {
     this.loadingText = loading;
@@ -3070,14 +3087,14 @@ var App = class {
   }
   /** 最新版本是多少。網頁版問的是自己網站現在上線的版本（重新整理就會拿到的那一版），不是 GitHub 上的 */
   checkVersion() {
-    if (true) return checkLatest("2026.11.23-1425");
+    if (true) return checkLatest("2026.11.23-1436");
     return (async () => {
       try {
         const r = await globalThis.fetch("/api/version?t=" + Date.now(), { cache: "no-store" });
         const latest = String((await r.json()).version || "");
         if (!latest) return null;
         const num = (v) => Number(v.replace(/\D/g, "")) || 0;
-        return { latest, isLatest: num("2026.11.23-1425") >= num(latest) };
+        return { latest, isLatest: num("2026.11.23-1436") >= num(latest) };
       } catch (_) {
         return null;
       }
@@ -3174,11 +3191,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.23-1425"}`);
+          Pasteboard.copy(`版本 ${"2026.11.23-1436"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.23-1425"}`,
+      `版本 ${"2026.11.23-1436"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -3520,7 +3537,7 @@ var App = class {
     if (false) {
       if (!r) return /* @__PURE__ */ h(Note, { text: "（無法確認是否為最新版：連不到網站）" });
       if (r.isLatest) return /* @__PURE__ */ h(Note, { text: "✅ 已是最新版" });
-      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.23-1425"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
+      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.23-1436"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
         globalThis.location.reload();
       } }));
     }
@@ -3926,7 +3943,7 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
       this.nowFormats = toggle(this.nowFormats, f);
     } })))), /* @__PURE__ */ h(Button, { label: "🔍 找場次", onTap: () => this.go(() => this.nowResultsView(selDates, selWins), "正在查詢各影城的場次…") }));
   }
-  // 上面那份收合狀態是哪一次查詢的
+  // 在結果裡再搜尋的字
   async nowResultsView(dates, winIds) {
     const byId = /* @__PURE__ */ new Map();
     const add = (list) => list.forEach((x) => {
@@ -3948,8 +3965,8 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
     const got = await Promise.all(jobs.map((p) => Promise.race([p, sleep(this.rerendering ? 0 : 600).then(() => void 0)])));
     const pending = jobs.filter((_, i) => got[i] === void 0);
     if (pending.length) this.late = [Promise.all(pending)];
-    const thumbOf = (i) => {
-      const u = got[i];
+    const thumbOf = (title) => {
+      const u = got[groups.findIndex((g) => g.title === title)];
       if (u === void 0) return { src: "", pending: true };
       const src = posterSrc(u);
       if (src && src === u) cachePoster(u);
@@ -3961,9 +3978,11 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
     if (this.nowFoldFor !== foldKey) {
       this.nowFoldFor = foldKey;
       this.nowFolded = [];
+      this.nowQuery = "";
     }
+    const shown = nowFilter(groups, this.nowQuery);
     const folded = (t) => this.nowFolded.indexOf(t) >= 0;
-    const allFolded = groups.length > 0 && groups.every((g) => folded(g.title));
+    const allFolded = shown.length > 0 && shown.every((g) => folded(g.title));
     const open = (hit) => {
       this.runtime = hit.movie.runtime;
       this.seat = hallOf(hit.version.label);
@@ -3971,20 +3990,22 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
     };
     return /* @__PURE__ */ h(Page, { title: multiLabel(dates, winIds), subtitle: `${hits.length} 場｜${groups.length} 部電影`, onBack: () => this.back() }, /* @__PURE__ */ h(Note, { text: `${multiDetail(dates, winIds)}
 影城：${scopeLabel}${this.nowFormats.length ? `
-特殊廳：${this.nowFormats.join("、")}` : ""}` }), groups.length ? null : /* @__PURE__ */ h(Empty, { icon: "🍿", text: "沒有符合的場次，換個時段或範圍試試。" }), groups.length > 1 ? /* @__PURE__ */ h(
+特殊廳：${this.nowFormats.join("、")}` : ""}` }), groups.length ? null : /* @__PURE__ */ h(Empty, { icon: "🍿", text: "沒有符合的場次，換個時段或範圍試試。" }), groups.length > 1 ? /* @__PURE__ */ h("input", { class: "field", name: "q", value: this.nowQuery, placeholder: "在結果裡搜尋片名、影城或廳別" }) : null, groups.length > 1 ? /* @__PURE__ */ h(Button, { label: "搜尋", kind: "secondary", enter: true, onTap: (v) => {
+      this.nowQuery = v.q || "";
+    } }) : null, this.nowQuery.trim() ? /* @__PURE__ */ h(Note, { text: shown.length ? `「${this.nowQuery.trim()}」：${shown.reduce((n, g) => n + g.hits.length, 0)} 場｜${shown.length} 部電影。清空搜尋欄再按搜尋，就回到全部結果。` : `結果裡找不到「${this.nowQuery.trim()}」。清空搜尋欄再按搜尋，就回到全部結果。` }) : null, shown.length > 1 ? /* @__PURE__ */ h(
       Button,
       {
         label: allFolded ? "▸ 全部展開場次" : "▾ 全部收合，只看片名",
         kind: "secondary",
         onTap: () => {
-          this.nowFolded = allFolded ? [] : groups.map((g) => g.title);
+          this.nowFolded = allFolded ? [] : shown.map((g) => g.title);
         }
       }
-    ) : null, groups.map((g, gi) => /* @__PURE__ */ h(Section, null, /* @__PURE__ */ h(
+    ) : null, shown.map((g) => /* @__PURE__ */ h(Section, null, /* @__PURE__ */ h(
       Item,
       {
         head: true,
-        thumb: thumbOf(gi),
+        thumb: thumbOf(g.title),
         title: g.title,
         subtitle: nowGroupLine(g) + (g.movie ? "\n點片名看電影介紹與所有場次" : ""),
         onTap: g.movie ? () => this.go(() => this.movieView(g.movie, ""), `讀取《${g.title}》…`) : void 0,

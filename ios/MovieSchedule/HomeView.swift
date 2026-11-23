@@ -64,6 +64,7 @@ struct HomeView: View {
 /// 現在有什麼可以看：選日期、時段、範圍，一次列出所有場次
 struct NowView: View {
     @State private var folded: Set<String> = [] // 搜尋結果裡收合起來的片（只留片名列）
+    @State private var query = "" // 在結果裡再搜尋（片名、影城、廳別）
     let cinemas: [Cinema]
     @ObservedObject private var settings = SettingsStore.shared
     // 四個條件都可以複選
@@ -94,6 +95,20 @@ struct NowView: View {
     }
 
     /// 一組可以複選的選項：點開選單，每個選項點一下打勾、再點一下取消（選單不會關掉）
+    /// 在結果裡再搜尋：片名符合的整部留下；不符合的只留影城名稱或廳別符合的那幾場
+    private func filtered(_ groups: [NowGroup]) -> [NowGroup] {
+        let k = query.trimmingCharacters(in: .whitespaces).lowercased().replacingOccurrences(of: "臺", with: "台")
+        if k.isEmpty { return groups }
+        func has(_ s: String?) -> Bool { (s ?? "").lowercased().replacingOccurrences(of: "臺", with: "台").contains(k) }
+        var out: [NowGroup] = []
+        for g in groups {
+            if has(g.title) || has(g.movie?.en) { out.append(g); continue }
+            let hits = g.hits.filter { has($0.cinema.name) || has($0.version.label) || has($0.cinema.city) }
+            if !hits.isEmpty { var copy = g; copy.hits = hits; out.append(copy) }
+        }
+        return out
+    }
+
     /// 搜尋結果裡一部片的標題列：海報、粗體片名、幾場｜片長｜分級
     private func groupHead(_ g: NowGroup) -> some View {
         let rt = g.runtime ?? 0
@@ -179,20 +194,24 @@ struct NowView: View {
             case .failed(let message):
                 Section { ErrorRow(message: message) { Task { await load() } } }
             case .loaded(let r):
+                let groups = filtered(r.groups)
+                let k = query.trimmingCharacters(in: .whitespaces)
                 if r.groups.isEmpty {
                     Section { Text("沒有符合的場次，換個時段或範圍試試。").foregroundStyle(.secondary) }
+                } else if !k.isEmpty {
+                    Section { Text(groups.isEmpty ? "結果裡找不到「\(k)」" : "「\(k)」：\(groups.reduce(0) { $0 + $1.hits.count }) 場｜\(groups.count) 部電影").foregroundStyle(.secondary) }
                 }
-                if r.groups.count > 1 {
-                    let all = r.groups.allSatisfy { folded.contains($0.title) }
+                if groups.count > 1 {
+                    let all = groups.allSatisfy { folded.contains($0.title) }
                     Section {
                         Button {
-                            folded = all ? [] : Set(r.groups.map { $0.title })
+                            folded = all ? [] : Set(groups.map { $0.title })
                         } label: {
                             Label(all ? "全部展開場次" : "全部收合，只看片名", systemImage: all ? "chevron.down.circle" : "chevron.right.circle")
                         }
                     }
                 }
-                ForEach(r.groups) { g in
+                ForEach(groups) { g in
                     Section {
                         // 片名獨立一列（海報、粗體大字），點下去是電影頁：簡介、預告、所有影城的場次
                         if let m = g.movie {
@@ -227,6 +246,7 @@ struct NowView: View {
                 }
             }
         }
+        .searchable(text: $query, prompt: "在結果裡搜尋片名、影城或廳別")
         .navigationTitle("現在有什麼可以看")
         .navigationBarTitleDisplayMode(.inline)
         .refreshable { await load() }

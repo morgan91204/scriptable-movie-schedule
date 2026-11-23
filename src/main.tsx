@@ -12,7 +12,7 @@ import {
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
   loadSettings, saveSettings, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, TW,
   FORMATS, formatsOf, filterVersions, filterVersionsAny, movieRows, movieDays, nearest, kmLabel, WINDOWS, findShowtimes, findShowtimesMulti, multiLabel, multiDetail, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText,
-  hallOf, tmdbTest, movieExtras, moviePoster, movieRuntime, posterSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityCached, communityVote, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalsReady, festivalNote, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, festivalDefaultDate, festivalStateLabel, festivalState, festivalFooter, linkMovies, nowGroupLine, festivalPick, movieAbout, festivalSearch, festivalSearchLines, festivalTrailer, festivalYears, festivalsAny, festivalGroups, festivalChipNote, festivalStatusLine, movieRatings, ratingTier,
+  hallOf, tmdbTest, movieExtras, moviePoster, movieRuntime, posterSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityCached, communityVote, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalsReady, festivalNote, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, festivalDefaultDate, festivalStateLabel, festivalState, festivalFooter, linkMovies, nowGroupLine, nowFilter, festivalPick, movieAbout, festivalSearch, festivalSearchLines, festivalTrailer, festivalYears, festivalsAny, festivalGroups, festivalChipNote, festivalStatusLine, movieRatings, ratingTier,
 } from "./core";
 import type { MovieExtras, Ratings, Community, BoxOfficeItem, BoxSort, Festival, FestivalFilm, FestivalSession } from "./core";
 import { setTabBar, setBackGuard, esc } from "./jsx";
@@ -1410,6 +1410,7 @@ class App {
 
   nowFolded: string[] = []; // 「現在有什麼可以看」結果裡收合起來的片（只留片名列）
   nowFoldFor = ""; // 上面那份收合狀態是哪一次查詢的
+  nowQuery = ""; // 在結果裡再搜尋的字
   async nowResultsView(dates: string[], winIds: string[]): Promise<string> {
     // 範圍複選：各範圍的影城合在一起，同一間只查一次（有距離的保留距離）
     const byId = new Map<string, { cinema: Cinema; km: number | null }>();
@@ -1430,8 +1431,8 @@ class App {
     const got = await Promise.all(jobs.map((p) => Promise.race([p, sleep(this.rerendering ? 0 : 600).then(() => undefined)])));
     const pending = jobs.filter((_, i) => got[i] === undefined);
     if (pending.length) this.late = [Promise.all(pending)];
-    const thumbOf = (i: number) => {
-      const u = got[i];
+    const thumbOf = (title: string) => {
+      const u = got[groups.findIndex((g) => g.title === title)];
       if (u === undefined) return { src: "", pending: true };
       const src = posterSrc(u);
       if (src && src === u) cachePoster(u);
@@ -1441,9 +1442,10 @@ class App {
     const many = dates.length > 1; // 複選多天：每一場前面標日期
     // 收合：換了查詢條件就全部重新展開
     const foldKey = [dates.join(","), winIds.join(","), this.nowScopes.join(","), this.nowFormats.join(",")].join("|");
-    if (this.nowFoldFor !== foldKey) { this.nowFoldFor = foldKey; this.nowFolded = []; }
+    if (this.nowFoldFor !== foldKey) { this.nowFoldFor = foldKey; this.nowFolded = []; this.nowQuery = ""; }
+    const shown = nowFilter(groups, this.nowQuery); // 在結果裡再搜尋（片名、影城、廳別）
     const folded = (t: string) => this.nowFolded.indexOf(t) >= 0;
-    const allFolded = groups.length > 0 && groups.every((g) => folded(g.title));
+    const allFolded = shown.length > 0 && shown.every((g) => folded(g.title));
     const open = (hit: Hit) => {
       this.runtime = hit.movie.runtime;
       this.seat = hallOf(hit.version.label);
@@ -1454,19 +1456,22 @@ class App {
         {/* 完整的查詢條件放在內文（標題列只有一行，複選多了會被截掉） */}
         <Note text={`${multiDetail(dates, winIds)}\n影城：${scopeLabel}${this.nowFormats.length ? `\n特殊廳：${this.nowFormats.join("、")}` : ""}`} />
         {groups.length ? null : <Empty icon="🍿" text="沒有符合的場次，換個時段或範圍試試。" />}
-        {groups.length > 1 ? (
+        {groups.length > 1 ? <input class="field" name="q" value={this.nowQuery} placeholder="在結果裡搜尋片名、影城或廳別" /> : null}
+        {groups.length > 1 ? <Button label="搜尋" kind="secondary" enter onTap={(v) => { this.nowQuery = v.q || ""; }} /> : null}
+        {this.nowQuery.trim() ? <Note text={shown.length ? `「${this.nowQuery.trim()}」：${shown.reduce((n, g) => n + g.hits.length, 0)} 場｜${shown.length} 部電影。清空搜尋欄再按搜尋，就回到全部結果。` : `結果裡找不到「${this.nowQuery.trim()}」。清空搜尋欄再按搜尋，就回到全部結果。`} /> : null}
+        {shown.length > 1 ? (
           <Button
             label={allFolded ? "▸ 全部展開場次" : "▾ 全部收合，只看片名"}
             kind="secondary"
-            onTap={() => { this.nowFolded = allFolded ? [] : groups.map((g) => g.title); }}
+            onTap={() => { this.nowFolded = allFolded ? [] : shown.map((g) => g.title); }}
           />
         ) : null}
-        {groups.map((g, gi) => (
+        {shown.map((g) => (
           <Section>
             {/* 片名獨立一列（海報、大字、有底色），點下去是電影頁：簡介、預告、所有影城的場次 */}
             <Item
               head
-              thumb={thumbOf(gi)}
+              thumb={thumbOf(g.title)}
               title={g.title}
               subtitle={nowGroupLine(g) + (g.movie ? "\n點片名看電影介紹與所有場次" : "")}
               onTap={g.movie ? () => this.go(() => this.movieView(g.movie as TwMovie, ""), `讀取《${g.title}》…`) : undefined}

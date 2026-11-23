@@ -14,7 +14,7 @@ import {
   Cinema, Movie, Settings, Version, TwMovie, TwMovieCinema, CITY_ORDER, TW,
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
   loadSettings, saveSettings, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, cinemaAddress,
-  FORMATS, formatsOf, filterVersions, filterVersionsAny, movieRows, movieDays, nearest, kmLabel, WINDOWS, findShowtimes, findShowtimesMulti, multiLabel, multiDetail, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText, hallOf, tmdbTest, movieExtras, moviePoster, posterReady, posterTint, POSTER_TINTS, normImageUrl, movieRuntime, posterSrc, isLocalSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityVote, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, SCRIPTING_IMPORT_URL, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, festivalDefaultDate, festivalStateLabel, festivalState, festivalFooter, linkMovies, nowGroupLine, festivalPick, movieAbout, festivalSearch, festivalSearchLines, festivalTrailer, festivalYears, festivalGroups, festivalChipNote, festivalStatusLine, movieRatings, ratingTier,
+  FORMATS, formatsOf, filterVersions, filterVersionsAny, movieRows, movieDays, nearest, kmLabel, WINDOWS, findShowtimes, findShowtimesMulti, multiLabel, multiDetail, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText, hallOf, tmdbTest, movieExtras, moviePoster, posterReady, posterTint, POSTER_TINTS, normImageUrl, movieRuntime, posterSrc, isLocalSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityVote, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, SCRIPTING_IMPORT_URL, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, festivalDefaultDate, festivalStateLabel, festivalState, festivalFooter, linkMovies, nowGroupLine, nowFilter, festivalPick, movieAbout, festivalSearch, festivalSearchLines, festivalTrailer, festivalYears, festivalGroups, festivalChipNote, festivalStatusLine, movieRatings, ratingTier,
 } from "./core"
 import type { Format, LatLng, Hit, Community, BoxOfficeItem, BoxSort, Festival, FestivalFilm, FestivalSession } from "./core"
 
@@ -1420,8 +1420,11 @@ function NowResultsPage({ dates, winIds, scopes, formats }: { dates: string[]; w
   const [folded, setFolded] = useState<string[]>([]) // 收合起來的片（只留片名列）
   const isFolded = (t: string) => folded.indexOf(t) >= 0
   const toggleFold = (t: string) => setFolded(isFolded(t) ? folded.filter((x) => x !== t) : [...folded, t])
-  const allFolded = groups.length > 0 && groups.every((g) => isFolded(g.title))
-  return <List navigationTitle={multiLabel(dates, winIds)} navigationBarTitleDisplayMode={"inline"} refreshable={res.reload}>
+  const [query, setQuery] = useState("") // 在結果裡再搜尋（片名、影城、廳別）
+  const shown = nowFilter(groups, query)
+  const allFolded = shown.length > 0 && shown.every((g) => isFolded(g.title))
+  return <List navigationTitle={multiLabel(dates, winIds)} navigationBarTitleDisplayMode={"inline"} refreshable={res.reload}
+    searchable={{ value: query, onChanged: setQuery, prompt: "在結果裡搜尋片名、影城或廳別" } as any}>
     {res.error ? <ErrorRow error={res.error} retry={res.reload} /> : null}
     {!res.data && !res.error ? <Section><Loading text={`查詢${scopeLabel}的場次…`} /></Section> : null}
     {/* 完整的查詢條件放在內文（導覽列標題只有一行，複選多了會被截掉） */}
@@ -1429,12 +1432,13 @@ function NowResultsPage({ dates, winIds, scopes, formats }: { dates: string[]; w
       <Text foregroundStyle={"secondaryLabel"}>{`${res.data.hits.length} 場｜${groups.length} 部電影`}</Text>
     </Section> : null}
     {res.data && !groups.length ? <Section><Text foregroundStyle={"secondaryLabel"}>沒有符合的場次，換個時段或範圍試試。</Text></Section> : null}
-    {groups.length > 1 ? <Section>
-      <Button action={() => setFolded(allFolded ? [] : groups.map((g) => g.title))}>
+    {query.trim() && groups.length ? <Section><Text foregroundStyle={"secondaryLabel"}>{shown.length ? `「${query.trim()}」：${shown.reduce((n, g) => n + g.hits.length, 0)} 場｜${shown.length} 部電影` : `結果裡找不到「${query.trim()}」`}</Text></Section> : null}
+    {shown.length > 1 ? <Section>
+      <Button action={() => setFolded(allFolded ? [] : shown.map((g) => g.title))}>
         <Label title={allFolded ? "全部展開場次" : "全部收合，只看片名"} systemImage={allFolded ? "chevron.down.circle" : "chevron.right.circle"} />
       </Button>
     </Section> : null}
-    {groups.map((g) =>
+    {shown.map((g) =>
       <Section key={g.title}>
         {/* 片名獨立一列（海報、粗體大字），點下去是電影頁：簡介、預告、所有影城的場次 */}
         {(() => {
