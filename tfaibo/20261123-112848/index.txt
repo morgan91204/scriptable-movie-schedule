@@ -1,0 +1,4 @@
+01.html 403 5900 https://boxofficetw.tfai.org.tw/statistic/Year/10/0/all/False/ReleaseDate/2026-09-09
+02.html 403 5726 https://boxofficetw.tfai.org.tw/OpenData
+03.html 200 5056 https://boxofficetw.tfai.org.tw/robots.txt
+04.html 403 5680 https://boxofficetw.tfai.org.tw/
