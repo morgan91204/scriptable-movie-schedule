@@ -1054,6 +1054,7 @@ class App {
 
   boxAsc = false; // 反過來排（低到高、舊到新、少到多）；換一種排法就回到預設方向
   boxRate = ""; // 依評分排時用哪一種評分（空 = IMDb）
+  boxFewLast = true; // 依 IMDb 排時，評分人數少的片排在後面（關掉就照分數一起排）
   boxOpen = ""; // 目前展開哪一組篩選（週次／年份／出品國別；空 = 都收合）
   boxSort = ""; // 排法：本週票房／累計票房／上映日期／評分／影城數／年度排行（year，含已下檔）（空 = 第一種）
   boxYears: string[] = []; // 年度排行選了哪幾年（空 = 最新的一年）
@@ -1065,7 +1066,7 @@ class App {
   async boxOfficeView(): Promise<string> {
     // 票房、片單（依觀眾評分排時再加評分總表）一次讀好；票房讀不到時清單照樣出來，只是少了依票房排的選項
     const k = this.movieQuery.trim().toLowerCase();
-    const board = await loadMovieBoard({ sort: this.boxSort, years: this.boxYears, week: this.boxWeek, countries: this.boxCountry, query: k, asc: this.boxAsc, rate: this.boxRate });
+    const board = await loadMovieBoard({ sort: this.boxSort, years: this.boxYears, week: this.boxWeek, countries: this.boxCountry, query: k, asc: this.boxAsc, rate: this.boxRate, fewLast: this.boxFewLast });
     const { years, countries } = board;
     const selYears = board.selYears, country = board.selCountries;
     // 年度排行一年有六百部左右、全選是好幾千部：先畫 100 列，快滑到底時自動接著載入（不用按）。換了排法、年份或搜尋字就從頭開始
@@ -1132,6 +1133,8 @@ class App {
                 {board.rates.map((r) => <Chip label={r.label} muted={board.rate !== r.id} onTap={() => { this.boxRate = r.id; }} />)}
               </Chips>
             ) : null}
+            {/* 評分人數少的片（分數不太準）要不要排在後面：點一下切換，不用展開 */}
+            {board.fewOption ? <Item kv title="評分人數少的片" right={board.fewLast ? "排在後面 ⇄" : "照分數一起排 ⇄"} chevron={false} onTap={() => { this.boxFewLast = !this.boxFewLast; }} /> : null}
             {board.weeks.length > 1 ? fold("week", "週次", board.weekSummary) : null}
             {board.weeks.length > 1 && this.boxOpen === "week" ? (
               <Chips>

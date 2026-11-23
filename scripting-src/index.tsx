@@ -995,6 +995,7 @@ function BoxOfficeSections({ movies, query }: { movies: TwMovie[]; query: string
   const pickedScope = pickedSort === "year" ? "year" : "now"
   const [asc, setAsc] = useState(false) // 反過來排（低到高、舊到新、少到多）；換一種排法就回到預設方向
   const [pickedRate, setRate] = useState<string>("") // 依評分排時用哪一種評分（空 = IMDb）
+  const [fewLast, setFewLast] = useState(true) // 依 IMDb 排時，評分人數少的片排在後面（關掉就照分數一起排）
   // 依觀眾評分排時才讀評分總表
   const needCommunity = pickedSort === "rating" && pickedRate === "community"
   const community = useLoad(() => (needCommunity ? loadCommunitySummary() : Promise.resolve(null)), [needCommunity])
@@ -1008,8 +1009,8 @@ function BoxOfficeSections({ movies, query }: { movies: TwMovie[]; query: string
   const [countryOpen, setCountryOpen] = useState(false)
   const b = box.data ? box.data.b : null
   const board = useMemo(
-    () => movieBoard(b, movies, { scope: pickedScope, sort: pickedSort, years: pickedYears, week: pickedWeek, countries: pickedCountry, query, asc, rate: pickedRate, community: community.data }),
-    [b, movies.length, asc, pickedRate, community.data, pickedScope, pickedSort, pickedYears.join(","), pickedWeek, pickedCountry.join(","), query])
+    () => movieBoard(b, movies, { scope: pickedScope, sort: pickedSort, years: pickedYears, week: pickedWeek, countries: pickedCountry, query, asc, rate: pickedRate, fewLast, community: community.data }),
+    [b, movies.length, asc, fewLast, pickedRate, community.data, pickedScope, pickedSort, pickedYears.join(","), pickedWeek, pickedCountry.join(","), query])
   const { years: yearOptions, selYears: years, countries, selCountries: country } = board
   // 年度排行一年有六百部左右、全選是好幾千部：先顯示 100 列，滑到底自動接著載入（不用按）。換了排法、年份或搜尋字就從頭開始
   const paged = board.paged
@@ -1057,6 +1058,7 @@ function BoxOfficeSections({ movies, query }: { movies: TwMovie[]; query: string
     {board.rates.length > 1 ? <Picker title={"評分來源"} value={board.rate} onChanged={(v: string) => setRate(v)}>
       {board.rates.map((x) => <Text key={x.id} tag={x.id}>{x.label}</Text>)}
     </Picker> : null}
+    {board.fewOption ? <Toggle title={"評分人數少的片排在後面"} value={board.fewLast} onChanged={setFewLast} /> : null}
     {board.weeks.length > 1 ? <Picker title={"週次"} value={board.selWeek} onChanged={(v: string) => setPickedWeek(b && v === b.end ? "" : v)}>
       {board.weeks.map((o) => <Text key={o.id} tag={o.id}>{`${o.label}（${o.note}）`}</Text>)}
     </Picker> : null}
