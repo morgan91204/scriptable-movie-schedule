@@ -228,7 +228,7 @@ export function Item(props: {
       ) : null}
       {props.icon ? <span class="ico">{props.icon}</span> : null}
       <div class="body">
-        <div class="title">{esc(props.title)}{props.tag && !props.kv ? <span class={"pill " + props.tag.tone}>{esc(props.tag.text)}</span> : null}</div>
+        <div class={props.tag && !props.kv ? "title tagged" : "title"}>{esc(props.title)}{props.tag && !props.kv ? <span class={"pill " + props.tag.tone}>{esc(props.tag.text)}</span> : null}</div>
         {/* 多行說明（用換行分開）：每行各自一行、太長就截斷，第二行起淡一階 */}
         {props.subtitle ? (props.subtitle.includes("\n") ? props.subtitle.split("\n").map((l, i) => <div class={"sub one" + (i ? " dim" : "")}>{esc(l)}</div>) : <div class="sub">{esc(props.subtitle)}</div>) : null}
       </div>

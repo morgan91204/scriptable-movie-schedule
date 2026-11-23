@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.24-0155
+// @movie-schedule-app 電影行程 v2026.11.24-0157
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/parsers.gen.ts
@@ -3314,7 +3314,7 @@ function Section(props) {
 function Item(props) {
   const cls = ["item", props.head ? "head" : "", props.kv ? "kv" : "", props.onTap ? "tap" : "", props.muted ? "muted" : "", props.accent ? "accent" : "", props.onLongPress ? "long" : ""].join(" ");
   const fallback = "if(this.dataset.url&&this.src!==this.dataset.url){this.src=this.dataset.url}else{this.remove()}";
-  return /* @__PURE__ */ h("div", { class: cls, onTap: props.onTap, onLongPress: props.onLongPress }, props.rank ? /* @__PURE__ */ h("span", { class: "rank" + (props.rank <= 3 ? " top" : "") + (props.rank >= 1e3 ? " d4" : props.rank >= 100 ? " d3" : "") }, props.rank) : null, props.thumb ? props.thumb.pending && !props.thumb.src ? /* @__PURE__ */ h("span", { class: "thumb none" }) : /* @__PURE__ */ h(GenPoster, { cls: "thumb", title: props.title }, props.thumb.src ? /* @__PURE__ */ h("img", { src: props.thumb.src, "data-url": props.thumb.url && props.thumb.url !== props.thumb.src ? props.thumb.url : void 0, alt: "", loading: "lazy", onerror: fallback }) : null) : null, props.icon ? /* @__PURE__ */ h("span", { class: "ico" }, props.icon) : null, /* @__PURE__ */ h("div", { class: "body" }, /* @__PURE__ */ h("div", { class: "title" }, esc(props.title), props.tag && !props.kv ? /* @__PURE__ */ h("span", { class: "pill " + props.tag.tone }, esc(props.tag.text)) : null), props.subtitle ? props.subtitle.includes("\n") ? props.subtitle.split("\n").map((l, i) => /* @__PURE__ */ h("div", { class: "sub one" + (i ? " dim" : "") }, esc(l))) : /* @__PURE__ */ h("div", { class: "sub" }, esc(props.subtitle)) : null), props.badge ? /* @__PURE__ */ h("span", { class: "badge" }, esc(props.badge)) : null, props.right ? /* @__PURE__ */ h("span", { class: "right" }, esc(props.right)) : null, props.tag && props.kv ? /* @__PURE__ */ h("span", { class: "right" }, /* @__PURE__ */ h("span", { class: "pill " + props.tag.tone }, esc(props.tag.text))) : null, props.hi ? /* @__PURE__ */ h("span", { class: `hi ${props.hi.kind} ${props.hi.tier}` }, /* @__PURE__ */ h("span", { class: "hv" }, props.hi.kind === "imdb" ? /* @__PURE__ */ h("i", { class: "imdb" }, "IMDb") : props.hi.kind === "tomato" ? /* @__PURE__ */ h("i", { class: "emo" }, props.hi.tier === "bad" ? "🤢" : "🍅") : props.hi.kind === "popcorn" ? /* @__PURE__ */ h("i", { class: "emo" }, props.hi.tier === "bad" ? "🫗" : "🍿") : props.hi.kind === "community" ? /* @__PURE__ */ h("i", { class: "emo star" }, "★") : null, /* @__PURE__ */ h("b", null, esc(props.hi.text))), props.hi.note ? /* @__PURE__ */ h("small", null, esc(props.hi.note)) : null) : null, props.onTap && props.chevron !== false && !props.action ? /* @__PURE__ */ h("span", { class: "chev" }, "›") : null, props.action ? /* @__PURE__ */ h("button", { class: "act", "aria-label": props.action.hint || props.action.label, onTap: props.action.onTap }, esc(props.action.label)) : null);
+  return /* @__PURE__ */ h("div", { class: cls, onTap: props.onTap, onLongPress: props.onLongPress }, props.rank ? /* @__PURE__ */ h("span", { class: "rank" + (props.rank <= 3 ? " top" : "") + (props.rank >= 1e3 ? " d4" : props.rank >= 100 ? " d3" : "") }, props.rank) : null, props.thumb ? props.thumb.pending && !props.thumb.src ? /* @__PURE__ */ h("span", { class: "thumb none" }) : /* @__PURE__ */ h(GenPoster, { cls: "thumb", title: props.title }, props.thumb.src ? /* @__PURE__ */ h("img", { src: props.thumb.src, "data-url": props.thumb.url && props.thumb.url !== props.thumb.src ? props.thumb.url : void 0, alt: "", loading: "lazy", onerror: fallback }) : null) : null, props.icon ? /* @__PURE__ */ h("span", { class: "ico" }, props.icon) : null, /* @__PURE__ */ h("div", { class: "body" }, /* @__PURE__ */ h("div", { class: props.tag && !props.kv ? "title tagged" : "title" }, esc(props.title), props.tag && !props.kv ? /* @__PURE__ */ h("span", { class: "pill " + props.tag.tone }, esc(props.tag.text)) : null), props.subtitle ? props.subtitle.includes("\n") ? props.subtitle.split("\n").map((l, i) => /* @__PURE__ */ h("div", { class: "sub one" + (i ? " dim" : "") }, esc(l))) : /* @__PURE__ */ h("div", { class: "sub" }, esc(props.subtitle)) : null), props.badge ? /* @__PURE__ */ h("span", { class: "badge" }, esc(props.badge)) : null, props.right ? /* @__PURE__ */ h("span", { class: "right" }, esc(props.right)) : null, props.tag && props.kv ? /* @__PURE__ */ h("span", { class: "right" }, /* @__PURE__ */ h("span", { class: "pill " + props.tag.tone }, esc(props.tag.text))) : null, props.hi ? /* @__PURE__ */ h("span", { class: `hi ${props.hi.kind} ${props.hi.tier}` }, /* @__PURE__ */ h("span", { class: "hv" }, props.hi.kind === "imdb" ? /* @__PURE__ */ h("i", { class: "imdb" }, "IMDb") : props.hi.kind === "tomato" ? /* @__PURE__ */ h("i", { class: "emo" }, props.hi.tier === "bad" ? "🤢" : "🍅") : props.hi.kind === "popcorn" ? /* @__PURE__ */ h("i", { class: "emo" }, props.hi.tier === "bad" ? "🫗" : "🍿") : props.hi.kind === "community" ? /* @__PURE__ */ h("i", { class: "emo star" }, "★") : null, /* @__PURE__ */ h("b", null, esc(props.hi.text))), props.hi.note ? /* @__PURE__ */ h("small", null, esc(props.hi.note)) : null) : null, props.onTap && props.chevron !== false && !props.action ? /* @__PURE__ */ h("span", { class: "chev" }, "›") : null, props.action ? /* @__PURE__ */ h("button", { class: "act", "aria-label": props.action.hint || props.action.label, onTap: props.action.onTap }, esc(props.action.label)) : null);
 }
 function Chips(props) {
   return /* @__PURE__ */ h("div", { class: props.tabs ? "chips tabs" : props.scroll ? "chips scroll" : "chips" }, props.children);
@@ -3437,6 +3437,7 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .item.kv .right{flex:1 1 auto;max-width:none;min-width:0;white-space:nowrap;overflow:hidden}
 .item .badge{flex:none;font-size:12px;padding:2px 8px;border-radius:999px;background:var(--chip);color:var(--chip-fg)}
 .item .chev{color:var(--fg2);opacity:.55;font-size:22px;line-height:1;flex:none}
+.item .title.tagged{display:block;overflow:visible;-webkit-line-clamp:unset;text-overflow:clip}
 .item.muted .title,.item.muted .sub{color:var(--fg2)}
 .item.accent .title{color:var(--accent)}
 .chips{display:flex;flex-wrap:wrap;gap:8px;padding:12px 14px}
@@ -3974,14 +3975,14 @@ var App = class {
   }
   /** 最新版本是多少。網頁版問的是自己網站現在上線的版本（重新整理就會拿到的那一版），不是 GitHub 上的 */
   checkVersion() {
-    if (true) return checkLatest("2026.11.24-0155");
+    if (true) return checkLatest("2026.11.24-0157");
     return (async () => {
       try {
         const r = await globalThis.fetch("/api/version?t=" + Date.now(), { cache: "no-store" });
         const latest = String((await r.json()).version || "");
         if (!latest) return null;
         const num = (v) => Number(v.replace(/\D/g, "")) || 0;
-        return { latest, isLatest: num("2026.11.24-0155") >= num(latest) };
+        return { latest, isLatest: num("2026.11.24-0157") >= num(latest) };
       } catch (_) {
         return null;
       }
@@ -4164,11 +4165,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.24-0155"}`);
+          Pasteboard.copy(`版本 ${"2026.11.24-0157"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.24-0155"}`,
+      `版本 ${"2026.11.24-0157"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -4508,7 +4509,7 @@ var App = class {
     if (false) {
       if (!r) return /* @__PURE__ */ h(Note, { text: "（無法確認是否為最新版：連不到網站）" });
       if (r.isLatest) return /* @__PURE__ */ h(Note, { text: "✅ 已是最新版" });
-      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.24-0155"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
+      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.24-0157"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
         globalThis.location.reload();
       } }));
     }

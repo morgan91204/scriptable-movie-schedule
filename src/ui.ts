@@ -85,6 +85,7 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .item.kv .right{flex:1 1 auto;max-width:none;min-width:0;white-space:nowrap;overflow:hidden}
 .item .badge{flex:none;font-size:12px;padding:2px 8px;border-radius:999px;background:var(--chip);color:var(--chip-fg)}
 .item .chev{color:var(--fg2);opacity:.55;font-size:22px;line-height:1;flex:none}
+.item .title.tagged{display:block;overflow:visible;-webkit-line-clamp:unset;text-overflow:clip}
 .item.muted .title,.item.muted .sub{color:var(--fg2)}
 .item.accent .title{color:var(--accent)}
 .chips{display:flex;flex-wrap:wrap;gap:8px;padding:12px 14px}
