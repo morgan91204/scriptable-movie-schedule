@@ -485,40 +485,31 @@ class App {
   }
 
   // ── 依縣市找影院 ──
+  // 搜尋欄直接放在這一頁最上面：有打字就即時顯示符合的影城（不另開一頁），清空就回到縣市清單
+  query = "";
   citiesView(): string {
     const cities = Array.from(new Set(this.cinemas.map((c) => c.city))).sort(
       (a, b) => (CITY_ORDER.indexOf(a) + 1 || 99) - (CITY_ORDER.indexOf(b) + 1 || 99)
     );
-    return (
-      <Page title="依縣市找影院" subtitle={`全台 ${this.cinemas.length} 間`} onBack={() => this.back()}>
-        <Section>
-          <Item icon="🔍" title="搜尋影城" subtitle="影城、分店、行政區或縣市" onTap={() => this.go(() => this.searchView())} />
-        </Section>
-        <Section title="縣市" hint="影城清單來自場次通與開眼電影網，會自動更新。">
-          {cities.map((city) => (
-            <Item title={city} badge={`${this.cinemas.filter((c) => c.city === city).length} 間`} onTap={() => this.go(() => this.cityView(city))} />
-          ))}
-        </Section>
-      </Page>
-    );
-  }
-
-  // ── 搜尋 ──
-  query = "";
-  searchView(): string {
     const k = this.query.trim().toLowerCase().replace(/臺/g, "台");
     const hits = k
       ? this.cinemas.filter((c) => `${c.name} ${c.city} ${c.district} ${c.id} ${c.aliases || ""}`.toLowerCase().replace(/臺/g, "台").includes(k))
       : [];
     return (
-      <Page title="搜尋影城" onBack={() => this.back()}>
-        <Search value={this.query} placeholder="搜尋影城，例如：松仁、西門、in89、台南" autofocus onInput={(t) => { this.query = t; }} />
+      <Page title="依縣市找影院" subtitle={k ? `符合「${this.query.trim()}」的 ${hits.length} 間` : `全台 ${this.cinemas.length} 間`} onBack={() => this.back()}>
+        <Search value={this.query} placeholder="搜尋影城，例如：松仁、西門、in89、台南" onInput={(t) => { this.query = t; }} />
         {k ? (
           <Section title={`結果 ${hits.length} 間`}>
             {hits.length ? null : <Note text="找不到相符的影城，換個關鍵字試試。" />}
             {hits.map((c) => this.cinemaItem(c))}
           </Section>
-        ) : null}
+        ) : (
+          <Section title="縣市" hint="影城清單來自場次通與開眼電影網，會自動更新。">
+            {cities.map((city) => (
+              <Item title={city} badge={`${this.cinemas.filter((c) => c.city === city).length} 間`} onTap={() => this.go(() => this.cityView(city))} />
+            ))}
+          </Section>
+        )}
       </Page>
     );
   }
