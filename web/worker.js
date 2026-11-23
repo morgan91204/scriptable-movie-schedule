@@ -22,7 +22,7 @@ import MANIFEST from "./public/manifest.webmanifest";
 import ICON_180 from "./public/icon-180.png";
 import ICON_192 from "./public/icon-192.png";
 import ICON_512 from "./public/icon-512.png";
-// 收藏電影的通知：背景接收程式（sw.js）與推送（push.js）
+// 收藏電影通知：背景接收程式（sw.js）與推送（push.js）
 import SW_JS from "./public/sw.js.txt";
 import { handlePush, runPush, PushHub } from "./push.js";
 export { PushHub };
@@ -54,7 +54,7 @@ export default {
     if (f) return new Response(f[0], { headers: { "content-type": f[1], "cache-control": f[2] } });
     return new Response("找不到這個頁面", { status: 404, headers: { "content-type": "text/plain; charset=utf-8" } });
   },
-  // 每小時一次：檢查收藏的電影有沒有新動態，有就推通知（見 push.js）
+  // 每小時一次：檢查收藏電影有沒有新動態，有就推通知（見 push.js）
   async scheduled(event, env, ctx) {
     ctx.waitUntil(runPush(env).catch(() => null));
   },

@@ -207,7 +207,7 @@ autoUpdate();
 document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") autoUpdate(); });
 window.addEventListener("pageshow", (e) => { if ((e as PageTransitionEvent).persisted) autoUpdate(); });
 
-// ── 收藏電影的通知（Web Push）──
+// ── 收藏電影通知（Web Push）──
 // 狀態：unsupported 這個瀏覽器不支援／needs-install iPhone 要先加到主畫面／denied 使用者在系統設定擋掉了／off 還沒開／on 已開
 const pushOK = () => "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
 const isIOS = () => /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);

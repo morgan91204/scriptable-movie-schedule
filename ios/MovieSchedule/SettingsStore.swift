@@ -3,7 +3,7 @@ import SwiftUI
 import CoreLocation
 import UIKit
 
-/// 使用者設定：收藏的影城、地圖、TMDB 金鑰。存在手機上，並同步給資料層（補片長、查預告會用到金鑰）
+/// 使用者設定：收藏影城、地圖、TMDB 金鑰。存在手機上，並同步給資料層（補片長、查預告會用到金鑰）
 @MainActor
 final class SettingsStore: ObservableObject {
     static let shared = SettingsStore()

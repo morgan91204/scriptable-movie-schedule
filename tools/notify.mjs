@@ -1,8 +1,8 @@
-// 通知用的精簡資料：收藏電影的通知（web/push.js）每小時要判斷「開放場次了、上映了、快下檔了、影展開始了」，
+// 通知用的精簡資料：收藏電影通知（web/push.js）每小時要判斷「開放場次了、上映了、快下檔了、影展開始了」，
 // 這裡把判斷需要的東西整理成一個小檔（data 分支的 notify.json），Worker 不用自己去讀影城網站。
 //   movies：片名鍵 → { s: 1 = 今天有場次（已上映）／0 = 還沒上映但已經排了場次, c: 今天放映的影城數, p: 看過最多的影城數, t: 片名 }
 //   fests：影展代碼 → { name, start, end }
-//   cs／cc：影城代碼與所在縣市；每部片的 i 是「今天有場次的影城」在 cs 裡的編號（給「只算某些縣市／收藏的影城」用）
+//   cs／cc：影城代碼與所在縣市；每部片的 i 是「今天有場次的影城」在 cs 裡的編號（給「只算某些縣市／收藏影城」用）
 // 用法：node tools/notify.mjs <上一份 notify.json> <這次的 festival.json> <輸出檔> [這次的 tw-near.json] [這次的 official.json]
 import fs from "node:fs";
 import { buildSync } from "esbuild";

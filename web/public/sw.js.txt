@@ -1,4 +1,4 @@
-// 電影行程的背景程式：只做一件事，接收「收藏電影的通知」並顯示出來；點通知就打開（或切回）電影行程。
+// 電影行程的背景程式：只做一件事，接收「收藏電影通知」並顯示出來；點通知就打開（或切回）電影行程。
 // 不快取網頁、不攔截連線，所以不會影響網站更新。
 self.addEventListener("install", () => self.skipWaiting());
 self.addEventListener("activate", (e) => e.waitUntil(self.clients.claim()));

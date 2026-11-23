@@ -796,7 +796,7 @@ function parseTwMovieDay(doc) {
   function notifyEndScope(p) {
     const { fav, cities: cs } = notifyEndPick(p);
     const ct = cs.length > 3 ? `${cs.slice(0, 2).join("、")}等 ${cs.length} 個縣市` : cs.join("、");
-    return [fav ? "收藏的影城" : "", ct].filter(Boolean).join("＋") || "全台";
+    return [fav ? "收藏影城" : "", ct].filter(Boolean).join("＋") || "全台";
   }
   function notifyPayload(s) {
     const p = notifyPrefs(s);
@@ -3653,7 +3653,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   var extra = { boxOffice, filmList, soonList, nowShowing, nowShowingMulti, movieBoard: movieBoard2, festivalBoard, festivalFilm, nearby, patchSettings, fillMovie, formatList };
   var BRIDGE_LEVEL = 2;
   globalThis.MS = {
-    version: "2026.11.24-0239",
+    version: "2026.11.24-0242",
     level: BRIDGE_LEVEL,
     init(saved) {
       cache = saved || {};

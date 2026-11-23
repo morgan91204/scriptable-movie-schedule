@@ -1,4 +1,4 @@
-// 收藏電影的通知（Web Push）：使用者在設定開啟後，瀏覽器會給一組「推送位址」，連同他開啟通知的那幾部片存在這裡；
+// 收藏電影通知（Web Push）：使用者在設定開啟後，瀏覽器會給一組「推送位址」，連同他開啟通知的那幾部片存在這裡；
 // 每小時檢查一次（見 worker.js 的 scheduled），條件成立就推一則通知：
 //   open  開放場次了：片單上出現這部片（之前沒有）
 //   rel   上映了：這部片開始有「今天」的場次
@@ -68,7 +68,7 @@ const idOf = async (endpoint) => b64u(await crypto.subtle.digest("SHA-256", enc.
 const todayTPE = () => new Date(Date.now() + 8 * 3600e3).toISOString().slice(0, 10);
 const hourTPE = () => new Date(Date.now() + 8 * 3600e3).getUTCHours();
 
-/** 「快下檔」的設定：剩下幾間以下（max）、算哪些影城（scope：all 全台／city 指定的縣市，可以好幾個／fav 收藏的影城／mix 縣市加上收藏的影城，兩邊合起來算） */
+/** 「快下檔」的設定：剩下幾間以下（max）、算哪些影城（scope：all 全台／city 指定的縣市，可以好幾個／fav 收藏影城／mix 縣市加上收藏影城，兩邊合起來算） */
 function endConfig(raw) {
   const max = Math.min(30, Math.max(1, Math.round(Number(raw && raw.max) || 3)));
   const scope = raw && (raw.scope === "city" || raw.scope === "fav" || raw.scope === "mix") ? raw.scope : "all";
@@ -81,7 +81,7 @@ function countIn(m, cfg, data) {
   if (!m || m.s !== 1) return null;
   if (cfg.scope === "all") return m.c;
   if (!Array.isArray(m.i) || !Array.isArray(data.cs)) return null;
-  return m.i.filter((x) => cfg.cities.indexOf((data.cc || [])[x]) >= 0 || cfg.cinemas.indexOf(data.cs[x]) >= 0).length; // 縣市和收藏的影城合起來算（同一間不重複）
+  return m.i.filter((x) => cfg.cities.indexOf((data.cc || [])[x]) >= 0 || cfg.cinemas.indexOf(data.cs[x]) >= 0).length; // 縣市和收藏影城合起來算（同一間不重複）
 }
 /** 現在這部片的各種條件成不成立（data = notify.json；mark = 這部片的紀錄，hi 是看過最多的影城數）。
  *  快下檔：在選的範圍裡，放映的影城曾經比門檻多、現在降到門檻以下（一開始就很少的片不會通知） */
@@ -132,7 +132,7 @@ export class PushHub {
     if (path === "/test") {
       const sub = await this.state.storage.get(id);
       if (!sub) return json({ error: "not subscribed" }, 404);
-      const status = await send(sub, { title: "電影行程的通知設定好了", body: "收藏的電影有新動態時，會像這樣通知你。", tag: "test", url: "/" }, this.env).catch(() => 0);
+      const status = await send(sub, { title: "電影行程的通知設定好了", body: "收藏電影有新動態時，會像這樣通知你。", tag: "test", url: "/" }, this.env).catch(() => 0);
       if (status === 404 || status === 410) await this.state.storage.delete(id);
       return json({ ok: status >= 200 && status < 300, status });
     }

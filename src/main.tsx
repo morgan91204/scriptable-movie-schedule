@@ -197,8 +197,9 @@ class App {
     if (!this.cinemas.length) this.cinemas = await loadCinemas();
     this.calendarName = (await currentCalendar(this.settings)).title;
     const favs = this.settings.favorites.map((id) => this.cinemas.find((c) => c.id === id)).filter(Boolean) as Cinema[];
-    // 收藏的電影：收合時只顯示有幾部（不用讀資料）；展開才查每部片現在的狀態
+    // 收藏電影：收合時只顯示有幾部（不用讀資料）；展開才查每部片現在的狀態
     const favMovies = this.settings.favMovies || [];
+    const favIssuers = this.settings.favIssuers || [];
     const favRows = this.favMovOpen && favMovies.length ? await favMovieRows(this.settings).catch(() => [] as FavRow[]) : [];
     const openFav = (r: FavRow) => {
       const t = r.target;
@@ -219,16 +220,28 @@ class App {
         {favs.length ? (
           <Section hint={this.favOpen ? "在影城頁可以收藏或取消收藏影城。" : ""}>
             {/* 預設收合，只留這一列；點一下展開清單 */}
-            <Item head icon="★" title={`收藏的影城（${favs.length} 間）`} subtitle={this.favOpen ? "點一下收合" : "點一下展開"} chevron={false} onTap={() => { this.favOpen = !this.favOpen; }} action={{ label: this.favOpen ? "▾" : "▸", hint: this.favOpen ? "收合收藏的影城" : "展開收藏的影城", onTap: () => { this.favOpen = !this.favOpen; } }} />
+            <Item head icon="★" title={`收藏影城（${favs.length} 間）`} subtitle={this.favOpen ? "點一下收合" : "點一下展開"} chevron={false} onTap={() => { this.favOpen = !this.favOpen; }} action={{ label: this.favOpen ? "▾" : "▸", hint: this.favOpen ? "收合收藏影城" : "展開收藏影城", onTap: () => { this.favOpen = !this.favOpen; } }} />
             {(this.favOpen ? favs : []).map((c) => (
               <Item icon="★" title={c.name} subtitle={`${c.city} ${c.district}`} onTap={() => this.go(() => this.cinemaView(c), `讀取 ${c.name} 的場次…`)} />
             ))}
           </Section>
         ) : null}
+        {favIssuers.length ? (
+          <Section hint={this.favIssOpen ? "點發行商看它歷年發行的片（新的在前）。要增減收藏：到「歷年電影」的發行商選單點星號。" : ""}>
+            <Item head icon="★" title={`收藏發行商（${favIssuers.length} 家）`} subtitle={this.favIssOpen ? "點一下收合" : "點一下展開"} chevron={false} onTap={() => { this.favIssOpen = !this.favIssOpen; }} />
+            {this.favIssOpen ? favIssuers.map((id) => (
+              <Item icon="🏢" title={id} onTap={() => {
+                // 歷年電影、所有年份、只看這一家，新的在前
+                this.movieMode = "year"; this.boxYears = Array.from({ length: new Date().getFullYear() - 2014 }, (_, i) => String(2016 + i)); this.boxIssuer = [id]; this.boxCountry = []; this.movieQuery = ""; this.sortBy.year = "date"; this.ascBy.year = false;
+                this.go(() => this.movieListView(), `讀取${id}發行的片…`);
+              }} />
+            )) : null}
+          </Section>
+        ) : null}
         {favMovies.length ? (
           <Section hint={this.favMovOpen ? "在電影頁的預告按鈕旁邊點愛心加入，再點一次取消。下檔的片也會留在這裡。" : ""}>
             {/* 預設收合，只留這一列；點一下展開清單 */}
-            <Item head icon="♥" title={`收藏的電影（${favMovies.length} 部）`} subtitle={this.favMovOpen ? "點一下收合" : "點一下展開"} chevron={false} onTap={() => { this.favMovOpen = !this.favMovOpen; }} action={{ label: this.favMovOpen ? "▾" : "▸", hint: this.favMovOpen ? "收合收藏的電影" : "展開收藏的電影", onTap: () => { this.favMovOpen = !this.favMovOpen; } }} />
+            <Item head icon="♥" title={`收藏電影（${favMovies.length} 部）`} subtitle={this.favMovOpen ? "點一下收合" : "點一下展開"} chevron={false} onTap={() => { this.favMovOpen = !this.favMovOpen; }} action={{ label: this.favMovOpen ? "▾" : "▸", hint: this.favMovOpen ? "收合收藏電影" : "展開收藏電影", onTap: () => { this.favMovOpen = !this.favMovOpen; } }} />
             {favRows.map((r) => (
               <Item thumb={{ src: r.fav.poster ? posterSrc(r.fav.poster) : "", url: r.fav.poster }} title={r.fav.title} subtitle={r.line} onTap={() => openFav(r)} />
             ))}
@@ -249,7 +262,7 @@ class App {
     const p = this.push();
     if (p) p.sync(notifyPayload(this.settings)).catch(() => null);
   }
-  /** 設定頁的「收藏電影的通知」：依裝置的狀況顯示開啟按鈕、各種通知的開關，或說明為什麼不能用 */
+  /** 設定頁的「收藏電影通知」：依裝置的狀況顯示開啟按鈕、各種通知的開關，或說明為什麼不能用 */
   /** 設定頁的一列：點進去才是完整的通知設定 */
   async notifyLink(): Promise<string> {
     const p = this.push();
@@ -260,13 +273,13 @@ class App {
     const note = state === "on" ? (on.length ? on.join("、") : "四種通知都關著") : state === "needs-install" ? "要先把電影行程加到主畫面" : state === "unsupported" ? "這個瀏覽器不支援" : state === "denied" ? "系統設定裡沒有允許通知" : "開放場次、上映、快下檔、影展開始時通知你";
     return (
       <Section title="通知">
-        <Item icon={state === "on" ? "🔔" : "🔕"} title="收藏電影的通知" subtitle={note} right={state === "on" ? "已開啟" : "未開啟"} onTap={() => this.go(() => this.notifyView())} />
+        <Item icon={state === "on" ? "🔔" : "🔕"} title="收藏電影通知" subtitle={note} right={state === "on" ? "已開啟" : "未開啟"} onTap={() => this.go(() => this.notifyView())} />
       </Section>
     );
   }
   async notifyView(): Promise<string> {
     return (
-      <Page title="收藏電影的通知" onBack={() => this.back()}>
+      <Page title="收藏電影通知" onBack={() => this.back()}>
         {await this.notifySection()}
       </Page>
     );
@@ -279,26 +292,26 @@ class App {
     const n = (this.settings.favMovies || []).length;
     if (state === "needs-install")
       return (
-        <Section title="收藏電影的通知" hint="iPhone 和 iPad 要先把電影行程加到主畫面，從主畫面的圖示開啟後，才能開啟通知（這是 iOS 的規定）。">
-          <Item icon="🔔" title="先加到主畫面" subtitle="收藏的電影開放場次、上映、快下檔時通知你" onTap={() => this.go(() => this.installView())} />
+        <Section title="收藏電影通知" hint="iPhone 和 iPad 要先把電影行程加到主畫面，從主畫面的圖示開啟後，才能開啟通知（這是 iOS 的規定）。">
+          <Item icon="🔔" title="先加到主畫面" subtitle="收藏電影開放場次、上映、快下檔時通知你" onTap={() => this.go(() => this.installView())} />
         </Section>
       );
     if (state === "unsupported")
       return (
-        <Section title="收藏電影的通知">
+        <Section title="收藏電影通知">
           <Item icon="🔕" title="這個瀏覽器不支援通知" subtitle="可以改用 Safari（iPhone 要加到主畫面）、Chrome 或 Edge" chevron={false} />
         </Section>
       );
     if (state === "denied")
       return (
-        <Section title="收藏電影的通知" hint="到手機或瀏覽器的設定，把電影行程的「通知」改成允許，再回來這裡開啟。">
+        <Section title="收藏電影通知" hint="到手機或瀏覽器的設定，把電影行程的「通知」改成允許，再回來這裡開啟。">
           <Item icon="🔕" title="通知被關掉了" subtitle="系統設定裡沒有允許電影行程發通知" chevron={false} />
         </Section>
       );
     if (state !== "on")
       return (
-        <Section title="收藏電影的通知" hint="開啟後，你收藏的片名會存在我們的伺服器上，用來判斷什麼時候通知你；不需要帳號，也不會記錄你是誰。隨時可以關閉，關閉時伺服器上的資料會一起刪掉。">
-          <Item icon="🔔" title="收藏的電影有動態時通知我" subtitle={n ? `目前收藏了 ${n} 部：開放場次、上映、快下檔、影展開始時通知` : "開放場次、上映、快下檔、影展開始時通知。先開著，之後收藏的片都會算進去"} chevron={false} />
+        <Section title="收藏電影通知" hint="開啟後，你收藏的片名會存在我們的伺服器上，用來判斷什麼時候通知你；不需要帳號，也不會記錄你是誰。隨時可以關閉，關閉時伺服器上的資料會一起刪掉。">
+          <Item icon="🔔" title="收藏電影有動態時通知我" subtitle={n ? `目前收藏了 ${n} 部：開放場次、上映、快下檔、影展開始時通知` : "開放場次、上映、快下檔、影展開始時通知。先開著，之後收藏的片都會算進去"} chevron={false} />
           <button class="btn primary" data-perm="notify" onTap={async () => {
             try {
               const st = await p.enable(notifyPayload(this.settings));
@@ -309,7 +322,7 @@ class App {
       );
     const set = (patch: Partial<NotifyPrefs>) => { this.settings.notify = { ...prefs, ...patch }; saveSettings(this.settings); this.pushSync(); };
     const toggle = (id: "open" | "rel" | "end" | "fest") => set({ [id]: !prefs[id] });
-    // 快下檔的細項：剩下幾間以下、算哪些影城（全台／指定縣市，可複選／收藏的影城）
+    // 快下檔的細項：剩下幾間以下、算哪些影城（全台／指定縣市，可複選／收藏影城）
     const max = prefs.endMax || 3;
     const pick = notifyEndPick(prefs);
     const picked = pick.cities;
@@ -323,7 +336,7 @@ class App {
           {NOTIFY_KINDS.map((k) => <Item icon={prefs[k.id] ? "✅" : "⬜️"} title={k.label} subtitle={k.id === "end" ? endNote : k.note} chevron={false} onTap={() => toggle(k.id)} />)}
         </Section>
         {prefs.end ? (
-          <Section title="快下檔的條件" hint={this.notifyOpen ? "收藏的影城和縣市可以一起選、縣市可以選好幾個，合起來算；可以左右滑動" : ""}>
+          <Section title="快下檔的條件" hint={this.notifyOpen ? "收藏影城和縣市可以一起選、縣市可以選好幾個，合起來算；可以左右滑動" : ""}>
             <Item kv title="剩下幾間以下" right={`${max} 間以下 ✎`} chevron={false} onTap={async () => {
               // 通知只有網頁版有：直接用瀏覽器的輸入框填數字
               const ask = (globalThis as any).prompt;
@@ -337,7 +350,7 @@ class App {
             {this.notifyOpen ? (
               <Chips scroll>
             <Chip label="全台" muted={pick.fav || picked.length > 0} onTap={() => pickSet(false, [])} />
-                <Chip label="收藏的影城" sub={`${this.settings.favorites.length} 間`} muted={!pick.fav} onTap={() => pickSet(!pick.fav, picked)} />
+                <Chip label="收藏影城" sub={`${this.settings.favorites.length} 間`} muted={!pick.fav} onTap={() => pickSet(!pick.fav, picked)} />
                 {cities.map((c) => <Chip label={c} muted={picked.indexOf(c) < 0} onTap={() => pickSet(pick.fav, picked.indexOf(c) < 0 ? [...picked, c] : picked.filter((z) => z !== c))} />)}
               </Chips>
             ) : null}
@@ -487,7 +500,7 @@ class App {
     if (i >= 0) f.splice(i, 1);
     else f.push(c.id);
     saveSettings(this.settings);
-    this.pushSync(); // 「快下檔」的範圍選收藏的影城時，名單要跟著更新
+    this.pushSync(); // 「快下檔」的範圍選收藏影城時，名單要跟著更新
   }
 
   // ── 影城：選日期 ──
@@ -670,9 +683,9 @@ class App {
     if (x) return this.boxMovieView(x);
     const e = await this.extras(fav.title, undefined, fav.en);
     return (
-      <Page title={fav.title} subtitle="收藏的電影" onBack={() => this.back()}>
+      <Page title={fav.title} subtitle="收藏電影" onBack={() => this.back()}>
         {this.hero(e, fav.title, [fav.en || "", fav.fest ? `收藏自${fav.fest.name}` : ""].filter(Boolean), { en: fav.en, poster: fav.poster, fest: fav.fest })}
-        <Note text="目前查不到這部片的場次，可能已經下檔，或還沒排片。之後有場次時，從首頁「收藏的電影」點進來就會直接到場次頁。" />
+        <Note text="目前查不到這部片的場次，可能已經下檔，或還沒排片。之後有場次時，從首頁「收藏電影」點進來就會直接到場次頁。" />
       </Page>
     );
   }
@@ -856,7 +869,7 @@ class App {
             { icon: "check", title: "點右上角的「加入」", text: "名稱可以維持「電影行程」。" },
             { icon: "home", title: "從主畫面開啟", text: "主畫面會多一個「電影行程」圖示，開起來沒有網址列，像一般的 App。" },
           ]} />
-          <Note text="要用 Safari 才能加到主畫面。收藏的影城等設定存在瀏覽器裡：從主畫面開啟的版本是另一份，設定要重新設一次。" />
+          <Note text="要用 Safari 才能加到主畫面。收藏影城等設定存在瀏覽器裡：從主畫面開啟的版本是另一份，設定要重新設一次。" />
         </>
       );
     } else if (ios) {
@@ -1210,16 +1223,21 @@ class App {
     const set = (next: string[]) => { if (isC) this.boxCountry = next; else this.boxIssuer = next; };
     const k = this.pickQuery.trim().toLowerCase();
     // 已經選的排最前面，其餘照部數多到少
-    const list = all.filter((c) => !k || c.id.toLowerCase().includes(k)).sort((a, b) => Number(sel.indexOf(b.id) >= 0) - Number(sel.indexOf(a.id) >= 0) || b.count - a.count);
+    const favI = this.settings.favIssuers || [];
+    const isFav = (id: string) => !isC && favI.indexOf(id) >= 0;
+    const toggleFavI = (id: string) => { this.settings.favIssuers = isFav(id) ? favI.filter((z) => z !== id) : [...favI, id]; saveSettings(this.settings); };
+    const list = all.filter((c) => !k || c.id.toLowerCase().includes(k)).sort((a, b) => Number(sel.indexOf(b.id) >= 0) - Number(sel.indexOf(a.id) >= 0) || Number(isFav(b.id)) - Number(isFav(a.id)) || b.count - a.count);
+    const favHere = all.filter((c) => isFav(c.id)).map((c) => c.id);
     const name = isC ? "出品國別" : "發行商";
     return (
       <Page title={`選${name}`} subtitle={sel.length ? `已選 ${sel.length} 個｜${board.entries.length + board.rest.length} 部` : `全部（${board.everyone} 部）`} onBack={() => this.back()}>
         <Search value={this.pickQuery} placeholder={`搜尋${name}（共 ${all.length} 個）`} onInput={(t) => { this.pickQuery = t; }} />
         <Section hint={isC ? BOX_COUNTRY_NOTE : "發行商來自官方票房資料；聯合發行的片算第一家。"}>
           <Item icon={sel.length ? "⬜️" : "✅"} title="全部" subtitle={sel.length ? "點這裡清除已選的" : ""} right={`${board.everyone} 部`} chevron={false} onTap={() => set([])} />
+          {favHere.length ? <Item icon="★" title="只看收藏發行商" subtitle={favHere.join("、")} right={`${favHere.length} 家`} chevron={false} onTap={() => set(favHere)} /> : null}
         </Section>
-        <Section title={`可以選好幾個${k ? `｜符合「${this.pickQuery.trim()}」的 ${list.length} 個` : ""}`} hint="選好之後按左上角的返回。">
-          {list.map((c) => <Item icon={sel.indexOf(c.id) >= 0 ? "✅" : "⬜️"} title={c.id} right={`${c.count} 部`} chevron={false} onTap={() => set(sel.indexOf(c.id) < 0 ? [...sel, c.id] : sel.filter((z) => z !== c.id))} />)}
+        <Section title={`可以選好幾個${k ? `｜符合「${this.pickQuery.trim()}」的 ${list.length} 個` : ""}`} hint={isC ? "選好之後按左上角的返回。" : "點右邊的星號可以收藏發行商（★ 已收藏），收藏的會排在前面，首頁也會多一個「收藏發行商」。選好之後按左上角的返回。"}>
+          {list.map((c) => <Item icon={sel.indexOf(c.id) >= 0 ? "✅" : "⬜️"} title={c.id} right={`${c.count} 部`} chevron={false} onTap={() => set(sel.indexOf(c.id) < 0 ? [...sel, c.id] : sel.filter((z) => z !== c.id))} action={isC ? undefined : { label: isFav(c.id) ? "★" : "☆", hint: isFav(c.id) ? "取消收藏這家發行商" : "收藏這家發行商", onTap: () => toggleFavI(c.id) }} />)}
         </Section>
         {list.length ? null : <Empty icon="🔎" text={`找不到相符的${name}`} />}
       </Page>
@@ -1451,7 +1469,7 @@ class App {
   movieDates: string[] = []; // 空 = 來源預設的那一天（通常是今天）
   movieCities: string[] = []; // 空 = 全部
   movieFormats: string[] = []; // 空 = 全部
-  movieFavOnly = false; // 只看收藏的影城
+  movieFavOnly = false; // 只看收藏影城
   async movieView(m: TwMovie, date: string): Promise<string> {
     if (this.movieFor !== m.slug) {
       this.movieFor = m.slug;
@@ -1539,7 +1557,7 @@ class App {
         <Section title="影城">
           <Chips>
             <Chip label="所有影城" muted={this.movieFavOnly} onTap={() => { this.movieFavOnly = false; }} />
-            <Chip label={`只看收藏的影城（${this.settings.favorites.length}）`} muted={!this.movieFavOnly} onTap={() => { this.movieFavOnly = true; }} />
+            <Chip label={`只看收藏影城（${this.settings.favorites.length}）`} muted={!this.movieFavOnly} onTap={() => { this.movieFavOnly = true; }} />
           </Chips>
         </Section>
         {shownCities.map((ct) => {
@@ -1628,7 +1646,7 @@ class App {
     const cities = Array.from(new Set(this.cinemas.map((c) => c.city))).sort(
       (a, b) => (CITY_ORDER.indexOf(a) + 1 || 99) - (CITY_ORDER.indexOf(b) + 1 || 99)
     );
-    const scopes = [{ id: "all", label: `不限（全台 ${this.cinemas.length} 間）` }, { id: "fav", label: `收藏的影城（${this.settings.favorites.length}）` }, { id: "near", label: "附近 10 間" }, ...cities.map((c) => ({ id: c, label: c }))];
+    const scopes = [{ id: "all", label: `不限（全台 ${this.cinemas.length} 間）` }, { id: "fav", label: `收藏影城（${this.settings.favorites.length}）` }, { id: "near", label: "附近 10 間" }, ...cities.map((c) => ({ id: c, label: c }))];
     // 點一下加入、再點一下拿掉；min1 = 至少留一個
     const toggle = (list: string[], id: string, min1 = false) => {
       const i = list.indexOf(id);
@@ -1665,7 +1683,8 @@ class App {
     );
   }
 
-  favOpen = false; // 首頁的收藏的影城清單有沒有展開（預設收合）
+  favIssOpen = false; // 首頁的收藏發行商清單有沒有展開
+  favOpen = false; // 首頁的收藏影城清單有沒有展開（預設收合）
   favMovOpen = IS_WEB && /[?&]fav=1/.test(String((globalThis as any).location?.search || "")); // 首頁的收藏電影清單有沒有展開（預設收合；從通知點進來時直接展開）
   nowFolded: string[] = []; // 「現在有什麼可以看」結果裡收合起來的片（只留片名列）
   nowFoldFor = ""; // 上面那份收合狀態是哪一次查詢的
@@ -1697,7 +1716,7 @@ class App {
       if (src && src === u) cachePoster(u);
       return { src, url: u };
     };
-    const scopeLabel = this.nowScopes.map((sc) => (sc === "all" ? "全台影城" : sc === "fav" ? "收藏的影城" : sc === "near" ? "附近 10 間" : sc)).join("、");
+    const scopeLabel = this.nowScopes.map((sc) => (sc === "all" ? "全台影城" : sc === "fav" ? "收藏影城" : sc === "near" ? "附近 10 間" : sc)).join("、");
     const many = dates.length > 1; // 複選多天：每一場前面標日期
     // 收合：換了查詢條件就全部重新展開
     const foldKey = [dates.join(","), winIds.join(","), this.nowScopes.join(","), this.nowFormats.join(",")].join("|");

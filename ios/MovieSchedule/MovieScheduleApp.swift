@@ -14,7 +14,7 @@ struct MovieScheduleApp: App {
                 SettingsView()
                     .tabItem { Label("設定", systemImage: "gearshape") }
             }
-            .task { SettingsStore.shared.sync() } // 啟動時把收藏的影城、TMDB 金鑰交給資料層
+            .task { SettingsStore.shared.sync() } // 啟動時把收藏影城、TMDB 金鑰交給資料層
         }
     }
 }

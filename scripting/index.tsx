@@ -207,8 +207,8 @@ function Home({ cinemas }: { cinemas: CinemasLoad }) {
   const [settings] = useSettings()
   const list = cinemas.data || []
   const favs = settings.favorites.map((id) => list.find((c) => c.id === id)).filter(Boolean) as Cinema[]
-  const [favOpen, setFavOpen] = useState(false) // 收藏的影城清單有沒有展開（預設收合）
-  const [favMovOpen, setFavMovOpen] = useState(false) // 收藏的電影清單有沒有展開（預設收合；展開才查每部片現在的狀態）
+  const [favOpen, setFavOpen] = useState(false) // 收藏影城清單有沒有展開（預設收合）
+  const [favMovOpen, setFavMovOpen] = useState(false) // 收藏電影清單有沒有展開（預設收合；展開才查每部片現在的狀態）
   const favMovies = settings.favMovies || []
   const favRows = useLoad(() => (favMovOpen && favMovies.length ? favMovieRows(settings) : Promise.resolve([] as FavRow[])), [favMovOpen, favMovies.map((f) => f.key).join("|")])
 
@@ -242,7 +242,7 @@ function Home({ cinemas }: { cinemas: CinemasLoad }) {
           <Button action={() => setFavOpen(!favOpen)}>
             <HStack spacing={8}>
               <Image systemName={"star.fill"} foregroundStyle={"systemYellow"} />
-              <Text font={"headline"} foregroundStyle={"label"}>{`收藏的影城（${favs.length} 間）`}</Text>
+              <Text font={"headline"} foregroundStyle={"label"}>{`收藏影城（${favs.length} 間）`}</Text>
               <Spacer />
               <Image systemName={favOpen ? "chevron.down.circle" : "chevron.right.circle"} font={"title3"} foregroundStyle={"secondaryLabel"} />
             </HStack>
@@ -254,12 +254,12 @@ function Home({ cinemas }: { cinemas: CinemasLoad }) {
           <Button action={() => setFavMovOpen(!favMovOpen)}>
             <HStack spacing={8}>
               <Image systemName={"heart.fill"} foregroundStyle={"systemPink"} />
-              <Text font={"headline"} foregroundStyle={"label"}>{`收藏的電影（${favMovies.length} 部）`}</Text>
+              <Text font={"headline"} foregroundStyle={"label"}>{`收藏電影（${favMovies.length} 部）`}</Text>
               <Spacer />
               <Image systemName={favMovOpen ? "chevron.down.circle" : "chevron.right.circle"} font={"title3"} foregroundStyle={"secondaryLabel"} />
             </HStack>
           </Button>
-          {favMovOpen && !favRows.data ? <Loading text={"讀取收藏的電影…"} /> : null}
+          {favMovOpen && !favRows.data ? <Loading text={"讀取收藏電影…"} /> : null}
           {(favMovOpen ? favRows.data || [] : []).map((r) => <FavMovieLink key={r.fav.key} row={r} />)}
         </Section> : null}
       </>}
@@ -514,12 +514,12 @@ function FavMoviePage({ fav }: { fav: FavMovie }) {
   if (box.data && box.data.x) return <BoxOfficeMoviePage item={box.data.x} />
   return <List navigationTitle={fav.title} navigationBarTitleDisplayMode={"inline"}>
     <MovieHero title={fav.title} en={fav.en} lines={[fav.en || "", fav.fest ? `收藏自${fav.fest.name}` : ""].filter(Boolean)} poster={fav.poster} fest={fav.fest} />
-    <Section footer={<Text>目前查不到這部片的場次，可能已經下檔，或還沒排片。之後有場次時，從首頁「收藏的電影」點進來就會直接到場次頁。</Text>}>
+    <Section footer={<Text>目前查不到這部片的場次，可能已經下檔，或還沒排片。之後有場次時，從首頁「收藏電影」點進來就會直接到場次頁。</Text>}>
       <Text foregroundStyle={"secondaryLabel"}>{box.data ? "目前沒有場次" : "讀取中…"}</Text>
     </Section>
   </List>
 }
-/** 首頁「收藏的電影」的一列：依這部片現在的狀態連到對的頁面（有場次的電影頁、即將上映、影展片、票房資訊） */
+/** 首頁「收藏電影」的一列：依這部片現在的狀態連到對的頁面（有場次的電影頁、即將上映、影展片、票房資訊） */
 function FavMovieLink({ row: r }: { row: FavRow }) {
   const imgOf = useDirectImages([r.fav.poster || ""], r.fav.key)
   const t = r.target
@@ -1432,7 +1432,7 @@ function MoviePage({ movie }: { movie: TwMovie }) {
       footer: "都不選就是全部；選了幾種，就找其中任一種。",
     }) : null}
     <Section footer={<Text>日期、縣市、特殊廳都可以複選：點標題展開，再點選項打勾。</Text>}>
-      <Toggle title={`只看收藏的影城（${settings.favorites.length}）`} value={onlyFav} onChanged={setOnlyFav} />
+      <Toggle title={`只看收藏影城（${settings.favorites.length}）`} value={onlyFav} onChanged={setOnlyFav} />
     </Section>
 
     {error ? <ErrorRow error={error} retry={reload} /> : null}
@@ -1530,7 +1530,7 @@ function NowPage() {
   const wins = WINDOWS.filter((w) => !w.todayOnly || hasToday)
   const winIds = selWins.filter((id) => wins.some((w) => w.id === id))
   const cities = sortCities(Array.from(new Set(store.cinemas.map((c) => c.city))))
-  const scopeOptions = [{ id: "all", label: `不限（全台 ${store.cinemas.length} 間）` }, { id: "fav", label: `收藏的影城（${settings.favorites.length}）` }, { id: "near", label: "附近 10 間" }, ...cities.map((c) => ({ id: c, label: c }))]
+  const scopeOptions = [{ id: "all", label: `不限（全台 ${store.cinemas.length} 間）` }, { id: "fav", label: `收藏影城（${settings.favorites.length}）` }, { id: "near", label: "附近 10 間" }, ...cities.map((c) => ({ id: c, label: c }))]
   // 點一下加入、再點一下拿掉；min1 = 至少留一個
   const toggle = (list: string[], id: string, min1 = false) => {
     const i = list.indexOf(id)
@@ -1555,7 +1555,7 @@ function NowPage() {
     })}
     {multiPick({
       title: "找哪些影城", open: open === "scope", onOpen: flip("scope"),
-      summary: scopes.map((x) => (x === "all" ? "不限" : x === "fav" ? "收藏的影城" : x === "near" ? "附近 10 間" : x)).join("、"),
+      summary: scopes.map((x) => (x === "all" ? "不限" : x === "fav" ? "收藏影城" : x === "near" ? "附近 10 間" : x)).join("、"),
       options: scopeOptions, selected: scopes,
       onToggle: (id) => setScopes(id === "all" ? ["all"] : toggle(scopes.filter((x) => x !== "all"), id, true)),
       footer: "縣市的影城較多、選的天數越多，查詢會比較久；「不限」要讀全台每一間，最久。開眼來源的戲院通常只有今天的場次。",
@@ -1595,7 +1595,7 @@ function NowResultsPage({ dates, winIds, scopes, formats }: { dates: string[]; w
   const groups = res.data ? res.data.groups : []
   const thumbOf = useThumbs(groups.map((g) => ({ title: g.title, slug: g.movie?.slug, en: g.movie?.en })), `now|${groups.length}|${dates.join(",")}|${winIds.join(",")}`)
   useEffect(() => { if (res.data) prefetchPosters(groups) }, [res.data]) // 背景先抓海報，進電影頁就不用等
-  const scopeLabel = scopes.map((x) => (x === "all" ? "全台影城" : x === "fav" ? "收藏的影城" : x === "near" ? "附近 10 間" : x)).join("、")
+  const scopeLabel = scopes.map((x) => (x === "all" ? "全台影城" : x === "fav" ? "收藏影城" : x === "near" ? "附近 10 間" : x)).join("、")
   const many = dates.length > 1 // 複選多天：每一場前面標日期
   const [folded, setFolded] = useState<string[]>([]) // 收合起來的片（只留片名列）
   const isFolded = (t: string) => folded.indexOf(t) >= 0

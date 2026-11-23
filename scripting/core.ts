@@ -39,30 +39,31 @@ export interface Settings {
   ads: number;
   tmdbToken?: string; // TMDB API Read Access Token：有填才會幫沒有片長的電影補片長
   maps?: MapsApp; // 導航用哪個地圖（預設 Apple 地圖）
-  favMovies?: FavMovie[]; // 收藏的電影（含影展片）
-  notify?: NotifyPrefs; // 收藏電影的通知要哪幾種（網頁版；沒設過 = 全部都要）
+  favMovies?: FavMovie[]; // 收藏電影（含影展片）
+  favIssuers?: string[]; // 收藏發行商（官方票房資料裡的名稱）
+  notify?: NotifyPrefs; // 收藏電影通知要哪幾種（網頁版；沒設過 = 全部都要）
 }
-/** 收藏電影的通知種類：open 開放場次了、rel 上映了、end 快下檔了、fest 影展開始了 */
+/** 收藏電影通知種類：open 開放場次了、rel 上映了、end 快下檔了、fest 影展開始了 */
 export interface NotifyPrefs {
   open: boolean; rel: boolean; end: boolean; fest: boolean;
   endMax?: number; // 快下檔：放映的影城剩下幾間以下才通知（自己填，1 到 30；預設 3）
   endScope?: "all" | "city" | "fav"; // 舊的寫法（只能三選一）；現在看 endFav 和 endCities
-  endFav?: boolean; // 算收藏的影城
-  endCities?: string[]; // 算這些縣市（可以好幾個）；跟收藏的影城可以一起選，兩邊合起來算；都沒選 = 全台
+  endFav?: boolean; // 算收藏影城
+  endCities?: string[]; // 算這些縣市（可以好幾個）；跟收藏影城可以一起選，兩邊合起來算；都沒選 = 全台
 }
-/** 「快下檔」算哪些影城：收藏的影城要不要算、哪些縣市（都沒有 = 全台） */
+/** 「快下檔」算哪些影城：收藏影城要不要算、哪些縣市（都沒有 = 全台） */
 export function notifyEndPick(p: NotifyPrefs): { fav: boolean; cities: string[] } {
   const fav = p.endFav !== undefined ? !!p.endFav : p.endScope === "fav";
   return { fav, cities: p.endFav === undefined && p.endScope === "fav" ? [] : p.endCities || [] };
 }
-/** 「快下檔」算哪些影城的說法：「全台」「台北市、新北市」「收藏的影城」「收藏的影城＋台北市」 */
+/** 「快下檔」算哪些影城的說法：「全台」「台北市、新北市」「收藏影城」「收藏影城＋台北市」 */
 export function notifyEndScope(p: NotifyPrefs): string {
   const { fav, cities: cs } = notifyEndPick(p);
   const ct = cs.length > 3 ? `${cs.slice(0, 2).join("、")}等 ${cs.length} 個縣市` : cs.join("、");
-  return [fav ? "收藏的影城" : "", ct].filter(Boolean).join("＋") || "全台";
+  return [fav ? "收藏影城" : "", ct].filter(Boolean).join("＋") || "全台";
 }
 /** 交給通知伺服器的整包設定：要哪幾種、快下檔的門檻與範圍、收藏的片（只有片名鍵、片名、影展代碼）。
- *  收藏的影城只有在範圍有選「收藏的影城」時才傳 */
+ *  收藏影城只有在範圍有選「收藏影城」時才傳 */
 export function notifyPayload(s: Settings): { prefs: Record<string, boolean>; endCfg: { max: number; scope: string; cities: string[]; cinemas: string[] }; favs: ReturnType<typeof notifyFavs> } {
   const p = notifyPrefs(s);
   const pick = notifyEndPick(p);
@@ -200,7 +201,7 @@ export async function loadSettings(): Promise<Settings> {
   try {
     const json = await platform().loadSettingsJSON();
     const s: Settings = json ? { ...def, ...JSON.parse(json) } : def;
-    // 收藏的影城裡被併掉的重複戲院，換成留下來的那一筆
+    // 收藏影城裡被併掉的重複戲院，換成留下來的那一筆
     let alias = cinemaAlias;
     if (!alias) { try { alias = JSON.parse(platform().cacheGet("cinema-alias.json") || "{}") || {}; } catch (_) { alias = {}; } }
     if (alias && s.favorites.some((id) => alias![id])) s.favorites = s.favorites.map((id) => alias![id] || id).filter((id, i, all) => all.indexOf(id) === i);
@@ -267,10 +268,10 @@ export async function loadCinemas(): Promise<Cinema[]> {
     return !twin;
   });
   cinemaAlias = alias;
-  cacheSet("cinema-alias.json", JSON.stringify(alias)); // 下次啟動時，收藏的影城裡被併掉的那一筆會換成留下來的那一筆
+  cacheSet("cinema-alias.json", JSON.stringify(alias)); // 下次啟動時，收藏影城裡被併掉的那一筆會換成留下來的那一筆
   return main.concat(others);
 }
-/** 被併掉的戲院代碼 → 留下來的那一筆（收藏的影城用） */
+/** 被併掉的戲院代碼 → 留下來的那一筆（收藏影城用） */
 let cinemaAlias: Record<string, string> | null = null;
 /** 戲院名稱比對用：去掉「影城、電影院、店」這些通稱和空白符號 */
 const cinemaNameKey = (name: string) => String(name || "").replace(/臺/g, "台").replace(/影城|電影院|大戲院|戲院|影院|數位|[\s_（）()・·\-－—,，.]/g, "").replace(/[店館]$/, "").toLowerCase();
@@ -2128,7 +2129,7 @@ export function loadYearRatings(): Promise<YearRatings | null> {
   return job;
 }
 
-// ───────────────────────── 收藏的電影 ─────────────────────────
+// ───────────────────────── 收藏電影 ─────────────────────────
 export const isFavMovie = (s: Settings, title: string): boolean => (s.favMovies || []).some((f) => f.key === communityKey(title));
 /** 收藏／取消收藏（直接改 s，呼叫的人負責存檔）；回傳現在是不是收藏中 */
 export function toggleFavMovie(s: Settings, m: { title: string; en?: string; poster?: string; fest?: FavMovie["fest"] }): boolean {
@@ -2328,7 +2329,7 @@ export function filterVersionsAny(versions: Version[], formats: Format[]): Versi
 }
 /** 「依電影找場次」的一列：某一天、某間影城（版本已經照特殊廳篩過） */
 export interface MovieRow { day: TwMovieDay; date: string; cinema: TwMovieCinema }
-/** 把幾天的資料攤平成一列一列，照條件篩選：縣市、特殊廳都可以複選（空的 = 不限），favIds 有給就只留收藏的影城。
+/** 把幾天的資料攤平成一列一列，照條件篩選：縣市、特殊廳都可以複選（空的 = 不限），favIds 有給就只留收藏影城。
  *  排序：縣市（北到南）→ 影城 → 日期 */
 export function movieRows(days: TwMovieDay[], opt: { cities: string[]; formats: Format[]; favIds?: string[] | null }): MovieRow[] {
   const rows: MovieRow[] = [];

@@ -223,7 +223,7 @@ struct MovieDetailView: View {
                             }
                         }
                     }
-                    Toggle("只看收藏的影城（\(settings.favorites.count)）", isOn: $onlyFav)
+                    Toggle("只看收藏影城（\(settings.favorites.count)）", isOn: $onlyFav)
                 } footer: {
                     Text("日期、縣市、特殊廳都可以複選。")
                 }
