@@ -186,6 +186,10 @@ async function refresh(m) {
     } catch (_) { stat.fail++; }
   }
   // 海報：其他來源都沒有（或只有預告縮圖、或是靠猜的 IMDb 圖）而 TMDB 確認過這部片有海報：用 TMDB 那張，一定是同一部片
+  // 用預告縮圖暫代的海報：只有它就是「目前這支預告」的縮圖時才留。
+  // 預告後來被判定對不上片名而拿掉、或換了一支，舊縮圖就是別的影片的畫面（Juice=Juice 演唱會放成別人的直播畫面），要一起拿掉
+  const thumbKey = (String(e.p || "").match(/ytimg\.com\/vi\/([\w-]{11})\//) || [])[1];
+  if (thumbKey && !(e.tn && String(e.t || "").indexOf(thumbKey) >= 0)) { delete e.p; stat.thumbDropped = (stat.thumbDropped || 0) + 1; }
   if (e.imp && (!e.p || /ytimg\.com|m\.media-amazon\.com/.test(e.p))) { if (e.p !== e.imp) stat.tmdbPoster = (stat.tmdbPoster || 0) + 1; e.p = e.imp; }
 }
 const queue = todo.slice();
