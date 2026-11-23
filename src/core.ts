@@ -857,9 +857,9 @@ async function atPoster(title: string): Promise<string> {
 /** 開眼電影頁上的上映年份（用來確認 IMDb／TMDB 對到的是同一部片；重映、修復版不適用，回傳 0）。最多等 3.5 秒 */
 async function atYearHint(title: string, slug?: string, en?: string): Promise<number> {
   if (isReissue(title)) return 0; // 重映片：開眼頁的日期是重映日，不能拿來比
-  // 開眼查不到年份時，改用已經知道的上映日期（電影清單、票房排行）。
-  // 沒有年份可以比的話，同名的外國舊片會被當成這部（《冠軍之路》2026 台灣紀錄片曾被配到 2023 的美國片 Champions）
-  const known = () => Number(releaseOf(title).slice(0, 4)) || 0;
+  // 開眼查不到年份就不比年份（回傳 0）。不能拿票房排行的上映日期來比：舊片重映的上映日期是今年，會把原片擋掉。
+  // 同名不同片的問題（《冠軍之路》2026 台灣紀錄片曾被配到 2023 的美國片 Champions）由伺服器用 TMDB 的中文片名確認，見 tools/meta.mjs
+  const known = () => 0;
   try {
     const poster = await Promise.race([moviePoster(title, slug, en), delay(1500).then(() => "")]);
     const id = await atMovieId(title, poster || "");
@@ -2012,7 +2012,7 @@ const errText = (e: unknown): string => {
 };
 
 const IMDB_GQL = "https://api.graphql.imdb.com/";
-interface Ident { id: string; name: string; year: number }
+export interface Ident { id: string; name: string; year: number }
 
 /** 找 IMDb 編號（同時拿到英文片名與年份，給爛番茄用）：有金鑰走 TMDB，否則用 IMDb 搜尋建議 */
 async function identify(title: string, en: string | undefined, errs: string[], yearHint = 0): Promise<Ident | null> {
@@ -2111,10 +2111,12 @@ async function rtFind(name: string, year: number): Promise<{ url: string; s: Non
   return s ? { url: pick.url, s } : null;
 }
 
-async function findRatings(title: string, en?: string, slug?: string): Promise<Ratings> {
+/** 已經確定是哪一部片（IMDb 編號、英文片名、年份）時直接查評分，不用再猜（伺服器用 TMDB 確認過的片走這裡） */
+export const ratingsOfIdent = (who: Ident): Promise<Ratings> => findRatings("", undefined, undefined, who);
+async function findRatings(title: string, en?: string, slug?: string, known?: Ident): Promise<Ratings> {
   const out: Ratings = {};
   const errs: string[] = [];
-  const who = await identify(title, en, errs, await atYearHint(title, slug, en));
+  const who = known || (await identify(title, en, errs, await atYearHint(title, slug, en)));
   if (!who) {
     out.err = errs.join("；") || "IMDb 上找不到這部片";
     return out;

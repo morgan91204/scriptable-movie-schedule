@@ -148,6 +148,7 @@
     posterTint: () => posterTint,
     prefetchPosters: () => prefetchPosters,
     ratingTier: () => ratingTier,
+    ratingsOfIdent: () => ratingsOfIdent,
     releaseLabel: () => releaseLabel,
     releaseOf: () => releaseOf,
     saveSettings: () => saveSettings,
@@ -1363,7 +1364,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   }
   async function atYearHint(title, slug, en) {
     if (isReissue(title)) return 0;
-    const known = () => Number(releaseOf(title).slice(0, 4)) || 0;
+    const known = () => 0;
     try {
       const poster = await Promise.race([moviePoster(title, slug, en), delay(1500).then(() => "")]);
       const id = await atMovieId(title, poster || "");
@@ -2360,10 +2361,11 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     const s = await rtPage(pick.url);
     return s ? { url: pick.url, s } : null;
   }
-  async function findRatings(title, en, slug) {
+  var ratingsOfIdent = (who) => findRatings("", void 0, void 0, who);
+  async function findRatings(title, en, slug, known) {
     const out = {};
     const errs = [];
-    const who = await identify(title, en, errs, await atYearHint(title, slug, en));
+    const who = known || await identify(title, en, errs, await atYearHint(title, slug, en));
     if (!who) {
       out.err = errs.join("；") || "IMDb 上找不到這部片";
       return out;
@@ -2804,7 +2806,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   var extra = { boxOffice, nowShowing, nowShowingMulti, movieBoard, festivalBoard, festivalFilm, nearby, patchSettings, fillMovie, formatList };
   var BRIDGE_LEVEL = 2;
   globalThis.MS = {
-    version: "2026.11.23-1536",
+    version: "2026.11.23-1542",
     level: BRIDGE_LEVEL,
     init(saved) {
       cache = saved || {};

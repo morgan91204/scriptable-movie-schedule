@@ -65,25 +65,36 @@ if (todo.length < 20) throw new Error("片單太短（" + todo.length + "），�
 
 // TMDB 金鑰（GitHub Actions 的密鑰 TMDB_TOKEN）：只用來查片長，只放在送給 TMDB 的請求標頭裡，不印出來、不寫進任何檔案
 const TMDB_TOKEN = (process.env.TMDB_TOKEN || "").trim();
-/** 用片名到 TMDB 查片長。比手機版嚴格：片名要完全相符才採用（不拿「搜尋結果第一筆」），寧可沒有也不要配錯 */
-async function tmdbStrict(title, en) {
+/** 用 TMDB 確認「這是哪一部片」：中文片名要完全相同才算（不拿搜尋結果第一筆），寧可沒有也不要配錯。
+ *  同名的有好幾部時（《冠軍之路》：2023 美國片和 2025 台灣紀錄片），挑年份最接近已知上映年的那一部。
+ *  回傳 IMDb 編號、英文片名、年份（查評分用）、片長、海報；找不到回傳 null */
+async function tmdbIdentify(title, en, releaseYear) {
   const same = (s) => core.normTitle(String(s || "")).replace(/臺/g, "台").replace(/祕/g, "秘").replace(/爲/g, "為");
   const call = async (path) => {
     const r = await fetch("https://api.themoviedb.org/3" + path, { headers: { accept: "application/json", Authorization: "Bearer " + TMDB_TOKEN }, signal: AbortSignal.timeout(25000) });
     if (!r.ok) throw new Error("TMDB " + r.status);
     return r.json();
   };
-  for (const q of Array.from(new Set([core.baseTitle(title), title, en].filter(Boolean)))) {
+  const want = [same(title), same(core.baseTitle(title))].filter(Boolean);
+  const yearOf = (x) => Number(String(x.release_date || "").slice(0, 4)) || 0;
+  for (const q of Array.from(new Set([core.baseTitle(title), title].filter(Boolean)))) {
     const found = await call(`/search/movie?language=zh-TW&query=${encodeURIComponent(q)}`);
-    const want = [same(title), same(core.baseTitle(title)), same(en)].filter(Boolean);
-    const hit = (found.results || []).find((x) => want.indexOf(same(x.title)) >= 0 || want.indexOf(same(x.original_title)) >= 0);
-    if (!hit) continue;
-    const d = await call(`/movie/${hit.id}?language=zh-TW`);
+    const hits = (found.results || []).filter((x) => want.indexOf(same(x.title)) >= 0 || want.indexOf(same(x.original_title)) >= 0);
+    if (!hits.length) continue;
+    // 同名多部：有已知上映年就挑最接近的（重映片的上映年是今年，原片只有一部時不受影響）
+    const hit = hits.length > 1 && releaseYear ? hits.slice().sort((x, y) => Math.abs(yearOf(x) - releaseYear) - Math.abs(yearOf(y) - releaseYear))[0] : hits[0];
+    const d = await call(`/movie/${hit.id}?language=en-US&append_to_response=external_ids`);
     const rt = Number(d.runtime) || 0;
-    const img = d.poster_path || hit.poster_path || "";
-    return { runtime: rt >= 20 && rt <= 400 ? rt : 0, poster: /^\/[\w.-]+$/.test(img) ? "https://image.tmdb.org/t/p/w500" + img : "" };
+    const img = hit.poster_path || d.poster_path || "";
+    return {
+      id: /^tt\d+$/.test((d.external_ids || {}).imdb_id || "") ? d.external_ids.imdb_id : "",
+      name: String(d.title || d.original_title || en || ""),
+      year: yearOf(d) || yearOf(hit),
+      runtime: rt >= 20 && rt <= 400 ? rt : 0,
+      poster: /^\/[\w.-]+$/.test(img) ? "https://image.tmdb.org/t/p/w500" + img : "",
+    };
   }
-  return { runtime: 0, poster: "" };
+  return null;
 }
 
 const noTrailer = [];
@@ -94,6 +105,20 @@ async function refresh(m) {
   if (!k) return;
   const e = (movies[k] ||= {});
   e.seen = now;
+  // 先確認是哪一部片（TMDB，中文片名完全相同）。確認過就記著不再問（im）；找不到的 14 天再試，試過 3 次就 60 天一次
+  if (TMDB_TOKEN && !(e.im && e.im.id) && (!e.ima || recheck || now - e.ima > ((e.imn || 0) >= 3 ? 60 : 14) * DAY)) {
+    try {
+      const who = await tmdbIdentify(m.title, m.en, Number(core.releaseOf(m.title).slice(0, 4)) || 0);
+      e.ima = now;
+      e.imn = (e.imn || 0) + 1;
+      stat.tmdbAsked = (stat.tmdbAsked || 0) + 1;
+      if (who) {
+        if (who.id) e.im = { id: who.id, name: who.name, year: who.year };
+        if (who.poster) e.imp = who.poster;
+        if (who.runtime && !m.runtime && !e.rt) { e.rt = who.runtime; e.rf = "TMDB"; stat.tmdb = (stat.tmdb || 0) + 1; }
+      }
+    } catch (_) { stat.fail++; }
+  }
   // 海報／預告：都有的 3 天查一次，缺的 6 小時再試
   // RECHECK=1：缺海報或預告的立刻重查（改了比對規則、加了新來源時手動跑一次）
   // RECHECK=1：全部重查（預告的挑選、檢查規則改過時手動跑一次）
@@ -112,19 +137,22 @@ async function refresh(m) {
   // 評分：有分數的 1 天查一次，沒有的 12 小時再試；連線出錯就保留舊資料
   if (!e.ra || recheck || now - e.ra > (has(e.r) ? DAY : 12 * HOUR)) {
     try {
-      const r = await core.movieRatings(m.title, m.en, m.slug);
+      const sure = !!(e.im && e.im.id); // TMDB 確認過是哪一部：直接用那一部的編號查，不用猜
+      const r = sure ? await core.ratingsOfIdent(e.im) : await core.movieRatings(m.title, m.en, m.slug);
       // 「暫時讀不到」是連線問題，下次再試；其他（例如 IMDb 上沒有這部片）是確定的結果，記下來
       if (!r.err || has(r) || !/暫時讀不到/.test(r.err)) {
         const { err: _e, ...keep } = r;
         // 以前有 IMDb 分數、這次確定對不到 IMDb（不是連線問題）：以前那筆是配錯片，連同從 IMDb 拿的海報一起拿掉。
         // 其他情況這次查不到分數時，不蓋掉以前查到的
-        const wrong = !!(e.r && e.r.imdb) && !keep.imdb && !/讀不到|連線|回應 \d/.test(r.err || "");
+        // 以前記的 IMDb 是另一部片（跟 TMDB 確認的編號不同）：以前那筆是配錯的，整筆換掉，從 IMDb 拿的海報也不能用
+        const oldId = (((e.r || {}).imdb || {}).url || "").match(/tt\d+/);
+        const wrong = sure && !!oldId && oldId[0] !== e.im.id;
         if (wrong) {
           e.r = keep;
           if (/m\.media-amazon\.com/.test(e.p || "")) { delete e.p; delete e.xa; }
           stat.unmatched = (stat.unmatched || 0) + 1;
-          console.log(`配錯片的評分與海報已拿掉：${m.title}`);
-        } else if (has(keep) || !has(e.r)) e.r = keep;
+          console.log(`配錯片的評分與海報已換掉：${m.title}（${oldId[0]} → ${e.im.id}）`);
+        } else if (has(keep) || !has(e.r)) e.r = keep; // 這次查不到分數時，不蓋掉以前查到的
         e.ra = now;
         stat.ratings++;
       } else stat.fail++;
@@ -148,20 +176,8 @@ async function refresh(m) {
       stat.runtime++;
     } catch (_) { stat.fail++; }
   }
-  // 開眼也沒有片長的（演唱會、動畫劇場版、重映片）：再用 TMDB 查。盡量少問：查到的不再查；
-  // 查不到的 7 天再試一次，試過 3 次還是沒有就 30 天才看一次（tmn = 試過幾次）
-  // 同一次查詢順便補海報：其他來源都找不到海報（或只有預告縮圖）的片才用。片長、海報都有了就不問
-  const noPoster = !e.p || /ytimg\.com/.test(e.p);
-  if (TMDB_TOKEN && ((!m.runtime && !e.rt) || noPoster) && (!e.tma || now - e.tma > ((e.tmn || 0) >= 3 ? 30 : 7) * DAY)) {
-    try {
-      const r = await tmdbStrict(m.title, m.en);
-      if (r.runtime && !m.runtime && !e.rt) { e.rt = r.runtime; e.rf = "TMDB"; stat.tmdb = (stat.tmdb || 0) + 1; }
-      if (r.poster && noPoster) { e.p = r.poster; stat.tmdbPoster = (stat.tmdbPoster || 0) + 1; }
-      e.tma = now;
-      e.tmn = (e.tmn || 0) + 1;
-      stat.tmdbAsked = (stat.tmdbAsked || 0) + 1;
-    } catch (_) { stat.fail++; }
-  }
+  // 海報：其他來源都沒有（或只有預告縮圖、或是靠猜的 IMDb 圖）而 TMDB 確認過這部片有海報：用 TMDB 那張，一定是同一部片
+  if (e.imp && (!e.p || /ytimg\.com|m\.media-amazon\.com/.test(e.p))) { if (e.p !== e.imp) stat.tmdbPoster = (stat.tmdbPoster || 0) + 1; e.p = e.imp; }
 }
 const queue = todo.slice();
 await Promise.all(Array.from({ length: 3 }, async () => {
