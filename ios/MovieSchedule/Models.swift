@@ -40,6 +40,8 @@ struct TwMovie: Codable, Hashable, Identifiable {
     var release: String?
     var noShowToday: Bool?
     var score: Double?
+    var tomato: Double?
+    var popcorn: Double?
     var scoreFew: Bool?
     var id: String { slug }
 }
@@ -184,6 +186,10 @@ struct FilmList: Codable {
     var sort: String           // 上映中的排法
     var sorts: [Option]        // 範圍是年度時是空的
     var order: String          // 畫面上範圍和排序併成一個選單：實際採用的那一項
+    var asc: Bool?             // 反過來排（低到高、舊到新、少到多）
+    var dirs: [Option]?        // 順序的兩個選項，字跟著排法換
+    var rate: String?          // 依評分排時用哪一種評分
+    var rates: [Option]?       // 可以選的評分來源（不是依評分排時是空的）
     var orders: [Option]       // 上映中的幾種排法，最後一項是年度排行（含已下檔）
     var years: [String]
     var selYears: [String]

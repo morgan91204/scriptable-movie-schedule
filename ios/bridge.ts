@@ -37,11 +37,9 @@ async function boxOffice(by?: string, years?: string[], query?: string, limit?: 
   };
 }
 /** 「電影」清單：上映中與票房排行合成一份（範圍、排序、年份、週次、出品國別、搜尋都由共用資料層處理） */
-async function filmList(scope?: string, sort?: string, years?: string[], query?: string, limit?: number, week?: string, country?: string[]) {
-  // 票房讀不到時清單照樣出來，只是少了依票房排的選項
-  const [b, all] = await Promise.all([core.loadBoxFor(sort === "year" ? "year" : scope || "now", sort || "week", week || "").catch(() => null), core.loadMovies().catch(() => [] as core.TwMovie[])]);
-  if (!b && !all.length) throw new Error("讀不到電影清單，請稍後再試");
-  const board = core.movieBoard(b, all, { scope, sort, years: years || [], week: week || "", countries: Array.isArray(country) ? country : [], query });
+async function filmList(scope?: string, sort?: string, years?: string[], query?: string, limit?: number, week?: string, country?: string[], asc?: boolean, rate?: string) {
+  // 票房讀不到時清單照樣出來，只是少了依票房排的選項（scope 是舊版畫面傳的：年度 = 排序選 year）
+  const board = await core.loadMovieBoard({ sort: scope === "year" ? "year" : sort, years: years || [], week: week || "", countries: Array.isArray(country) ? country : [], query, asc: !!asc, rate });
   return {
     ...board,
     countries: board.countries.map((c) => ({ id: c.id, label: `${c.id}（${c.count} 部）` })), countryNote: core.BOX_COUNTRY_NOTE,

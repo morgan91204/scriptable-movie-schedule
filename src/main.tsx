@@ -12,7 +12,7 @@ import {
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
   loadSettings, saveSettings, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, TW,
   FORMATS, formatsOf, filterVersions, filterVersionsAny, movieRows, movieDays, nearest, kmLabel, WINDOWS, findShowtimes, findShowtimesMulti, multiLabel, multiDetail, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText,
-  hallOf, tmdbTest, movieExtras, moviePoster, movieRuntime, posterSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxCountries, boxByCountry, boxInfo, boxInfoRows, boxCountryText, BOX_COUNTRY_NOTE, boxCountryTag, boxCountriesPicked, movieBoard, loadBoxFor, soonGroups, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityCached, communityVote, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalsReady, festivalNote, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, festivalDefaultDate, festivalStateLabel, festivalState, festivalFooter, linkMovies, nowGroupLine, nowFilter, festivalPick, movieAbout, festivalSearch, festivalSearchLines, festivalTrailer, festivalYears, festivalsAny, festivalGroups, festivalChipNote, festivalStatusLine, movieRatings, ratingTier,
+  hallOf, tmdbTest, movieExtras, moviePoster, movieRuntime, posterSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxCountries, boxByCountry, boxInfo, boxInfoRows, boxCountryText, BOX_COUNTRY_NOTE, boxCountryTag, boxCountriesPicked, loadMovieBoard, soonGroups, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityCached, communityVote, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalsReady, festivalNote, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, festivalDefaultDate, festivalStateLabel, festivalState, festivalFooter, linkMovies, nowGroupLine, nowFilter, festivalPick, movieAbout, festivalSearch, festivalSearchLines, festivalTrailer, festivalYears, festivalsAny, festivalGroups, festivalChipNote, festivalStatusLine, movieRatings, ratingTier,
 } from "./core";
 import type { MovieExtras, Ratings, Community, BoxOfficeItem, BoxSort, MovieEntry, Festival, FestivalFilm, FestivalSession } from "./core";
 import { setTabBar, setBackGuard, esc } from "./jsx";
@@ -1043,6 +1043,8 @@ class App {
     );
   }
 
+  boxAsc = false; // 反過來排（低到高、舊到新、少到多）；換一種排法就回到預設方向
+  boxRate = ""; // 依評分排時用哪一種評分（空 = IMDb）
   boxOpen = ""; // 目前展開哪一組篩選（週次／年份／出品國別；空 = 都收合）
   boxSort = ""; // 排法：本週票房／累計票房／上映日期／評分／影城數／年度排行（year，含已下檔）（空 = 第一種）
   boxYears: string[] = []; // 年度排行選了哪幾年（空 = 最新的一年）
@@ -1052,16 +1054,14 @@ class App {
   boxPageKey = "";
   /** 「電影」清單：上映中與票房排行合成一份（範圍、排序、出品國別都在這裡選） */
   async boxOfficeView(): Promise<string> {
-    // 票房讀不到時清單照樣出來，只是少了依票房排的選項
-    const [b, all] = await Promise.all([loadBoxFor(this.boxSort === "year" ? "year" : "now", this.boxSort || "week", this.boxWeek).catch(() => null), loadMovies().catch(() => [] as TwMovie[])]);
-    if (!b && !all.length) throw new Error("讀不到電影清單，請稍後再試");
+    // 票房、片單（依觀眾評分排時再加評分總表）一次讀好；票房讀不到時清單照樣出來，只是少了依票房排的選項
     const k = this.movieQuery.trim().toLowerCase();
-    const board = movieBoard(b, all, { sort: this.boxSort, years: this.boxYears, week: this.boxWeek, countries: this.boxCountry, query: k });
+    const board = await loadMovieBoard({ sort: this.boxSort, years: this.boxYears, week: this.boxWeek, countries: this.boxCountry, query: k, asc: this.boxAsc, rate: this.boxRate });
     const { years, countries } = board;
     const selYears = board.selYears, country = board.selCountries;
     // 年度排行一年有六百部左右、全選是好幾千部：先畫 100 列，快滑到底時自動接著載入（不用按）。換了排法、年份或搜尋字就從頭開始
     const paged = board.paged;
-    const pageKey = `${board.scope}|${board.sort}|${selYears.join(",")}|${board.selWeek}|${k}|${country.join(",")}`;
+    const pageKey = `${board.asc}|${board.rate}|${board.scope}|${board.sort}|${selYears.join(",")}|${board.selWeek}|${k}|${country.join(",")}`;
     if (this.boxPageKey !== pageKey) {
       this.boxPageKey = pageKey;
       this.boxLimit = BOX_PAGE;
@@ -1108,12 +1108,19 @@ class App {
         <Search value={this.movieQuery} placeholder="搜尋片名（中文或英文）" onInput={(t) => { this.movieQuery = t; }} />
         {board.orders.length > 1 ? (
           <Chips scroll>
-            {board.orders.map((x) => <Chip label={x.id === "year" ? "年度排行（含已下檔）" : x.label} muted={board.order !== x.id} onTap={() => { this.boxSort = x.id; }} />)}
+            {/* 再點一次選中的那一顆 = 反過來排；箭頭標方向（↓ 高到低、新到舊、多到少） */}
+            {board.orders.map((x) => <Chip label={`${x.id === "year" ? "年度排行（含已下檔）" : x.label}${board.order === x.id ? (board.asc ? " ↑" : " ↓") : ""}`} muted={board.order !== x.id} onTap={() => { if (board.order === x.id) this.boxAsc = !this.boxAsc; else { this.boxSort = x.id; this.boxAsc = false; } }} />)}
           </Chips>
         ) : null}
         {/* 週次、出品國別、年份預設收合成一行，點了才展開 */}
-        {board.weeks.length > 1 || countries.length > 1 || (board.scope === "year" && years.length > 1) ? (
-          <Section hint={this.boxOpen === "country" ? BOX_COUNTRY_NOTE + "可以左右滑動。" : this.boxOpen === "year" ? "可以複選，選了幾年就合在一起排；全選就是 2016 年至今的總排行。" : this.boxOpen === "week" ? "可以回頭看過去幾週的排行。" : ""}>
+        {board.weeks.length > 1 || countries.length > 1 || board.rates.length > 1 || (board.scope === "year" && years.length > 1) ? (
+          <Section hint={this.boxOpen === "country" ? BOX_COUNTRY_NOTE + "可以左右滑動。" : this.boxOpen === "year" ? "可以複選，選了幾年就合在一起排；全選就是 2016 年至今的總排行。" : this.boxOpen === "week" ? "可以回頭看過去幾週的排行。" : this.boxOpen === "rate" ? "番茄指數是影評的分數、爆米花指數是觀眾的分數（都來自爛番茄）；觀眾評分是這個 App 的使用者打的。" : ""}>
+            {board.rates.length > 1 ? fold("rate", "評分來源", board.rateSummary) : null}
+            {board.rates.length > 1 && this.boxOpen === "rate" ? (
+              <Chips scroll>
+                {board.rates.map((r) => <Chip label={r.label} muted={board.rate !== r.id} onTap={() => { this.boxRate = r.id; }} />)}
+              </Chips>
+            ) : null}
             {board.weeks.length > 1 ? fold("week", "週次", board.weekSummary) : null}
             {board.weeks.length > 1 && this.boxOpen === "week" ? (
               <Chips>

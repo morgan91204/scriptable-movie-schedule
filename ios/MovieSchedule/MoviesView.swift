@@ -121,6 +121,8 @@ struct BoxOfficeSection: View {
     var query: String = ""
     @State private var board: Loadable<FilmList> = .loading
     @State private var sort = "" // 排法（空 = 第一種：本週票房）；year = 年度排行（含已下檔）
+    @State private var asc = false // 反過來排（低到高、舊到新、少到多）；換一種排法就回到預設方向
+    @State private var rate = "" // 依評分排時用哪一種評分（空 = IMDb）
     @State private var years: Set<String> = [] // 年度排行選了哪幾年（空 = 最新的一年）
     @State private var limit = 100 // 年度排行目前顯示幾列（一年六百部左右，分批顯示）
     @State private var week = "" // 週票房看哪一週（空 = 最新）
@@ -134,14 +136,15 @@ struct BoxOfficeSection: View {
             results
         }
         .task(id: loadKey) { await load() }
-        .onChange(of: sort) { _, _ in limit = 100 }
+        .onChange(of: sort) { _, _ in limit = 100; asc = false }
+        .onChange(of: asc) { _, _ in limit = 100 }
         .onChange(of: years) { _, _ in limit = 100 }
         .onChange(of: query) { _, _ in limit = 100 }
         .onChange(of: countries) { _, _ in limit = 100 }
     }
 
     private var loadKey: String {
-        [sort, years.sorted().joined(separator: ","), query, String(limit), week, countries.sorted().joined(separator: ",")].joined(separator: "|")
+        [sort, asc ? "asc" : "desc", rate, years.sorted().joined(separator: ","), query, String(limit), week, countries.sorted().joined(separator: ",")].joined(separator: "|")
     }
 
     @ViewBuilder private var pickers: some View {
@@ -153,6 +156,18 @@ struct BoxOfficeSection: View {
                         ForEach(b.orders) { Text($0.id == "year" ? "\($0.label)（含已下檔）" : $0.label).tag($0.id) }
                     }
                     .accessibilityIdentifier("order-picker")
+                }
+                // 順序：字跟著排法換（高到低／新到舊／多到少）
+                if let dirs = b.dirs, dirs.count > 1 {
+                    Picker("順序", selection: Binding(get: { (b.asc ?? false) ? "asc" : "desc" }, set: { asc = $0 == "asc" })) {
+                        ForEach(dirs) { Text($0.label).tag($0.id) }
+                    }
+                    .pickerStyle(.segmented)
+                }
+                if let rates = b.rates, rates.count > 1 {
+                    Picker("評分來源", selection: Binding(get: { b.rate ?? "imdb" }, set: { rate = $0 })) {
+                        ForEach(rates) { Text($0.label).tag($0.id) }
+                    }
                 }
                 if b.weeks.count > 1 {
                     Picker("週次", selection: Binding(
@@ -309,7 +324,7 @@ struct BoxOfficeSection: View {
 
     private func load() async {
         do {
-            board = .loaded(try await Bridge.shared.call("filmList", ["", sort, years.sorted(), query.trimmingCharacters(in: .whitespaces), limit, week, countries.sorted()]))
+            board = .loaded(try await Bridge.shared.call("filmList", ["", sort, years.sorted(), query.trimmingCharacters(in: .whitespaces), limit, week, countries.sorted(), asc, rate]))
         } catch {
             board = .failed(errorText(error))
         }

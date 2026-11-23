@@ -340,6 +340,8 @@ export interface TwMovie {
   release?: string; // 上映日期 YYYY-MM-DD（伺服器查好的，沒有就是不知道）
   noShowToday?: boolean; // 已經上映，今天沒有場次、之後幾天才有
   score?: number; // IMDb 評分（伺服器查好的，沒有就是不知道；清單依評分排序用）
+  tomato?: number; // 番茄指數（影評，0～100）
+  popcorn?: number; // 爆米花指數（觀眾，0～100）
   scoreFew?: boolean; // 評分的人還很少（不到 500 人）：分數不太準，排序時排在後面
 }
 export interface TwMovieCinema {
