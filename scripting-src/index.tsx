@@ -14,7 +14,7 @@ import {
   Cinema, Movie, Settings, Version, TwMovie, TwMovieCinema, CITY_ORDER, TW,
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
   loadSettings, saveSettings, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, cinemaAddress,
-  FORMATS, formatsOf, filterVersions, filterVersionsAny, movieRows, movieDays, nearest, kmLabel, WINDOWS, findShowtimes, findShowtimesMulti, multiLabel, multiDetail, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText, hallOf, tmdbTest, movieExtras, moviePoster, posterReady, posterTint, POSTER_TINTS, normImageUrl, movieRuntime, posterSrc, isLocalSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityVote, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, SCRIPTING_IMPORT_URL, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, festivalDefaultDate, festivalStateLabel, festivalState, festivalFooter, festivalPick, movieAbout, festivalSearch, festivalSearchLines, festivalTrailer, festivalYears, festivalGroups, festivalChipNote, festivalStatusLine, movieRatings, ratingTier,
+  FORMATS, formatsOf, filterVersions, filterVersionsAny, movieRows, movieDays, nearest, kmLabel, WINDOWS, findShowtimes, findShowtimesMulti, multiLabel, multiDetail, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText, hallOf, tmdbTest, movieExtras, moviePoster, posterReady, posterTint, POSTER_TINTS, normImageUrl, movieRuntime, posterSrc, isLocalSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityVote, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, SCRIPTING_IMPORT_URL, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, festivalDefaultDate, festivalStateLabel, festivalState, festivalFooter, linkMovies, nowGroupLine, festivalPick, movieAbout, festivalSearch, festivalSearchLines, festivalTrailer, festivalYears, festivalGroups, festivalChipNote, festivalStatusLine, movieRatings, ratingTier,
 } from "./core"
 import type { Format, LatLng, Hit, Community, BoxOfficeItem, BoxSort, Festival, FestivalFilm, FestivalSession } from "./core"
 
@@ -1409,9 +1409,11 @@ function NowResultsPage({ dates, winIds, scopes, formats }: { dates: string[]; w
     }
     const list = Array.from(byId.values())
     if (!list.length) throw new Error("沒有可以查的影城。先在影城頁加入常去影城，或改選附近／縣市。")
-    return await findShowtimesMulti(list, dates, winIds, formats)
+    const r = await findShowtimesMulti(list, dates, winIds, formats)
+    return { ...r, groups: await linkMovies(groupByMovie(r.hits)) } // 每部片對到電影清單上的那一部，片名才能連到電影頁
   }, [dates.join(","), winIds.join(","), scopes.join(","), formats.join(",")])
-  const groups = res.data ? groupByMovie(res.data.hits) : []
+  const groups = res.data ? res.data.groups : []
+  const thumbOf = useThumbs(groups.map((g) => ({ title: g.title, slug: g.movie?.slug, en: g.movie?.en })), `now|${groups.length}|${dates.join(",")}|${winIds.join(",")}`)
   useEffect(() => { if (res.data) prefetchPosters(groups) }, [res.data]) // 背景先抓海報，進電影頁就不用等
   const scopeLabel = scopes.map((x) => (x === "all" ? "全台影城" : x === "fav" ? "常去影城" : x === "near" ? "附近 10 間" : x)).join("、")
   const many = dates.length > 1 // 複選多天：每一場前面標日期
@@ -1424,9 +1426,20 @@ function NowResultsPage({ dates, winIds, scopes, formats }: { dates: string[]; w
     </Section> : null}
     {res.data && !groups.length ? <Section><Text foregroundStyle={"secondaryLabel"}>沒有符合的場次，換個時段或範圍試試。</Text></Section> : null}
     {groups.map((g) =>
-      <Section key={g.title}
-        header={<Text>{`${g.title}（${g.hits.length} 場）`}</Text>}
-        footer={g.runtime || g.rating ? <Text>{[g.runtime ? `${g.runtime} 分鐘` : "", g.rating].filter(Boolean).join("｜")}</Text> : undefined}>
+      <Section key={g.title}>
+        {/* 片名獨立一列（海報、粗體大字），點下去是電影頁：簡介、預告、所有影城的場次 */}
+        {(() => {
+          const t = thumbOf({ title: g.title, slug: g.movie?.slug })
+          const head = <HStack spacing={10}>
+            {PosterBox({ w: 44, h: 66, r: 6, img: t.img, ver: 0, pending: t.pending, title: g.title })}
+            <VStack alignment={"leading"} spacing={2}>
+              <Text font={"headline"} foregroundStyle={"label"} lineLimit={2}>{g.title}</Text>
+              <Text font={"subheadline"} foregroundStyle={"secondaryLabel"} lineLimit={1}>{nowGroupLine(g)}</Text>
+            </VStack>
+            <Spacer />
+          </HStack>
+          return g.movie ? <NavigationLink destination={<MoviePage movie={g.movie} />}>{head}</NavigationLink> : head
+        })()}
         {g.hits.map((hit: Hit) =>
           <NavigationLink key={`${hit.cinema.id}-${hit.date}-${hit.version.label}-${hit.time}`} destination={
             <ConfirmPage pick={{ cinema: hit.cinema, date: hit.date, movie: hit.movie, version: hit.version, time: hit.time, ...hit.ctx }} />

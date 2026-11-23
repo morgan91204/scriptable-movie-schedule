@@ -1920,6 +1920,20 @@ export function groupByMovie(hits: Hit[]): { title: string; runtime: number; rat
   return Object.values(map).sort((a, b) => b.hits.length - a.hits.length || showMinute(a.hits[0].time) - showMinute(b.hits[0].time));
 }
 
+/** 幫每一組（一部片）找出電影清單上對應的那部片，畫面才能從片名連到電影頁（簡介、所有影城的場次）。
+ *  片名對不上（官網來源的戲院用的片名不同）或清單讀不到的，就沒有 movie */
+export async function linkMovies<T extends { title: string }>(groups: T[]): Promise<(T & { movie?: TwMovie })[]> {
+  const list = await loadMovies().catch(() => [] as TwMovie[]);
+  return groups.map((g) => {
+    const k = normTitle(g.title), b = normTitle(baseTitle(g.title));
+    const movie = list.find((m) => normTitle(m.title) === k) || list.find((m) => normTitle(baseTitle(m.title)) === b);
+    return movie ? { ...g, movie } : g;
+  });
+}
+/** 「現在有什麼可以看」每部片標題列的說明：幾場｜片長｜分級 */
+export const nowGroupLine = (g: { hits: unknown[]; runtime?: number; rating?: string }): string =>
+  [`${g.hits.length} 場`, g.runtime ? `${g.runtime} 分鐘` : "", g.rating || ""].filter(Boolean).join("｜");
+
 // ───────────────────────── 評分：IMDb、爛番茄、爆米花 ─────────────────────────
 // 不需要 TMDB 金鑰：IMDb 的搜尋建議可以直接用中文片名找到 tt 編號；有金鑰時改用 TMDB 對應的 IMDb 編號，比較準。
 

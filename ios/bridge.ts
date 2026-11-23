@@ -41,7 +41,7 @@ async function nowShowing(scope: { cinema: core.Cinema; km: number | null }[], d
 /** 複選版：多個日期、時段、特殊廳一起找 */
 async function nowShowingMulti(scope: { cinema: core.Cinema; km: number | null }[], dates: string[], winIds: string[], formats: string[]) {
   const { hits, failed, noData } = await core.findShowtimesMulti(scope, dates, winIds, formats as core.Format[]);
-  return { groups: core.groupByMovie(hits), failed, noData, label: core.multiLabel(dates, winIds) };
+  return { groups: await core.linkMovies(core.groupByMovie(hits)), failed, noData, label: core.multiLabel(dates, winIds) };
 }
 /** 離我最近的影城 */
 async function nearby(lat: number, lng: number, limit: number) {

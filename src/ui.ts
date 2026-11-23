@@ -98,6 +98,8 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .step-s{font-size:13px;color:var(--fg2);margin-top:2px}
 .note.version{padding:6px 0;-webkit-user-select:none;user-select:none}
 .note.version:active{opacity:.5}
+.item.head{background:var(--chip)}
+.item.head .title{font-size:18px;font-weight:700}
 .para{padding:12px 14px;font-size:15px;line-height:1.6;white-space:pre-line}
 .para .dim{margin-top:8px;font-size:13px;color:var(--fg2)}
 .note.warn{color:var(--orange)}

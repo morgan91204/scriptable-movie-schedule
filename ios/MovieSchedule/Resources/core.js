@@ -108,6 +108,7 @@
     kmLabel: () => kmLabel,
     lateIsTonight: () => lateIsTonight,
     lateOnOwnDate: () => lateOnOwnDate,
+    linkMovies: () => linkMovies,
     loadBoxOffice: () => loadBoxOffice,
     loadBoxOfficeFull: () => loadBoxOfficeFull,
     loadBoxOfficeWeeks: () => loadBoxOfficeWeeks,
@@ -137,6 +138,7 @@
     nearest: () => nearest,
     normImageUrl: () => normImageUrl,
     normTitle: () => normTitle,
+    nowGroupLine: () => nowGroupLine,
     nowHM: () => nowHM,
     posterKnown: () => posterKnown,
     posterLight: () => posterLight,
@@ -2204,6 +2206,15 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     }
     return Object.values(map).sort((a, b) => b.hits.length - a.hits.length || showMinute(a.hits[0].time) - showMinute(b.hits[0].time));
   }
+  async function linkMovies(groups) {
+    const list = await loadMovies().catch(() => []);
+    return groups.map((g) => {
+      const k = normTitle(g.title), b = normTitle(baseTitle(g.title));
+      const movie = list.find((m) => normTitle(m.title) === k) || list.find((m) => normTitle(baseTitle(m.title)) === b);
+      return movie ? { ...g, movie } : g;
+    });
+  }
+  var nowGroupLine = (g) => [`${g.hits.length} 場`, g.runtime ? `${g.runtime} 分鐘` : "", g.rating || ""].filter(Boolean).join("｜");
   var errText = (e) => {
     const m = String(e?.message || e || "");
     if (/JSON|Unexpected|Unrecognized|token|SyntaxError|<|\{/i.test(m)) return "回傳的內容不是預期格式";
@@ -2656,7 +2667,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   }
   async function nowShowingMulti(scope, dates, winIds, formats) {
     const { hits, failed, noData } = await findShowtimesMulti(scope, dates, winIds, formats);
-    return { groups: groupByMovie(hits), failed, noData, label: multiLabel(dates, winIds) };
+    return { groups: await linkMovies(groupByMovie(hits)), failed, noData, label: multiLabel(dates, winIds) };
   }
   async function nearby(lat, lng, limit) {
     return nearest(await loadCinemas(), { lat, lng }, limit || 20);

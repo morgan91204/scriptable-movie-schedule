@@ -198,6 +198,7 @@ struct NowGroup: Codable, Identifiable {
     var title: String
     var runtime: Int?
     var rating: String?
+    var movie: TwMovie? // 電影清單上對應的那部片（對得到才有），片名列連到電影頁
     var hits: [Hit]
     var id: String { title }
 }

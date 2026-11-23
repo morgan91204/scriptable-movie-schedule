@@ -93,6 +93,20 @@ struct NowView: View {
     }
 
     /// 一組可以複選的選項：點開選單，每個選項點一下打勾、再點一下取消（選單不會關掉）
+    /// 搜尋結果裡一部片的標題列：海報、粗體片名、幾場｜片長｜分級
+    private func groupHead(_ g: NowGroup) -> some View {
+        let rt = g.runtime ?? 0
+        let info = ["\(g.hits.count) 場", rt > 0 ? "\(rt) 分鐘" : "", g.rating ?? ""].filter { !$0.isEmpty }.joined(separator: "｜")
+        return HStack(spacing: 10) {
+            PosterView(title: g.title, slug: g.movie?.slug, en: g.movie?.en)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(g.title).font(.headline).lineLimit(2)
+                Text(info).font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
+            }
+            Spacer(minLength: 4)
+        }
+    }
+
     private func multiMenu(_ title: String, summary: String, @ViewBuilder content: () -> some View) -> some View {
         Menu {
             content()
@@ -162,6 +176,12 @@ struct NowView: View {
                 }
                 ForEach(r.groups) { g in
                     Section {
+                        // 片名獨立一列（海報、粗體大字），點下去是電影頁：簡介、預告、所有影城的場次
+                        if let m = g.movie {
+                            NavigationLink { MovieDetailView(movie: m) } label: { groupHead(g) }
+                        } else {
+                            groupHead(g)
+                        }
                         ForEach(g.hits, id: \.self) { h in
                             NavigationLink {
                                 ConfirmView(pick: ShowPick(title: h.movie.title, versionLabel: h.version.label, cinemaName: h.cinema.name, address: h.ctx?.address ?? h.cinema.address ?? "", date: h.date, time: h.time, runtime: h.movie.runtime ?? g.runtime ?? 0, bookingUrl: h.ctx?.booking ?? "", cinema: h.cinema))
@@ -179,11 +199,6 @@ struct NowView: View {
                                 }
                             }
                         }
-                    } header: {
-                        Text(g.title)
-                    } footer: {
-                        let info = [(g.runtime ?? 0) > 0 ? "\(g.runtime ?? 0) 分鐘" : "", g.rating ?? ""].filter { !$0.isEmpty }.joined(separator: "｜")
-                        if !info.isEmpty { Text(info) }
                     }
                 }
                 if let none = r.noData, !none.isEmpty {

@@ -198,8 +198,9 @@ export function Item(props: {
   /** 小海報：src 是顯示來源（本機或網址），url 是載入失敗時改用的網址；空字串 = 沒有海報（灰色預設圖） */
   thumb?: { src: string; url?: string; pending?: boolean };
   rank?: number; // 排行名次（前三名橘色）
+  head?: boolean; // 一組資料最上面的標題列（片名）：字大、有底色，跟底下的列分得開
 }): string {
-  const cls = ["item", props.onTap ? "tap" : "", props.muted ? "muted" : "", props.accent ? "accent" : "", props.onLongPress ? "long" : ""].join(" ");
+  const cls = ["item", props.head ? "head" : "", props.onTap ? "tap" : "", props.muted ? "muted" : "", props.accent ? "accent" : "", props.onLongPress ? "long" : ""].join(" ");
   const fallback = "if(this.dataset.url&&this.src!==this.dataset.url){this.src=this.dataset.url}else{this.remove()}";
   return (
     <div class={cls} onTap={props.onTap} onLongPress={props.onLongPress}>
