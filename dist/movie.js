@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.24-0358
+// @movie-schedule-app 電影行程 v2026.11.24-0402
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/parsers.gen.ts
@@ -4056,14 +4056,14 @@ var App = class {
   }
   /** 最新版本是多少。網頁版問的是自己網站現在上線的版本（重新整理就會拿到的那一版），不是 GitHub 上的 */
   checkVersion() {
-    if (true) return checkLatest("2026.11.24-0358");
+    if (true) return checkLatest("2026.11.24-0402");
     return (async () => {
       try {
         const r = await globalThis.fetch("/api/version?t=" + Date.now(), { cache: "no-store" });
         const latest = String((await r.json()).version || "");
         if (!latest) return null;
         const num = (v) => Number(v.replace(/\D/g, "")) || 0;
-        return { latest, isLatest: num("2026.11.24-0358") >= num(latest) };
+        return { latest, isLatest: num("2026.11.24-0402") >= num(latest) };
       } catch (_) {
         return null;
       }
@@ -4081,7 +4081,10 @@ var App = class {
       this.switchTab("movies");
     }
     await this.openShared().catch(() => void 0);
-    if (this.syncNote) this.switchTab("settings");
+    if (this.syncNote) {
+      this.switchTab("settings");
+      this.go(() => this.syncView());
+    }
     loadFestivals().catch(() => []);
     const input = String(args.shortcutParameter || args.urls && args.urls[0] || args.plainTexts && args.plainTexts[0] || "");
     let pendingUrl = input;
@@ -4229,12 +4232,21 @@ var App = class {
       sy.setAt(r.at);
     }
   }
+  /** 設定頁的一列：點進去才是登入、同步、登出這些選項 */
+  syncLink() {
+    const sy = this.sync();
+    if (!sy) return "";
+    return /* @__PURE__ */ h(Section, { title: "同步" }, /* @__PURE__ */ h(Item, { icon: "🔄", title: "用 Google 帳號同步", subtitle: sy.on() ? "收藏和設定有變動會自動同步" : "讓主畫面的 App 和瀏覽器用同一份收藏", right: sy.on() ? "已登入" : "未登入", onTap: () => this.go(() => this.syncView()) }));
+  }
+  syncView() {
+    return /* @__PURE__ */ h(Page, { title: "用 Google 帳號同步", onBack: () => this.back() }, this.syncSection());
+  }
   syncSection() {
     const sy = this.sync();
     if (!sy) return "";
     if (!sy.on())
-      return /* @__PURE__ */ h(Section, { title: "同步", hint: this.syncNote || "登入後，收藏影城、收藏電影、收藏發行商和各項設定會存到你的帳號，在別的裝置或瀏覽器登入同一個帳號就會帶過來。我們只存帳號的識別碼（經過雜湊）和設定，不存 email 和姓名。不登入也能照常使用。" }, /* @__PURE__ */ h(Item, { icon: "🔄", title: "用 Google 登入來同步", subtitle: "例如讓主畫面的 App 和 Safari 用同一份收藏", accent: true, onTap: () => sy.login() }));
-    return /* @__PURE__ */ h(Section, { title: "同步", hint: this.syncNote || "已登入 Google，設定有變動會自動同步。通知要在每台裝置各自開啟。" }, /* @__PURE__ */ h(Item, { icon: "✅", title: "已登入，自動同步中", subtitle: "點一下立刻同步一次", chevron: false, onTap: async () => {
+      return /* @__PURE__ */ h(Section, { hint: this.syncNote || "登入後，收藏影城、收藏電影、收藏發行商和各項設定會存到你的帳號，在別的裝置或瀏覽器登入同一個帳號就會帶過來。我們只存帳號的識別碼（經過雜湊）和設定，不存 email 和姓名。不登入也能照常使用。" }, /* @__PURE__ */ h(Item, { icon: "🔄", title: "用 Google 登入來同步", subtitle: "例如讓主畫面的 App 和 Safari 用同一份收藏", accent: true, onTap: () => sy.login() }));
+    return /* @__PURE__ */ h(Section, { hint: this.syncNote || "已登入 Google，設定有變動會自動同步。通知要在每台裝置各自開啟。" }, /* @__PURE__ */ h(Item, { icon: "✅", title: "已登入，自動同步中", subtitle: "點一下立刻同步一次", chevron: false, onTap: async () => {
       const r = await sy.pull();
       if (r && r.data && r.at > sy.at()) {
         this.syncMute = true;
@@ -4390,16 +4402,16 @@ var App = class {
     return /* @__PURE__ */ h(Page, { title: "設定" }, /* @__PURE__ */ h(Section, { title: "加入行事曆時", hint: `廣告預告：${ADS_NOTE}` }, /* @__PURE__ */ h(Item, { icon: "📅", title: "寫入的行事曆", subtitle: this.calendarName, onTap: () => this.go(() => this.calendarView()) }), /* @__PURE__ */ h(Item, { icon: "📺", title: "廣告預告", subtitle: `預計散場時間會加上 ${this.settings.ads} 分鐘`, right: "點一下切換", chevron: false, onTap: () => this.cycleAds() }), /* @__PURE__ */ h(Item, { icon: "🗺", title: "導航地圖", subtitle: "點地址、分享、行程備註的導航連結", right: MAPS_LABEL[this.settings.maps || "apple"], chevron: false, onTap: () => {
       this.settings.maps = this.settings.maps === "google" ? "apple" : "google";
       saveSettings(this.settings);
-    } })), await this.notifyLink(), this.syncSection(), /* @__PURE__ */ h(Section, { title: "關於" }, false ? /* @__PURE__ */ h(Item, { icon: "📲", title: "加到主畫面", subtitle: "像 App 一樣從主畫面開啟，看圖示教學", onTap: () => this.go(() => this.installView()) }) : null, /* @__PURE__ */ h(Item, { icon: "ℹ️", title: "關於", subtitle: "資料來源、隱私權政策、場次通", onTap: () => this.go(() => this.aboutView()) })), /* @__PURE__ */ h(
+    } })), await this.notifyLink(), this.syncLink(), /* @__PURE__ */ h(Section, { title: "關於" }, false ? /* @__PURE__ */ h(Item, { icon: "📲", title: "加到主畫面", subtitle: "像 App 一樣從主畫面開啟，看圖示教學", onTap: () => this.go(() => this.installView()) }) : null, /* @__PURE__ */ h(Item, { icon: "ℹ️", title: "關於", subtitle: "資料來源、隱私權政策、場次通", onTap: () => this.go(() => this.aboutView()) })), /* @__PURE__ */ h(
       "p",
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.24-0358"}`);
+          Pasteboard.copy(`版本 ${"2026.11.24-0402"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.24-0358"}`,
+      `版本 ${"2026.11.24-0402"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -4741,7 +4753,7 @@ var App = class {
     if (false) {
       if (!r) return /* @__PURE__ */ h(Note, { text: "（無法確認是否為最新版：連不到網站）" });
       if (r.isLatest) return /* @__PURE__ */ h(Note, { text: "✅ 已是最新版" });
-      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.24-0358"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
+      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.24-0402"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
         globalThis.location.reload();
       } }));
     }

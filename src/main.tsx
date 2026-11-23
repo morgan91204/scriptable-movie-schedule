@@ -120,7 +120,7 @@ class App {
     const startTab = IS_WEB ? (/[?&]tab=(soon|fest)\b/.exec(String((globalThis as any).location?.search || "")) || [])[1] : "";
     if (startTab) { this.movieMode = startTab as "soon" | "fest"; this.switchTab("movies"); }
     await this.openShared().catch(() => undefined);
-    if (this.syncNote) this.switchTab("settings"); // 剛從 Google 登入回來：直接到設定頁看結果
+    if (this.syncNote) { this.switchTab("settings"); this.go(() => this.syncView()); } // 剛從 Google 登入回來：直接到同步那一頁看結果
     loadFestivals().catch(() => []); // 背景先看有沒有影展（有才會在電影分頁多出「影展」）
     const input = String(args.shortcutParameter || (args.urls && args.urls[0]) || (args.plainTexts && args.plainTexts[0]) || "");
     let pendingUrl = input;
@@ -286,17 +286,34 @@ class App {
     const r = await Promise.race([sy.pull(), sleep(2500).then(() => null)]);
     if (r && r.data && r.at > sy.at()) { applyLocal(syncApply(this.settings, r.data as Partial<SyncData>)); sy.setAt(r.at); }
   }
+  /** 設定頁的一列：點進去才是登入、同步、登出這些選項 */
+  syncLink(): string {
+    const sy = this.sync();
+    if (!sy) return "";
+    return (
+      <Section title="同步">
+        <Item icon="🔄" title="用 Google 帳號同步" subtitle={sy.on() ? "收藏和設定有變動會自動同步" : "讓主畫面的 App 和瀏覽器用同一份收藏"} right={sy.on() ? "已登入" : "未登入"} onTap={() => this.go(() => this.syncView())} />
+      </Section>
+    );
+  }
+  syncView(): string {
+    return (
+      <Page title="用 Google 帳號同步" onBack={() => this.back()}>
+        {this.syncSection()}
+      </Page>
+    );
+  }
   syncSection(): string {
     const sy = this.sync();
     if (!sy) return "";
     if (!sy.on())
       return (
-        <Section title="同步" hint={this.syncNote || "登入後，收藏影城、收藏電影、收藏發行商和各項設定會存到你的帳號，在別的裝置或瀏覽器登入同一個帳號就會帶過來。我們只存帳號的識別碼（經過雜湊）和設定，不存 email 和姓名。不登入也能照常使用。"}>
+        <Section hint={this.syncNote || "登入後，收藏影城、收藏電影、收藏發行商和各項設定會存到你的帳號，在別的裝置或瀏覽器登入同一個帳號就會帶過來。我們只存帳號的識別碼（經過雜湊）和設定，不存 email 和姓名。不登入也能照常使用。"}>
           <Item icon="🔄" title="用 Google 登入來同步" subtitle="例如讓主畫面的 App 和 Safari 用同一份收藏" accent onTap={() => sy.login()} />
         </Section>
       );
     return (
-      <Section title="同步" hint={this.syncNote || "已登入 Google，設定有變動會自動同步。通知要在每台裝置各自開啟。"}>
+      <Section hint={this.syncNote || "已登入 Google，設定有變動會自動同步。通知要在每台裝置各自開啟。"}>
         <Item icon="✅" title="已登入，自動同步中" subtitle="點一下立刻同步一次" chevron={false} onTap={async () => {
           const r = await sy.pull();
           if (r && r.data && r.at > sy.at()) { this.syncMute = true; this.settings = syncApply(this.settings, r.data as Partial<SyncData>); saveSettings(this.settings); this.syncMute = false; sy.setAt(r.at); this.pushSync(); await this.ui.toast("已帶入帳號裡比較新的設定"); }
@@ -519,7 +536,7 @@ class App {
           }} />
         </Section>
         {await this.notifyLink()}
-        {this.syncSection()}
+        {this.syncLink()}
         <Section title="關於">
           {IS_WEB && !this.isStandalone() ? <Item icon="📲" title="加到主畫面" subtitle="像 App 一樣從主畫面開啟，看圖示教學" onTap={() => this.go(() => this.installView())} /> : null}
           <Item icon="ℹ️" title="關於" subtitle="資料來源、隱私權政策、場次通" onTap={() => this.go(() => this.aboutView())} />
