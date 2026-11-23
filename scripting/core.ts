@@ -1769,8 +1769,14 @@ export function movieBoard(b: BoxOffice | null, movies: TwMovie[], opt: { scope?
     // 還在上映的片，如果今天有場次的影城已經比官方的數字多（剛擴大上映、或上週只有少數戲院搶先場），就用今天的數字，
     // 這樣上映中和已下檔的片都是「放映過的戲院數」，可以放在一起比（《善男信女》：官方到 11/15 只有 1 間，現在是 22 間）
     const theatersOf = (x: BoxOfficeItem, m: TwMovie | null): number => Math.max(x.theaters || 0, m && !m.comingSoon ? m.cinemaCount || 0 : 0);
+    // 上映日期：官方記的是「第一次有票房」的日期，有搶先場的片會比正式上映日早（《善男信女》官方 11/05、正式 11/20）。
+    // 還在上映的片，場次通有正式上映日、而且只比官方的晚兩個月以內（同一次上映）就用它；差更多的是舊片重映，照官方的
+    const dateOf = (x: BoxOfficeItem, m: TwMovie | null): string => {
+      const off = (x.release || "").slice(0, 10), tw = m && !m.comingSoon ? (m.release || "").slice(0, 10) : "";
+      return off && tw && tw > off && Date.parse(tw) - Date.parse(off) <= 60 * 86400e3 ? tw : off;
+    };
     const keyOf = (x: BoxOfficeItem, m: TwMovie | null): { tier: number; v: number; hi: EntryHi } => {
-      if (sort === "date") return x.release ? { tier: 1, v: Number(x.release.slice(0, 10).replace(/-/g, "")) || 0, hi: { kind: "date", text: mdOf(x.release), tier: "none", note: x.release.slice(0, 4) } } : { tier: 0, v: 0, hi: noneHi("date", "日期不明") };
+      if (sort === "date") { const d = dateOf(x, m); return d ? { tier: 1, v: Number(d.replace(/-/g, "")) || 0, hi: { kind: "date", text: mdOf(d), tier: "none", note: d.slice(0, 4) } } : { tier: 0, v: 0, hi: noneHi("date", "日期不明") }; }
       if (sort === "cinemas") { const th = theatersOf(x, m); return th ? { tier: 1, v: th, hi: { kind: "cinemas", text: String(th), tier: "none", note: "累計院數" } } : { tier: 0, v: 0, hi: noneHi("cinemas") }; }
       if (sort === "rating") {
         if (rate === "community") {
@@ -1792,7 +1798,7 @@ export function movieBoard(b: BoxOffice | null, movies: TwMovie[], opt: { scope?
     if (sort === "rating" || sort === "cinemas") keyed.slice().sort((a, c) => c.k.tier - a.k.tier || c.k.v - a.k.v).forEach((e, i) => { if (e.k.tier > 0) e.rank = i + 1; });
     keyed.sort((a, c) => c.k.tier - a.k.tier || (asc ? a.k.v - c.k.v : c.k.v - a.k.v));
     const entries = keyed.map(({ x, m, k: kk, rank }): MovieEntry => {
-      const info = [x.showing ? "上映中" : "", boxMainCountry(x.country), sort === "date" ? "" : releaseLabel(x.release), theatersOf(x, m) && sort !== "cinemas" ? `${theatersOf(x, m)} 間戲院` : ""].filter(Boolean).join("｜");
+      const info = [x.showing ? "上映中" : "", boxMainCountry(x.country), sort === "date" ? "" : releaseLabel(dateOf(x, m)), theatersOf(x, m) && sort !== "cinemas" ? `${theatersOf(x, m)} 間戲院` : ""].filter(Boolean).join("｜");
       return { key: `${x.name}|${x.release}`, rank, name: x.name, x, m, lines: sort === "total" ? [info, ""] : [`票房 ${money(x.total)}`, info], light: !m, hi: kk.hi };
     });
     const rateName = rates.find((r) => r.id === rate)!.label;

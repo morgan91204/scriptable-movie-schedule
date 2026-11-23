@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.24-0107
+// @movie-schedule-app 電影行程 v2026.11.24-0109
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/parsers.gen.ts
@@ -1972,8 +1972,15 @@ function movieBoard(b, movies, opt = {}) {
     const yr = opt.yearRatings ? opt.yearRatings.ratings : {};
     const noneHi = (kind, note) => ({ kind, text: "–", tier: "none", ...note ? { note } : {} });
     const theatersOf = (x, m) => Math.max(x.theaters || 0, m && !m.comingSoon ? m.cinemaCount || 0 : 0);
+    const dateOf = (x, m) => {
+      const off = (x.release || "").slice(0, 10), tw = m && !m.comingSoon ? (m.release || "").slice(0, 10) : "";
+      return off && tw && tw > off && Date.parse(tw) - Date.parse(off) <= 60 * 864e5 ? tw : off;
+    };
     const keyOf2 = (x, m) => {
-      if (sort === "date") return x.release ? { tier: 1, v: Number(x.release.slice(0, 10).replace(/-/g, "")) || 0, hi: { kind: "date", text: mdOf(x.release), tier: "none", note: x.release.slice(0, 4) } } : { tier: 0, v: 0, hi: noneHi("date", "日期不明") };
+      if (sort === "date") {
+        const d = dateOf(x, m);
+        return d ? { tier: 1, v: Number(d.replace(/-/g, "")) || 0, hi: { kind: "date", text: mdOf(d), tier: "none", note: d.slice(0, 4) } } : { tier: 0, v: 0, hi: noneHi("date", "日期不明") };
+      }
       if (sort === "cinemas") {
         const th = theatersOf(x, m);
         return th ? { tier: 1, v: th, hi: { kind: "cinemas", text: String(th), tier: "none", note: "累計院數" } } : { tier: 0, v: 0, hi: noneHi("cinemas") };
@@ -2002,7 +2009,7 @@ function movieBoard(b, movies, opt = {}) {
     });
     keyed2.sort((a, c) => c.k.tier - a.k.tier || (asc ? a.k.v - c.k.v : c.k.v - a.k.v));
     const entries2 = keyed2.map(({ x, m, k: kk, rank }) => {
-      const info = [x.showing ? "上映中" : "", boxMainCountry(x.country), sort === "date" ? "" : releaseLabel(x.release), theatersOf(x, m) && sort !== "cinemas" ? `${theatersOf(x, m)} 間戲院` : ""].filter(Boolean).join("｜");
+      const info = [x.showing ? "上映中" : "", boxMainCountry(x.country), sort === "date" ? "" : releaseLabel(dateOf(x, m)), theatersOf(x, m) && sort !== "cinemas" ? `${theatersOf(x, m)} 間戲院` : ""].filter(Boolean).join("｜");
       return { key: `${x.name}|${x.release}`, rank, name: x.name, x, m, lines: sort === "total" ? [info, ""] : [`票房 ${money(x.total)}`, info], light: !m, hi: kk.hi };
     });
     const rateName2 = rates.find((r) => r.id === rate).label;
@@ -3839,14 +3846,14 @@ var App = class {
   }
   /** 最新版本是多少。網頁版問的是自己網站現在上線的版本（重新整理就會拿到的那一版），不是 GitHub 上的 */
   checkVersion() {
-    if (true) return checkLatest("2026.11.24-0107");
+    if (true) return checkLatest("2026.11.24-0109");
     return (async () => {
       try {
         const r = await globalThis.fetch("/api/version?t=" + Date.now(), { cache: "no-store" });
         const latest = String((await r.json()).version || "");
         if (!latest) return null;
         const num = (v) => Number(v.replace(/\D/g, "")) || 0;
-        return { latest, isLatest: num("2026.11.24-0107") >= num(latest) };
+        return { latest, isLatest: num("2026.11.24-0109") >= num(latest) };
       } catch (_) {
         return null;
       }
@@ -3961,11 +3968,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.24-0107"}`);
+          Pasteboard.copy(`版本 ${"2026.11.24-0109"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.24-0107"}`,
+      `版本 ${"2026.11.24-0109"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -4302,7 +4309,7 @@ var App = class {
     if (false) {
       if (!r) return /* @__PURE__ */ h(Note, { text: "（無法確認是否為最新版：連不到網站）" });
       if (r.isLatest) return /* @__PURE__ */ h(Note, { text: "✅ 已是最新版" });
-      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.24-0107"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
+      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.24-0109"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
         globalThis.location.reload();
       } }));
     }
