@@ -1698,7 +1698,7 @@ export async function loadMovieBoard(opt: { sort?: string; years?: string[]; wee
 // ───────────────────────── 即將上映：場次通（已經排了場次）＋開眼的近期上映（還沒有場次） ─────────────────────────
 export const UPCOMING_URL = "https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/data/upcoming.json";
 /** 還沒有場次的即將上映片（伺服器每六小時從開眼電影網的「近期上映」整理，海報用 TMDB 查好；見 tools/upcoming.mjs） */
-export interface UpcomingFilm { title: string; release: string; rating: string; runtime: number; en: string; poster: string; url: string }
+export interface UpcomingFilm { title: string; release: string; rating: string; runtime: number; en: string; poster: string; url: string; approx?: boolean /* 只知道是哪一週上映，日期是大約的 */ }
 let upcomingMem: { at: number; job: Promise<UpcomingFilm[]> } | null = null;
 /** 讀即將上映的片單（記憶體 30 分鐘、手機 6 小時）；讀不到回傳空的（清單就只剩場次通有場次的片） */
 export function loadUpcoming(): Promise<UpcomingFilm[]> {
@@ -1750,7 +1750,7 @@ export function soonBoard(movies: TwMovie[], upcoming: UpcomingFilm[], query?: s
   const open = rows.length;
   for (const u of upcoming) {
     if (known[communityKey(u.title)] || u.release <= today || !hit(u.title, u.en)) continue;
-    rows.push({ key: "u|" + u.title + "|" + u.release, title: u.title, m: null, u, lines: [[`${mdOf(u.release)} 上映`, u.rating, u.runtime ? `${u.runtime} 分` : "", "尚未開放場次"].filter(Boolean).join("｜"), u.en || ""], release: u.release });
+    rows.push({ key: "u|" + u.title + "|" + u.release, title: u.title, m: null, u, lines: [[`${mdOf(u.release)} ${u.approx ? "當週" : ""}上映`, u.rating, u.runtime ? `${u.runtime} 分` : "", "尚未開放場次"].filter(Boolean).join("｜"), u.en || ""], release: u.release });
   }
   rows.sort((a, b) => (a.release || "9999").localeCompare(b.release || "9999")); // 穩定排序：同一天有場次的在前
   return {

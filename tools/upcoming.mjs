@@ -17,6 +17,8 @@ const today = new Date(now + 8 * HOUR).toISOString().slice(0, 10); // 台灣的�
 
 const text = (s) => String(s || "").replace(/<[^>]+>/g, " ").replace(/&amp;/g, "&").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim();
 const iso = (d) => d.replace(/\//g, "-");
+/** 原文片名：全是漢字的（華語片，常常只是簡體寫法）不顯示 */
+const enOf = (t) => (t && t.en && /[A-Za-zぁ-ヿ가-힣\u0600-\u06FF\u0400-\u04FF\u0E00-\u0E7F]/.test(t.en) ? t.en : "");
 const CERT = { G: "普遍級", P: "保護級", F2: "輔12級", F5: "輔15級", R: "限制級" };
 
 /** 「未來八週」那一頁：每個日期一個標題，底下是那一天上映的片 */
@@ -26,7 +28,8 @@ export function parseWeeks(html) {
   for (let i = 1; i < parts.length; i += 2) {
     const release = iso(parts[i]);
     const block = parts[i + 1].split(/<h2 /)[0];
-    for (const m of block.matchAll(/<a href="\/movie\/(f\w+)\/"><img[^>]*alt="([^"]*)"/g)) out.push({ id: m[1], title: text(m[2]), release });
+    // 這一頁的日期是「那一週」的日期，不是每部片確切的上映日：先標成大約（approx），之後到電影頁查確切的
+    for (const m of block.matchAll(/<a href="\/movie\/(f\w+)\/"><img[^>]*alt="([^"]*)"/g)) out.push({ id: m[1], title: text(m[2]), release, approx: true });
   }
   return out;
 }
@@ -38,7 +41,7 @@ export function parseFeatured(html) {
     if (!d) continue;
     const cert = (li[0].match(/cer_(\w+)\.gif/) || [])[1];
     const mins = Number((li[0].match(/片長：\s*(\d+)\s*分/) || [])[1]) || 0;
-    out.push({ id: li[1], title: text(li[2]), release: iso(d[1]), rating: CERT[cert] || "", runtime: mins });
+    out.push({ id: li[1], title: text(li[2]), release: iso(d[1]), rating: CERT[cert] || "", runtime: mins, approx: false });
   }
   return out;
 }
@@ -50,7 +53,7 @@ async function page(path) {
 }
 
 if (process.argv[1] && process.argv[1].endsWith("upcoming.mjs")) {
-  if (now - (prev.at || 0) < 6 * HOUR && (prev.films || []).length) {
+  if (now - (prev.at || 0) < 6 * HOUR && (prev.films || []).length && prev.dates) { // 沒有 dates 的是舊格式：重抓
     // 六小時內抓過：沿用，只把已經過了上映日的拿掉
     const films = prev.films.filter((f) => f.release > today);
     fs.writeFileSync(outPath, JSON.stringify({ ...prev, films }) + "\n");
@@ -76,7 +79,30 @@ if (process.argv[1] && process.argv[1].endsWith("upcoming.mjs")) {
   const byId = new Map();
   for (const f of weeks) byId.set(f.id, f);
   for (const f of featured) byId.set(f.id, { ...(byId.get(f.id) || {}), ...f });
-  const list = Array.from(byId.values()).filter((f) => f.title && f.release > today);
+  const all = Array.from(byId.values()).filter((f) => f.title);
+  // 只知道「哪一週」的片：到它的電影頁查確切的上映日期（一部片只查一次，記在 dates；一次最多查 60 部，每部隔 1.2 秒）
+  const dates = prev.dates || {};
+  let looked = 0;
+  for (const f of all) {
+    if (!f.approx) continue;
+    const old = dates[f.id];
+    if (!old && looked < 60) {
+      looked++;
+      await new Promise((r) => setTimeout(r, 1200));
+      try {
+        const h = await page(`/movie/${f.id}/`);
+        const d = h.match(/上映日期[：:]\s*(?:<[^>]*>\s*)*(\d{4})\/(\d{1,2})\/(\d{1,2})/);
+        const mins = Number((h.match(/片長[：:]\s*(\d+)\s*分/) || [])[1]) || 0;
+        dates[f.id] = { d: d ? `${d[1]}-${d[2].padStart(2, "0")}-${d[3].padStart(2, "0")}` : "", mins, at: now };
+      } catch (_) { /* 這次讀不到：下次再查 */ }
+    }
+    const got = dates[f.id];
+    // 電影頁的日期要跟「那一週」差不多（前後十天內）才採用，免得抓到別的日期（例如重映片的舊上映日）
+    if (got && got.d && Math.abs(Date.parse(got.d) - Date.parse(f.release)) <= 10 * DAY) { f.release = got.d; f.approx = false; }
+    if (got && got.mins && !f.runtime) f.runtime = got.mins;
+  }
+  for (const k of Object.keys(dates)) if (!byId.has(k) && now - dates[k].at > 30 * DAY) delete dates[k];
+  const list = all.filter((f) => f.release > today);
 
   // 海報：開眼代碼「f＋一個字母＋兩碼國別＋IMDb 編號」→ 到 TMDB 用 IMDb 編號查。查過的記在 tmdb（找不到的 7 天後再試）
   const tmdb = prev.tmdb || {};
@@ -99,8 +125,8 @@ if (process.argv[1] && process.argv[1].endsWith("upcoming.mjs")) {
   }
   for (const k of Object.keys(tmdb)) if (!byId.has(k) && now - tmdb[k].at > 30 * DAY) delete tmdb[k];
   const films = list
-    .map((f) => ({ title: f.title, release: f.release, rating: f.rating || "", runtime: f.runtime || 0, en: (tmdb[f.id] && tmdb[f.id].en) || "", poster: tmdb[f.id] && tmdb[f.id].p ? "https://image.tmdb.org/t/p/w342" + tmdb[f.id].p : "", url: `${AT}/movie/${f.id}/` }))
+    .map((f) => ({ title: f.title, release: f.release, rating: f.rating || "", runtime: f.runtime || 0, approx: !!f.approx, en: enOf(tmdb[f.id]), poster: tmdb[f.id] && tmdb[f.id].p ? "https://image.tmdb.org/t/p/w342" + tmdb[f.id].p : "", url: `${AT}/movie/${f.id}/` }))
     .sort((a, b) => a.release.localeCompare(b.release) || a.title.localeCompare(b.title, "zh-Hant"));
-  fs.writeFileSync(outPath, JSON.stringify({ at: now, source: "開眼電影網", films, tmdb }) + "\n");
-  console.log(`即將上映 ${films.length} 部（未來八週 ${weeks.length}、重點片 ${featured.length}），到 ${films.length ? films[films.length - 1].release : "-"}；有海報 ${films.filter((f) => f.poster).length}；這次問了 TMDB ${asked} 次`);
+  fs.writeFileSync(outPath, JSON.stringify({ at: now, source: "開眼電影網", films, tmdb, dates }) + "\n");
+  console.log(`即將上映 ${films.length} 部（未來八週 ${weeks.length}、重點片 ${featured.length}），到 ${films.length ? films[films.length - 1].release : "-"}；有海報 ${films.filter((f) => f.poster).length}；這次問了 TMDB ${asked} 次、查了 ${looked} 部的電影頁；只知道哪一週的還有 ${films.filter((f) => f.approx).length} 部`);
 }

@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.23-2147
+// @movie-schedule-app 電影行程 v2026.11.23-2153
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/parsers.gen.ts
@@ -1936,7 +1936,7 @@ function soonBoard(movies, upcoming, query) {
   const open = rows.length;
   for (const u of upcoming) {
     if (known[communityKey(u.title)] || u.release <= today || !hit(u.title, u.en)) continue;
-    rows.push({ key: "u|" + u.title + "|" + u.release, title: u.title, m: null, u, lines: [[`${mdOf(u.release)} 上映`, u.rating, u.runtime ? `${u.runtime} 分` : "", "尚未開放場次"].filter(Boolean).join("｜"), u.en || ""], release: u.release });
+    rows.push({ key: "u|" + u.title + "|" + u.release, title: u.title, m: null, u, lines: [[`${mdOf(u.release)} ${u.approx ? "當週" : ""}上映`, u.rating, u.runtime ? `${u.runtime} 分` : "", "尚未開放場次"].filter(Boolean).join("｜"), u.en || ""], release: u.release });
   }
   rows.sort((a, b) => (a.release || "9999").localeCompare(b.release || "9999"));
   return {
@@ -3466,14 +3466,14 @@ var App = class {
   }
   /** 最新版本是多少。網頁版問的是自己網站現在上線的版本（重新整理就會拿到的那一版），不是 GitHub 上的 */
   checkVersion() {
-    if (true) return checkLatest("2026.11.23-2147");
+    if (true) return checkLatest("2026.11.23-2153");
     return (async () => {
       try {
         const r = await globalThis.fetch("/api/version?t=" + Date.now(), { cache: "no-store" });
         const latest = String((await r.json()).version || "");
         if (!latest) return null;
         const num = (v) => Number(v.replace(/\D/g, "")) || 0;
-        return { latest, isLatest: num("2026.11.23-2147") >= num(latest) };
+        return { latest, isLatest: num("2026.11.23-2153") >= num(latest) };
       } catch (_) {
         return null;
       }
@@ -3574,11 +3574,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.23-2147"}`);
+          Pasteboard.copy(`版本 ${"2026.11.23-2153"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.23-2147"}`,
+      `版本 ${"2026.11.23-2153"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -3920,7 +3920,7 @@ var App = class {
     if (false) {
       if (!r) return /* @__PURE__ */ h(Note, { text: "（無法確認是否為最新版：連不到網站）" });
       if (r.isLatest) return /* @__PURE__ */ h(Note, { text: "✅ 已是最新版" });
-      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.23-2147"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
+      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.23-2153"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
         globalThis.location.reload();
       } }));
     }
@@ -4206,7 +4206,7 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
   async soonMovieView(u) {
     const e = await this.extras(u.title, void 0, u.en);
     const date = u.release.replace(/-/g, "/");
-    return /* @__PURE__ */ h(Page, { title: u.title, subtitle: `${date} 上映`, onBack: () => this.back() }, this.hero(e, u.title, [u.en, [`${date} 上映`, u.rating, u.runtime ? `${u.runtime} 分` : ""].filter(Boolean).join("｜")].filter(Boolean)), /* @__PURE__ */ h(Note, { text: "戲院還沒有排這部片的場次。通常上映前一到兩週會開放，到時候這裡會自動變成可以查場次。上映日期可能再調整。" }), /* @__PURE__ */ h(Button, { label: "🌐 開眼電影網的介紹", kind: "secondary", onTap: () => Safari.open(u.url) }));
+    return /* @__PURE__ */ h(Page, { title: u.title, subtitle: `${date} 上映`, onBack: () => this.back() }, this.hero(e, u.title, [u.en, [`${date} ${u.approx ? "當週" : ""}上映`, u.rating, u.runtime ? `${u.runtime} 分` : ""].filter(Boolean).join("｜")].filter(Boolean)), /* @__PURE__ */ h(Note, { text: "戲院還沒有排這部片的場次。通常上映前一到兩週會開放，到時候這裡會自動變成可以查場次。上映日期可能再調整。" }), /* @__PURE__ */ h(Button, { label: "🌐 開眼電影網的介紹", kind: "secondary", onTap: () => Safari.open(u.url) }));
   }
   // 只看常去影城
   async movieView(m, date) {

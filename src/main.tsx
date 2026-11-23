@@ -1222,7 +1222,7 @@ class App {
     const date = u.release.replace(/-/g, "/");
     return (
       <Page title={u.title} subtitle={`${date} 上映`} onBack={() => this.back()}>
-        {this.hero(e, u.title, [u.en, [`${date} 上映`, u.rating, u.runtime ? `${u.runtime} 分` : ""].filter(Boolean).join("｜")].filter(Boolean))}
+        {this.hero(e, u.title, [u.en, [`${date} ${u.approx ? "當週" : ""}上映`, u.rating, u.runtime ? `${u.runtime} 分` : ""].filter(Boolean).join("｜")].filter(Boolean))}
         <Note text="戲院還沒有排這部片的場次。通常上映前一到兩週會開放，到時候這裡會自動變成可以查場次。上映日期可能再調整。" />
         <Button label="🌐 開眼電影網的介紹" kind="secondary" onTap={() => Safari.open(u.url)} />
       </Page>

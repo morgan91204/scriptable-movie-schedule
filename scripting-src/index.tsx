@@ -961,7 +961,7 @@ function BoxOfficeMoviePage({ item: x }: { item: BoxOfficeItem }) {
 function SoonMoviePage({ film: u }: { film: UpcomingFilm }) {
   const date = u.release.replace(/-/g, "/")
   return <List navigationTitle={u.title} navigationBarTitleDisplayMode={"inline"}>
-    <MovieHero title={u.title} en={u.en} lines={[u.en, [`${date} 上映`, u.rating, u.runtime ? `${u.runtime} 分` : ""].filter(Boolean).join("｜")].filter(Boolean)} />
+    <MovieHero title={u.title} en={u.en} lines={[u.en, [`${date} ${u.approx ? "當週" : ""}上映`, u.rating, u.runtime ? `${u.runtime} 分` : ""].filter(Boolean).join("｜")].filter(Boolean)} />
     <Section footer={<Text>戲院還沒有排這部片的場次。通常上映前一到兩週會開放，到時候這裡會自動變成可以查場次。上映日期可能再調整。</Text>}>
       <Button title={"開眼電影網的介紹"} systemImage={"safari"} action={() => Safari.openURL(u.url)} />
     </Section>
