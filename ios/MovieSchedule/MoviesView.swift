@@ -12,7 +12,7 @@ struct MoviesView: View {
             List {
                 Section {
                     Picker("顯示", selection: $mode) {
-                        Text("電影").tag("box")
+                        Text("已上映").tag("box")
                         Text("即將上映").tag("soon")
                         if hasFestival { Text("影展").tag("fest") } // 有進行中或即將開始的影展才出現
                     }
@@ -46,15 +46,33 @@ struct MoviesView: View {
             let k = query.trimmingCharacters(in: .whitespaces).lowercased()
             let list = all.filter { k.isEmpty || "\($0.title) \($0.en ?? "")".lowercased().contains(k) }
             let soon = list.filter { $0.comingSoon ?? false }
-            if !soon.isEmpty {
+            let groups = soonGroups(soon)
+            ForEach(Array(groups.enumerated()), id: \.offset) { i, g in
                 Section {
-                    ForEach(soon) { row($0) }
+                    ForEach(g.items) { row($0) }
                 } header: {
-                    Text("即將上映（\(soon.count)）")
+                    Text(g.title)
                 } footer: {
-                    Text("還沒上映、但已經可以查到場次的片，依上映日期排序。")
+                    if i == groups.count - 1 { Text("還沒上映、但已經可以查到場次的片，依上映日期排序。") }
                 }
             }
+        }
+    }
+
+    /// 「即將上映」依上映月份分段：「11 月（3）」…，不知道上映日期的放最後一段（清單本來就依上映日期排好）
+    private func soonGroups(_ list: [TwMovie]) -> [(title: String, items: [TwMovie])] {
+        var out: [(key: String, items: [TwMovie])] = []
+        for m in list {
+            let d = m.release ?? ""
+            let key = d.count >= 7 ? String(d.prefix(7)) : ""
+            if let i = out.firstIndex(where: { $0.key == key }) { out[i].items.append(m) } else { out.append((key, [m])) }
+        }
+        out.sort { ($0.key.isEmpty ? "9999" : $0.key) < ($1.key.isEmpty ? "9999" : $1.key) }
+        let thisYear = String(Calendar.current.component(.year, from: Date()))
+        return out.map { g in
+            guard !g.key.isEmpty else { return ("日期未定（\(g.items.count)）", g.items) }
+            let y = String(g.key.prefix(4)), mo = Int(g.key.suffix(2)) ?? 0
+            return ("\(y == thisYear ? "" : y + " 年 ")\(mo) 月（\(g.items.count)）", g.items)
         }
     }
 
@@ -102,8 +120,7 @@ struct MoviesView: View {
 struct BoxOfficeSection: View {
     var query: String = ""
     @State private var board: Loadable<FilmList> = .loading
-    @State private var scope = "now" // 範圍：上映中／年度（含已下檔）
-    @State private var sort = "" // 上映中的排法（空 = 第一種：本週票房）
+    @State private var sort = "" // 排法（空 = 第一種：本週票房）；year = 年度排行（含已下檔）
     @State private var years: Set<String> = [] // 年度排行選了哪幾年（空 = 最新的一年）
     @State private var limit = 100 // 年度排行目前顯示幾列（一年六百部左右，分批顯示）
     @State private var week = "" // 週票房看哪一週（空 = 最新）
@@ -117,7 +134,6 @@ struct BoxOfficeSection: View {
             results
         }
         .task(id: loadKey) { await load() }
-        .onChange(of: scope) { _, _ in limit = 100 }
         .onChange(of: sort) { _, _ in limit = 100 }
         .onChange(of: years) { _, _ in limit = 100 }
         .onChange(of: query) { _, _ in limit = 100 }
@@ -125,22 +141,18 @@ struct BoxOfficeSection: View {
     }
 
     private var loadKey: String {
-        [scope, sort, years.sorted().joined(separator: ","), query, String(limit), week, countries.sorted().joined(separator: ",")].joined(separator: "|")
+        [sort, years.sorted().joined(separator: ","), query, String(limit), week, countries.sorted().joined(separator: ",")].joined(separator: "|")
     }
 
     @ViewBuilder private var pickers: some View {
         if let b = board.value {
             Section {
-                if b.scopes.count > 1 {
-                    Picker("範圍", selection: $scope) {
-                        ForEach(b.scopes) { Text($0.label).tag($0.id) }
+                // 範圍和排序併成一個選單：最後一項是年度排行（含已下檔）
+                if b.orders.count > 1 {
+                    Picker("排序", selection: Binding(get: { b.order }, set: { sort = $0 })) {
+                        ForEach(b.orders) { Text($0.id == "year" ? "\($0.label)（含已下檔）" : $0.label).tag($0.id) }
                     }
-                    .pickerStyle(.segmented)
-                }
-                if b.sorts.count > 1 {
-                    Picker("排序", selection: Binding(get: { b.sort }, set: { sort = $0 })) {
-                        ForEach(b.sorts) { Text($0.label).tag($0.id) }
-                    }
+                    .accessibilityIdentifier("order-picker")
                 }
                 if b.weeks.count > 1 {
                     Picker("週次", selection: Binding(
@@ -150,8 +162,6 @@ struct BoxOfficeSection: View {
                         ForEach(b.weeks) { Text("\($0.label)（\($0.note)）").tag($0.id) }
                     }
                 }
-            } footer: {
-                Text(b.scope == "year" ? "年度：那一年上映的電影，已經下檔的也在裡面。" : "上映中：現在查得到場次的電影，可以換排序。")
             }
         }
     }
@@ -299,7 +309,7 @@ struct BoxOfficeSection: View {
 
     private func load() async {
         do {
-            board = .loaded(try await Bridge.shared.call("filmList", [scope, sort, years.sorted(), query.trimmingCharacters(in: .whitespaces), limit, week, countries.sorted()]))
+            board = .loaded(try await Bridge.shared.call("filmList", ["", sort, years.sorted(), query.trimmingCharacters(in: .whitespaces), limit, week, countries.sorted()]))
         } catch {
             board = .failed(errorText(error))
         }

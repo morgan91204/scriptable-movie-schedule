@@ -12,7 +12,7 @@ import {
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
   loadSettings, saveSettings, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, TW,
   FORMATS, formatsOf, filterVersions, filterVersionsAny, movieRows, movieDays, nearest, kmLabel, WINDOWS, findShowtimes, findShowtimesMulti, multiLabel, multiDetail, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText,
-  hallOf, tmdbTest, movieExtras, moviePoster, movieRuntime, posterSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxCountries, boxByCountry, boxInfo, boxInfoRows, boxCountryText, BOX_COUNTRY_NOTE, boxCountryTag, boxCountriesPicked, movieBoard, loadBoxFor, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityCached, communityVote, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalsReady, festivalNote, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, festivalDefaultDate, festivalStateLabel, festivalState, festivalFooter, linkMovies, nowGroupLine, nowFilter, festivalPick, movieAbout, festivalSearch, festivalSearchLines, festivalTrailer, festivalYears, festivalsAny, festivalGroups, festivalChipNote, festivalStatusLine, movieRatings, ratingTier,
+  hallOf, tmdbTest, movieExtras, moviePoster, movieRuntime, posterSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxCountries, boxByCountry, boxInfo, boxInfoRows, boxCountryText, BOX_COUNTRY_NOTE, boxCountryTag, boxCountriesPicked, movieBoard, loadBoxFor, soonGroups, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityCached, communityVote, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalsReady, festivalNote, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, festivalDefaultDate, festivalStateLabel, festivalState, festivalFooter, linkMovies, nowGroupLine, nowFilter, festivalPick, movieAbout, festivalSearch, festivalSearchLines, festivalTrailer, festivalYears, festivalsAny, festivalGroups, festivalChipNote, festivalStatusLine, movieRatings, ratingTier,
 } from "./core";
 import type { MovieExtras, Ratings, Community, BoxOfficeItem, BoxSort, MovieEntry, Festival, FestivalFilm, FestivalSession } from "./core";
 import { setTabBar, setBackGuard, esc } from "./jsx";
@@ -917,7 +917,7 @@ class App {
   movieModeChips(): string {
     return (
       <Chips tabs>
-        <Chip label="電影" muted={this.movieMode !== "box"} onTap={() => { this.movieMode = "box"; }} />
+        <Chip label="已上映" muted={this.movieMode !== "box"} onTap={() => { this.movieMode = "box"; }} />
         <Chip label="即將上映" muted={this.movieMode !== "soon"} onTap={() => { this.movieMode = "soon"; }} />
         {/* 有進行中或即將開始的影展才會出現 */}
         {festivalsAny() ? <Chip label="影展" muted={this.movieMode !== "fest"} onTap={() => { this.movieMode = "fest"; }} /> : null}
@@ -1045,8 +1045,8 @@ class App {
     );
   }
 
-  boxScope = "now"; // 範圍：上映中（預設）／年度（含已下檔）
-  boxSort = ""; // 上映中的排法：本週票房／累計票房／上映日期／評分／影城數（空 = 第一種）
+  boxOpen = ""; // 目前展開哪一組篩選（週次／年份／出品國別；空 = 都收合）
+  boxSort = ""; // 排法：本週票房／累計票房／上映日期／評分／影城數／年度排行（year，含已下檔）（空 = 第一種）
   boxYears: string[] = []; // 年度排行選了哪幾年（空 = 最新的一年）
   boxWeek = ""; // 週票房看哪一週（空 = 最新）
   boxCountry: string[] = []; // 只看哪幾個出品國別（可以複選；空 = 全部）
@@ -1055,10 +1055,10 @@ class App {
   /** 「電影」清單：上映中與票房排行合成一份（範圍、排序、出品國別都在這裡選） */
   async boxOfficeView(): Promise<string> {
     // 票房讀不到時清單照樣出來，只是少了依票房排的選項
-    const [b, all] = await Promise.all([loadBoxFor(this.boxScope, this.boxSort || "week", this.boxWeek).catch(() => null), loadMovies().catch(() => [] as TwMovie[])]);
+    const [b, all] = await Promise.all([loadBoxFor(this.boxSort === "year" ? "year" : "now", this.boxSort || "week", this.boxWeek).catch(() => null), loadMovies().catch(() => [] as TwMovie[])]);
     if (!b && !all.length) throw new Error("讀不到電影清單，請稍後再試");
     const k = this.movieQuery.trim().toLowerCase();
-    const board = movieBoard(b, all, { scope: this.boxScope, sort: this.boxSort, years: this.boxYears, week: this.boxWeek, countries: this.boxCountry, query: k });
+    const board = movieBoard(b, all, { sort: this.boxSort, years: this.boxYears, week: this.boxWeek, countries: this.boxCountry, query: k });
     const { years, countries } = board;
     const selYears = board.selYears, country = board.selCountries;
     // 年度排行一年有六百部左右、全選是好幾千部：先畫 100 列，快滑到底時自動接著載入（不用按）。換了排法、年份或搜尋字就從頭開始
@@ -1087,6 +1087,10 @@ class App {
       if (src && src === u) cachePoster(u);
       return { src, url: u };
     };
+    // 收合的篩選：一行「名稱　目前選的 ▸」，點了展開（一次只展開一個）
+    const fold = (id: string, title: string, summary: string) => (
+      <Item title={title} right={`${summary} ${this.boxOpen === id ? "▾" : "▸"}`} chevron={false} onTap={() => { this.boxOpen = this.boxOpen === id ? "" : id; }} />
+    );
     const item = (e: MovieEntry, i: number) => {
       const m = e.m, x = e.x;
       return (
@@ -1102,46 +1106,42 @@ class App {
     return (
       <Page title="依電影找場次" subtitle={board.title} onBack={() => this.back()}>
         {this.movieModeChips()}
-        {board.scopes.length > 1 ? (
-          <Chips>
-            {board.scopes.map((x) => <Chip label={x.id === "year" ? `${x.label}（${x.sub}）` : x.label} muted={board.scope !== x.id} onTap={() => { this.boxScope = x.id; }} />)}
-          </Chips>
-        ) : null}
-        {board.sorts.length > 1 ? (
-          <Section title="排序">
-            <Chips scroll>
-              {board.sorts.map((x) => <Chip label={x.label} muted={board.sort !== x.id} onTap={() => { this.boxSort = x.id; }} />)}
-            </Chips>
-          </Section>
-        ) : null}
-        {board.weeks.length > 1 ? (
-          <Section title="週次">
-            <Chips>
-              {board.weeks.map((o) => <Chip label={o.label} sub={o.note} muted={board.selWeek !== o.id} onTap={() => { this.boxWeek = o.note === "最新" ? "" : o.id; }} />)}
-            </Chips>
-          </Section>
-        ) : null}
-        {countries.length > 1 ? (
-          <Section title="出品國別（全台票房，可篩選出品國）" hint="可複選，可以左右滑動">
-            <Chips scroll>
-              <Chip label="全部" sub={`${board.everyone} 部`} muted={country.length > 0} onTap={() => { this.boxCountry = []; }} />
-              {countries.map((c) => <Chip label={c.id} sub={`${c.count} 部`} muted={country.indexOf(c.id) < 0} onTap={() => { this.boxCountry = country.indexOf(c.id) < 0 ? [...country, c.id] : country.filter((z) => z !== c.id); }} />)}
-            </Chips>
-          </Section>
-        ) : null}
-        {board.scope === "year" && years.length > 1 ? (
-          <Section title="年份" hint="可以複選，選了幾年就合在一起排；全選就是 2016 年至今的總排行。">
-            <Chips>
-              {/* 全選：再點一次回到只看最新的一年 */}
-              <Chip label="全選" muted={selYears.length !== years.length} onTap={() => { this.boxYears = selYears.length === years.length ? [] : years.slice(); }} />
-              {years.map((y) => (
-                <Chip label={y} muted={selYears.indexOf(y) < 0} onTap={() => { this.boxYears = selYears.indexOf(y) < 0 ? [...selYears, y] : selYears.length > 1 ? selYears.filter((z) => z !== y) : selYears; }} />
-              ))}
-            </Chips>
-          </Section>
-        ) : null}
+        {/* 搜尋放最上面；範圍和排序併成一排（最後一項是年度排行） */}
         <input class="field" name="q" value={this.movieQuery} placeholder="搜尋片名" />
         <Button label="搜尋" kind="secondary" enter onTap={(v) => { this.movieQuery = v.q || ""; }} />
+        {board.orders.length > 1 ? (
+          <Chips scroll>
+            {board.orders.map((x) => <Chip label={x.id === "year" ? "年度排行（含已下檔）" : x.label} muted={board.order !== x.id} onTap={() => { this.boxSort = x.id; }} />)}
+          </Chips>
+        ) : null}
+        {/* 週次、出品國別、年份預設收合成一行，點了才展開 */}
+        {board.weeks.length > 1 || countries.length > 1 || (board.scope === "year" && years.length > 1) ? (
+          <Section hint={this.boxOpen === "country" ? BOX_COUNTRY_NOTE + "可以左右滑動。" : this.boxOpen === "year" ? "可以複選，選了幾年就合在一起排；全選就是 2016 年至今的總排行。" : this.boxOpen === "week" ? "可以回頭看過去幾週的排行。" : ""}>
+            {board.weeks.length > 1 ? fold("week", "週次", board.weekSummary) : null}
+            {board.weeks.length > 1 && this.boxOpen === "week" ? (
+              <Chips>
+                {board.weeks.map((o) => <Chip label={o.label} sub={o.note} muted={board.selWeek !== o.id} onTap={() => { this.boxWeek = o.note === "最新" ? "" : o.id; }} />)}
+              </Chips>
+            ) : null}
+            {board.scope === "year" && years.length > 1 ? fold("year", "年份", board.yearSummary) : null}
+            {board.scope === "year" && years.length > 1 && this.boxOpen === "year" ? (
+              <Chips>
+                {/* 全選：再點一次回到只看最新的一年 */}
+                <Chip label="全選" muted={selYears.length !== years.length} onTap={() => { this.boxYears = selYears.length === years.length ? [] : years.slice(); }} />
+                {years.map((y) => (
+                  <Chip label={y} muted={selYears.indexOf(y) < 0} onTap={() => { this.boxYears = selYears.indexOf(y) < 0 ? [...selYears, y] : selYears.length > 1 ? selYears.filter((z) => z !== y) : selYears; }} />
+                ))}
+              </Chips>
+            ) : null}
+            {countries.length > 1 ? fold("country", "出品國別", board.countrySummary) : null}
+            {countries.length > 1 && this.boxOpen === "country" ? (
+              <Chips scroll>
+                <Chip label="全部" sub={`${board.everyone} 部`} muted={country.length > 0} onTap={() => { this.boxCountry = []; }} />
+                {countries.map((c) => <Chip label={c.id} sub={`${c.count} 部`} muted={country.indexOf(c.id) < 0} onTap={() => { this.boxCountry = country.indexOf(c.id) < 0 ? [...country, c.id] : country.filter((z) => z !== c.id); }} />)}
+              </Chips>
+            ) : null}
+          </Section>
+        ) : null}
         {every.length ? null : <Empty icon="🎞" text="找不到相符的電影" />}
         {rows.length ? <Section title={board.title} hint={board.footer}>{rows.map(item)}</Section> : null}
         {paged && board.entries.length > rows.length ? (
@@ -1199,15 +1199,13 @@ class App {
         onTap={() => this.go(() => this.movieView(m, ""), `讀取《${m.title}》的放映影城…`)}
       />
     );
-    const now = list.filter((m) => !m.comingSoon);
-    const soon = list.filter((m) => m.comingSoon);
+    const groups = soonGroups(list); // 依上映月份分段
     return (
-      <Page title="依電影找場次" subtitle={`${all.length} 部電影`} onBack={() => this.back()}>
+      <Page title="依電影找場次" subtitle={`即將上映 ${list.length} 部`} onBack={() => this.back()}>
         {this.movieModeChips()}
         <input class="field" name="q" value={this.movieQuery} placeholder="搜尋片名" />
         <Button label="搜尋" kind="secondary" enter onTap={(v) => { this.movieQuery = v.q || ""; }} />
-        {now.length ? <Section title={`上映中（${now.length}）`} hint="依今天放映的影城數排序；今天沒有場次、過幾天才有的排在最後。資料來自場次通。">{now.map(item)}</Section> : null}
-        {soon.length ? <Section title={`即將上映（${soon.length}）`} hint="還沒上映、但已經可以查到場次的片，依上映日期排序。">{soon.map(item)}</Section> : null}
+        {groups.map((g, i) => <Section title={g.title} hint={i === groups.length - 1 ? "還沒上映、但已經可以查到場次的片，依上映日期排序。" : ""}>{g.items.map(item)}</Section>)}
         {list.length ? null : <Empty icon="🎞" text="找不到相符的電影" />}
       </Page>
     );

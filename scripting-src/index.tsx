@@ -14,7 +14,7 @@ import {
   Cinema, Movie, Settings, Version, TwMovie, TwMovieCinema, CITY_ORDER, TW,
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
   loadSettings, saveSettings, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, cinemaAddress,
-  FORMATS, formatsOf, filterVersions, filterVersionsAny, movieRows, movieDays, nearest, kmLabel, WINDOWS, findShowtimes, findShowtimesMulti, multiLabel, multiDetail, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText, hallOf, tmdbTest, movieExtras, moviePoster, posterReady, posterTint, POSTER_TINTS, normImageUrl, movieRuntime, posterSrc, isLocalSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxCountries, boxByCountry, boxInfo, boxInfoRows, boxCountryText, BOX_COUNTRY_NOTE, boxCountryTag, boxCountriesPicked, movieBoard, loadBoxFor, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityVote, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, SCRIPTING_IMPORT_URL, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, festivalDefaultDate, festivalStateLabel, festivalState, festivalFooter, linkMovies, nowGroupLine, nowFilter, festivalPick, movieAbout, festivalSearch, festivalSearchLines, festivalTrailer, festivalYears, festivalGroups, festivalChipNote, festivalStatusLine, movieRatings, ratingTier,
+  FORMATS, formatsOf, filterVersions, filterVersionsAny, movieRows, movieDays, nearest, kmLabel, WINDOWS, findShowtimes, findShowtimesMulti, multiLabel, multiDetail, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText, hallOf, tmdbTest, movieExtras, moviePoster, posterReady, posterTint, POSTER_TINTS, normImageUrl, movieRuntime, posterSrc, isLocalSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxCountries, boxByCountry, boxInfo, boxInfoRows, boxCountryText, BOX_COUNTRY_NOTE, boxCountryTag, boxCountriesPicked, movieBoard, loadBoxFor, soonGroups, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityVote, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, SCRIPTING_IMPORT_URL, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, festivalDefaultDate, festivalStateLabel, festivalState, festivalFooter, linkMovies, nowGroupLine, nowFilter, festivalPick, movieAbout, festivalSearch, festivalSearchLines, festivalTrailer, festivalYears, festivalGroups, festivalChipNote, festivalStatusLine, movieRatings, ratingTier,
 } from "./core"
 import type { Format, LatLng, Hit, Community, BoxOfficeItem, BoxSort, BoxOffice, MovieEntry, Festival, FestivalFilm, FestivalSession } from "./core"
 
@@ -959,8 +959,8 @@ function BoxOfficeMoviePage({ item: x }: { item: BoxOfficeItem }) {
 
 /** 「電影」清單：上映中與票房排行合成一份（範圍、排序、出品國別都在這裡選）。每一部都可以點：有場次的進電影頁，沒有的進精簡頁 */
 function BoxOfficeSections({ movies, query }: { movies: TwMovie[]; query: string }) {
-  const [pickedScope, setScope] = useState<string>("now") // 範圍：上映中／年度（含已下檔）
-  const [pickedSort, setSort] = useState<string>("") // 上映中的排法（空 = 第一種：本週票房）
+  const [pickedSort, setSort] = useState<string>("") // 排法（空 = 第一種：本週票房）；year = 年度排行（含已下檔）
+  const pickedScope = pickedSort === "year" ? "year" : "now"
   const [pickedWeek, setPickedWeek] = useState<string>("") // 週票房看哪一週（空 = 最新）
   // 年度排行的其他年份、過去的週票房各是另一個檔，用到才下載；票房讀不到時清單照樣出來，只是少了依票房排的選項
   const needWeeks = pickedScope !== "year" && (pickedSort || "week") === "week" && !!pickedWeek
@@ -1007,12 +1007,10 @@ function BoxOfficeSections({ movies, query }: { movies: TwMovie[]; query: string
     return body
   }
   return <>
-  <Section footer={<Text>{board.scope === "year" ? "年度：那一年上映的電影，已經下檔的也在裡面。" : "上映中：現在查得到場次的電影，可以換排序。"}</Text>}>
-    {board.scopes.length > 1 ? <Picker title={"範圍"} value={board.scope} onChanged={(v: string) => setScope(v)} pickerStyle={"segmented"}>
-      {board.scopes.map((x) => <Text key={x.id} tag={x.id}>{x.id === "year" ? `${x.label}（${x.sub}）` : x.label}</Text>)}
-    </Picker> : null}
-    {board.sorts.length > 1 ? <Picker title={"排序"} value={board.sort} onChanged={(v: string) => setSort(v)}>
-      {board.sorts.map((x) => <Text key={x.id} tag={x.id}>{x.label}</Text>)}
+  <Section>
+    {/* 範圍和排序併成一個選單：最後一項是年度排行（含已下檔） */}
+    {board.orders.length > 1 ? <Picker title={"排序"} value={board.order} onChanged={(v: string) => setSort(v)}>
+      {board.orders.map((x) => <Text key={x.id} tag={x.id}>{x.id === "year" ? `${x.label}（含已下檔）` : x.label}</Text>)}
     </Picker> : null}
     {board.weeks.length > 1 ? <Picker title={"週次"} value={board.selWeek} onChanged={(v: string) => setPickedWeek(b && v === b.end ? "" : v)}>
       {board.weeks.map((o) => <Text key={o.id} tag={o.id}>{`${o.label}（${o.note}）`}</Text>)}
@@ -1224,7 +1222,7 @@ function MoviesPage() {
   >
     <Section>
       <Picker title={"顯示"} value={mode} onChanged={(v: string) => setMode(v)} pickerStyle={"segmented"}>
-        <Text tag={"box"}>電影</Text>
+        <Text tag={"box"}>已上映</Text>
         <Text tag={"soon"}>即將上映</Text>
         {festList.length ? <Text tag={"fest"}>影展</Text> : null}
       </Picker>
@@ -1232,7 +1230,8 @@ function MoviesPage() {
     {mode === "fest" ? <FestivalSections list={festList} query={k} /> : mode === "box" ? <BoxOfficeSections movies={movies.data || []} query={k} /> : <>
       {movies.error ? <ErrorRow error={movies.error} retry={movies.reload} /> : null}
       {!movies.data && !movies.error ? <Section><Loading text={"讀取電影清單…"} /></Section> : null}
-      {soon.length ? <Section header={<Text>{`即將上映（${soon.length}）`}</Text>} footer={<Text>還沒上映、但已經可以查到場次的片，依上映日期排序。</Text>}>{soon.map(row)}</Section> : null}
+      {/* 依上映月份分段 */}
+      {soonGroups(soon).map((g, i, all) => <Section key={g.title} header={<Text>{g.title}</Text>} footer={i === all.length - 1 ? <Text>還沒上映、但已經可以查到場次的片，依上映日期排序。</Text> : undefined}>{g.items.map(row)}</Section>)}
     </>}
   </List>
 }

@@ -183,6 +183,8 @@ struct FilmList: Codable {
     var scopes: [Option]
     var sort: String           // 上映中的排法
     var sorts: [Option]        // 範圍是年度時是空的
+    var order: String          // 畫面上範圍和排序併成一個選單：實際採用的那一項
+    var orders: [Option]       // 上映中的幾種排法，最後一項是年度排行（含已下檔）
     var years: [String]
     var selYears: [String]
     var weeks: [BoxOfficeBoard.Week]

@@ -170,6 +170,7 @@
     shareText: () => shareText,
     showDay: () => showDay,
     showMinute: () => showMinute,
+    soonGroups: () => soonGroups,
     tmdbRuntime: () => tmdbRuntime,
     tmdbTest: () => tmdbTest,
     todayTPE: () => todayTPE,
@@ -1992,7 +1993,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     const yearOptions = b ? boxYears(b) : [];
     const scopes = [{ id: "now", label: "上映中", sub: "有場次的" }];
     if (yearOptions.length) scopes.push({ id: "year", label: "年度", sub: "含已下檔" });
-    const scope = opt.scope === "year" && yearOptions.length ? "year" : "now";
+    const scope = (opt.scope === "year" || opt.sort === "year") && yearOptions.length ? "year" : "now";
     const sortsAll = [];
     if (b) sortsAll.push({ id: "week", label: b.mode === "week" ? "本週票房" : "近期票房" });
     if (b && b.mode === "week") sortsAll.push({ id: "total", label: "累計票房" });
@@ -2003,7 +2004,10 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     const match = boxMatcher(movies);
     const selYears = b ? boxYearsPicked(b, opt.years) : [];
     const wk = b ? boxWeekPicked(b, opt.week) : { id: "", past: false };
-    const base = { scope, scopes, sort, years: yearOptions, selYears, weeks: [], selWeek: wk.id, restTitle: "", restFooter: "" };
+    const orders = [...sortsAll.map((x) => ({ id: x.id, label: x.label })), ...yearOptions.length ? [{ id: "year", label: "年度排行" }] : []];
+    const yearSummary = selYears.length > 1 && selYears.length === yearOptions.length ? `全部（${yearOptions[yearOptions.length - 1]}–${yearOptions[0]}）` : selYears.join("、");
+    const base = { scope, scopes, sort, order: scope === "year" ? "year" : sort, orders, years: yearOptions, selYears, weeks: [], selWeek: wk.id, restTitle: "", restFooter: "", weekSummary: "", yearSummary };
+    const landText = (land2, total) => land2.length ? land2.join("、") : `全部（${total} 部）`;
     const boxEntry = (x, by, past, old) => {
       const m = match(x.name) || null;
       return { key: `${x.name}|${x.release}`, rank: x.rank, name: x.name, x, m, lines: boxOfficeLines(x, by, past), light: old && !m };
@@ -2025,9 +2029,11 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
         ...base,
         sorts: scope === "year" ? [] : sortsAll,
         weeks: by === "week" ? boxWeekOptions(b) : [],
+        weekSummary: by === "week" ? ((o) => o ? `${o.label}（${o.note}）` : "")(boxWeekOptions(b).find((o) => o.id === wk.id)) : "",
         countries: countries2,
         selCountries: land2,
         everyone: everyone.length,
+        countrySummary: landText(land2, everyone.length),
         entries: entries2,
         rest,
         title: boxOfficeTitle(b, by, selYears, wk.id) + boxCountryTag(land2),
@@ -2058,12 +2064,25 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
       countries,
       selCountries: land,
       everyone: pool.length,
+      countrySummary: landText(land, pool.length),
       entries,
       rest: [],
       title: `上映中（${entries.length}）｜${sortsAll.find((x) => x.id === sort).label}` + boxCountryTag(land),
       footer: `${how}。場次資料來自場次通${b ? `；票房是全台灣戲院的票房，資料來源：${b.source}` : ""}。${land.length ? "篩選出品國別時，只列得出票房資料裡有的片。" : ""}`,
       paged: false
     };
+  }
+  function soonGroups(list) {
+    const out = [];
+    for (const m of list) {
+      const key = m.release && /^\d{4}-\d{2}/.test(m.release) ? m.release.slice(0, 7) : "";
+      const g = out.find((x) => x.key === key);
+      if (g) g.items.push(m);
+      else out.push({ key, items: [m] });
+    }
+    out.sort((a, b) => (a.key || "9999").localeCompare(b.key || "9999"));
+    const thisYear = todayTPE().slice(0, 4);
+    return out.map((g) => ({ title: `${g.key ? `${g.key.slice(0, 4) === thisYear ? "" : g.key.slice(0, 4) + " 年 "}${Number(g.key.slice(5, 7))} 月` : "日期未定"}（${g.items.length}）`, items: g.items }));
   }
   function movieLines(m) {
     const md = (d) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`;
@@ -2940,7 +2959,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     };
   }
   async function filmList(scope, sort, years, query, limit, week, country) {
-    const [b, all] = await Promise.all([loadBoxFor(scope || "now", sort || "week", week || "").catch(() => null), loadMovies().catch(() => [])]);
+    const [b, all] = await Promise.all([loadBoxFor(sort === "year" ? "year" : scope || "now", sort || "week", week || "").catch(() => null), loadMovies().catch(() => [])]);
     if (!b && !all.length) throw new Error("讀不到電影清單，請稍後再試");
     const board = movieBoard(b, all, { scope, sort, years: years || [], week: week || "", countries: Array.isArray(country) ? country : [], query });
     return {
@@ -3041,7 +3060,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   var extra = { boxOffice, filmList, nowShowing, nowShowingMulti, movieBoard: movieBoard2, festivalBoard, festivalFilm, nearby, patchSettings, fillMovie, formatList };
   var BRIDGE_LEVEL = 2;
   globalThis.MS = {
-    version: "2026.11.23-2025",
+    version: "2026.11.23-2126",
     level: BRIDGE_LEVEL,
     init(saved) {
       cache = saved || {};
