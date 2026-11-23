@@ -80,6 +80,7 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .pill.off{background:rgba(255,69,58,.18);color:#d63a31}
 .pill.soon{background:rgba(255,159,10,.2);color:#c77700}
 @media(prefers-color-scheme:dark){.pill.now{color:#30d158}.pill.off{color:#ff6961}.pill.soon{color:#ffb340}}
+.item .title .pill{position:relative;top:-2px}
 .item.kv .right .pill{margin-left:0;font-size:12px;padding:2px 9px}
 .item.kv .body{flex:0 0 auto}
 .item.kv .right{flex:1 1 auto;max-width:none;min-width:0;white-space:nowrap;overflow:hidden}
