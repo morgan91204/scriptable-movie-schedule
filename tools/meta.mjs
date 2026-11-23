@@ -63,6 +63,27 @@ try {
 }
 if (todo.length < 20) throw new Error("片單太短（" + todo.length + "），可能是來源暫時有問題，這次不更新");
 
+// TMDB 金鑰（GitHub Actions 的密鑰 TMDB_TOKEN）：只用來查片長，只放在送給 TMDB 的請求標頭裡，不印出來、不寫進任何檔案
+const TMDB_TOKEN = (process.env.TMDB_TOKEN || "").trim();
+/** 用片名到 TMDB 查片長。比手機版嚴格：片名要完全相符才採用（不拿「搜尋結果第一筆」），寧可沒有也不要配錯 */
+async function tmdbRuntimeStrict(title, en) {
+  const same = (s) => core.normTitle(String(s || "")).replace(/臺/g, "台").replace(/祕/g, "秘").replace(/爲/g, "為");
+  const call = async (path) => {
+    const r = await fetch("https://api.themoviedb.org/3" + path, { headers: { accept: "application/json", Authorization: "Bearer " + TMDB_TOKEN }, signal: AbortSignal.timeout(25000) });
+    if (!r.ok) throw new Error("TMDB " + r.status);
+    return r.json();
+  };
+  for (const q of Array.from(new Set([core.baseTitle(title), title, en].filter(Boolean)))) {
+    const found = await call(`/search/movie?language=zh-TW&query=${encodeURIComponent(q)}`);
+    const want = [same(title), same(core.baseTitle(title)), same(en)].filter(Boolean);
+    const hit = (found.results || []).find((x) => want.indexOf(same(x.title)) >= 0 || want.indexOf(same(x.original_title)) >= 0);
+    if (!hit) continue;
+    const rt = Number((await call(`/movie/${hit.id}?language=zh-TW`)).runtime) || 0;
+    if (rt >= 20 && rt <= 400) return rt;
+  }
+  return 0;
+}
+
 const noTrailer = [];
 const stat = { extras: 0, ratings: 0, runtime: 0, release: 0, fail: 0 };
 const has = (r) => !!(r && (r.imdb || r.tomato || r.popcorn));
@@ -117,6 +138,14 @@ async function refresh(m) {
       stat.runtime++;
     } catch (_) { stat.fail++; }
   }
+  // 開眼也沒有片長的（演唱會、動畫劇場版、重映片）：再用 TMDB 查。沒查過的馬上查，查不到的 3 天再試
+  if (TMDB_TOKEN && !m.runtime && !e.rt && (!e.tma || now - e.tma > 3 * DAY)) {
+    try {
+      const r = await tmdbRuntimeStrict(m.title, m.en);
+      if (r) { e.rt = r; e.rf = "TMDB"; stat.tmdb = (stat.tmdb || 0) + 1; }
+      e.tma = now;
+    } catch (_) { stat.fail++; }
+  }
 }
 const queue = todo.slice();
 await Promise.all(Array.from({ length: 3 }, async () => {
@@ -143,7 +172,7 @@ for (const [k, e] of Object.entries(movies)) if (!e.seen || now - e.seen > 14 * 
 const sorted = Object.fromEntries(Object.keys(movies).sort().map((k) => [k, movies[k]]));
 fs.writeFileSync(outPath, JSON.stringify({ updated: now, movies: sorted }) + "\n");
 const all = Object.values(sorted);
-console.log(`片單 ${todo.length} 部；這次查了 海報／預告 ${stat.extras}、評分 ${stat.ratings}、片長 ${stat.runtime}、上映日期 ${stat.release}、手動指定預告 ${stat.pins || 0}，失敗 ${stat.fail}`);
+console.log(`片單 ${todo.length} 部；這次查了 海報／預告 ${stat.extras}、評分 ${stat.ratings}、片長 ${stat.runtime}（TMDB 補到 ${stat.tmdb || 0}${TMDB_TOKEN ? "" : "，沒有金鑰"}）、上映日期 ${stat.release}、手動指定預告 ${stat.pins || 0}，失敗 ${stat.fail}`);
 console.log(`總表 ${all.length} 部：有海報 ${all.filter((e) => e.p).length}、有預告 ${all.filter((e) => e.tn).length}、有評分 ${all.filter((e) => has(e.r)).length}；檔案 ${Math.round(fs.statSync(outPath).size / 1024)}KB`);
 if (noTrailer.length) console.log("找不到預告的例子：\n" + noTrailer.join("\n"));
 process.exit(0);

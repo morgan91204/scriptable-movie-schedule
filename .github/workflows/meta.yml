@@ -31,6 +31,7 @@ jobs:
         run: node tools/meta.mjs "$RUNNER_TEMP/prev.json" "$RUNNER_TEMP/meta.json"
         env:
           RECHECK: ${{ inputs.recheck && '1' || '' }}
+          TMDB_TOKEN: ${{ secrets.TMDB_TOKEN }} # 只用來補片長；沒設定就跳過這一步
       - name: 取上一次的開眼場次
         run: curl -fsSL "https://raw.githubusercontent.com/${{ github.repository }}/data/at.json?t=$(date +%s)" -o "$RUNNER_TEMP/prev-at.json" || echo "還沒有，從頭抓"
       - name: 抓開眼場次（只有開眼有的戲院、要補頂級影廳的威秀）
