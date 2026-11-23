@@ -206,8 +206,10 @@ class App {
           <Item icon="🎦" title="依縣市找影院" subtitle={`全台 ${this.cinemas.length} 間，也可以搜尋影城`} onTap={() => this.go(() => this.citiesView())} />
         </Section>
         {favs.length ? (
-          <Section title="常去影城" hint="影城搜尋在「影城」分頁，行事曆與提醒在「設定」分頁。">
-            {favs.map((c) => (
+          <Section hint="影城搜尋在「影城」分頁，行事曆與提醒在「設定」分頁。">
+            {/* 預設收合，只留這一列；點一下展開清單 */}
+            <Item head icon="★" title={`常去影城（${favs.length} 間）`} subtitle={this.favOpen ? "點一下收合" : "點一下展開"} chevron={false} onTap={() => { this.favOpen = !this.favOpen; }} action={{ label: this.favOpen ? "▾" : "▸", hint: this.favOpen ? "收合常去影城" : "展開常去影城", onTap: () => { this.favOpen = !this.favOpen; } }} />
+            {(this.favOpen ? favs : []).map((c) => (
               <Item icon="★" title={c.name} subtitle={`${c.city} ${c.district}`} onTap={() => this.go(() => this.cinemaView(c), `讀取 ${c.name} 的場次…`)} />
             ))}
           </Section>
@@ -1408,6 +1410,7 @@ class App {
     );
   }
 
+  favOpen = false; // 首頁的常去影城清單有沒有展開（預設收合）
   nowFolded: string[] = []; // 「現在有什麼可以看」結果裡收合起來的片（只留片名列）
   nowFoldFor = ""; // 上面那份收合狀態是哪一次查詢的
   nowQuery = ""; // 在結果裡再搜尋的字

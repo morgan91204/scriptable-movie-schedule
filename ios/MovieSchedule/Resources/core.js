@@ -2785,7 +2785,10 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   }
   var formatList = () => FORMATS;
   var extra = { boxOffice, nowShowing, nowShowingMulti, movieBoard, festivalBoard, festivalFilm, nearby, patchSettings, fillMovie, formatList };
+  var BRIDGE_LEVEL = 1;
   globalThis.MS = {
+    version: "2026.11.23-1447",
+    level: BRIDGE_LEVEL,
     init(saved) {
       cache = saved || {};
       setPlatform({

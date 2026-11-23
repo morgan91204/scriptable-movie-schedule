@@ -212,6 +212,7 @@ function Home({ cinemas }: { cinemas: CinemasLoad }) {
   const [settings] = useSettings()
   const list = cinemas.data || []
   const favs = settings.favorites.map((id) => list.find((c) => c.id === id)).filter(Boolean) as Cinema[]
+  const [favOpen, setFavOpen] = useState(false) // 常去影城清單有沒有展開（預設收合）
 
   return <NavigationStack>
     <List
@@ -238,8 +239,17 @@ function Home({ cinemas }: { cinemas: CinemasLoad }) {
 
         {!cinemas.data && !cinemas.error ? <Section><Loading text={"讀取影城清單…"} /></Section> : null}
 
-        {favs.length ? <Section header={<Text>常去影城</Text>} footer={<Text>在影城頁可以加入或移除常去影城。影城搜尋在「影城」分頁，行事曆與提醒在「設定」分頁。</Text>}>
-          {favs.map((c) => <CinemaLink key={c.id} cinema={c} showCity />)}
+        {favs.length ? <Section footer={<Text>在影城頁可以加入或移除常去影城。影城搜尋在「影城」分頁，行事曆與提醒在「設定」分頁。</Text>}>
+          {/* 預設收合，只留這一列；點一下展開清單 */}
+          <Button action={() => setFavOpen(!favOpen)}>
+            <HStack spacing={8}>
+              <Image systemName={"star.fill"} foregroundStyle={"systemYellow"} />
+              <Text font={"headline"} foregroundStyle={"label"}>{`常去影城（${favs.length} 間）`}</Text>
+              <Spacer />
+              <Image systemName={favOpen ? "chevron.down.circle" : "chevron.right.circle"} font={"title3"} foregroundStyle={"secondaryLabel"} />
+            </HStack>
+          </Button>
+          {(favOpen ? favs : []).map((c) => <CinemaLink key={c.id} cinema={c} showCity />)}
         </Section> : null}
       </>}
     </List>
@@ -585,12 +595,51 @@ function VersionRow() {
   </>
 }
 
-/** 開啟時檢查新版：有新版就問要不要更新（同一個新版只問一次） */
+const RAW_MAIN = "https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/main/"
+/** 自己更新：把 GitHub 上最新的腳本檔下載下來，蓋掉這支腳本資料夾裡的檔案（下次開啟就是新版）。
+ *  全部下載好、長度都對得上才動手寫，寫的時候 script.json（版本號）最後寫；做不到就回傳 false，改用手動匯入 */
+async function selfUpdate(latest: string): Promise<boolean> {
+  try {
+    const dir = (Script as any).directory
+    const FM = (globalThis as any).FileManager, P = (globalThis as any).Path
+    if (typeof dir !== "string" || !dir || !FM || !P || !FM.existsSync(P.join(dir, "index.tsx"))) return false
+    const get = async (path: string) => {
+      const r = await scriptingPlatform.fetchText(RAW_MAIN + path + "?t=" + Date.now(), {})
+      if (r.status < 200 || r.status >= 300 || !r.body) throw new Error(path)
+      return r.body
+    }
+    const man = JSON.parse(await get("dist/scripting-files.json")) as { version: string; files: { name: string; chars: number }[] }
+    if (man.version !== latest || !Array.isArray(man.files) || man.files.length < 3) return false // 剛好正在發佈新版：下次再試
+    const got: Record<string, string> = {}
+    for (const f of man.files) {
+      if (!/^[\w.-]+\.(ts|tsx|json)$/.test(f.name)) return false
+      const text = await get("scripting/" + f.name)
+      if (text.length !== f.chars) return false // 下載不完整，或下載到一半 GitHub 上又換版了
+      got[f.name] = text
+    }
+    const names = man.files.map((f) => f.name).filter((n) => n !== "script.json")
+    for (const n of names) FM.writeAsStringSync(P.join(dir, n), got[n])
+    if (got["script.json"]) FM.writeAsStringSync(P.join(dir, "script.json"), got["script.json"]) // 版本號最後寫：中途失敗的話下次會再更新一次
+    return true
+  } catch (_) {
+    return false
+  }
+}
+
+/** 開啟時檢查新版：有新版就自動更新（下次開啟生效，同一版只通知一次）；自動更新做不到才問要不要手動匯入 */
 function useUpdatePrompt() {
   useEffect(() => {
     ;(async () => {
       const r = await checkLatest(appVersion())
       if (!r || r.isLatest) return
+      let done = ""
+      try { done = Storage.get("auto-updated") || "" } catch (_) {}
+      if (done === r.latest) return // 這一版已經下載好了，只是還沒重新開啟
+      if (await selfUpdate(r.latest)) {
+        try { Storage.set("auto-updated", r.latest) } catch (_) {}
+        await Dialog.alert({ title: "已自動更新", message: `電影行程已經更新到 ${r.latest}。\n關掉再開一次就是新版，設定不會消失。` })
+        return
+      }
       let asked = ""
       try { asked = Storage.get("asked-update") || "" } catch (_) {}
       if (asked === r.latest) return

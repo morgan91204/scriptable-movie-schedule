@@ -186,6 +186,27 @@ class CalendarEvent {
 }
 g.CalendarEvent = CalendarEvent;
 
+// ── 自動更新：網站上線了新版，就自動重新載入換成新版（不用使用者自己重新整理）。
+// 只在「剛開啟」和「從背景切回來」時檢查，不會在操作到一半時突然重載；同一個新版只重載一次，避免出錯時一直重來
+declare const APP_VERSION: string;
+let lastVersionCheck = 0;
+async function autoUpdate() {
+  if (Date.now() - lastVersionCheck < 60e3) return;
+  lastVersionCheck = Date.now();
+  try {
+    const r = await fetch("/api/version?t=" + Date.now(), { cache: "no-store" });
+    const latest = String((await r.json()).version || "");
+    const num = (v: string) => Number(v.replace(/\D/g, "")) || 0;
+    if (!latest || num(latest) <= num(APP_VERSION)) return;
+    if (sessionStorage.getItem("auto-reloaded") === latest) return;
+    sessionStorage.setItem("auto-reloaded", latest);
+    location.reload();
+  } catch (_) {}
+}
+autoUpdate();
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") autoUpdate(); });
+window.addEventListener("pageshow", (e) => { if ((e as PageTransitionEvent).persisted) autoUpdate(); });
+
 // ── WebView：畫面直接畫在這一頁 ──
 class WebView {
   async loadHTML(html: string) {

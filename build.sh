@@ -31,11 +31,21 @@ cp $SHARED scripting-src/index.tsx scripting-src/platform-scripting.ts scripting
 node -e '
 const fs=require("fs");const m=JSON.parse(fs.readFileSync("scripting-src/script.json","utf8"));
 m.version=process.argv[1];fs.writeFileSync("scripting/script.json",JSON.stringify(m,null,2)+"\n");' "$(echo $VERSION | tr - .)"
+# Scripting 版自己更新時用的清單：有哪些檔、各多長（下載完對長度，確認沒有缺）
+node -e '
+const fs=require("fs");const files=fs.readdirSync("scripting").filter(n=>/\.(ts|tsx|json)$/.test(n)).sort().map(n=>({name:n,chars:fs.readFileSync("scripting/"+n,"utf8").length}));
+fs.writeFileSync("dist/scripting-files.json",JSON.stringify({version:process.argv[1],files})+"\n");' "$VERSION"
 echo "scripting/ ready"
 
 # ── 原生 iOS App：共用資料層包成一支 JS（ios/MovieSchedule/Resources/core.js），在 App 內的 WKWebView 執行
 npx esbuild ios/bridge.ts --bundle --format=iife --target=safari16 --charset=utf8 --legal-comments=none --log-level=warning \
   --define:APP_VERSION="\"$VERSION\"" --outfile=ios/MovieSchedule/Resources/core.js
+# 原生 App 自動換用新版資料層時看的清單：版本、相容等級（ios/bridge.ts 的 BRIDGE_LEVEL）、長度
+node -e '
+const fs=require("fs");const js=fs.readFileSync("ios/MovieSchedule/Resources/core.js","utf8");
+const level=Number((fs.readFileSync("ios/bridge.ts","utf8").match(/const BRIDGE_LEVEL = (\d+)/)||[])[1])||0;
+if(!level)throw new Error("ios/bridge.ts 找不到 BRIDGE_LEVEL");
+fs.writeFileSync("dist/ios-core.json",JSON.stringify({version:process.argv[1],level,chars:js.length})+"\n");' "$VERSION"
 echo "ios core.js ready"
 
 # ── 網頁版：同一份 App（src/main.tsx）加上瀏覽器版的 Scriptable 全域物件（web/shim.ts）→ web/public/app.js

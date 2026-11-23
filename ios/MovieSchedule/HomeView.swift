@@ -4,6 +4,7 @@ import SwiftUI
 struct HomeView: View {
     @ObservedObject private var settings = SettingsStore.shared
     @State private var cinemas: Loadable<[Cinema]> = .loading
+    @State private var favOpen = false // 常去影城清單有沒有展開（預設收合）
 
     var body: some View {
         NavigationStack {
@@ -31,8 +32,20 @@ struct HomeView: View {
                         let favs = settings.favorites.compactMap { id in all.first { $0.id == id } }
                         if favs.isEmpty {
                             Text("還沒有常去影城。到「影城」分頁打開一間影城，點右上角的星星加入。").font(.subheadline).foregroundStyle(.secondary)
+                        } else {
+                            // 預設收合，只留這一列；點一下展開清單
+                            Button {
+                                favOpen.toggle()
+                            } label: {
+                                HStack(spacing: 8) {
+                                    Image(systemName: "star.fill").foregroundStyle(Color.yellow)
+                                    Text("常去影城（\(favs.count) 間）").font(.headline).foregroundStyle(Color.primary)
+                                    Spacer(minLength: 4)
+                                    Image(systemName: favOpen ? "chevron.down.circle" : "chevron.right.circle").font(.title3).foregroundStyle(Color.secondary)
+                                }
+                            }
                         }
-                        ForEach(favs) { c in
+                        ForEach(favOpen ? favs : []) { c in
                             NavigationLink {
                                 CinemaView(cinema: c)
                             } label: {
@@ -43,8 +56,6 @@ struct HomeView: View {
                             }
                         }
                     }
-                } header: {
-                    Text("常去影城")
                 }
             }
             .navigationTitle("電影行程")

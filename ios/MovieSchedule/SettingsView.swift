@@ -62,6 +62,8 @@ struct SettingsView: View {
                 }
                 Section {
                     LabeledContent("版本", value: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "")
+                    // 場次的讀法與整理（資料層）會自己在背景更新，下次開啟生效；這一行是現在用的那一版
+                    LabeledContent("資料版本", value: Bridge.shared.coreVersion.isEmpty ? "讀取中" : Bridge.shared.coreVersion)
                 } header: {
                     Text("關於")
                 } footer: {

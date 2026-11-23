@@ -45,11 +45,82 @@ final class Bridge: NSObject, WKScriptMessageHandlerWithReply, WKNavigationDeleg
         }
     }
 
+    // MARK: 資料層自動更新
+    // 場次怎麼讀、資料怎麼整理都寫在資料層（core.js）。App 啟動後會在背景看 GitHub 上有沒有新版，
+    // 有就下載存起來，下次啟動改用新的，不用等 App 更新。畫面（Swift）不會變，所以只換用「相容等級」相同的。
+
+    /// 橋接層的相容等級，要跟 ios/bridge.ts 的 BRIDGE_LEVEL 一樣
+    static let level = 1
+    /// 現在實際在用的資料層版本（設定頁顯示用）
+    private(set) var coreVersion = ""
+    private static let remoteBase = "https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/main/"
+    private var remoteJS: URL { cacheDir.deletingLastPathComponent().appendingPathComponent("core-remote.js") }
+    private var remoteInfo: URL { cacheDir.deletingLastPathComponent().appendingPathComponent("core-remote.json") }
+    private struct CoreInfo: Codable { var version: String; var level: Int; var chars: Int? }
+
+    private static func versionNumber(_ v: String) -> Int { Int(v.filter { $0.isNumber }) ?? 0 }
+    /// 程式碼裡寫的版本號（建置時填進去的 2026.11.23-1436 這種格式）
+    private static func embeddedVersion(_ js: String) -> String {
+        guard let r = js.range(of: #"\d{4}\.\d{2}\.\d{2}-\d{4}"#, options: .regularExpression) else { return "" }
+        return String(js[r])
+    }
+
+    /// 這次啟動要用哪一份資料層：下載過、等級相同、而且比 App 內建的新，就用下載的；否則用內建的
+    private func pickCore(bundled: String) -> (js: String, version: String, remote: Bool) {
+        let builtIn = Self.embeddedVersion(bundled)
+        guard let data = try? Data(contentsOf: remoteInfo),
+              let info = try? JSONDecoder().decode(CoreInfo.self, from: data),
+              info.level == Self.level,
+              Self.versionNumber(info.version) > Self.versionNumber(builtIn),
+              let js = try? String(contentsOf: remoteJS, encoding: .utf8),
+              js.contains("MS.init") || js.contains("init(saved)") || js.count > 100_000 else {
+            return (bundled, builtIn, false)
+        }
+        return (js, info.version, true)
+    }
+
+    /// 背景檢查新版資料層：有、而且等級相同，就下載存起來（下次啟動生效）
+    private func refreshCore() async {
+        do {
+            let stamp = Int(Date().timeIntervalSince1970)
+            guard let infoURL = URL(string: Self.remoteBase + "dist/ios-core.json?t=\(stamp)"),
+                  let jsURL = URL(string: Self.remoteBase + "ios/MovieSchedule/Resources/core.js?t=\(stamp)") else { return }
+            let (infoData, infoResp) = try await session.data(from: infoURL)
+            guard (infoResp as? HTTPURLResponse)?.statusCode == 200 else { return }
+            let info = try JSONDecoder().decode(CoreInfo.self, from: infoData)
+            guard info.level == Self.level, Self.versionNumber(info.version) > Self.versionNumber(coreVersion) else { return }
+            if let old = try? Data(contentsOf: remoteInfo), let had = try? JSONDecoder().decode(CoreInfo.self, from: old), had.version == info.version { return } // 已經下載過這一版
+            let (jsData, jsResp) = try await session.data(from: jsURL)
+            guard (jsResp as? HTTPURLResponse)?.statusCode == 200, let js = String(data: jsData, encoding: .utf8) else { return }
+            // 確認下載到的就是清單上那一版、而且完整（版本號對得上、長度一樣）
+            guard Self.embeddedVersion(js) == info.version, info.chars == nil || info.chars == js.utf16.count else { return }
+            try jsData.write(to: remoteJS, options: .atomic)
+            try infoData.write(to: remoteInfo, options: .atomic)
+        } catch {}
+    }
+
     private func boot() async throws {
         guard let url = Bundle.main.url(forResource: "core", withExtension: "js"),
-              let js = try? String(contentsOf: url, encoding: .utf8) else {
+              let bundled = try? String(contentsOf: url, encoding: .utf8) else {
             throw BridgeError(message: "找不到資料層（core.js）")
         }
+        let picked = pickCore(bundled: bundled)
+        do {
+            try await boot(js: picked.js)
+            coreVersion = picked.version
+        } catch {
+            guard picked.remote else { throw error }
+            // 下載的那一份跑不起來：刪掉，改用 App 內建的
+            try? FileManager.default.removeItem(at: remoteJS)
+            try? FileManager.default.removeItem(at: remoteInfo)
+            webView = nil
+            try await boot(js: bundled)
+            coreVersion = Self.embeddedVersion(bundled)
+        }
+        Task { await self.refreshCore() }
+    }
+
+    private func boot(js: String) async throws {
         let config = WKWebViewConfiguration()
         config.userContentController.addScriptMessageHandler(self, contentWorld: .page, name: "native")
         let web = WKWebView(frame: .zero, configuration: config)
