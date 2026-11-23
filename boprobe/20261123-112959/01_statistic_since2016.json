@@ -1,0 +1,71 @@
+{
+ "Start": "2016-01-01T00:00:00",
+ "End": "2026-11-15T00:00:00",
+ "List": [
+  {
+   "Country": "中華民國",
+   "Name": "告別的年代",
+   "ReleaseDate": "2026-11-08T00:00:00",
+   "Issue": "興揚電影有限公司",
+   "Produce": "興揚電影有限公司##合拍映畫",
+   "TheaterCount": 29,
+   "Tickets": 2399,
+   "TicketChangeRate": 0,
+   "Amounts": 644035,
+   "TotalTickets": 2399,
+   "TotalAmounts": 644035
+  },
+  {
+   "Country": "中華民國",
+   "Name": "晚窒息",
+   "ReleaseDate": "2026-11-08T00:00:00",
+   "Issue": "天馬傳播事業有限公司",
+   "Produce": "天馬傳播事業有限公司",
+   "TheaterCount": 4,
+   "Tickets": 658,
+   "TicketChangeRate": 0,
+   "Amounts": 166650,
+   "TotalTickets": 658,
+   "TotalAmounts": 166650
+  },
+  {
+   "Country": "香港",
+   "Name": "廚師發辦",
+   "ReleaseDate": "2026-11-07T00:00:00",
+   "Issue": "老灰狼影片製作有限公司",
+   "Produce": "點對點製作有限公司",
+   "TheaterCount": 1,
+   "Tickets": 109,
+   "TicketChangeRate": 0,
+   "Amounts": 22955,
+   "TotalTickets": 109,
+   "TotalAmounts": 22955
+  },
+  {
+   "Country": "中華民國",
+   "Name": "有用的人",
+   "ReleaseDate": "2026-11-07T00:00:00",
+   "Issue": "威視股份有限公司",
+   "Produce": "高二電影股份有限公司",
+   "TheaterCount": 47,
+   "Tickets": 3385,
+   "TicketChangeRate": 0,
+   "Amounts": 871840,
+   "TotalTickets": 3385,
+   "TotalAmounts": 871840
+  },
+  {
+   "Country": "香港",
+   "Name": "UFO離奇命案",
+   "ReleaseDate": "2026-11-06T00:00:00",
+   "Issue": "華映國際文創股份有限公司",
+   "Produce": "悠悠製作有限公司",
+   "TheaterCount": 23,
+   "Tickets": 328,
+   "TicketChangeRate": 0,
+   "Amounts": 82065,
+   "TotalTickets": 328,
+   "TotalAmounts": 82065
+  }
+ ]
+}
