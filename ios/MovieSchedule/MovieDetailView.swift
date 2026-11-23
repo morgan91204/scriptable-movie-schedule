@@ -223,12 +223,12 @@ struct MovieDetailView: View {
                             }
                         }
                     }
-                    Toggle("只看常去影城（\(settings.favorites.count)）", isOn: $onlyFav)
+                    Toggle("只看收藏的影城（\(settings.favorites.count)）", isOn: $onlyFav)
                 } footer: {
                     Text("日期、縣市、特殊廳都可以複選。")
                 }
                 if b.rows.isEmpty {
-                    Section { Text(onlyFav && settings.favorites.isEmpty ? "還沒有常去影城，先到影城頁加入。" : "沒有符合條件的影城，換個日期或條件試試。").foregroundStyle(.secondary) }
+                    Section { Text(onlyFav && settings.favorites.isEmpty ? "還沒有收藏的影城，先到影城頁加入。" : "沒有符合條件的影城，換個日期或條件試試。").foregroundStyle(.secondary) }
                 }
                 let many = b.selDates.count > 1 // 複選多天：每一列標日期
                 ForEach(b.cities.filter { c in b.rows.contains { $0.cinema.city == c } }, id: \.self) { c in

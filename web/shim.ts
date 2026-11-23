@@ -228,7 +228,7 @@ g.__push = {
     return pushState;
   },
   /** 開啟：要權限（g.__notifyPermission 是按鈕按下的那一刻就先要的，見下面）→ 訂閱 → 把推送位址和要通知的片交給伺服器 */
-  async enable(prefs: unknown, favs: unknown): Promise<string> {
+  async enable(payload: Record<string, unknown>): Promise<string> {
     if (!pushOK()) return this.refresh();
     const perm = await (g.__notifyPermission || Notification.requestPermission());
     g.__notifyPermission = null;
@@ -237,15 +237,15 @@ g.__push = {
     await navigator.serviceWorker.ready;
     const { key } = await fetch("/api/push/key").then((r) => r.json());
     const sub = (await reg.pushManager.getSubscription()) || (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(key) }));
-    const r = await post("/api/push/subscribe", { subscription: sub.toJSON(), prefs, favs });
+    const r = await post("/api/push/subscribe", { ...payload, subscription: sub.toJSON() });
     if (!r || !r.ok) throw new Error("伺服器沒有收到訂閱，請稍後再試");
     return (pushState = "on");
   },
   /** 收藏或通知種類變了：把最新的清單同步給伺服器（沒開通知就什麼都不做） */
-  async sync(prefs: unknown, favs: unknown): Promise<void> {
+  async sync(payload: Record<string, unknown>): Promise<void> {
     if (!pushOK() || pushState !== "on") return;
     const sub = await currentSub();
-    if (sub) await post("/api/push/subscribe", { subscription: sub.toJSON(), prefs, favs }).catch(() => null);
+    if (sub) await post("/api/push/subscribe", { ...payload, subscription: sub.toJSON() }).catch(() => null);
   },
   async disable(): Promise<string> {
     if (!pushOK()) return pushState;

@@ -66,7 +66,7 @@ async function nowShowingMulti(scope: { cinema: core.Cinema; km: number | null }
 async function nearby(lat: number, lng: number, limit: number) {
   return core.nearest(await core.loadCinemas(), { lat, lng }, limit || 20);
 }
-/** 更新設定裡的部分欄位（常去影城、地圖、TMDB 金鑰），其餘保留 */
+/** 更新設定裡的部分欄位（收藏的影城、地圖、TMDB 金鑰），其餘保留 */
 async function patchSettings(patch: Record<string, unknown>) {
   core.saveSettings({ ...(await core.loadSettings()), ...patch } as core.Settings);
   return true;
@@ -75,7 +75,7 @@ async function patchSettings(patch: Record<string, unknown>) {
 async function fillMovie(slug: string, date: string | null, ids: string[]) {
   return core.fillMovieDay(await core.movieDay(slug, date || undefined), ids);
 }
-/** 「依電影找場次」整頁要的資料：日期、縣市、特殊廳都可以複選（空的 = 預設／全部），favIds 有給就只留常去影城。
+/** 「依電影找場次」整頁要的資料：日期、縣市、特殊廳都可以複選（空的 = 預設／全部），favIds 有給就只留收藏的影城。
  *  fill = 把目前要顯示的影城補齊所有版本（電影頁每間影城只列一種），比較慢，畫面先用沒補的畫一次再補 */
 async function movieBoard(slug: string, dates: string[], cities: string[], formats: string[], favIds: string[] | null, fill: boolean) {
   const base = await core.movieDay(slug, undefined);

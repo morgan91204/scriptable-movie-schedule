@@ -43,11 +43,36 @@ export interface Settings {
   notify?: NotifyPrefs; // 收藏電影的通知要哪幾種（網頁版；沒設過 = 全部都要）
 }
 /** 收藏電影的通知種類：open 開放場次了、rel 上映了、end 快下檔了、fest 影展開始了 */
-export interface NotifyPrefs { open: boolean; rel: boolean; end: boolean; fest: boolean }
-export const NOTIFY_KINDS: { id: keyof NotifyPrefs; label: string; note: string }[] = [
+export interface NotifyPrefs {
+  open: boolean; rel: boolean; end: boolean; fest: boolean;
+  endMax?: number; // 快下檔：放映的影城剩下幾間以下才通知（預設 3）
+  endScope?: "all" | "city" | "fav"; // 算哪些影城：全台／指定的縣市（可以好幾個）／收藏的影城
+  endCities?: string[];
+}
+/** 「剩下幾間以下」可以選的數字 */
+export const NOTIFY_END_STEPS = [1, 3, 5, 10];
+/** 「快下檔」算哪些影城的說法：「全台」「台北市、新北市」「收藏的影城」 */
+export function notifyEndScope(p: NotifyPrefs): string {
+  if (p.endScope === "fav") return "收藏的影城";
+  const cs = p.endCities || [];
+  if (p.endScope === "city" && cs.length) return cs.length > 3 ? `${cs.slice(0, 2).join("、")}等 ${cs.length} 個縣市` : cs.join("、");
+  return "全台";
+}
+/** 交給通知伺服器的整包設定：要哪幾種、快下檔的門檻與範圍、收藏的片（只有片名鍵、片名、影展代碼）。
+ *  收藏的影城只有在範圍選「收藏的影城」時才傳 */
+export function notifyPayload(s: Settings): { prefs: Record<string, boolean>; endCfg: { max: number; scope: string; cities: string[]; cinemas: string[] }; favs: ReturnType<typeof notifyFavs> } {
+  const p = notifyPrefs(s);
+  const scope = p.endScope === "fav" ? "fav" : p.endScope === "city" && (p.endCities || []).length ? "city" : "all";
+  return {
+    prefs: { open: p.open, rel: p.rel, end: p.end, fest: p.fest },
+    endCfg: { max: p.endMax || 3, scope, cities: scope === "city" ? p.endCities || [] : [], cinemas: scope === "fav" ? s.favorites.slice(0, 80) : [] },
+    favs: notifyFavs(s),
+  };
+}
+export const NOTIFY_KINDS: { id: "open" | "rel" | "end" | "fest"; label: string; note: string }[] = [
   { id: "open", label: "開放場次時", note: "還沒排片的片，戲院開始排場次、可以訂票了" },
   { id: "rel", label: "上映時", note: "收藏的片正式上映的那一天" },
-  { id: "end", label: "快下檔時", note: "放映的影城剩下三間以下" },
+  { id: "end", label: "快下檔時", note: "放映的影城變少到你設定的間數以下" },
   { id: "fest", label: "影展開始時", note: "收藏的影展片所屬的影展開始了" },
 ];
 export const notifyPrefs = (s: Settings): NotifyPrefs => ({ open: true, rel: true, end: true, fest: true, ...(s.notify || {}) });
@@ -171,7 +196,7 @@ export async function loadSettings(): Promise<Settings> {
   try {
     const json = await platform().loadSettingsJSON();
     const s: Settings = json ? { ...def, ...JSON.parse(json) } : def;
-    // 常去影城裡被併掉的重複戲院，換成留下來的那一筆
+    // 收藏的影城裡被併掉的重複戲院，換成留下來的那一筆
     let alias = cinemaAlias;
     if (!alias) { try { alias = JSON.parse(platform().cacheGet("cinema-alias.json") || "{}") || {}; } catch (_) { alias = {}; } }
     if (alias && s.favorites.some((id) => alias![id])) s.favorites = s.favorites.map((id) => alias![id] || id).filter((id, i, all) => all.indexOf(id) === i);
@@ -238,10 +263,10 @@ export async function loadCinemas(): Promise<Cinema[]> {
     return !twin;
   });
   cinemaAlias = alias;
-  cacheSet("cinema-alias.json", JSON.stringify(alias)); // 下次啟動時，常去影城裡被併掉的那一筆會換成留下來的那一筆
+  cacheSet("cinema-alias.json", JSON.stringify(alias)); // 下次啟動時，收藏的影城裡被併掉的那一筆會換成留下來的那一筆
   return main.concat(others);
 }
-/** 被併掉的戲院代碼 → 留下來的那一筆（常去影城用） */
+/** 被併掉的戲院代碼 → 留下來的那一筆（收藏的影城用） */
 let cinemaAlias: Record<string, string> | null = null;
 /** 戲院名稱比對用：去掉「影城、電影院、店」這些通稱和空白符號 */
 const cinemaNameKey = (name: string) => String(name || "").replace(/臺/g, "台").replace(/影城|電影院|大戲院|戲院|影院|數位|[\s_（）()・·\-－—,，.]/g, "").replace(/[店館]$/, "").toLowerCase();
@@ -2277,7 +2302,7 @@ export function filterVersionsAny(versions: Version[], formats: Format[]): Versi
 }
 /** 「依電影找場次」的一列：某一天、某間影城（版本已經照特殊廳篩過） */
 export interface MovieRow { day: TwMovieDay; date: string; cinema: TwMovieCinema }
-/** 把幾天的資料攤平成一列一列，照條件篩選：縣市、特殊廳都可以複選（空的 = 不限），favIds 有給就只留常去影城。
+/** 把幾天的資料攤平成一列一列，照條件篩選：縣市、特殊廳都可以複選（空的 = 不限），favIds 有給就只留收藏的影城。
  *  排序：縣市（北到南）→ 影城 → 日期 */
 export function movieRows(days: TwMovieDay[], opt: { cities: string[]; formats: Format[]; favIds?: string[] | null }): MovieRow[] {
   const rows: MovieRow[] = [];

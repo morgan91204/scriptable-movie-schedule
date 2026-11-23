@@ -29,7 +29,7 @@ struct SettingsView: View {
                     }
                 }
                 Section {
-                    LabeledContent("常去影城", value: "\(settings.favorites.count) 間")
+                    LabeledContent("收藏的影城", value: "\(settings.favorites.count) 間")
                 } footer: {
                     Text("到「影城」分頁打開一間影城，點右上角的星星加入或移除。")
                 }

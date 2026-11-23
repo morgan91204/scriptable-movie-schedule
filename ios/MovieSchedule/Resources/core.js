@@ -30,6 +30,7 @@
     FORMATS: () => FORMATS,
     MAPS_LABEL: () => MAPS_LABEL,
     META_URL: () => META_URL,
+    NOTIFY_END_STEPS: () => NOTIFY_END_STEPS,
     NOTIFY_KINDS: () => NOTIFY_KINDS,
     OFFICIAL_URL: () => OFFICIAL_URL,
     POSTERS_URL: () => POSTERS_URL,
@@ -171,7 +172,9 @@
     nearest: () => nearest,
     normImageUrl: () => normImageUrl,
     normTitle: () => normTitle,
+    notifyEndScope: () => notifyEndScope,
     notifyFavs: () => notifyFavs,
+    notifyPayload: () => notifyPayload,
     notifyPrefs: () => notifyPrefs,
     nowFilter: () => nowFilter,
     nowGroupLine: () => nowGroupLine,
@@ -786,10 +789,26 @@ function parseTwMovieDay(doc) {
   };
 
   // src/core.ts
+  var NOTIFY_END_STEPS = [1, 3, 5, 10];
+  function notifyEndScope(p) {
+    if (p.endScope === "fav") return "收藏的影城";
+    const cs = p.endCities || [];
+    if (p.endScope === "city" && cs.length) return cs.length > 3 ? `${cs.slice(0, 2).join("、")}等 ${cs.length} 個縣市` : cs.join("、");
+    return "全台";
+  }
+  function notifyPayload(s) {
+    const p = notifyPrefs(s);
+    const scope = p.endScope === "fav" ? "fav" : p.endScope === "city" && (p.endCities || []).length ? "city" : "all";
+    return {
+      prefs: { open: p.open, rel: p.rel, end: p.end, fest: p.fest },
+      endCfg: { max: p.endMax || 3, scope, cities: scope === "city" ? p.endCities || [] : [], cinemas: scope === "fav" ? s.favorites.slice(0, 80) : [] },
+      favs: notifyFavs(s)
+    };
+  }
   var NOTIFY_KINDS = [
     { id: "open", label: "開放場次時", note: "還沒排片的片，戲院開始排場次、可以訂票了" },
     { id: "rel", label: "上映時", note: "收藏的片正式上映的那一天" },
-    { id: "end", label: "快下檔時", note: "放映的影城剩下三間以下" },
+    { id: "end", label: "快下檔時", note: "放映的影城變少到你設定的間數以下" },
     { id: "fest", label: "影展開始時", note: "收藏的影展片所屬的影展開始了" }
   ];
   var notifyPrefs = (s) => ({ open: true, rel: true, end: true, fest: true, ...s.notify || {} });
@@ -3613,7 +3632,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   var extra = { boxOffice, filmList, soonList, nowShowing, nowShowingMulti, movieBoard: movieBoard2, festivalBoard, festivalFilm, nearby, patchSettings, fillMovie, formatList };
   var BRIDGE_LEVEL = 2;
   globalThis.MS = {
-    version: "2026.11.24-0141",
+    version: "2026.11.24-0150",
     level: BRIDGE_LEVEL,
     init(saved) {
       cache = saved || {};

@@ -1,10 +1,10 @@
 import SwiftUI
 
-/// 「首頁」分頁：現在有什麼可以看、常去影城、附近的影城
+/// 「首頁」分頁：現在有什麼可以看、收藏的影城、附近的影城
 struct HomeView: View {
     @ObservedObject private var settings = SettingsStore.shared
     @State private var cinemas: Loadable<[Cinema]> = .loading
-    @State private var favOpen = false // 常去影城清單有沒有展開（預設收合）
+    @State private var favOpen = false // 收藏的影城清單有沒有展開（預設收合）
 
     var body: some View {
         NavigationStack {
@@ -31,7 +31,7 @@ struct HomeView: View {
                     case .loaded(let all):
                         let favs = settings.favorites.compactMap { id in all.first { $0.id == id } }
                         if favs.isEmpty {
-                            Text("還沒有常去影城。到「影城」分頁打開一間影城，點右上角的星星加入。").font(.subheadline).foregroundStyle(.secondary)
+                            Text("還沒有收藏的影城。到「影城」分頁打開一間影城，點右上角的星星加入。").font(.subheadline).foregroundStyle(.secondary)
                         } else {
                             // 預設收合，只留這一列；點一下展開清單
                             Button {
@@ -39,7 +39,7 @@ struct HomeView: View {
                             } label: {
                                 HStack(spacing: 8) {
                                     Image(systemName: "star.fill").foregroundStyle(Color.yellow)
-                                    Text("常去影城（\(favs.count) 間）").font(.headline).foregroundStyle(Color.primary)
+                                    Text("收藏的影城（\(favs.count) 間）").font(.headline).foregroundStyle(Color.primary)
                                     Spacer(minLength: 4)
                                     Image(systemName: favOpen ? "chevron.down.circle" : "chevron.right.circle").font(.title3).foregroundStyle(Color.secondary)
                                 }
@@ -97,8 +97,8 @@ struct NowView: View {
     private var cityOptions: [String] { Fmt.sortCities(Array(Set(cinemas.map { $0.city }))) }
     private var activeWindows: [String] { windowOptions.map { $0.0 }.filter { windows.contains($0) } }
 
-    private func scopeName(_ id: String) -> String { id == "all" ? "不限" : id == "fav" ? "常去影城" : id == "near" ? "附近 10 間" : id }
-    /// 範圍的選項順序：不限（全台）、常去、附近、各縣市
+    private func scopeName(_ id: String) -> String { id == "all" ? "不限" : id == "fav" ? "收藏的影城" : id == "near" ? "附近 10 間" : id }
+    /// 範圍的選項順序：不限（全台）、收藏、附近、各縣市
     private var scopeOptions: [String] { ["all", "fav", "near"] + cityOptions }
     private func short(_ d: String) -> String {
         let p = d.split(separator: "-").compactMap { Int($0) }
@@ -300,7 +300,7 @@ struct NowView: View {
                 }
             }
             let list = order.compactMap { byId[$0] }
-            if list.isEmpty { throw BridgeError(message: "沒有可以查的影城。先加入常去影城，或改選附近／縣市。") }
+            if list.isEmpty { throw BridgeError(message: "沒有可以查的影城。先收藏這間影城，或改選附近／縣市。") }
             result = .loaded(try await Bridge.shared.call("nowShowingMulti", [Bridge.json(list), dates.sorted(), activeWindows, formats.filter { picked.contains($0) }]))
         } catch is CancellationError {
             // 條件改了，新的查詢會接手

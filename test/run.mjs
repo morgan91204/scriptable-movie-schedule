@@ -30,7 +30,7 @@ const driver = (async () => {
     await tap(/^搜尋$/, { q: "松仁" });
     await dump("搜尋結果");
     await tap(/MUVIE CINEMAS 台北松仁/);
-    await tap(/加入常去影城/);
+    await tap(/收藏這間影城/);
     await dump("加入常去後");
     await tap(/返回/); await tap(/返回/); await tap(/返回/);
     await dump("首頁（常去應有松仁）");

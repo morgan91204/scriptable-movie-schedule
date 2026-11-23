@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.24-0141
+// @movie-schedule-app 電影行程 v2026.11.24-0150
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/parsers.gen.ts
@@ -583,10 +583,26 @@ var AT_REGIONS = {
 };
 
 // src/core.ts
+var NOTIFY_END_STEPS = [1, 3, 5, 10];
+function notifyEndScope(p) {
+  if (p.endScope === "fav") return "收藏的影城";
+  const cs = p.endCities || [];
+  if (p.endScope === "city" && cs.length) return cs.length > 3 ? `${cs.slice(0, 2).join("、")}等 ${cs.length} 個縣市` : cs.join("、");
+  return "全台";
+}
+function notifyPayload(s) {
+  const p = notifyPrefs(s);
+  const scope = p.endScope === "fav" ? "fav" : p.endScope === "city" && (p.endCities || []).length ? "city" : "all";
+  return {
+    prefs: { open: p.open, rel: p.rel, end: p.end, fest: p.fest },
+    endCfg: { max: p.endMax || 3, scope, cities: scope === "city" ? p.endCities || [] : [], cinemas: scope === "fav" ? s.favorites.slice(0, 80) : [] },
+    favs: notifyFavs(s)
+  };
+}
 var NOTIFY_KINDS = [
   { id: "open", label: "開放場次時", note: "還沒排片的片，戲院開始排場次、可以訂票了" },
   { id: "rel", label: "上映時", note: "收藏的片正式上映的那一天" },
-  { id: "end", label: "快下檔時", note: "放映的影城剩下三間以下" },
+  { id: "end", label: "快下檔時", note: "放映的影城變少到你設定的間數以下" },
   { id: "fest", label: "影展開始時", note: "收藏的影展片所屬的影展開始了" }
 ];
 var notifyPrefs = (s) => ({ open: true, rel: true, end: true, fest: true, ...s.notify || {} });
@@ -3832,6 +3848,8 @@ var App = class {
     // 背景查 GitHub 上的最新版本（首頁顯示是否為最新版）
     this.latest = this.checkVersion();
     this.latestAt = Date.now();
+    // ── 設定 ──
+    this.notifyOpen = false;
     // ── 搜尋 ──
     this.query = "";
     /** 讀好後要在原位補畫的資料（海報、評分、預告），每一項各自觸發一次補畫 */
@@ -3897,7 +3915,7 @@ var App = class {
     // fav / near / 縣市名稱
     this.nowFormats = [];
     this.favOpen = false;
-    // 首頁的常去影城清單有沒有展開（預設收合）
+    // 首頁的收藏的影城清單有沒有展開（預設收合）
     this.favMovOpen = false;
     // 首頁的收藏電影清單有沒有展開（預設收合；從通知點進來時直接展開）
     this.nowFolded = [];
@@ -3930,14 +3948,14 @@ var App = class {
   }
   /** 最新版本是多少。網頁版問的是自己網站現在上線的版本（重新整理就會拿到的那一版），不是 GitHub 上的 */
   checkVersion() {
-    if (true) return checkLatest("2026.11.24-0141");
+    if (true) return checkLatest("2026.11.24-0150");
     return (async () => {
       try {
         const r = await globalThis.fetch("/api/version?t=" + Date.now(), { cache: "no-store" });
         const latest = String((await r.json()).version || "");
         if (!latest) return null;
         const num = (v) => Number(v.replace(/\D/g, "")) || 0;
-        return { latest, isLatest: num("2026.11.24-0141") >= num(latest) };
+        return { latest, isLatest: num("2026.11.24-0150") >= num(latest) };
       } catch (_) {
         return null;
       }
@@ -4031,9 +4049,9 @@ var App = class {
       else if (t.kind === "box") this.go(() => this.boxMovieView(t.x), `讀取《${t.x.name}》…`);
       else this.go(() => this.favMovieView(r.fav), `讀取《${r.fav.title}》…`);
     };
-    return /* @__PURE__ */ h(Page, { title: "🎬 電影行程", subtitle: `${this.cinemas.length} 間影城｜選影城 → 日期 → 電影 → 場次` }, /* @__PURE__ */ h(Section, null, /* @__PURE__ */ h(Item, { icon: "🕘", title: "現在有什麼可以看", subtitle: "依時段找常去、附近或各縣市的場次", onTap: () => this.go(() => this.nowView()) }), /* @__PURE__ */ h(Item, { icon: "🎞️", title: "依電影找場次", subtitle: "先選電影，再看哪些影城有放映", onTap: () => this.go(() => this.movieListView(), "讀取電影清單…") }), /* @__PURE__ */ h(Item, { icon: "🧭", title: "附近的影城", subtitle: "依目前位置排序", onTap: () => this.go(() => this.nearbyView(), "取得目前位置…") }), /* @__PURE__ */ h(Item, { icon: "🎦", title: "依縣市找影院", subtitle: `全台 ${this.cinemas.length} 間，也可以搜尋影城`, onTap: () => this.go(() => this.citiesView()) })), favs.length ? /* @__PURE__ */ h(Section, { hint: this.favOpen ? "在影城頁可以加入或移除常去影城。" : "" }, /* @__PURE__ */ h(Item, { head: true, icon: "★", title: `常去影城（${favs.length} 間）`, subtitle: this.favOpen ? "點一下收合" : "點一下展開", chevron: false, onTap: () => {
+    return /* @__PURE__ */ h(Page, { title: "🎬 電影行程", subtitle: `${this.cinemas.length} 間影城｜選影城 → 日期 → 電影 → 場次` }, /* @__PURE__ */ h(Section, null, /* @__PURE__ */ h(Item, { icon: "🕘", title: "現在有什麼可以看", subtitle: "依時段找收藏、附近或各縣市的場次", onTap: () => this.go(() => this.nowView()) }), /* @__PURE__ */ h(Item, { icon: "🎞️", title: "依電影找場次", subtitle: "先選電影，再看哪些影城有放映", onTap: () => this.go(() => this.movieListView(), "讀取電影清單…") }), /* @__PURE__ */ h(Item, { icon: "🧭", title: "附近的影城", subtitle: "依目前位置排序", onTap: () => this.go(() => this.nearbyView(), "取得目前位置…") }), /* @__PURE__ */ h(Item, { icon: "🎦", title: "依縣市找影院", subtitle: `全台 ${this.cinemas.length} 間，也可以搜尋影城`, onTap: () => this.go(() => this.citiesView()) })), favs.length ? /* @__PURE__ */ h(Section, { hint: this.favOpen ? "在影城頁可以收藏或取消收藏影城。" : "" }, /* @__PURE__ */ h(Item, { head: true, icon: "★", title: `收藏的影城（${favs.length} 間）`, subtitle: this.favOpen ? "點一下收合" : "點一下展開", chevron: false, onTap: () => {
       this.favOpen = !this.favOpen;
-    }, action: { label: this.favOpen ? "▾" : "▸", hint: this.favOpen ? "收合常去影城" : "展開常去影城", onTap: () => {
+    }, action: { label: this.favOpen ? "▾" : "▸", hint: this.favOpen ? "收合收藏的影城" : "展開收藏的影城", onTap: () => {
       this.favOpen = !this.favOpen;
     } } }), (this.favOpen ? favs : []).map((c) => /* @__PURE__ */ h(Item, { icon: "★", title: c.name, subtitle: `${c.city} ${c.district}`, onTap: () => this.go(() => this.cinemaView(c), `讀取 ${c.name} 的場次…`) }))) : null, favMovies.length ? /* @__PURE__ */ h(Section, { hint: this.favMovOpen ? "在電影頁的預告按鈕旁邊點愛心加入，再點一次取消。下檔的片也會留在這裡。" : "" }, /* @__PURE__ */ h(Item, { head: true, icon: "♥", title: `收藏的電影（${favMovies.length} 部）`, subtitle: this.favMovOpen ? "點一下收合" : "點一下展開", chevron: false, onTap: () => {
       this.favMovOpen = !this.favMovOpen;
@@ -4041,7 +4059,7 @@ var App = class {
       this.favMovOpen = !this.favMovOpen;
     } } }), favRows.map((r) => /* @__PURE__ */ h(Item, { thumb: { src: r.fav.poster ? posterSrc(r.fav.poster) : "", url: r.fav.poster }, title: r.fav.title, subtitle: r.line, onTap: () => openFav(r) }))) : null, this.installEntry(), await this.versionNote());
   }
-  // ── 設定 ──
+  // 設定頁「算哪些影城」的選項有沒有展開
   /** 網頁版的通知介面（web/shim.ts 的 __push）；Scriptable 版沒有 */
   push() {
     return false ? globalThis.__push : null;
@@ -4049,7 +4067,7 @@ var App = class {
   /** 收藏或通知種類變了：把最新的清單同步給通知伺服器（沒開通知時什麼都不做） */
   pushSync() {
     const p = this.push();
-    if (p) p.sync(notifyPrefs(this.settings), notifyFavs(this.settings)).catch(() => null);
+    if (p) p.sync(notifyPayload(this.settings)).catch(() => null);
   }
   /** 設定頁的「收藏電影的通知」：依裝置的狀況顯示開啟按鈕、各種通知的開關，或說明為什麼不能用 */
   async notifySection() {
@@ -4067,18 +4085,30 @@ var App = class {
     if (state !== "on")
       return /* @__PURE__ */ h(Section, { title: "收藏電影的通知", hint: "開啟後，你收藏的片名會存在我們的伺服器上，用來判斷什麼時候通知你；不需要帳號，也不會記錄你是誰。隨時可以關閉，關閉時伺服器上的資料會一起刪掉。" }, /* @__PURE__ */ h(Item, { icon: "🔔", title: "收藏的電影有動態時通知我", subtitle: n ? `目前收藏了 ${n} 部：開放場次、上映、快下檔、影展開始時通知` : "開放場次、上映、快下檔、影展開始時通知。先開著，之後收藏的片都會算進去", chevron: false }), /* @__PURE__ */ h("button", { class: "btn primary", "data-perm": "notify", onTap: async () => {
         try {
-          const st = await p.enable(prefs, notifyFavs(this.settings));
+          const st = await p.enable(notifyPayload(this.settings));
           await this.ui.toast(st === "on" ? "通知已開啟" : st === "denied" ? "沒有取得通知的權限" : "沒有開啟通知");
         } catch (e) {
           await this.ui.toast(String(e?.message || "開啟失敗，請稍後再試"));
         }
       } }, "開啟通知"));
-    const toggle = (id) => {
-      this.settings.notify = { ...prefs, [id]: !prefs[id] };
+    const set = (patch) => {
+      this.settings.notify = { ...prefs, ...patch };
       saveSettings(this.settings);
       this.pushSync();
     };
-    return /* @__PURE__ */ h(Section, { title: "收藏電影的通知", hint: `已開啟${n ? `，目前收藏了 ${n} 部` : "；還沒有收藏的電影，到電影頁點愛心收藏"}。晚上十點到早上九點不會發通知，留到早上再發。你收藏的片名存在我們的伺服器上，只用來判斷什麼時候通知；關閉通知時會一起刪掉。` }, NOTIFY_KINDS.map((k) => /* @__PURE__ */ h(Item, { icon: prefs[k.id] ? "✅" : "⬜️", title: k.label, subtitle: k.note, chevron: false, onTap: () => toggle(k.id) })), /* @__PURE__ */ h(Item, { icon: "📨", title: "傳一則測試通知", subtitle: "確認這台裝置收得到", chevron: false, onTap: async () => {
+    const toggle = (id) => set({ [id]: !prefs[id] });
+    const max = prefs.endMax || 3;
+    const scope = prefs.endScope === "fav" ? "fav" : prefs.endScope === "city" && (prefs.endCities || []).length ? "city" : "all";
+    const picked = scope === "city" ? prefs.endCities || [] : [];
+    if (!this.cinemas.length) this.cinemas = await loadCinemas().catch(() => []);
+    const cities = Array.from(new Set(this.cinemas.map((c) => c.city))).sort((a, b) => (CITY_ORDER.indexOf(a) + 1 || 99) - (CITY_ORDER.indexOf(b) + 1 || 99));
+    const endRows = prefs.end ? /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Item, { kv: true, title: "　剩下幾間以下", right: `${max} 間以下 ⇄`, chevron: false, onTap: () => set({ endMax: NOTIFY_END_STEPS[(NOTIFY_END_STEPS.indexOf(max) + 1) % NOTIFY_END_STEPS.length] }) }), /* @__PURE__ */ h(Item, { kv: true, title: "　算哪些影城", right: `${notifyEndScope(prefs)} ${this.notifyOpen ? "▾" : "▸"}`, chevron: false, onTap: () => {
+      this.notifyOpen = !this.notifyOpen;
+    } }), this.notifyOpen ? /* @__PURE__ */ h(Chips, { scroll: true }, /* @__PURE__ */ h(Chip, { label: "全台", muted: scope !== "all", onTap: () => set({ endScope: "all", endCities: [] }) }), /* @__PURE__ */ h(Chip, { label: "收藏的影城", sub: `${this.settings.favorites.length} 間`, muted: scope !== "fav", onTap: () => set({ endScope: "fav", endCities: [] }) }), cities.map((c) => /* @__PURE__ */ h(Chip, { label: c, muted: picked.indexOf(c) < 0, onTap: () => {
+      const next = picked.indexOf(c) < 0 ? [...picked, c] : picked.filter((z) => z !== c);
+      set(next.length ? { endScope: "city", endCities: next } : { endScope: "all", endCities: [] });
+    } }))) : null) : "";
+    return /* @__PURE__ */ h(Section, { title: "收藏電影的通知", hint: `已開啟${n ? `，目前收藏了 ${n} 部` : "；還沒有收藏的電影，到電影頁點愛心收藏"}。晚上十點到早上九點不會發通知，留到早上再發。你收藏的片名存在我們的伺服器上，只用來判斷什麼時候通知；關閉通知時會一起刪掉。` }, NOTIFY_KINDS.map((k) => /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Item, { icon: prefs[k.id] ? "✅" : "⬜️", title: k.label, subtitle: k.id === "end" ? scope === "fav" ? `你收藏的影城裡，還在放映的從比較多變成剩下 ${max} 間以下` : `${notifyEndScope(prefs)}放映的影城，從比較多變成剩下 ${max} 間以下` : k.note, chevron: false, onTap: () => toggle(k.id) }), k.id === "end" ? endRows : "")), /* @__PURE__ */ h(Item, { icon: "📨", title: "傳一則測試通知", subtitle: "確認這台裝置收得到", chevron: false, onTap: async () => {
       await this.ui.toast(await p.test() ? "已送出，幾秒內應該會收到" : "送不出去，請關閉通知後重新開啟");
     } }), /* @__PURE__ */ h(Item, { icon: "🔕", title: "關閉通知", subtitle: "停止通知，並刪除伺服器上的資料", chevron: false, onTap: async () => {
       await p.disable();
@@ -4095,11 +4125,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.24-0141"}`);
+          Pasteboard.copy(`版本 ${"2026.11.24-0150"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.24-0141"}`,
+      `版本 ${"2026.11.24-0150"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -4161,12 +4191,13 @@ var App = class {
     if (i >= 0) f.splice(i, 1);
     else f.push(c.id);
     saveSettings(this.settings);
+    this.pushSync();
   }
   // ── 影城：選日期 ──
   async cinemaView(c) {
     const { dates, address, notice, site } = await datesOf(c);
     const fav = this.settings.favorites.indexOf(c.id) >= 0;
-    return /* @__PURE__ */ h(Page, { title: c.name, subtitle: `${c.city} ${c.district}`, onBack: () => this.back() }, address ? /* @__PURE__ */ h(Section, null, this.addressItem(c.name, address)) : null, /* @__PURE__ */ h(Section, { title: "選擇日期" }, dates.length ? null : /* @__PURE__ */ h(Empty, { icon: "🗓", text: "目前沒有公布的場次" }), dates.map((d) => /* @__PURE__ */ h(Item, { title: dateLabel(d), onTap: () => this.go(() => this.moviesView(c, d), `讀取 ${dateLabel(d)} 的片單…`) }))), notice ? /* @__PURE__ */ h(Note, { kind: "warn", text: notice }) : null, /* @__PURE__ */ h(Section, null, /* @__PURE__ */ h(Item, { icon: fav ? "★" : "☆", title: fav ? "移出常去影城" : "加入常去影城", chevron: false, onTap: () => this.toggleFav(c) }), site ? /* @__PURE__ */ h(Item, { icon: "🏠", title: "影城官網（訂票）", subtitle: site.replace(/^https?:\/\//, "").replace(/\/.*$/, ""), chevron: false, accent: true, onTap: () => Safari.open(site) }) : null, site !== c.url ? /* @__PURE__ */ h(Item, { icon: "🌐", title: c.source === "at" ? "以瀏覽器開啟開眼時刻表" : "以瀏覽器開啟場次通時刻表", chevron: false, accent: true, onTap: () => Safari.open(c.url) }) : null));
+    return /* @__PURE__ */ h(Page, { title: c.name, subtitle: `${c.city} ${c.district}`, onBack: () => this.back() }, address ? /* @__PURE__ */ h(Section, null, this.addressItem(c.name, address)) : null, /* @__PURE__ */ h(Section, { title: "選擇日期" }, dates.length ? null : /* @__PURE__ */ h(Empty, { icon: "🗓", text: "目前沒有公布的場次" }), dates.map((d) => /* @__PURE__ */ h(Item, { title: dateLabel(d), onTap: () => this.go(() => this.moviesView(c, d), `讀取 ${dateLabel(d)} 的片單…`) }))), notice ? /* @__PURE__ */ h(Note, { kind: "warn", text: notice }) : null, /* @__PURE__ */ h(Section, null, /* @__PURE__ */ h(Item, { icon: fav ? "★" : "☆", title: fav ? "取消收藏影城" : "收藏這間影城", chevron: false, onTap: () => this.toggleFav(c) }), site ? /* @__PURE__ */ h(Item, { icon: "🏠", title: "影城官網（訂票）", subtitle: site.replace(/^https?:\/\//, "").replace(/\/.*$/, ""), chevron: false, accent: true, onTap: () => Safari.open(site) }) : null, site !== c.url ? /* @__PURE__ */ h(Item, { icon: "🌐", title: c.source === "at" ? "以瀏覽器開啟開眼時刻表" : "以瀏覽器開啟場次通時刻表", chevron: false, accent: true, onTap: () => Safari.open(c.url) }) : null));
   }
   // ── 電影列表 ──
   async moviesView(c, date) {
@@ -4406,7 +4437,7 @@ var App = class {
         { icon: "plus", title: "往下滑，點「加入主畫面」", text: "選單裡方框加一個加號的那一項。" },
         { icon: "check", title: "點右上角的「加入」", text: "名稱可以維持「電影行程」。" },
         { icon: "home", title: "從主畫面開啟", text: "主畫面會多一個「電影行程」圖示，開起來沒有網址列，像一般的 App。" }
-      ] }), /* @__PURE__ */ h(Note, { text: "要用 Safari 才能加到主畫面。常去影城等設定存在瀏覽器裡：從主畫面開啟的版本是另一份，設定要重新設一次。" }));
+      ] }), /* @__PURE__ */ h(Note, { text: "要用 Safari 才能加到主畫面。收藏的影城等設定存在瀏覽器裡：從主畫面開啟的版本是另一份，設定要重新設一次。" }));
     } else if (ios) {
       body = /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Steps, { items: [
         { icon: "share", title: "點「分享」按鈕", text: "網址列旁邊，方框加向上箭頭的圖示。" },
@@ -4438,7 +4469,7 @@ var App = class {
     if (false) {
       if (!r) return /* @__PURE__ */ h(Note, { text: "（無法確認是否為最新版：連不到網站）" });
       if (r.isLatest) return /* @__PURE__ */ h(Note, { text: "✅ 已是最新版" });
-      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.24-0141"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
+      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.24-0150"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
         globalThis.location.reload();
       } }));
     }
@@ -4753,7 +4784,7 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
     const date = u.release.replace(/-/g, "/");
     return /* @__PURE__ */ h(Page, { title: u.title, subtitle: `${date} 上映`, onBack: () => this.back() }, this.hero(e, u.title, [u.en, [`${date} ${u.approx ? "當週" : ""}上映`, u.rating, u.runtime ? `${u.runtime} 分` : ""].filter(Boolean).join("｜")].filter(Boolean), { en: u.en, poster: u.poster }), /* @__PURE__ */ h(Note, { text: "戲院還沒有排這部片的場次。通常上映前一到兩週會開放，到時候這裡會自動變成可以查場次。上映日期可能再調整。" }), /* @__PURE__ */ h(Button, { label: "🌐 開眼電影網的介紹", kind: "secondary", onTap: () => Safari.open(u.url) }));
   }
-  // 只看常去影城
+  // 只看收藏的影城
   async movieView(m, date) {
     if (this.movieFor !== m.slug) {
       this.movieFor = m.slug;
@@ -4809,7 +4840,7 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
       this.movieFormats = toggle(selFormats, f);
     } })))) : null, /* @__PURE__ */ h(Section, { title: "影城" }, /* @__PURE__ */ h(Chips, null, /* @__PURE__ */ h(Chip, { label: "所有影城", muted: this.movieFavOnly, onTap: () => {
       this.movieFavOnly = false;
-    } }), /* @__PURE__ */ h(Chip, { label: `只看常去影城（${this.settings.favorites.length}）`, muted: !this.movieFavOnly, onTap: () => {
+    } }), /* @__PURE__ */ h(Chip, { label: `只看收藏的影城（${this.settings.favorites.length}）`, muted: !this.movieFavOnly, onTap: () => {
       this.movieFavOnly = true;
     } }))), shownCities.map((ct) => {
       const list = rows.filter((r) => r.cinema.city === ct);
@@ -4831,7 +4862,7 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
           }
         );
       }));
-    }), rows.length ? null : /* @__PURE__ */ h(Empty, { icon: "🎞", text: this.movieFavOnly && !this.settings.favorites.length ? "還沒有常去影城，先到影城頁加入。" : "沒有符合條件的影城，換個日期或條件試試。" }));
+    }), rows.length ? null : /* @__PURE__ */ h(Empty, { icon: "🎞", text: this.movieFavOnly && !this.settings.favorites.length ? "還沒有收藏的影城，先到影城頁加入。" : "沒有符合條件的影城，換個日期或條件試試。" }));
   }
   // ── 分享 ──
   async share(p) {
@@ -4874,7 +4905,7 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
     const cities = Array.from(new Set(this.cinemas.map((c) => c.city))).sort(
       (a, b) => (CITY_ORDER.indexOf(a) + 1 || 99) - (CITY_ORDER.indexOf(b) + 1 || 99)
     );
-    const scopes = [{ id: "all", label: `不限（全台 ${this.cinemas.length} 間）` }, { id: "fav", label: `常去影城（${this.settings.favorites.length}）` }, { id: "near", label: "附近 10 間" }, ...cities.map((c) => ({ id: c, label: c }))];
+    const scopes = [{ id: "all", label: `不限（全台 ${this.cinemas.length} 間）` }, { id: "fav", label: `收藏的影城（${this.settings.favorites.length}）` }, { id: "near", label: "附近 10 間" }, ...cities.map((c) => ({ id: c, label: c }))];
     const toggle = (list, id, min1 = false) => {
       const i = list.indexOf(id);
       if (i < 0) return [...list, id];
@@ -4906,7 +4937,7 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
       else add(this.cinemas.filter((c) => c.city === sc).map((c) => ({ cinema: c, km: null })));
     }
     const scope = Array.from(byId.values());
-    if (!scope.length) throw new Error("沒有可以查的影城。先在影城頁加入常去影城，或改選附近／縣市。");
+    if (!scope.length) throw new Error("沒有可以查的影城。先到影城頁收藏影城，或改選附近／縣市。");
     const { hits, failed, noData } = await findShowtimesMulti(scope, dates, winIds, this.nowFormats);
     const groups = await linkMovies(groupByMovie(hits));
     prefetchPosters(groups);
@@ -4921,7 +4952,7 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
       if (src && src === u) cachePoster(u);
       return { src, url: u };
     };
-    const scopeLabel = this.nowScopes.map((sc) => sc === "all" ? "全台影城" : sc === "fav" ? "常去影城" : sc === "near" ? "附近 10 間" : sc).join("、");
+    const scopeLabel = this.nowScopes.map((sc) => sc === "all" ? "全台影城" : sc === "fav" ? "收藏的影城" : sc === "near" ? "附近 10 間" : sc).join("、");
     const many = dates.length > 1;
     const foldKey = [dates.join(","), winIds.join(","), this.nowScopes.join(","), this.nowFormats.join(",")].join("|");
     if (this.nowFoldFor !== foldKey) {

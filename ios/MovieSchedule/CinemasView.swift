@@ -100,7 +100,7 @@ struct CinemaView: View {
                 } label: {
                     Image(systemName: settings.isFavorite(cinema.id) ? "star.fill" : "star")
                 }
-                .accessibilityLabel(settings.isFavorite(cinema.id) ? "移出常去影城" : "加入常去影城")
+                .accessibilityLabel(settings.isFavorite(cinema.id) ? "取消收藏影城" : "收藏這間影城")
             }
         }
         .task { if info.value == nil { await load() } }

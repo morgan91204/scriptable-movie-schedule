@@ -12,7 +12,7 @@ import {
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
   loadSettings, saveSettings, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, TW,
   FORMATS, formatsOf, filterVersions, filterVersionsAny, movieRows, movieDays, nearest, kmLabel, WINDOWS, findShowtimes, findShowtimesMulti, multiLabel, multiDetail, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText,
-  hallOf, tmdbTest, movieExtras, moviePoster, movieRuntime, posterSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxCountries, boxByCountry, boxInfo, boxInfoRows, boxCountryText, BOX_COUNTRY_NOTE, boxCountryTag, boxCountriesPicked, loadMovieBoard, loadSoonBoard, notifyPrefs, notifyFavs, NOTIFY_KINDS, boxStatus, STATUS_LABEL, boxInfoBy, isFavMovie, toggleFavMovie, favMovieRows, favMovieBox, soonGroups, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityCached, communityVote, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalsReady, festivalNote, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, festivalDefaultDate, festivalStateLabel, festivalState, festivalFooter, linkMovies, nowGroupLine, nowFilter, festivalPick, movieAbout, festivalSearch, festivalSearchLines, festivalTrailer, festivalYears, festivalsAny, festivalGroups, festivalChipNote, festivalStatusLine, movieRatings, ratingTier,
+  hallOf, tmdbTest, movieExtras, moviePoster, movieRuntime, posterSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxCountries, boxByCountry, boxInfo, boxInfoRows, boxCountryText, BOX_COUNTRY_NOTE, boxCountryTag, boxCountriesPicked, loadMovieBoard, loadSoonBoard, notifyPrefs, notifyPayload, notifyEndScope, NOTIFY_END_STEPS, NOTIFY_KINDS, boxStatus, STATUS_LABEL, boxInfoBy, isFavMovie, toggleFavMovie, favMovieRows, favMovieBox, soonGroups, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityCached, communityVote, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalsReady, festivalNote, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, festivalDefaultDate, festivalStateLabel, festivalState, festivalFooter, linkMovies, nowGroupLine, nowFilter, festivalPick, movieAbout, festivalSearch, festivalSearchLines, festivalTrailer, festivalYears, festivalsAny, festivalGroups, festivalChipNote, festivalStatusLine, movieRatings, ratingTier,
 } from "./core";
 import type { MovieExtras, Ratings, Community, BoxOfficeItem, BoxSort, MovieEntry, SoonEntry, UpcomingFilm, FavMovie, FavRow, NotifyPrefs, Festival, FestivalFilm, FestivalSession } from "./core";
 import { setTabBar, setBackGuard, esc } from "./jsx";
@@ -211,15 +211,15 @@ class App {
     return (
       <Page title="🎬 電影行程" subtitle={`${this.cinemas.length} 間影城｜選影城 → 日期 → 電影 → 場次`}>
         <Section>
-          <Item icon="🕘" title="現在有什麼可以看" subtitle="依時段找常去、附近或各縣市的場次" onTap={() => this.go(() => this.nowView())} />
+          <Item icon="🕘" title="現在有什麼可以看" subtitle="依時段找收藏、附近或各縣市的場次" onTap={() => this.go(() => this.nowView())} />
           <Item icon="🎞️" title="依電影找場次" subtitle="先選電影，再看哪些影城有放映" onTap={() => this.go(() => this.movieListView(), "讀取電影清單…")} />
           <Item icon="🧭" title="附近的影城" subtitle="依目前位置排序" onTap={() => this.go(() => this.nearbyView(), "取得目前位置…")} />
           <Item icon="🎦" title="依縣市找影院" subtitle={`全台 ${this.cinemas.length} 間，也可以搜尋影城`} onTap={() => this.go(() => this.citiesView())} />
         </Section>
         {favs.length ? (
-          <Section hint={this.favOpen ? "在影城頁可以加入或移除常去影城。" : ""}>
+          <Section hint={this.favOpen ? "在影城頁可以收藏或取消收藏影城。" : ""}>
             {/* 預設收合，只留這一列；點一下展開清單 */}
-            <Item head icon="★" title={`常去影城（${favs.length} 間）`} subtitle={this.favOpen ? "點一下收合" : "點一下展開"} chevron={false} onTap={() => { this.favOpen = !this.favOpen; }} action={{ label: this.favOpen ? "▾" : "▸", hint: this.favOpen ? "收合常去影城" : "展開常去影城", onTap: () => { this.favOpen = !this.favOpen; } }} />
+            <Item head icon="★" title={`收藏的影城（${favs.length} 間）`} subtitle={this.favOpen ? "點一下收合" : "點一下展開"} chevron={false} onTap={() => { this.favOpen = !this.favOpen; }} action={{ label: this.favOpen ? "▾" : "▸", hint: this.favOpen ? "收合收藏的影城" : "展開收藏的影城", onTap: () => { this.favOpen = !this.favOpen; } }} />
             {(this.favOpen ? favs : []).map((c) => (
               <Item icon="★" title={c.name} subtitle={`${c.city} ${c.district}`} onTap={() => this.go(() => this.cinemaView(c), `讀取 ${c.name} 的場次…`)} />
             ))}
@@ -241,12 +241,13 @@ class App {
   }
 
   // ── 設定 ──
+  notifyOpen = false; // 設定頁「算哪些影城」的選項有沒有展開
   /** 網頁版的通知介面（web/shim.ts 的 __push）；Scriptable 版沒有 */
   push(): any { return IS_WEB ? (globalThis as any).__push : null; }
   /** 收藏或通知種類變了：把最新的清單同步給通知伺服器（沒開通知時什麼都不做） */
   pushSync(): void {
     const p = this.push();
-    if (p) p.sync(notifyPrefs(this.settings), notifyFavs(this.settings)).catch(() => null);
+    if (p) p.sync(notifyPayload(this.settings)).catch(() => null);
   }
   /** 設定頁的「收藏電影的通知」：依裝置的狀況顯示開啟按鈕、各種通知的開關，或說明為什麼不能用 */
   async notifySection(): Promise<string> {
@@ -279,17 +280,40 @@ class App {
           <Item icon="🔔" title="收藏的電影有動態時通知我" subtitle={n ? `目前收藏了 ${n} 部：開放場次、上映、快下檔、影展開始時通知` : "開放場次、上映、快下檔、影展開始時通知。先開著，之後收藏的片都會算進去"} chevron={false} />
           <button class="btn primary" data-perm="notify" onTap={async () => {
             try {
-              const st = await p.enable(prefs, notifyFavs(this.settings));
+              const st = await p.enable(notifyPayload(this.settings));
               await this.ui.toast(st === "on" ? "通知已開啟" : st === "denied" ? "沒有取得通知的權限" : "沒有開啟通知");
             } catch (e) { await this.ui.toast(String((e as Error)?.message || "開啟失敗，請稍後再試")); }
           }}>開啟通知</button>
         </Section>
       );
-    const toggle = (id: keyof NotifyPrefs) => { this.settings.notify = { ...prefs, [id]: !prefs[id] }; saveSettings(this.settings); this.pushSync(); };
+    const set = (patch: Partial<NotifyPrefs>) => { this.settings.notify = { ...prefs, ...patch }; saveSettings(this.settings); this.pushSync(); };
+    const toggle = (id: "open" | "rel" | "end" | "fest") => set({ [id]: !prefs[id] });
+    // 快下檔的細項：剩下幾間以下、算哪些影城（全台／指定縣市，可複選／收藏的影城）
+    const max = prefs.endMax || 3;
+    const scope = prefs.endScope === "fav" ? "fav" : prefs.endScope === "city" && (prefs.endCities || []).length ? "city" : "all";
+    const picked = scope === "city" ? prefs.endCities || [] : [];
+    if (!this.cinemas.length) this.cinemas = await loadCinemas().catch(() => [] as Cinema[]);
+    const cities = Array.from(new Set(this.cinemas.map((c) => c.city))).sort((a, b) => (CITY_ORDER.indexOf(a) + 1 || 99) - (CITY_ORDER.indexOf(b) + 1 || 99));
+    const endRows = prefs.end ? (
+      <>
+        <Item kv title="　剩下幾間以下" right={`${max} 間以下 ⇄`} chevron={false} onTap={() => set({ endMax: NOTIFY_END_STEPS[(NOTIFY_END_STEPS.indexOf(max) + 1) % NOTIFY_END_STEPS.length] })} />
+        <Item kv title="　算哪些影城" right={`${notifyEndScope(prefs)} ${this.notifyOpen ? "▾" : "▸"}`} chevron={false} onTap={() => { this.notifyOpen = !this.notifyOpen; }} />
+        {this.notifyOpen ? (
+          <Chips scroll>
+            <Chip label="全台" muted={scope !== "all"} onTap={() => set({ endScope: "all", endCities: [] })} />
+            <Chip label="收藏的影城" sub={`${this.settings.favorites.length} 間`} muted={scope !== "fav"} onTap={() => set({ endScope: "fav", endCities: [] })} />
+            {cities.map((c) => <Chip label={c} muted={picked.indexOf(c) < 0} onTap={() => { const next = picked.indexOf(c) < 0 ? [...picked, c] : picked.filter((z) => z !== c); set(next.length ? { endScope: "city", endCities: next } : { endScope: "all", endCities: [] }); }} />)}
+          </Chips>
+        ) : null}
+      </>
+    ) : "";
     return (
       <Section title="收藏電影的通知" hint={`已開啟${n ? `，目前收藏了 ${n} 部` : "；還沒有收藏的電影，到電影頁點愛心收藏"}。晚上十點到早上九點不會發通知，留到早上再發。你收藏的片名存在我們的伺服器上，只用來判斷什麼時候通知；關閉通知時會一起刪掉。`}>
         {NOTIFY_KINDS.map((k) => (
-          <Item icon={prefs[k.id] ? "✅" : "⬜️"} title={k.label} subtitle={k.note} chevron={false} onTap={() => toggle(k.id)} />
+          <>
+            <Item icon={prefs[k.id] ? "✅" : "⬜️"} title={k.label} subtitle={k.id === "end" ? (scope === "fav" ? `你收藏的影城裡，還在放映的從比較多變成剩下 ${max} 間以下` : `${notifyEndScope(prefs)}放映的影城，從比較多變成剩下 ${max} 間以下`) : k.note} chevron={false} onTap={() => toggle(k.id)} />
+            {k.id === "end" ? endRows : ""}
+          </>
         ))}
         <Item icon="📨" title="傳一則測試通知" subtitle="確認這台裝置收得到" chevron={false} onTap={async () => { await this.ui.toast((await p.test()) ? "已送出，幾秒內應該會收到" : "送不出去，請關閉通知後重新開啟"); }} />
         <Item icon="🔕" title="關閉通知" subtitle="停止通知，並刪除伺服器上的資料" chevron={false} onTap={async () => { await p.disable(); await this.ui.toast("通知已關閉"); }} />
@@ -424,6 +448,7 @@ class App {
     if (i >= 0) f.splice(i, 1);
     else f.push(c.id);
     saveSettings(this.settings);
+    this.pushSync(); // 「快下檔」的範圍選收藏的影城時，名單要跟著更新
   }
 
   // ── 影城：選日期 ──
@@ -441,7 +466,7 @@ class App {
         </Section>
         {notice ? <Note kind="warn" text={notice} /> : null}
         <Section>
-          <Item icon={fav ? "★" : "☆"} title={fav ? "移出常去影城" : "加入常去影城"} chevron={false} onTap={() => this.toggleFav(c)} />
+          <Item icon={fav ? "★" : "☆"} title={fav ? "取消收藏影城" : "收藏這間影城"} chevron={false} onTap={() => this.toggleFav(c)} />
           {site ? <Item icon="🏠" title="影城官網（訂票）" subtitle={site.replace(/^https?:\/\//, "").replace(/\/.*$/, "")} chevron={false} accent onTap={() => Safari.open(site)} /> : null}
           {site !== c.url ? <Item icon="🌐" title={c.source === "at" ? "以瀏覽器開啟開眼時刻表" : "以瀏覽器開啟場次通時刻表"} chevron={false} accent onTap={() => Safari.open(c.url)} /> : null}
         </Section>
@@ -792,7 +817,7 @@ class App {
             { icon: "check", title: "點右上角的「加入」", text: "名稱可以維持「電影行程」。" },
             { icon: "home", title: "從主畫面開啟", text: "主畫面會多一個「電影行程」圖示，開起來沒有網址列，像一般的 App。" },
           ]} />
-          <Note text="要用 Safari 才能加到主畫面。常去影城等設定存在瀏覽器裡：從主畫面開啟的版本是另一份，設定要重新設一次。" />
+          <Note text="要用 Safari 才能加到主畫面。收藏的影城等設定存在瀏覽器裡：從主畫面開啟的版本是另一份，設定要重新設一次。" />
         </>
       );
     } else if (ios) {
@@ -1330,7 +1355,7 @@ class App {
   movieDates: string[] = []; // 空 = 來源預設的那一天（通常是今天）
   movieCities: string[] = []; // 空 = 全部
   movieFormats: string[] = []; // 空 = 全部
-  movieFavOnly = false; // 只看常去影城
+  movieFavOnly = false; // 只看收藏的影城
   async movieView(m: TwMovie, date: string): Promise<string> {
     if (this.movieFor !== m.slug) {
       this.movieFor = m.slug;
@@ -1418,7 +1443,7 @@ class App {
         <Section title="影城">
           <Chips>
             <Chip label="所有影城" muted={this.movieFavOnly} onTap={() => { this.movieFavOnly = false; }} />
-            <Chip label={`只看常去影城（${this.settings.favorites.length}）`} muted={!this.movieFavOnly} onTap={() => { this.movieFavOnly = true; }} />
+            <Chip label={`只看收藏的影城（${this.settings.favorites.length}）`} muted={!this.movieFavOnly} onTap={() => { this.movieFavOnly = true; }} />
           </Chips>
         </Section>
         {shownCities.map((ct) => {
@@ -1446,7 +1471,7 @@ class App {
             </Section>
           );
         })}
-        {rows.length ? null : <Empty icon="🎞" text={this.movieFavOnly && !this.settings.favorites.length ? "還沒有常去影城，先到影城頁加入。" : "沒有符合條件的影城，換個日期或條件試試。"} />}
+        {rows.length ? null : <Empty icon="🎞" text={this.movieFavOnly && !this.settings.favorites.length ? "還沒有收藏的影城，先到影城頁加入。" : "沒有符合條件的影城，換個日期或條件試試。"} />}
       </Page>
     );
   }
@@ -1507,7 +1532,7 @@ class App {
     const cities = Array.from(new Set(this.cinemas.map((c) => c.city))).sort(
       (a, b) => (CITY_ORDER.indexOf(a) + 1 || 99) - (CITY_ORDER.indexOf(b) + 1 || 99)
     );
-    const scopes = [{ id: "all", label: `不限（全台 ${this.cinemas.length} 間）` }, { id: "fav", label: `常去影城（${this.settings.favorites.length}）` }, { id: "near", label: "附近 10 間" }, ...cities.map((c) => ({ id: c, label: c }))];
+    const scopes = [{ id: "all", label: `不限（全台 ${this.cinemas.length} 間）` }, { id: "fav", label: `收藏的影城（${this.settings.favorites.length}）` }, { id: "near", label: "附近 10 間" }, ...cities.map((c) => ({ id: c, label: c }))];
     // 點一下加入、再點一下拿掉；min1 = 至少留一個
     const toggle = (list: string[], id: string, min1 = false) => {
       const i = list.indexOf(id);
@@ -1544,7 +1569,7 @@ class App {
     );
   }
 
-  favOpen = false; // 首頁的常去影城清單有沒有展開（預設收合）
+  favOpen = false; // 首頁的收藏的影城清單有沒有展開（預設收合）
   favMovOpen = IS_WEB && /[?&]fav=1/.test(String((globalThis as any).location?.search || "")); // 首頁的收藏電影清單有沒有展開（預設收合；從通知點進來時直接展開）
   nowFolded: string[] = []; // 「現在有什麼可以看」結果裡收合起來的片（只留片名列）
   nowFoldFor = ""; // 上面那份收合狀態是哪一次查詢的
@@ -1560,7 +1585,7 @@ class App {
       else add(this.cinemas.filter((c) => c.city === sc).map((c) => ({ cinema: c, km: null })));
     }
     const scope = Array.from(byId.values());
-    if (!scope.length) throw new Error("沒有可以查的影城。先在影城頁加入常去影城，或改選附近／縣市。");
+    if (!scope.length) throw new Error("沒有可以查的影城。先到影城頁收藏影城，或改選附近／縣市。");
     const { hits, failed, noData } = await findShowtimesMulti(scope, dates, winIds, this.nowFormats as Format[]);
     const groups = await linkMovies(groupByMovie(hits)); // 每部片對到電影清單上的那一部，片名才能連到電影頁
     prefetchPosters(groups); // 背景先抓海報，進電影頁就不用等
@@ -1576,7 +1601,7 @@ class App {
       if (src && src === u) cachePoster(u);
       return { src, url: u };
     };
-    const scopeLabel = this.nowScopes.map((sc) => (sc === "all" ? "全台影城" : sc === "fav" ? "常去影城" : sc === "near" ? "附近 10 間" : sc)).join("、");
+    const scopeLabel = this.nowScopes.map((sc) => (sc === "all" ? "全台影城" : sc === "fav" ? "收藏的影城" : sc === "near" ? "附近 10 間" : sc)).join("、");
     const many = dates.length > 1; // 複選多天：每一場前面標日期
     // 收合：換了查詢條件就全部重新展開
     const foldKey = [dates.join(","), winIds.join(","), this.nowScopes.join(","), this.nowFormats.join(",")].join("|");
