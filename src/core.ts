@@ -1376,6 +1376,42 @@ export async function tmdbTest(token: string): Promise<string> {
 
 let moviesCache: TwMovie[] | null = null;
 /** 場次通的電影清單（上映中＋即將上映） */
+/** 同一部片的其他頁（主要那一頁的代稱 → 其他幾頁的代稱）：讀電影頁時要把這幾頁的場次合在一起 */
+const altSlugs: Record<string, string[]> = {};
+/** 比對「是不是同一部片」用的鍵：去掉重映、修復、特別場之類的裝飾字，異體字當成同一個字 */
+const sameMovieKey = (title: string) => normTitle(baseTitle(title)).replace(/祕/g, "秘").replace(/臺/g, "台");
+/** 場次通把各家戲院取的不同片名當成不同的片（沙丘／沙丘(重映版)／沙丘_經典重映、來自深淵的「神祕／神秘」）：
+ *  去掉裝飾字後片名相同、片長也差不多（差 5 分鐘以內，或有一邊不知道）的併成一筆。
+ *  留下片名最單純的那一筆當代表，其他的記在 alts；影城數相加，只要有一筆在上映就算上映中 */
+function mergeSameMovies(list: TwMovie[]): TwMovie[] {
+  const groups: TwMovie[][] = [];
+  const byKey: Record<string, TwMovie[][]> = {};
+  for (const m of list) {
+    const k = sameMovieKey(m.title);
+    const g = (byKey[k] ||= []).find((x) => x.every((o) => !o.runtime || !m.runtime || Math.abs(o.runtime - m.runtime) <= 5));
+    if (g) g.push(m);
+    else {
+      const fresh = [m];
+      byKey[k].push(fresh);
+      groups.push(fresh);
+    }
+  }
+  return groups.map((g) => {
+    if (g.length === 1) return g[0];
+    // 代表：片名最單純的（跟去掉裝飾字後一樣的優先），再來是影城最多的
+    const plain = (m: TwMovie) => (normTitle(m.title) === normTitle(baseTitle(m.title)) ? 0 : 1);
+    const main = g.slice().sort((a, b) => plain(a) - plain(b) || b.cinemaCount - a.cinemaCount)[0];
+    const others = g.filter((m) => m !== main);
+    const pick = <K extends keyof TwMovie>(key: K): TwMovie[K] => (main[key] || (others.find((o) => o[key]) || main)[key]) as TwMovie[K];
+    const now = g.filter((m) => !m.comingSoon);
+    altSlugs[main.slug] = others.map((m) => m.slug);
+    return {
+      ...main, en: pick("en"), rating: pick("rating"), runtime: pick("runtime"), release: g.map((m) => m.release || "").filter(Boolean).sort()[0] || undefined, score: pick("score"), tomato: main.tomato ?? others.find((o) => o.tomato !== undefined)?.tomato, popcorn: main.popcorn ?? others.find((o) => o.popcorn !== undefined)?.popcorn,
+      cinemaCount: g.reduce((n, m) => n + (m.cinemaCount || 0), 0), comingSoon: !now.length, noShowToday: now.length ? now.every((m) => !!m.noShowToday) : false,
+      alts: others.map((m) => m.slug),
+    };
+  });
+}
 export async function loadMovies(): Promise<TwMovie[]> {
   if (!moviesCache) {
     const list = await fillRuntimes(await parse<TwMovie[]>("parseTwMovies", await getText(TW + "/movies/")));
@@ -1397,8 +1433,9 @@ export async function loadMovies(): Promise<TwMovie[]> {
         m.noShowToday = true;
       }
     }
-    const soon = list.filter((m) => m.comingSoon).sort((a, b) => (a.release || "9999").localeCompare(b.release || "9999")); // 快上映的排前面
-    moviesCache = [...list.filter((m) => !m.comingSoon && !m.noShowToday), ...list.filter((m) => m.noShowToday), ...soon];
+    const merged = mergeSameMovies(list);
+    const soon = merged.filter((m) => m.comingSoon).sort((a, b) => (a.release || "9999").localeCompare(b.release || "9999")); // 快上映的排前面
+    moviesCache = [...merged.filter((m) => !m.comingSoon && !m.noShowToday), ...merged.filter((m) => m.noShowToday), ...soon];
   }
   return moviesCache;
 }
@@ -1670,7 +1707,7 @@ export function movieBoard(b: BoxOffice | null, movies: TwMovie[], opt: { scope?
   const keyed = list.map((p) => ({ p, k: keyOf(p) }));
   keyed.sort((a, c) => c.k.tier - a.k.tier || (asc ? a.k.v - c.k.v : c.k.v - a.k.v));
   const entries = keyed.map(({ p: { m, x, d } }): MovieEntry => {
-    const first = [sort === "rating" ? rated(m).text : "", m.noShowToday ? "今天無場次" : "", d ? `${sort === "date" ? d.slice(0, 4) + "/" : ""}${mdOf(d)} 上映` : "", m.rating, m.runtime ? `${m.runtime} 分` : "", m.cinemaCount ? `${m.cinemaCount} 間影城` : ""].filter(Boolean).join("｜");
+    const first = [sort === "rating" ? rated(m).text : "", m.noShowToday ? "今天無場次" : "", d ? `${sort === "date" || d.slice(0, 4) !== todayTPE().slice(0, 4) ? d.slice(0, 4) + "/" : ""}${mdOf(d)} 上映` : "" /* 不是今年上映的（重映的舊片）一律寫出年份 */, m.rating, m.runtime ? `${m.runtime} 分` : "", m.cinemaCount ? `${m.cinemaCount} 間影城` : ""].filter(Boolean).join("｜");
     return { key: m.slug, rank: null, name: m.title, x, m, lines: [first, x ? boxOfficeLines(x, "week")[0] : m.en || ""], light: false };
   });
   const rateName = rates.find((r) => r.id === rate)!.label;
@@ -1785,8 +1822,38 @@ export function movieLines(m: TwMovie): [string, string] {
 }
 
 const movieDayCache: Record<string, TwMovieDay> = {};
-/** 某部電影某天在哪些影城放映（不給日期 = 今天） */
+const mergedDayCache: Record<string, TwMovieDay> = {};
+/** 某部電影某天在哪些影城放映（不給日期 = 今天）。同一部片在場次通分成好幾頁的（見 mergeSameMovies），幾頁的場次合在一起 */
 export async function movieDay(slug: string, date?: string): Promise<TwMovieDay> {
+  if (!moviesCache) await loadMovies().catch(() => null); // 要先知道這部片有沒有其他頁
+  const alts = altSlugs[slug] || [];
+  if (!alts.length) return movieDayOne(slug, date);
+  const ck = slug + "|" + (date || "");
+  if (mergedDayCache[ck]) return mergedDayCache[ck];
+  // 各頁先讀預設那一天（要知道各自有哪些日期可選）；主要那一頁今天沒場次的，就以最早有場次的那一頁為準
+  const firsts = (await Promise.all([slug, ...alts].map((s) => movieDayOne(s, undefined).then((d) => ({ s, d }), () => null)))).filter((x): x is { s: string; d: TwMovieDay } => !!x);
+  if (!firsts.length) return movieDayOne(slug, date);
+  const dates = Array.from(new Set(firsts.flatMap((x) => x.d.dates.length ? x.d.dates : [x.d.date]))).sort();
+  const want = date || firsts.map((x) => x.d.date).sort()[0];
+  const days = (await Promise.all(firsts.map((x) => (x.d.date === want ? Promise.resolve(x.d) : x.d.dates.indexOf(want) >= 0 ? movieDayOne(x.s, want).catch(() => null) : Promise.resolve(null))))).filter((d): d is TwMovieDay => !!d);
+  const head = firsts[0].s === slug ? firsts[0].d : firsts[0].d;
+  const all = firsts.map((x) => x.d);
+  const first = <K extends keyof TwMovieDay>(key: K): TwMovieDay[K] => (head[key] || (all.find((d) => d[key]) || head)[key]) as TwMovieDay[K];
+  // 影城合在一起：同一間影城兩頁都有的，版本接在一起（同名的版本場次合併）
+  const cinemas: TwMovieCinema[] = [];
+  for (const d of days) for (const c of d.cinemas) {
+    const old = cinemas.find((x) => x.id === c.id);
+    if (!old) { cinemas.push({ ...c, versions: c.versions.map((v) => ({ ...v, times: v.times.slice() })) }); continue; }
+    for (const v of c.versions) {
+      const ov = old.versions.find((x) => x.label === v.label);
+      if (ov) ov.times = Array.from(new Set([...ov.times, ...v.times])).sort();
+      else old.versions.push({ ...v, times: v.times.slice() });
+    }
+  }
+  const out: TwMovieDay = { ...head, en: first("en"), rating: first("rating"), runtime: first("runtime"), image: first("image"), release: all.map((d) => d.release || "").filter(Boolean).sort()[0] || head.release, intro: first("intro"), director: first("director"), cast: first("cast"), date: want, dates, cinemas };
+  return (mergedDayCache[ck] = out);
+}
+async function movieDayOne(slug: string, date?: string): Promise<TwMovieDay> {
   const path = encodeURIComponent(slug).replace(/%3A/gi, ":");
   const url = `${TW}/movies/${path}/${date ? date + "/" : ""}`;
   if (!movieDayCache[url]) {

@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.23-2153
+// @movie-schedule-app 電影行程 v2026.11.23-2201
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/parsers.gen.ts
@@ -1625,6 +1625,45 @@ async function tmdbTest(token) {
   return `${d.title}：${d.runtime} 分鐘`;
 }
 var moviesCache = null;
+var altSlugs = {};
+var sameMovieKey = (title) => normTitle(baseTitle(title)).replace(/祕/g, "秘").replace(/臺/g, "台");
+function mergeSameMovies(list) {
+  const groups = [];
+  const byKey = {};
+  for (const m of list) {
+    const k = sameMovieKey(m.title);
+    const g = (byKey[k] ||= []).find((x) => x.every((o) => !o.runtime || !m.runtime || Math.abs(o.runtime - m.runtime) <= 5));
+    if (g) g.push(m);
+    else {
+      const fresh = [m];
+      byKey[k].push(fresh);
+      groups.push(fresh);
+    }
+  }
+  return groups.map((g) => {
+    if (g.length === 1) return g[0];
+    const plain = (m) => normTitle(m.title) === normTitle(baseTitle(m.title)) ? 0 : 1;
+    const main = g.slice().sort((a, b) => plain(a) - plain(b) || b.cinemaCount - a.cinemaCount)[0];
+    const others = g.filter((m) => m !== main);
+    const pick = (key) => main[key] || (others.find((o) => o[key]) || main)[key];
+    const now = g.filter((m) => !m.comingSoon);
+    altSlugs[main.slug] = others.map((m) => m.slug);
+    return {
+      ...main,
+      en: pick("en"),
+      rating: pick("rating"),
+      runtime: pick("runtime"),
+      release: g.map((m) => m.release || "").filter(Boolean).sort()[0] || void 0,
+      score: pick("score"),
+      tomato: main.tomato ?? others.find((o) => o.tomato !== void 0)?.tomato,
+      popcorn: main.popcorn ?? others.find((o) => o.popcorn !== void 0)?.popcorn,
+      cinemaCount: g.reduce((n, m) => n + (m.cinemaCount || 0), 0),
+      comingSoon: !now.length,
+      noShowToday: now.length ? now.every((m) => !!m.noShowToday) : false,
+      alts: others.map((m) => m.slug)
+    };
+  });
+}
 async function loadMovies() {
   if (!moviesCache) {
     const list = await fillRuntimes(await parse("parseTwMovies", await getText(TW + "/movies/")));
@@ -1644,8 +1683,9 @@ async function loadMovies() {
         m.noShowToday = true;
       }
     }
-    const soon = list.filter((m) => m.comingSoon).sort((a, b) => (a.release || "9999").localeCompare(b.release || "9999"));
-    moviesCache = [...list.filter((m) => !m.comingSoon && !m.noShowToday), ...list.filter((m) => m.noShowToday), ...soon];
+    const merged = mergeSameMovies(list);
+    const soon = merged.filter((m) => m.comingSoon).sort((a, b) => (a.release || "9999").localeCompare(b.release || "9999"));
+    moviesCache = [...merged.filter((m) => !m.comingSoon && !m.noShowToday), ...merged.filter((m) => m.noShowToday), ...soon];
   }
   return moviesCache;
 }
@@ -1859,7 +1899,7 @@ function movieBoard(b, movies, opt = {}) {
   const keyed = list.map((p) => ({ p, k: keyOf(p) }));
   keyed.sort((a, c) => c.k.tier - a.k.tier || (asc ? a.k.v - c.k.v : c.k.v - a.k.v));
   const entries = keyed.map(({ p: { m, x, d } }) => {
-    const first = [sort === "rating" ? rated(m).text : "", m.noShowToday ? "今天無場次" : "", d ? `${sort === "date" ? d.slice(0, 4) + "/" : ""}${mdOf(d)} 上映` : "", m.rating, m.runtime ? `${m.runtime} 分` : "", m.cinemaCount ? `${m.cinemaCount} 間影城` : ""].filter(Boolean).join("｜");
+    const first = [sort === "rating" ? rated(m).text : "", m.noShowToday ? "今天無場次" : "", d ? `${sort === "date" || d.slice(0, 4) !== todayTPE().slice(0, 4) ? d.slice(0, 4) + "/" : ""}${mdOf(d)} 上映` : "", m.rating, m.runtime ? `${m.runtime} 分` : "", m.cinemaCount ? `${m.cinemaCount} 間影城` : ""].filter(Boolean).join("｜");
     return { key: m.slug, rank: null, name: m.title, x, m, lines: [first, x ? boxOfficeLines(x, "week")[0] : m.en || ""], light: false };
   });
   const rateName = rates.find((r) => r.id === rate).label;
@@ -1968,7 +2008,38 @@ function movieLines(m) {
   return [[head, m.rating, m.runtime ? `${m.runtime} 分` : "", m.cinemaCount ? `${m.cinemaCount} 間影城` : ""].filter(Boolean).join("｜"), m.en || ""];
 }
 var movieDayCache = {};
+var mergedDayCache = {};
 async function movieDay(slug, date) {
+  if (!moviesCache) await loadMovies().catch(() => null);
+  const alts = altSlugs[slug] || [];
+  if (!alts.length) return movieDayOne(slug, date);
+  const ck = slug + "|" + (date || "");
+  if (mergedDayCache[ck]) return mergedDayCache[ck];
+  const firsts = (await Promise.all([slug, ...alts].map((s) => movieDayOne(s, void 0).then((d) => ({ s, d }), () => null)))).filter((x) => !!x);
+  if (!firsts.length) return movieDayOne(slug, date);
+  const dates = Array.from(new Set(firsts.flatMap((x) => x.d.dates.length ? x.d.dates : [x.d.date]))).sort();
+  const want = date || firsts.map((x) => x.d.date).sort()[0];
+  const days = (await Promise.all(firsts.map((x) => x.d.date === want ? Promise.resolve(x.d) : x.d.dates.indexOf(want) >= 0 ? movieDayOne(x.s, want).catch(() => null) : Promise.resolve(null)))).filter((d) => !!d);
+  const head = firsts[0].s === slug ? firsts[0].d : firsts[0].d;
+  const all = firsts.map((x) => x.d);
+  const first = (key) => head[key] || (all.find((d) => d[key]) || head)[key];
+  const cinemas = [];
+  for (const d of days) for (const c of d.cinemas) {
+    const old = cinemas.find((x) => x.id === c.id);
+    if (!old) {
+      cinemas.push({ ...c, versions: c.versions.map((v) => ({ ...v, times: v.times.slice() })) });
+      continue;
+    }
+    for (const v of c.versions) {
+      const ov = old.versions.find((x) => x.label === v.label);
+      if (ov) ov.times = Array.from(/* @__PURE__ */ new Set([...ov.times, ...v.times])).sort();
+      else old.versions.push({ ...v, times: v.times.slice() });
+    }
+  }
+  const out = { ...head, en: first("en"), rating: first("rating"), runtime: first("runtime"), image: first("image"), release: all.map((d) => d.release || "").filter(Boolean).sort()[0] || head.release, intro: first("intro"), director: first("director"), cast: first("cast"), date: want, dates, cinemas };
+  return mergedDayCache[ck] = out;
+}
+async function movieDayOne(slug, date) {
   const path = encodeURIComponent(slug).replace(/%3A/gi, ":");
   const url = `${TW}/movies/${path}/${date ? date + "/" : ""}`;
   if (!movieDayCache[url]) {
@@ -3466,14 +3537,14 @@ var App = class {
   }
   /** 最新版本是多少。網頁版問的是自己網站現在上線的版本（重新整理就會拿到的那一版），不是 GitHub 上的 */
   checkVersion() {
-    if (true) return checkLatest("2026.11.23-2153");
+    if (true) return checkLatest("2026.11.23-2201");
     return (async () => {
       try {
         const r = await globalThis.fetch("/api/version?t=" + Date.now(), { cache: "no-store" });
         const latest = String((await r.json()).version || "");
         if (!latest) return null;
         const num = (v) => Number(v.replace(/\D/g, "")) || 0;
-        return { latest, isLatest: num("2026.11.23-2153") >= num(latest) };
+        return { latest, isLatest: num("2026.11.23-2201") >= num(latest) };
       } catch (_) {
         return null;
       }
@@ -3574,11 +3645,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.23-2153"}`);
+          Pasteboard.copy(`版本 ${"2026.11.23-2201"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.23-2153"}`,
+      `版本 ${"2026.11.23-2201"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -3920,7 +3991,7 @@ var App = class {
     if (false) {
       if (!r) return /* @__PURE__ */ h(Note, { text: "（無法確認是否為最新版：連不到網站）" });
       if (r.isLatest) return /* @__PURE__ */ h(Note, { text: "✅ 已是最新版" });
-      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.23-2153"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
+      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.23-2201"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
         globalThis.location.reload();
       } }));
     }

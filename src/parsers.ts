@@ -339,6 +339,7 @@ export interface TwMovie {
   comingSoon: boolean; // 還沒上映（場次通的「即將上映」裡，已經上映過、只是今天沒場次的不算，見 noShowToday）
   release?: string; // 上映日期 YYYY-MM-DD（伺服器查好的，沒有就是不知道）
   noShowToday?: boolean; // 已經上映，今天沒有場次、之後幾天才有
+  alts?: string[]; // 同一部片在場次通的其他頁（各家戲院取的片名不同：沙丘／沙丘(重映版)／沙丘_經典重映），場次要合在一起看
   score?: number; // IMDb 評分（伺服器查好的，沒有就是不知道；清單依評分排序用）
   tomato?: number; // 番茄指數（影評，0～100）
   popcorn?: number; // 爆米花指數（觀眾，0～100）
