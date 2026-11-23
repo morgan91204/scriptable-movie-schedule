@@ -1,9 +1,11 @@
 # 原生 iOS App：在 macOS 上產生專案、編譯，並在模擬器用真實網路跑資料層測試
 name: iOS 編譯與測試
+# 原生版暫停開發（2026-11-24）：不再每次推送就自動建置，只在手動執行時才跑。
+# 要恢復自動建置，把下面 push 那三行的註解拿掉。
 on:
-  push:
-    branches: [main]
-    paths: ["ios/**", ".github/workflows/ios.yml"]
+  # push:
+  #   branches: [main]
+  #   paths: ["ios/**", ".github/workflows/ios.yml"]
   workflow_dispatch:
 permissions:
   contents: write
