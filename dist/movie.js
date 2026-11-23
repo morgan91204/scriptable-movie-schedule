@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.24-0324
+// @movie-schedule-app 電影行程 v2026.11.24-0330
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/parsers.gen.ts
@@ -3359,7 +3359,7 @@ function GenPoster(props) {
 }
 function Hero(props) {
   const fallback = "if(this.dataset.url&&this.src!==this.dataset.url){this.src=this.dataset.url}else{this.remove()}";
-  return /* @__PURE__ */ h("div", { class: "hero" }, props.posterPending && !props.poster ? /* @__PURE__ */ h("div", { class: "poster none pending" }) : /* @__PURE__ */ h(GenPoster, { cls: "poster", title: props.title || "" }, props.poster ? /* @__PURE__ */ h("img", { src: props.poster, "data-url": props.posterUrl && props.posterUrl !== props.poster ? props.posterUrl : void 0, alt: "", onerror: fallback }) : null), /* @__PURE__ */ h("div", { class: "hero-info" }, props.lines.filter(Boolean).map((l) => /* @__PURE__ */ h("div", { class: "hero-line" }, esc(l))), props.badges ? /* @__PURE__ */ h(Badges, { items: props.badges }) : null, props.onTrailer || props.fav ? /* @__PURE__ */ h("div", { class: "hero-acts" }, props.onTrailer ? /* @__PURE__ */ h("button", { class: "trailer", onTap: props.onTrailer }, "▶︎ ", esc(props.trailerLabel || "觀看預告")) : null, props.fav ? /* @__PURE__ */ h("button", { class: "fav" + (props.fav.on ? " on" : ""), "aria-label": props.fav.on ? "取消收藏" : "收藏這部電影", "aria-pressed": props.fav.on ? "true" : "false", onTap: props.fav.onTap }, props.fav.on ? "♥" : "♡") : null) : null));
+  return /* @__PURE__ */ h("div", { class: "hero" }, props.posterPending && !props.poster ? /* @__PURE__ */ h("div", { class: "poster none pending" }) : /* @__PURE__ */ h(GenPoster, { cls: "poster", title: props.title || "" }, props.poster ? /* @__PURE__ */ h("img", { src: props.poster, "data-url": props.posterUrl && props.posterUrl !== props.poster ? props.posterUrl : void 0, alt: "", onerror: fallback }) : null), /* @__PURE__ */ h("div", { class: "hero-info" }, props.lines.filter(Boolean).map((l) => /* @__PURE__ */ h("div", { class: "hero-line" }, esc(l))), props.badges ? /* @__PURE__ */ h(Badges, { items: props.badges }) : null, props.onTrailer || props.fav || props.onShare ? /* @__PURE__ */ h("div", { class: "hero-acts" }, props.onTrailer ? /* @__PURE__ */ h("button", { class: "trailer", onTap: props.onTrailer }, "▶︎ ", esc(props.trailerLabel || "觀看預告")) : null, props.fav ? /* @__PURE__ */ h("button", { class: "fav" + (props.fav.on ? " on" : ""), "aria-label": props.fav.on ? "取消收藏" : "收藏這部電影", "aria-pressed": props.fav.on ? "true" : "false", onTap: props.fav.onTap }, props.fav.on ? "♥" : "♡") : null, props.onShare ? /* @__PURE__ */ h("button", { class: "fav share", "aria-label": "分享這部電影", onTap: props.onShare }, '<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V3"/><path d="M8 7l4-4 4 4"/><path d="M5 11v8a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-8"/></svg>') : null) : null));
 }
 function Para(props) {
   return /* @__PURE__ */ h("div", { class: "para" }, esc(props.text), props.dim ? /* @__PURE__ */ h("div", { class: "dim" }, esc(props.dim)) : null);
@@ -4014,14 +4014,14 @@ var App = class {
   }
   /** 最新版本是多少。網頁版問的是自己網站現在上線的版本（重新整理就會拿到的那一版），不是 GitHub 上的 */
   checkVersion() {
-    if (true) return checkLatest("2026.11.24-0324");
+    if (true) return checkLatest("2026.11.24-0330");
     return (async () => {
       try {
         const r = await globalThis.fetch("/api/version?t=" + Date.now(), { cache: "no-store" });
         const latest = String((await r.json()).version || "");
         if (!latest) return null;
         const num = (v) => Number(v.replace(/\D/g, "")) || 0;
-        return { latest, isLatest: num("2026.11.24-0324") >= num(latest) };
+        return { latest, isLatest: num("2026.11.24-0330") >= num(latest) };
       } catch (_) {
         return null;
       }
@@ -4037,6 +4037,7 @@ var App = class {
       this.movieMode = startTab;
       this.switchTab("movies");
     }
+    await this.openShared().catch(() => void 0);
     loadFestivals().catch(() => []);
     const input = String(args.shortcutParameter || args.urls && args.urls[0] || args.plainTexts && args.plainTexts[0] || "");
     let pendingUrl = input;
@@ -4284,11 +4285,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.24-0324"}`);
+          Pasteboard.copy(`版本 ${"2026.11.24-0330"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.24-0324"}`,
+      `版本 ${"2026.11.24-0330"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -4489,6 +4490,7 @@ var App = class {
         lines,
         badges,
         fav: this.favOf({ title, en: fav?.en, poster: fav?.poster || posterUrl, fest: fav?.fest }),
+        onShare: () => this.shareMovie(title, fav?.fest),
         trailerLabel: !x || x.trailerName ? "觀看預告" : "搜尋預告",
         onTrailer: async () => Safari.open((x || await e.px)?.trailer || search)
       }
@@ -4629,7 +4631,7 @@ var App = class {
     if (false) {
       if (!r) return /* @__PURE__ */ h(Note, { text: "（無法確認是否為最新版：連不到網站）" });
       if (r.isLatest) return /* @__PURE__ */ h(Note, { text: "✅ 已是最新版" });
-      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.24-0324"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
+      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.24-0330"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
         globalThis.location.reload();
       } }));
     }
@@ -5075,6 +5077,36 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
     }), rows.length ? null : /* @__PURE__ */ h(Empty, { icon: "🎞", text: this.movieFavOnly && !this.settings.favorites.length ? "還沒有收藏的影城，先到影城頁加入。" : "沒有符合條件的影城，換個日期或條件試試。" }));
   }
   // ── 分享 ──
+  /** 分享這部電影：一段文字加連結，朋友點了會直接開到這部片的頁面（網頁版） */
+  async shareMovie(title, fest) {
+    const url = `${SITE_URL}/?m=${encodeURIComponent(title)}${fest ? `&f=${encodeURIComponent(fest.id)}&ff=${encodeURIComponent(fest.film)}` : ""}`;
+    await ShareSheet.present([`《${title}》${fest ? `｜${fest.name}` : ""}
+場次、評分、預告都在「片刻」：
+${url}`]);
+  }
+  /** 從分享連結進來（?m=片名）：找出這部片現在對應的頁面（有場次的電影頁、即將上映、影展片、票房資訊）直接打開 */
+  async openShared() {
+    if (true) return;
+    const search = String(globalThis.location?.search || "");
+    const param = (name) => {
+      const m = new RegExp(`[?&]${name}=([^&]*)`).exec(search);
+      try {
+        return m ? decodeURIComponent(m[1].replace(/\+/g, " ")) : "";
+      } catch (_) {
+        return "";
+      }
+    };
+    const title = param("m").trim().slice(0, 120);
+    if (!title) return;
+    const fid = param("f"), film = param("ff");
+    const fav = { key: communityKey(title), title, at: 0, ...fid ? { fest: { id: fid.slice(0, 40), film: film.slice(0, 80), name: "" } } : {} };
+    if (!fav.key) return;
+    const row = (await favMovieRows({ ...this.settings, favMovies: [fav] }).catch(() => []))[0];
+    this.tab = "movies";
+    this.stack = [() => this.movieListView()];
+    if (row) this.openFavRow(row);
+    else this.go(() => this.favMovieView(fav), `讀取《${title}》…`);
+  }
   async share(p) {
     await ShareSheet.present([shareText({ ...p, address: p.address }, this.start(p), this.runtime ? this.end(p) : void 0, this.seat, this.settings.maps)]);
   }

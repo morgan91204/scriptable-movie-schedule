@@ -10,7 +10,7 @@ import { scriptablePlatform } from "./platform-scriptable";
 import {
   Cinema, Settings, Movie, Version, EXTRA, CITY_ORDER, AD_STEPS,
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
-  loadSettings, saveSettings, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, communityKey, TW,
+  loadSettings, saveSettings, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, communityKey, SITE_URL, TW,
   FORMATS, formatsOf, filterVersions, filterVersionsAny, movieRows, movieDays, nearest, kmLabel, WINDOWS, findShowtimes, findShowtimesMulti, multiLabel, multiDetail, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText,
   hallOf, tmdbTest, movieExtras, moviePoster, movieRuntime, posterSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxCountries, boxByCountry, boxInfo, boxInfoRows, boxCountryText, BOX_COUNTRY_NOTE, boxCountryTag, boxCountriesPicked, loadMovieBoard, loadSoonBoard, notifyPrefs, notifyPayload, notifyEndScope, notifyEndPick, notifyQuiet, NOTIFY_PRE_STEPS, NOTIFY_KINDS, boxStatus, STATUS_LABEL, boxInfoBy, isFavMovie, toggleFavMovie, favMovieRows, favMovieBox, soonGroups, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityCached, communityVote, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalsReady, festivalNote, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, festivalDefaultDate, festivalStateLabel, festivalState, festivalFooter, linkMovies, nowGroupLine, nowFilter, festivalPick, movieAbout, festivalSearch, festivalSearchLines, festivalTrailer, festivalYears, festivalsAny, festivalGroups, festivalChipNote, festivalStatusLine, movieRatings, ratingTier,
 } from "./core";
@@ -118,6 +118,7 @@ class App {
     // 從通知點進來（?tab=soon／?tab=fest）：直接開電影分頁的那一類
     const startTab = IS_WEB ? (/[?&]tab=(soon|fest)\b/.exec(String((globalThis as any).location?.search || "")) || [])[1] : "";
     if (startTab) { this.movieMode = startTab as "soon" | "fest"; this.switchTab("movies"); }
+    await this.openShared().catch(() => undefined);
     loadFestivals().catch(() => []); // 背景先看有沒有影展（有才會在電影分頁多出「影展」）
     const input = String(args.shortcutParameter || (args.urls && args.urls[0]) || (args.plainTexts && args.plainTexts[0]) || "");
     let pendingUrl = input;
@@ -789,6 +790,7 @@ class App {
         lines={lines}
         badges={badges}
         fav={this.favOf({ title, en: fav?.en, poster: fav?.poster || posterUrl, fest: fav?.fest })}
+        onShare={() => this.shareMovie(title, fav?.fest)}
         // 還在讀的時候先顯示「觀看預告」，點下去會等讀好再開，不會誤開成搜尋頁
         trailerLabel={!x || x.trailerName ? "觀看預告" : "搜尋預告"}
         onTrailer={async () => Safari.open((x || (await e.px))?.trailer || search)}
@@ -1679,6 +1681,26 @@ class App {
   }
 
   // ── 分享 ──
+  /** 分享這部電影：一段文字加連結，朋友點了會直接開到這部片的頁面（網頁版） */
+  async shareMovie(title: string, fest?: FavMovie["fest"]) {
+    const url = `${SITE_URL}/?m=${encodeURIComponent(title)}${fest ? `&f=${encodeURIComponent(fest.id)}&ff=${encodeURIComponent(fest.film)}` : ""}`;
+    await ShareSheet.present([`《${title}》${fest ? `｜${fest.name}` : ""}\n場次、評分、預告都在「片刻」：\n${url}`]);
+  }
+  /** 從分享連結進來（?m=片名）：找出這部片現在對應的頁面（有場次的電影頁、即將上映、影展片、票房資訊）直接打開 */
+  async openShared(): Promise<void> {
+    if (!IS_WEB) return;
+    const search = String((globalThis as any).location?.search || "");
+    const param = (name: string) => { const m = new RegExp(`[?&]${name}=([^&]*)`).exec(search); try { return m ? decodeURIComponent(m[1].replace(/\+/g, " ")) : ""; } catch (_) { return ""; } };
+    const title = param("m").trim().slice(0, 120);
+    if (!title) return;
+    const fid = param("f"), film = param("ff");
+    const fav: FavMovie = { key: communityKey(title), title, at: 0, ...(fid ? { fest: { id: fid.slice(0, 40), film: film.slice(0, 80), name: "" } } : {}) };
+    if (!fav.key) return;
+    const row = (await favMovieRows({ ...this.settings, favMovies: [fav] }).catch(() => [] as FavRow[]))[0];
+    this.tab = "movies";
+    this.stack = [() => this.movieListView()];
+    if (row) this.openFavRow(row); else this.go(() => this.favMovieView(fav), `讀取《${title}》…`);
+  }
   async share(p: Pick) {
     await ShareSheet.present([shareText({ ...p, address: p.address }, this.start(p), this.runtime ? this.end(p) : undefined, this.seat, this.settings.maps)]);
   }
