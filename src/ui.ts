@@ -130,7 +130,11 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .rate .emo{font-size:12px}
 .rate .n{font-size:10px;font-weight:600;opacity:.85}
 .rate:active{opacity:.6}
-.trailer{margin-top:8px;align-self:flex-start;padding:7px 13px;border-radius:999px;background:#ff0033;color:#fff;font-size:14px;font-weight:600;white-space:nowrap}
+.hero-acts{display:flex;align-items:center;gap:8px;margin-top:8px}
+.fav{flex:none;width:34px;height:34px;border-radius:17px;background:var(--chip);color:var(--fg2);font-size:18px;line-height:1;display:flex;align-items:center;justify-content:center}
+.fav.on{color:#ff2d55;background:rgba(255,45,85,.14)}
+.fav:active{opacity:.6}
+.trailer{padding:7px 13px;border-radius:999px;background:#ff0033;color:#fff;font-size:14px;font-weight:600;white-space:nowrap}
 .trailer:active{opacity:.7}
 .cm{padding:14px 16px}
 .cm-top{display:flex;align-items:center;gap:12px}

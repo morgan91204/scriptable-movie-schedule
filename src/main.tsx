@@ -226,7 +226,7 @@ class App {
           </Section>
         ) : null}
         {favMovies.length ? (
-          <Section hint={this.favMovOpen ? "在電影頁點「收藏這部電影」加入；再點一次取消。下檔的片也會留在這裡。" : ""}>
+          <Section hint={this.favMovOpen ? "在電影頁的預告按鈕旁邊點愛心加入，再點一次取消。下檔的片也會留在這裡。" : ""}>
             {/* 預設收合，只留這一列；點一下展開清單 */}
             <Item head icon="♥" title={`收藏的電影（${favMovies.length} 部）`} subtitle={this.favMovOpen ? "點一下收合" : "點一下展開"} chevron={false} onTap={() => { this.favMovOpen = !this.favMovOpen; }} action={{ label: this.favMovOpen ? "▾" : "▸", hint: this.favMovOpen ? "收合收藏的電影" : "展開收藏的電影", onTap: () => { this.favMovOpen = !this.favMovOpen; } }} />
             {favRows.map((r) => (
@@ -534,14 +534,9 @@ class App {
     );
   }
 
-  /** 「收藏這部電影」那一列：電影頁、影展片、即將上映、已下檔的片都放同一個 */
-  favMovieItem(m: { title: string; en?: string; poster?: string; fest?: FavMovie["fest"] }): string {
-    const on = isFavMovie(this.settings, m.title);
-    return (
-      <Section>
-        <Item icon={on ? "♥" : "♡"} title={on ? "已收藏（點一下取消）" : "收藏這部電影"} subtitle={on ? "在首頁「收藏的電影」可以快速打開" : "之後在首頁就能快速打開；下檔後也找得到"} chevron={false} onTap={() => { toggleFavMovie(this.settings, m); saveSettings(this.settings); }} />
-      </Section>
-    );
+  /** 海報旁邊那顆收藏的愛心：電影頁、影展片、即將上映、已下檔的片都用同一顆 */
+  favOf(m: { title: string; en?: string; poster?: string; fest?: FavMovie["fest"] }): { on: boolean; onTap: () => void } {
+    return { on: isFavMovie(this.settings, m.title), onTap: () => { const on = toggleFavMovie(this.settings, m); saveSettings(this.settings); this.ui.toast(on ? "已收藏，在首頁可以快速打開" : "已取消收藏"); } };
   }
   /** 收藏的片目前哪裡都沒有場次：票房排行（2016 年至今）找得到就開那一頁；找不到就只顯示海報、評分、預告 */
   async favMovieView(fav: FavMovie): Promise<string> {
@@ -550,8 +545,7 @@ class App {
     const e = await this.extras(fav.title, undefined, fav.en);
     return (
       <Page title={fav.title} subtitle="收藏的電影" onBack={() => this.back()}>
-        {this.hero(e, fav.title, [fav.en || "", fav.fest ? `收藏自${fav.fest.name}` : ""].filter(Boolean))}
-        {this.favMovieItem(fav)}
+        {this.hero(e, fav.title, [fav.en || "", fav.fest ? `收藏自${fav.fest.name}` : ""].filter(Boolean), { en: fav.en, poster: fav.poster, fest: fav.fest })}
         <Note text="目前查不到這部片的場次，可能已經下檔，或還沒排片。之後有場次時，從首頁「收藏的電影」點進來就會直接到場次頁。" />
       </Page>
     );
@@ -566,7 +560,7 @@ class App {
     }
     return badges;
   }
-  hero(e: Extras, title: string, lines: string[]): string {
+  hero(e: Extras, title: string, lines: string[], fav?: { en?: string; poster?: string; fest?: FavMovie["fest"] }): string {
     const { x, r } = e;
     const posterUrl = x?.poster || e.p || "";
     const poster = posterSrc(posterUrl);
@@ -585,6 +579,7 @@ class App {
         posterPending={!poster && e.loading}
         lines={lines}
         badges={badges}
+        fav={this.favOf({ title, en: fav?.en, poster: fav?.poster || posterUrl, fest: fav?.fest })}
         // 還在讀的時候先顯示「觀看預告」，點下去會等讀好再開，不會誤開成搜尋頁
         trailerLabel={!x || x.trailerName ? "觀看預告" : "搜尋預告"}
         onTrailer={async () => Safari.open((x || (await e.px))?.trailer || search)}
@@ -1035,9 +1030,8 @@ class App {
     const end = (x: FestivalSession) => (film.mins ? fmt(new Date(tpeDate(x.date, x.time).getTime() + (film.mins + this.settings.ads) * 6e4)).slice(-5) : "");
     return (
       <Page title={film.title} subtitle={f.name} onBack={() => this.back()}>
-        <Hero title={film.title} poster={film.poster || undefined} lines={[[film.rating, film.mins ? `${film.mins} 分鐘` : ""].filter(Boolean).join("｜"), `${f.name}（${festivalStateLabel(f)}）`, "影展片名，院線上映時可能不同", ...(r === undefined ? ["評分讀取中…"] : [])]} badges={this.ratingBadges(r)} trailerLabel={festivalTrailer(film).label} onTrailer={() => Safari.open(festivalTrailer(film).url)} />
+        <Hero title={film.title} poster={film.poster || undefined} lines={[[film.rating, film.mins ? `${film.mins} 分鐘` : ""].filter(Boolean).join("｜"), `${f.name}（${festivalStateLabel(f)}）`, "影展片名，院線上映時可能不同", ...(r === undefined ? ["評分讀取中…"] : [])]} badges={this.ratingBadges(r)} fav={this.favOf({ title: film.title, poster: film.poster, fest: { id: f.id, film: film.id, name: f.name } })} trailerLabel={festivalTrailer(film).label} onTrailer={() => Safari.open(festivalTrailer(film).url)} />
         {this.community(film.title, rated)}
-        {this.favMovieItem({ title: film.title, poster: film.poster, fest: { id: f.id, film: film.id, name: f.name } })}
         {film.intro || film.credits ? (
           <Section title="介紹" hint={`介紹來自${f.source}。`}>
             <Para text={film.intro || film.credits || ""} dim={film.intro ? film.credits : ""} />
@@ -1179,7 +1173,6 @@ class App {
     return (
       <Page title={x.name} subtitle={`票房第 ${x.rank} 名`} onBack={() => this.back()}>
         {this.hero(e, x.name, [boxCountryText(x.country), `${date} 上映`])}
-        {this.favMovieItem({ title: x.name, poster: e.x?.poster || e.p })}
         {/* 個別資訊：跟官方網站列的欄位一樣（國別、發行、出品、上映日期、院數、票數、金額） */}
         <Section title="票房資訊" hint="資料來源：國家電影及視聽文化中心「全國電影票房統計」。">
           {boxInfoRows(x, info).map(([label, value]) => <Item kv title={label} right={value} />)}
@@ -1238,8 +1231,7 @@ class App {
     const date = u.release.replace(/-/g, "/");
     return (
       <Page title={u.title} subtitle={`${date} 上映`} onBack={() => this.back()}>
-        {this.hero(e, u.title, [u.en, [`${date} ${u.approx ? "當週" : ""}上映`, u.rating, u.runtime ? `${u.runtime} 分` : ""].filter(Boolean).join("｜")].filter(Boolean))}
-        {this.favMovieItem({ title: u.title, en: u.en, poster: u.poster || e.x?.poster || e.p })}
+        {this.hero(e, u.title, [u.en, [`${date} ${u.approx ? "當週" : ""}上映`, u.rating, u.runtime ? `${u.runtime} 分` : ""].filter(Boolean).join("｜")].filter(Boolean), { en: u.en, poster: u.poster })}
         <Note text="戲院還沒有排這部片的場次。通常上映前一到兩週會開放，到時候這裡會自動變成可以查場次。上映日期可能再調整。" />
         <Button label="🌐 開眼電影網的介紹" kind="secondary" onTap={() => Safari.open(u.url)} />
       </Page>
@@ -1297,7 +1289,6 @@ class App {
     return (
       <Page title={m.title} subtitle={[m.rating || d.rating, runtime ? `${runtime} 分鐘` : "", `${d.cinemas.length} 間影城`].filter(Boolean).join("｜")} onBack={() => this.back()}>
         {this.hero(x, m.title, [m.en, [m.rating || d.rating, runtime ? `${runtime} 分鐘` : ""].filter(Boolean).join("｜"), releaseLabel(d.release || m.release || releaseOf(m.title)), `${d.cinemas.length} 間影城有放映`])}
-        {this.favMovieItem({ title: m.title, en: m.en, poster: x.x?.poster || x.p })}
         {about.text || about.credits ? (
           <Section title="劇情簡介" hint="簡介來自場次通。">
             <Para text={about.text || about.credits} dim={about.text ? about.credits : ""} />

@@ -249,7 +249,7 @@ function Home({ cinemas }: { cinemas: CinemasLoad }) {
           </Button>
           {(favOpen ? favs : []).map((c) => <CinemaLink key={c.id} cinema={c} showCity />)}
         </Section> : null}
-        {favMovies.length ? <Section footer={favMovOpen ? <Text>在電影頁點「收藏這部電影」加入；再點一次取消。下檔的片也會留在這裡。</Text> : undefined}>
+        {favMovies.length ? <Section footer={favMovOpen ? <Text>在電影頁的預告按鈕旁邊點愛心加入，再點一次取消。下檔的片也會留在這裡。</Text> : undefined}>
           {/* 預設收合，只留這一列；點一下展開清單 */}
           <Button action={() => setFavMovOpen(!favMovOpen)}>
             <HStack spacing={8}>
@@ -479,8 +479,8 @@ function useThumbs(items: { title: string; slug?: string; en?: string; light?: b
 }
 
 /** 電影頁頂端：海報在左，資訊、評分與紅色預告按鈕在右（跟 Scriptable 版一樣） */
-/** 「收藏這部電影」那一列：電影頁、影展片、即將上映、已下檔的片都放同一個 */
-function FavMovieRow({ title, en, poster, fest }: { title: string; en?: string; poster?: string; fest?: FavMovie["fest"] }) {
+/** 預告按鈕旁邊那顆收藏的愛心（不另外佔一行）：電影頁、影展片、即將上映、已下檔的片都用同一顆 */
+function FavHeart({ title, en, poster, fest }: { title: string; en?: string; poster?: string; fest?: FavMovie["fest"] }) {
   const [settings, update] = useSettings()
   const on = isFavMovie(settings, title)
   const toggle = () => {
@@ -488,15 +488,9 @@ function FavMovieRow({ title, en, poster, fest }: { title: string; en?: string; 
     toggleFavMovie(next, { title, en, poster, fest })
     update({ favMovies: next.favMovies })
   }
-  return <Section footer={<Text>{on ? "在首頁「收藏的電影」可以快速打開。" : "收藏後在首頁就能快速打開；下檔後也找得到。"}</Text>}>
-    <Button action={toggle}>
-      <HStack spacing={8}>
-        <Image systemName={on ? "heart.fill" : "heart"} foregroundStyle={"systemPink"} />
-        <Text foregroundStyle={"label"}>{on ? "已收藏（點一下取消）" : "收藏這部電影"}</Text>
-        <Spacer />
-      </HStack>
-    </Button>
-  </Section>
+  return <Button action={toggle} buttonStyle={"bordered"} buttonBorderShape={"circle"} tint={on ? "systemPink" : "secondaryLabel"} padding={{ top: 6 }}>
+    <Image systemName={on ? "heart.fill" : "heart"} font={"subheadline"} />
+  </Button>
 }
 /** 收藏的片目前哪裡都沒有場次：票房排行（2016 年至今）找得到就顯示票房資訊；找不到就只有海報、評分、預告 */
 function FavMoviePage({ fav }: { fav: FavMovie }) {
@@ -570,9 +564,12 @@ function MovieHero({ title, slug, lines, en, poster, fest }: { title: string; sl
       <VStack alignment={"leading"} spacing={4}>
         {lines.filter(Boolean).map((l) => <Text key={l} font={"subheadline"} foregroundStyle={"secondaryLabel"}>{l}</Text>)}
         <RatingLine rt={rt} />
-        <Button action={openTrailer} buttonStyle={"borderedProminent"} buttonBorderShape={"capsule"} tint={"systemRed"} padding={{ top: 6 }} disabled={opening}>
-          <Label title={trailerLabel} systemImage={"play.fill"} font={"subheadline"} fontWeight={"semibold"} lineLimit={1} />
-        </Button>
+        <HStack spacing={8}>
+          <Button action={openTrailer} buttonStyle={"borderedProminent"} buttonBorderShape={"capsule"} tint={"systemRed"} padding={{ top: 6 }} disabled={opening}>
+            <Label title={trailerLabel} systemImage={"play.fill"} font={"subheadline"} fontWeight={"semibold"} lineLimit={1} />
+          </Button>
+          <FavHeart title={title} en={en} poster={posterUrl || poster} fest={fest} />
+        </HStack>
         {x.data?.err ? <Text font={"caption2"} foregroundStyle={"tertiaryLabel"}>{`預告：${x.data.err}`}</Text> : null}
         {x.error ? <Text font={"caption2"} foregroundStyle={"tertiaryLabel"}>{`預告讀不到：${x.error}`}</Text> : null}
       </VStack>
@@ -580,7 +577,6 @@ function MovieHero({ title, slug, lines, en, poster, fest }: { title: string; sl
     </HStack>
   </Section>
   <CommunitySection title={title} />
-  <FavMovieRow title={title} en={en} poster={posterUrl || poster} fest={fest} />
   </>
 }
 
@@ -1192,14 +1188,16 @@ function FestivalFilmPage({ festival: f, film }: { festival: Festival; film: Fes
           <Text font={"subheadline"} foregroundStyle={"secondaryLabel"}>{`${f.name}（${festivalStateLabel(f)}）`}</Text>
           <Text font={"footnote"} foregroundStyle={"tertiaryLabel"}>影展片名，院線上映時可能不同</Text>
           <RatingLine rt={rt} />
-          <Button action={() => { Safari.openURL(festivalTrailer(film).url) }} buttonStyle={"borderedProminent"} buttonBorderShape={"capsule"} tint={"systemRed"} padding={{ top: 6 }}>
-            <Label title={festivalTrailer(film).label} systemImage={"play.fill"} font={"subheadline"} fontWeight={"semibold"} lineLimit={1} />
-          </Button>
+          <HStack spacing={8}>
+            <Button action={() => { Safari.openURL(festivalTrailer(film).url) }} buttonStyle={"borderedProminent"} buttonBorderShape={"capsule"} tint={"systemRed"} padding={{ top: 6 }}>
+              <Label title={festivalTrailer(film).label} systemImage={"play.fill"} font={"subheadline"} fontWeight={"semibold"} lineLimit={1} />
+            </Button>
+            <FavHeart title={film.title} poster={film.poster} fest={{ id: f.id, film: film.id, name: f.name }} />
+          </HStack>
         </VStack>
       </HStack>
     </Section>
     <CommunitySection title={film.title} />
-    <FavMovieRow title={film.title} poster={film.poster} fest={{ id: f.id, film: film.id, name: f.name }} />
     {film.intro || film.credits ? <Section header={<Text>介紹</Text>} footer={<Text>{`介紹來自${f.source}。`}</Text>}>
       {film.intro ? <Text font={"subheadline"}>{film.intro}</Text> : null}
       {film.credits ? <Text font={"footnote"} foregroundStyle={"secondaryLabel"}>{film.credits}</Text> : null}

@@ -304,7 +304,7 @@ export function GenPoster(props: { cls: string; title: string; children?: Childr
   );
 }
 
-export function Hero(props: { title?: string; poster?: string; posterUrl?: string; posterPending?: boolean; lines: string[]; trailerLabel?: string; onTrailer?: Handler; badges?: RatingBadge[] }): string {
+export function Hero(props: { title?: string; poster?: string; posterUrl?: string; posterPending?: boolean; lines: string[]; trailerLabel?: string; onTrailer?: Handler; badges?: RatingBadge[]; fav?: { on: boolean; onTap: Handler } }): string {
   // 海報：本機快取（file://）讀不到就改用網址，網址也讀不到就拿掉，露出底下的預設海報
   const fallback = "if(this.dataset.url&&this.src!==this.dataset.url){this.src=this.dataset.url}else{this.remove()}";
   return (
@@ -319,10 +319,20 @@ export function Hero(props: { title?: string; poster?: string; posterUrl?: strin
       <div class="hero-info">
         {props.lines.filter(Boolean).map((l) => <div class="hero-line">{esc(l)}</div>)}
         {props.badges ? <Badges items={props.badges} /> : null}
-        {props.onTrailer ? (
-          <button class="trailer" onTap={props.onTrailer}>
-            ▶︎ {esc(props.trailerLabel || "觀看預告")}
-          </button>
+        {/* 預告按鈕旁邊放收藏的愛心（不另外佔一行） */}
+        {props.onTrailer || props.fav ? (
+          <div class="hero-acts">
+            {props.onTrailer ? (
+              <button class="trailer" onTap={props.onTrailer}>
+                ▶︎ {esc(props.trailerLabel || "觀看預告")}
+              </button>
+            ) : null}
+            {props.fav ? (
+              <button class={"fav" + (props.fav.on ? " on" : "")} aria-label={props.fav.on ? "取消收藏" : "收藏這部電影"} aria-pressed={props.fav.on ? "true" : "false"} onTap={props.fav.onTap}>
+                {props.fav.on ? "♥" : "♡"}
+              </button>
+            ) : null}
+          </div>
         ) : null}
       </div>
     </div>
