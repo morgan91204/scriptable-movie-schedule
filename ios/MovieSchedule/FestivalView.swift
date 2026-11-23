@@ -161,6 +161,7 @@ struct FestivalFilmView: View {
                                 .font(.subheadline).foregroundStyle(.secondary)
                             Text(d.name).font(.subheadline).foregroundStyle(.secondary)
                             Text("影展片名，院線上映時可能不同").font(.footnote).foregroundStyle(.tertiary)
+                            RatingBadges(title: d.film.title) // 三大評分：跟院線片同一個樣式（用影展的片名查，查不到顯示「-」）
                             if let t = d.trailerUrl, let turl = URL(string: t) {
                                 Button { openURL(turl) } label: {
                                     Label(d.trailerLabel ?? "觀看預告", systemImage: "play.fill")

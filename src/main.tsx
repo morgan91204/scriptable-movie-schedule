@@ -560,19 +560,23 @@ class App {
     );
   }
 
-  hero(e: Extras, title: string, lines: string[]): string {
-    const { x, r } = e;
-    const posterUrl = x?.poster || e.p || "";
-    const poster = posterSrc(posterUrl);
-    if (poster && poster === posterUrl) cachePoster(posterUrl); // 這次用網址顯示，順便抓進快取
-    const search = `https://www.youtube.com/results?search_query=${encodeURIComponent(title + " 預告")}`;
-    // 評分讀好後三個徽章都顯示：沒有那項評分就是「-」（跟「還沒抓到」分得開）
+  /** 三大評分徽章（IMDb、番茄、爆米花）：電影頁和影展片共用。讀好後三個都顯示，沒有那項評分就是「-」（跟「還沒抓到」分得開） */
+  ratingBadges(r: Ratings | null | undefined): RatingBadge[] {
     const badges: RatingBadge[] = [];
     if (r) {
       badges.push(r.imdb ? { kind: "imdb", value: r.imdb.score.toFixed(1), tier: ratingTier("imdb", r.imdb.score), onTap: () => Safari.open(r.imdb!.url) } : { kind: "imdb", value: "-", tier: "none" });
       badges.push(r.tomato ? { kind: "tomato", value: `${r.tomato.score}%`, tier: ratingTier("pct", r.tomato.score), note: r.tomato.certified ? "✓" : undefined, onTap: () => Safari.open(r.tomato!.url) } : { kind: "tomato", value: "-", tier: "none" });
       badges.push(r.popcorn ? { kind: "popcorn", value: `${r.popcorn.score}%`, tier: ratingTier("pct", r.popcorn.score), onTap: () => Safari.open(r.popcorn!.url) } : { kind: "popcorn", value: "-", tier: "none" });
     }
+    return badges;
+  }
+  hero(e: Extras, title: string, lines: string[]): string {
+    const { x, r } = e;
+    const posterUrl = x?.poster || e.p || "";
+    const poster = posterSrc(posterUrl);
+    if (poster && poster === posterUrl) cachePoster(posterUrl); // 這次用網址顯示，順便抓進快取
+    const search = `https://www.youtube.com/results?search_query=${encodeURIComponent(title + " 預告")}`;
+    const badges = this.ratingBadges(r);
     if (!r && e.loading) lines = [...lines, "評分讀取中…"];
     else if (!r) lines = [...lines, "評分讀不到"];
     if (r?.err && !(r.imdb || r.tomato || r.popcorn)) lines = [...lines, `評分讀不到：${r.err}`];
@@ -1020,6 +1024,10 @@ class App {
     // 觀眾評分：跟院線片共用同一套（片名相同就是同一部片的分數）
     const rated: Community | false = communityCached(film.title) || (await communityStats(film.title).catch(() => false as const));
     const sessions = festivalFilmSessions(f, film.id);
+    // 三大評分：用影展的片名查，跟院線片同一套（最多等 0.4 秒，還沒好就先畫、好了再補上）
+    const pr = foregroundTask(movieRatings(film.title).catch(() => null));
+    const r = await Promise.race([pr, sleep(this.rerendering ? 0 : 400).then(() => undefined)]);
+    if (r === undefined) this.late = [pr];
     const pick = (x: FestivalSession) => {
       const cinema = festivalCinema(x, this.cinemas, f);
       const version: Version = { label: festivalPlace(x), times: [x.time] };
@@ -1031,7 +1039,7 @@ class App {
     const end = (x: FestivalSession) => (film.mins ? fmt(new Date(tpeDate(x.date, x.time).getTime() + (film.mins + this.settings.ads) * 6e4)).slice(-5) : "");
     return (
       <Page title={film.title} subtitle={f.name} onBack={() => this.back()}>
-        <Hero title={film.title} poster={film.poster || undefined} lines={[[film.rating, film.mins ? `${film.mins} 分鐘` : ""].filter(Boolean).join("｜"), `${f.name}（${festivalStateLabel(f)}）`, "影展片名，院線上映時可能不同"]} trailerLabel={festivalTrailer(film).label} onTrailer={() => Safari.open(festivalTrailer(film).url)} />
+        <Hero title={film.title} poster={film.poster || undefined} lines={[[film.rating, film.mins ? `${film.mins} 分鐘` : ""].filter(Boolean).join("｜"), `${f.name}（${festivalStateLabel(f)}）`, "影展片名，院線上映時可能不同", ...(r === undefined ? ["評分讀取中…"] : [])]} badges={this.ratingBadges(r)} trailerLabel={festivalTrailer(film).label} onTrailer={() => Safari.open(festivalTrailer(film).url)} />
         {this.community(film.title, rated)}
         {film.intro || film.credits ? (
           <Section title="介紹" hint={`介紹來自${f.source}。`}>

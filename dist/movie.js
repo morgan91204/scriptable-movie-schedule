@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.23-2251
+// @movie-schedule-app 電影行程 v2026.11.23-2316
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/parsers.gen.ts
@@ -3544,14 +3544,14 @@ var App = class {
   }
   /** 最新版本是多少。網頁版問的是自己網站現在上線的版本（重新整理就會拿到的那一版），不是 GitHub 上的 */
   checkVersion() {
-    if (true) return checkLatest("2026.11.23-2251");
+    if (true) return checkLatest("2026.11.23-2316");
     return (async () => {
       try {
         const r = await globalThis.fetch("/api/version?t=" + Date.now(), { cache: "no-store" });
         const latest = String((await r.json()).version || "");
         if (!latest) return null;
         const num = (v) => Number(v.replace(/\D/g, "")) || 0;
-        return { latest, isLatest: num("2026.11.23-2251") >= num(latest) };
+        return { latest, isLatest: num("2026.11.23-2316") >= num(latest) };
       } catch (_) {
         return null;
       }
@@ -3652,11 +3652,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.23-2251"}`);
+          Pasteboard.copy(`版本 ${"2026.11.23-2316"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.23-2251"}`,
+      `版本 ${"2026.11.23-2316"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -3838,18 +3838,23 @@ var App = class {
     };
     return /* @__PURE__ */ h(Section, { title: "觀眾評分", hint: "滿分 10 分。匿名評分，一台手機一票，可以隨時更改；再點一次已選的分數可以取消。各版本的評分會一起統計。" }, /* @__PURE__ */ h("div", { class: "cm" }, /* @__PURE__ */ h("div", { class: "cm-top" }, /* @__PURE__ */ h("div", { class: "cm-avg" }, n ? avg.toFixed(1) : "-", /* @__PURE__ */ h("small", null, "／10")), /* @__PURE__ */ h("div", { class: "cm-meta" }, /* @__PURE__ */ h("span", { class: "cm-stars", "aria-label": n ? `平均 ${avg} 分，滿分 10 分` : "還沒有評分" }, /* @__PURE__ */ h("span", { class: "bg" }, "★★★★★"), /* @__PURE__ */ h("span", { class: "fg", style: `width:${avg / 10 * 100}%` }, "★★★★★")), /* @__PURE__ */ h("span", { class: "cm-n" }, esc(status))), c && n ? /* @__PURE__ */ h("div", { class: "cm-dist" }, [10, 9, 8, 7, 6, 5, 4, 3, 2, 1].map((s) => /* @__PURE__ */ h("div", { class: "cm-row" }, /* @__PURE__ */ h("span", null, s), /* @__PURE__ */ h("i", { style: `width:${Math.round((c.dist[s - 1] || 0) / max * 100)}%` })))) : null), /* @__PURE__ */ h("div", { class: "cm-mine" }, /* @__PURE__ */ h("span", null, mine ? `你給 ${mine} 分` : "點一個分數評分（滿分 10）")), /* @__PURE__ */ h("div", { class: "cm-pick" }, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((s) => /* @__PURE__ */ h("button", { class: "cm-num" + (s === mine ? " on" : s < mine ? " below" : ""), "aria-label": `${s} 分`, onTap: () => vote(s) }, s)))));
   }
-  hero(e, title, lines) {
-    const { x, r } = e;
-    const posterUrl = x?.poster || e.p || "";
-    const poster = posterSrc(posterUrl);
-    if (poster && poster === posterUrl) cachePoster(posterUrl);
-    const search = `https://www.youtube.com/results?search_query=${encodeURIComponent(title + " 預告")}`;
+  /** 三大評分徽章（IMDb、番茄、爆米花）：電影頁和影展片共用。讀好後三個都顯示，沒有那項評分就是「-」（跟「還沒抓到」分得開） */
+  ratingBadges(r) {
     const badges = [];
     if (r) {
       badges.push(r.imdb ? { kind: "imdb", value: r.imdb.score.toFixed(1), tier: ratingTier("imdb", r.imdb.score), onTap: () => Safari.open(r.imdb.url) } : { kind: "imdb", value: "-", tier: "none" });
       badges.push(r.tomato ? { kind: "tomato", value: `${r.tomato.score}%`, tier: ratingTier("pct", r.tomato.score), note: r.tomato.certified ? "✓" : void 0, onTap: () => Safari.open(r.tomato.url) } : { kind: "tomato", value: "-", tier: "none" });
       badges.push(r.popcorn ? { kind: "popcorn", value: `${r.popcorn.score}%`, tier: ratingTier("pct", r.popcorn.score), onTap: () => Safari.open(r.popcorn.url) } : { kind: "popcorn", value: "-", tier: "none" });
     }
+    return badges;
+  }
+  hero(e, title, lines) {
+    const { x, r } = e;
+    const posterUrl = x?.poster || e.p || "";
+    const poster = posterSrc(posterUrl);
+    if (poster && poster === posterUrl) cachePoster(posterUrl);
+    const search = `https://www.youtube.com/results?search_query=${encodeURIComponent(title + " 預告")}`;
+    const badges = this.ratingBadges(r);
     if (!r && e.loading) lines = [...lines, "評分讀取中…"];
     else if (!r) lines = [...lines, "評分讀不到"];
     if (r?.err && !(r.imdb || r.tomato || r.popcorn)) lines = [...lines, `評分讀不到：${r.err}`];
@@ -3998,7 +4003,7 @@ var App = class {
     if (false) {
       if (!r) return /* @__PURE__ */ h(Note, { text: "（無法確認是否為最新版：連不到網站）" });
       if (r.isLatest) return /* @__PURE__ */ h(Note, { text: "✅ 已是最新版" });
-      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.23-2251"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
+      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.23-2316"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
         globalThis.location.reload();
       } }));
     }
@@ -4157,6 +4162,9 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
   async festivalFilmView(f, film) {
     const rated = communityCached(film.title) || await communityStats(film.title).catch(() => false);
     const sessions = festivalFilmSessions(f, film.id);
+    const pr = foregroundTask(movieRatings(film.title).catch(() => null));
+    const r = await Promise.race([pr, sleep(this.rerendering ? 0 : 400).then(() => void 0)]);
+    if (r === void 0) this.late = [pr];
     const pick = (x) => {
       const cinema = festivalCinema(x, this.cinemas, f);
       const version = { label: festivalPlace(x), times: [x.time] };
@@ -4166,7 +4174,7 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
       this.go(() => this.confirmView({ cinema, address: cinema.address || "", booking: x.ticket || film.url, sourceUrl: film.url, date: x.date, movie, version, time: x.time }));
     };
     const end = (x) => film.mins ? fmt(new Date(tpeDate(x.date, x.time).getTime() + (film.mins + this.settings.ads) * 6e4)).slice(-5) : "";
-    return /* @__PURE__ */ h(Page, { title: film.title, subtitle: f.name, onBack: () => this.back() }, /* @__PURE__ */ h(Hero, { title: film.title, poster: film.poster || void 0, lines: [[film.rating, film.mins ? `${film.mins} 分鐘` : ""].filter(Boolean).join("｜"), `${f.name}（${festivalStateLabel(f)}）`, "影展片名，院線上映時可能不同"], trailerLabel: festivalTrailer(film).label, onTrailer: () => Safari.open(festivalTrailer(film).url) }), this.community(film.title, rated), film.intro || film.credits ? /* @__PURE__ */ h(Section, { title: "介紹", hint: `介紹來自${f.source}。` }, /* @__PURE__ */ h(Para, { text: film.intro || film.credits || "", dim: film.intro ? film.credits : "" })) : null, /* @__PURE__ */ h(Section, { title: "場次", hint: festivalState(f) === "past" ? "這個影展已經結束，場次僅供回顧。" : "點一場加入行事曆。散場時間是依片長和你設定的廣告預告時間估的。" }, sessions.map((x) => /* @__PURE__ */ h(
+    return /* @__PURE__ */ h(Page, { title: film.title, subtitle: f.name, onBack: () => this.back() }, /* @__PURE__ */ h(Hero, { title: film.title, poster: film.poster || void 0, lines: [[film.rating, film.mins ? `${film.mins} 分鐘` : ""].filter(Boolean).join("｜"), `${f.name}（${festivalStateLabel(f)}）`, "影展片名，院線上映時可能不同", ...r === void 0 ? ["評分讀取中…"] : []], badges: this.ratingBadges(r), trailerLabel: festivalTrailer(film).label, onTrailer: () => Safari.open(festivalTrailer(film).url) }), this.community(film.title, rated), film.intro || film.credits ? /* @__PURE__ */ h(Section, { title: "介紹", hint: `介紹來自${f.source}。` }, /* @__PURE__ */ h(Para, { text: film.intro || film.credits || "", dim: film.intro ? film.credits : "" })) : null, /* @__PURE__ */ h(Section, { title: "場次", hint: festivalState(f) === "past" ? "這個影展已經結束，場次僅供回顧。" : "點一場加入行事曆。散場時間是依片長和你設定的廣告預告時間估的。" }, sessions.map((x) => /* @__PURE__ */ h(
       Item,
       {
         title: `${dateLabel(x.date).replace(/ .*$/, "")}　${x.time}`,

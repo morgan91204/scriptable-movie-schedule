@@ -1,18 +1,40 @@
 import SwiftUI
 
-/// 電影頁頂端：海報在左，資訊、三大評分與預告按鈕在右
-struct MovieHero: View {
+/// 三大評分徽章（IMDb、番茄、爆米花）：電影頁和影展片共用同一個樣式。沒有那項評分顯示「-」
+struct RatingBadges: View {
     let title: String
     var slug: String? = nil
     var en: String? = nil
-    let lines: [String]
 
     @Environment(\.openURL) private var openURL
-    @State private var extras: MovieExtras?
     @State private var ratings: Ratings?
     @State private var ratingsDone = false
-    @State private var opening = false
     private let showScores = ExternalScores.enabled
+
+    var body: some View {
+        Group {
+            if !showScores {
+                // 不顯示外部分數：只放前往查看的連結（用片名搜尋，不讀對方網站）
+                HStack(spacing: 6) {
+                    linkChip("IMDb", "https://www.imdb.com/find/?q=")
+                    linkChip("爛番茄", "https://www.rottentomatoes.com/search?search=")
+                }
+            } else if ratingsDone {
+                HStack(spacing: 4) {
+                    badge(tag: "IMDb", text: ratings?.imdb.map { String(format: "%.1f", $0.score) }, percent: ratings?.imdb.map { $0.score * 10 }, url: ratings?.imdb?.url)
+                    badge(tag: "🍅", text: ratings?.tomato.map { "\(Int($0.score))%" }, percent: ratings?.tomato?.score, url: ratings?.tomato?.url)
+                    badge(tag: "🍿", text: ratings?.popcorn.map { "\(Int($0.score))%" }, percent: ratings?.popcorn?.score, url: ratings?.popcorn?.url)
+                }
+            } else {
+                Text("評分讀取中…").font(.caption).foregroundStyle(.tertiary)
+            }
+        }
+        .task(id: title) {
+            guard showScores else { return }
+            ratings = try? await Bridge.shared.call("movieRatings", [title, js(en), js(slug)], as: Ratings.self)
+            ratingsDone = true
+        }
+    }
 
     /// 到外部網站查這部片的評分（用英文片名搜尋，沒有就用中文）
     private func linkChip(_ name: String, _ base: String) -> some View {
@@ -30,45 +52,6 @@ struct MovieHero: View {
         }
         .buttonStyle(.plain)
         .foregroundStyle(.secondary)
-    }
-
-    var body: some View {
-        HStack(alignment: .bottom, spacing: 12) {
-            PosterView(title: title, slug: slug, en: en, width: 104)
-            VStack(alignment: .leading, spacing: 5) {
-                ForEach(lines.filter { !$0.isEmpty }, id: \.self) { line in
-                    Text(line).font(.subheadline).foregroundStyle(.secondary)
-                }
-                if !showScores {
-                    // 不顯示外部分數：只放前往查看的連結（用片名搜尋，不讀對方網站）
-                    HStack(spacing: 6) {
-                        linkChip("IMDb", "https://www.imdb.com/find/?q=")
-                        linkChip("爛番茄", "https://www.rottentomatoes.com/search?search=")
-                    }
-                } else if ratingsDone {
-                    HStack(spacing: 4) {
-                        badge(tag: "IMDb", text: ratings?.imdb.map { String(format: "%.1f", $0.score) }, percent: ratings?.imdb.map { $0.score * 10 }, url: ratings?.imdb?.url)
-                        badge(tag: "🍅", text: ratings?.tomato.map { "\(Int($0.score))%" }, percent: ratings?.tomato?.score, url: ratings?.tomato?.url)
-                        badge(tag: "🍿", text: ratings?.popcorn.map { "\(Int($0.score))%" }, percent: ratings?.popcorn?.score, url: ratings?.popcorn?.url)
-                    }
-                } else {
-                    Text("評分讀取中…").font(.caption).foregroundStyle(.tertiary)
-                }
-                Button {
-                    Task { await openTrailer() }
-                } label: {
-                    Label(opening ? "預告讀取中…" : "觀看預告", systemImage: "play.fill")
-                        .font(.subheadline.weight(.semibold)).lineLimit(1)
-                        .foregroundStyle(.white) // 列表裡的圖示預設會染成藍色
-                }
-                .buttonStyle(.borderedProminent).buttonBorderShape(.capsule).tint(.red)
-                .disabled(opening)
-                .padding(.top, 4)
-            }
-            Spacer(minLength: 0)
-        }
-        .listRowBackground(Color.clear)
-        .task(id: title) { await load() }
     }
 
     /// 評分徽章：沒有那項評分顯示「-」（灰色、不能點）
@@ -94,15 +77,46 @@ struct MovieHero: View {
         .buttonStyle(.plain)
         .disabled(url == nil)
     }
+}
+
+/// 電影頁頂端：海報在左，資訊、三大評分與預告按鈕在右
+struct MovieHero: View {
+    let title: String
+    var slug: String? = nil
+    var en: String? = nil
+    let lines: [String]
+
+    @Environment(\.openURL) private var openURL
+    @State private var extras: MovieExtras?
+    @State private var opening = false
+
+    var body: some View {
+        HStack(alignment: .bottom, spacing: 12) {
+            PosterView(title: title, slug: slug, en: en, width: 104)
+            VStack(alignment: .leading, spacing: 5) {
+                ForEach(lines.filter { !$0.isEmpty }, id: \.self) { line in
+                    Text(line).font(.subheadline).foregroundStyle(.secondary)
+                }
+                RatingBadges(title: title, slug: slug, en: en)
+                Button {
+                    Task { await openTrailer() }
+                } label: {
+                    Label(opening ? "預告讀取中…" : "觀看預告", systemImage: "play.fill")
+                        .font(.subheadline.weight(.semibold)).lineLimit(1)
+                        .foregroundStyle(.white) // 列表裡的圖示預設會染成藍色
+                }
+                .buttonStyle(.borderedProminent).buttonBorderShape(.capsule).tint(.red)
+                .disabled(opening)
+                .padding(.top, 4)
+            }
+            Spacer(minLength: 0)
+        }
+        .listRowBackground(Color.clear)
+        .task(id: title) { await load() }
+    }
 
     private func load() async {
-        async let x = try? Bridge.shared.call("movieExtras", [title, js(slug)], as: MovieExtras.self)
-        if showScores {
-            async let r = try? Bridge.shared.call("movieRatings", [title, js(en), js(slug)], as: Ratings.self)
-            ratings = await r
-            ratingsDone = true
-        }
-        extras = await x
+        extras = try? await Bridge.shared.call("movieExtras", [title, js(slug)], as: MovieExtras.self)
     }
 
     private func openTrailer() async {

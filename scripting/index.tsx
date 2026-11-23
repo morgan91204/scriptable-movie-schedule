@@ -16,7 +16,7 @@ import {
   loadSettings, saveSettings, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, cinemaAddress,
   FORMATS, formatsOf, filterVersions, filterVersionsAny, movieRows, movieDays, nearest, kmLabel, WINDOWS, findShowtimes, findShowtimesMulti, multiLabel, multiDetail, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText, hallOf, tmdbTest, movieExtras, moviePoster, posterReady, posterTint, POSTER_TINTS, normImageUrl, movieRuntime, posterSrc, isLocalSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxCountries, boxByCountry, boxInfo, boxInfoRows, boxCountryText, BOX_COUNTRY_NOTE, boxCountryTag, boxCountriesPicked, movieBoard, loadBoxFor, loadCommunitySummary, loadUpcoming, soonBoard, soonGroups, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityVote, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, SCRIPTING_IMPORT_URL, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, festivalDefaultDate, festivalStateLabel, festivalState, festivalFooter, linkMovies, nowGroupLine, nowFilter, festivalPick, movieAbout, festivalSearch, festivalSearchLines, festivalTrailer, festivalYears, festivalGroups, festivalChipNote, festivalStatusLine, movieRatings, ratingTier,
 } from "./core"
-import type { Format, LatLng, Hit, Community, BoxOfficeItem, BoxSort, BoxOffice, MovieEntry, SoonEntry, UpcomingFilm, Festival, FestivalFilm, FestivalSession } from "./core"
+import type { Ratings, Format, LatLng, Hit, Community, BoxOfficeItem, BoxSort, BoxOffice, MovieEntry, SoonEntry, UpcomingFilm, Festival, FestivalFilm, FestivalSession } from "./core"
 
 declare const Safari: any
 declare const Dialog: any
@@ -468,6 +468,22 @@ function useThumbs(items: { title: string; slug?: string; en?: string; light?: b
 }
 
 /** 電影頁頂端：海報在左，資訊、評分與紅色預告按鈕在右（跟 Scriptable 版一樣） */
+/** 三大評分徽章（IMDb、番茄、爆米花）：電影頁和影展片共用同一個樣式。讀好後三個都顯示，沒有那項評分就是「-」（跟「還沒抓到」分得開） */
+function RatingLine({ rt }: { rt: { data: Ratings | null; error: string | null } }) {
+  const r = rt.data
+  const loaded = !!(r && (r.imdb || r.tomato || r.popcorn))
+  return <>
+    {r ? <HStack spacing={3}>
+      {r.imdb ? <RatingBadge kind={"imdb"} value={r.imdb.score.toFixed(1)} tier={ratingTier("imdb", r.imdb.score)} url={r.imdb.url} /> : <RatingBadge kind={"imdb"} value={"-"} tier={"none"} />}
+      {r.tomato ? <RatingBadge kind={"tomato"} value={`${r.tomato.score}%`} tier={ratingTier("pct", r.tomato.score)} note={r.tomato.certified ? "認證" : undefined} url={r.tomato.url} /> : <RatingBadge kind={"tomato"} value={"-"} tier={"none"} />}
+      {r.popcorn ? <RatingBadge kind={"popcorn"} value={`${r.popcorn.score}%`} tier={ratingTier("pct", r.popcorn.score)} url={r.popcorn.url} /> : <RatingBadge kind={"popcorn"} value={"-"} tier={"none"} />}
+    </HStack> : null}
+    {!r && !rt.error ? <Text font={"caption"} foregroundStyle={"tertiaryLabel"}>評分讀取中…</Text> : null}
+    {(r && !loaded && r.err) || rt.error
+      ? <Text font={"caption2"} foregroundStyle={"tertiaryLabel"}>{`評分讀不到：${rt.error || r?.err}`}</Text> : null}
+  </>
+}
+
 function MovieHero({ title, slug, lines, en }: { title: string; slug?: string; lines: string[]; en?: string }) {
   const x = useLoad(() => movieExtras(title, slug), [title, slug || ""])
   const rt = useLoad(() => movieRatings(title, en, slug), [title, en || ""])
@@ -489,22 +505,13 @@ function MovieHero({ title, slug, lines, en }: { title: string; slug?: string; l
     await Safari.openURL(d?.trailer || search)
   }
   const trailerLabel = opening ? "預告讀取中…" : !x.data || x.data.trailerName ? "觀看預告" : "搜尋預告"
-  const loaded = !!(r && (r.imdb || r.tomato || r.popcorn))
   return <>
   <Section>
     <HStack alignment={"bottom"} spacing={12} listRowBackground={"clear"}>
       <PosterBox w={104} h={156} r={12} img={pi.img} ver={pi.ver} pending={posterPending} title={title} />
       <VStack alignment={"leading"} spacing={4}>
         {lines.filter(Boolean).map((l) => <Text key={l} font={"subheadline"} foregroundStyle={"secondaryLabel"}>{l}</Text>)}
-        {/* 評分讀好後三個徽章都顯示：沒有那項評分就是「-」（跟「還沒抓到」分得開） */}
-        {r ? <HStack spacing={3}>
-          {r.imdb ? <RatingBadge kind={"imdb"} value={r.imdb.score.toFixed(1)} tier={ratingTier("imdb", r.imdb.score)} url={r.imdb.url} /> : <RatingBadge kind={"imdb"} value={"-"} tier={"none"} />}
-          {r.tomato ? <RatingBadge kind={"tomato"} value={`${r.tomato.score}%`} tier={ratingTier("pct", r.tomato.score)} note={r.tomato.certified ? "認證" : undefined} url={r.tomato.url} /> : <RatingBadge kind={"tomato"} value={"-"} tier={"none"} />}
-          {r.popcorn ? <RatingBadge kind={"popcorn"} value={`${r.popcorn.score}%`} tier={ratingTier("pct", r.popcorn.score)} url={r.popcorn.url} /> : <RatingBadge kind={"popcorn"} value={"-"} tier={"none"} />}
-        </HStack> : null}
-        {!r && !rt.error ? <Text font={"caption"} foregroundStyle={"tertiaryLabel"}>評分讀取中…</Text> : null}
-        {(r && !loaded && r.err) || rt.error
-          ? <Text font={"caption2"} foregroundStyle={"tertiaryLabel"}>{`評分讀不到：${rt.error || r?.err}`}</Text> : null}
+        <RatingLine rt={rt} />
         <Button action={openTrailer} buttonStyle={"borderedProminent"} buttonBorderShape={"capsule"} tint={"systemRed"} padding={{ top: 6 }} disabled={opening}>
           <Label title={trailerLabel} systemImage={"play.fill"} font={"subheadline"} fontWeight={"semibold"} lineLimit={1} />
         </Button>
@@ -1172,6 +1179,7 @@ function FestivalFilmPage({ festival: f, film }: { festival: Festival; film: Fes
   const [settings] = useSettings()
   const sessions = festivalFilmSessions(f, film.id)
   const imgOf = useDirectImages([film.poster || ""], film.id)
+  const rt = useLoad(() => movieRatings(film.title), [film.title]) // 三大評分：用影展的片名查，跟院線片同一套
   const end = (x: FestivalSession) => (film.mins ? fmt(new Date(tpeDate(x.date, x.time).getTime() + (film.mins + settings.ads) * 6e4)).slice(-5) : "")
   return <List navigationTitle={film.title} navigationBarTitleDisplayMode={"inline"}>
     <Section>
@@ -1181,6 +1189,7 @@ function FestivalFilmPage({ festival: f, film }: { festival: Festival; film: Fes
           <Text font={"subheadline"} foregroundStyle={"secondaryLabel"}>{[film.rating, film.mins ? `${film.mins} 分鐘` : ""].filter(Boolean).join("｜")}</Text>
           <Text font={"subheadline"} foregroundStyle={"secondaryLabel"}>{`${f.name}（${festivalStateLabel(f)}）`}</Text>
           <Text font={"footnote"} foregroundStyle={"tertiaryLabel"}>影展片名，院線上映時可能不同</Text>
+          <RatingLine rt={rt} />
           <Button action={() => { Safari.openURL(festivalTrailer(film).url) }} buttonStyle={"borderedProminent"} buttonBorderShape={"capsule"} tint={"systemRed"} padding={{ top: 6 }}>
             <Label title={festivalTrailer(film).label} systemImage={"play.fill"} font={"subheadline"} fontWeight={"semibold"} lineLimit={1} />
           </Button>
