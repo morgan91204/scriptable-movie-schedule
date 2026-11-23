@@ -22,6 +22,10 @@ import MANIFEST from "./public/manifest.webmanifest";
 import ICON_180 from "./public/icon-180.png";
 import ICON_192 from "./public/icon-192.png";
 import ICON_512 from "./public/icon-512.png";
+// 收藏電影的通知：背景接收程式（sw.js）與推送（push.js）
+import SW_JS from "./public/sw.js.txt";
+import { handlePush, runPush, PushHub } from "./push.js";
+export { PushHub };
 const FILES = {
   "/": [INDEX_HTML, "text/html; charset=utf-8", "no-cache"],
   "/index.html": [INDEX_HTML, "text/html; charset=utf-8", "no-cache"],
@@ -39,6 +43,8 @@ export default {
     const url = new URL(req.url);
     if (url.pathname === "/api/version") return new Response(JSON.stringify({ version: DEPLOYED }), { headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } });
     if (url.pathname === "/api/fetch" && req.method === "POST") return proxy(req, ctx);
+    if (url.pathname.startsWith("/api/push/")) return handlePush(req, env, url.pathname);
+    if (url.pathname === "/sw.js") return new Response(SW_JS, { headers: { "content-type": "text/javascript; charset=utf-8", "cache-control": "no-cache", "service-worker-allowed": "/" } });
     if (url.pathname === "/app.js") {
       return new Response(APP_JS, { headers: { "content-type": "text/javascript; charset=utf-8", "cache-control": "no-cache" } });
     }
@@ -47,6 +53,10 @@ export default {
     const f = FILES[url.pathname];
     if (f) return new Response(f[0], { headers: { "content-type": f[1], "cache-control": f[2] } });
     return new Response("找不到這個頁面", { status: 404, headers: { "content-type": "text/plain; charset=utf-8" } });
+  },
+  // 每小時一次：檢查收藏的電影有沒有新動態，有就推通知（見 push.js）
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(runPush(env).catch(() => null));
   },
 };
 

@@ -63,6 +63,10 @@ jobs:
           node tools/upcoming.mjs "$RUNNER_TEMP/prev-upcoming.json" "$RUNNER_TEMP/upcoming.json" || echo "即將上映的片單這次略過"
         env:
           TMDB_TOKEN: ${{ secrets.TMDB_TOKEN }}
+      - name: 通知用的精簡資料（收藏電影的通知每小時用它判斷）
+        run: |
+          curl -fsSL "https://raw.githubusercontent.com/${{ github.repository }}/data/notify.json?t=$(date +%s)" -o "$RUNNER_TEMP/prev-notify.json" || echo "還沒有通知資料"
+          node tools/notify.mjs "$RUNNER_TEMP/prev-notify.json" "$RUNNER_TEMP/festival.json" "$RUNNER_TEMP/notify.json" || echo "通知資料這次略過"
       - name: 發佈影展劇照的備份到 img 分支（要比影展資料先發佈：資料裡的圖片網址指向這裡）
         run: |
           tools/publish-images.sh "$RUNNER_TEMP/fest-img"
@@ -92,6 +96,11 @@ jobs:
           if [ -f "$RUNNER_TEMP/upcoming.json" ]; then
             git checkout -q -f "$GITHUB_SHA"
             tools/publish-data.sh "$RUNNER_TEMP/upcoming.json" upcoming.json "更新資料"
+          fi
+          # 通知用的精簡資料
+          if [ -f "$RUNNER_TEMP/notify.json" ]; then
+            git checkout -q -f "$GITHUB_SHA"
+            tools/publish-data.sh "$RUNNER_TEMP/notify.json" notify.json "更新資料"
           fi
           # 劇照備份的對照表（原圖網址 → 備份檔）
           if [ -f "$RUNNER_TEMP/festival-images.json" ]; then

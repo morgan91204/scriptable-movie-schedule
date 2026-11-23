@@ -207,6 +207,69 @@ autoUpdate();
 document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") autoUpdate(); });
 window.addEventListener("pageshow", (e) => { if ((e as PageTransitionEvent).persisted) autoUpdate(); });
 
+// ── 收藏電影的通知（Web Push）──
+// 狀態：unsupported 這個瀏覽器不支援／needs-install iPhone 要先加到主畫面／denied 使用者在系統設定擋掉了／off 還沒開／on 已開
+const pushOK = () => "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+const isIOS = () => /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+const standalone = () => (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches) || (navigator as any).standalone === true;
+const keyBytes = (s: string) => Uint8Array.from(atob(s.replace(/-/g, "+").replace(/_/g, "/")), (c) => c.charCodeAt(0));
+const post = (path: string, body: unknown) => fetch(path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }).then((r) => r.json());
+let pushState = "off";
+async function currentSub(): Promise<PushSubscription | null> {
+  const reg = await navigator.serviceWorker.getRegistration("/");
+  return reg ? reg.pushManager.getSubscription() : null;
+}
+g.__push = {
+  state: () => pushState,
+  async refresh(): Promise<string> {
+    if (!pushOK()) return (pushState = isIOS() && !standalone() ? "needs-install" : "unsupported");
+    if (Notification.permission === "denied") return (pushState = "denied");
+    try { pushState = (await currentSub()) ? "on" : "off"; } catch (_) { pushState = "off"; }
+    return pushState;
+  },
+  /** 開啟：要權限（g.__notifyPermission 是按鈕按下的那一刻就先要的，見下面）→ 訂閱 → 把推送位址和要通知的片交給伺服器 */
+  async enable(prefs: unknown, favs: unknown): Promise<string> {
+    if (!pushOK()) return this.refresh();
+    const perm = await (g.__notifyPermission || Notification.requestPermission());
+    g.__notifyPermission = null;
+    if (perm !== "granted") return this.refresh();
+    const reg = await navigator.serviceWorker.register("/sw.js");
+    await navigator.serviceWorker.ready;
+    const { key } = await fetch("/api/push/key").then((r) => r.json());
+    const sub = (await reg.pushManager.getSubscription()) || (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(key) }));
+    const r = await post("/api/push/subscribe", { subscription: sub.toJSON(), prefs, favs });
+    if (!r || !r.ok) throw new Error("伺服器沒有收到訂閱，請稍後再試");
+    return (pushState = "on");
+  },
+  /** 收藏或通知種類變了：把最新的清單同步給伺服器（沒開通知就什麼都不做） */
+  async sync(prefs: unknown, favs: unknown): Promise<void> {
+    if (!pushOK() || pushState !== "on") return;
+    const sub = await currentSub();
+    if (sub) await post("/api/push/subscribe", { subscription: sub.toJSON(), prefs, favs }).catch(() => null);
+  },
+  async disable(): Promise<string> {
+    if (!pushOK()) return pushState;
+    const sub = await currentSub();
+    if (sub) {
+      await post("/api/push/unsubscribe", { endpoint: sub.endpoint }).catch(() => null); // 伺服器上的資料一起刪掉
+      await sub.unsubscribe().catch(() => false);
+    }
+    return (pushState = "off");
+  },
+  async test(): Promise<boolean> {
+    const sub = pushOK() ? await currentSub() : null;
+    if (!sub) return false;
+    const r = await post("/api/push/test", { endpoint: sub.endpoint }).catch(() => null);
+    return !!(r && r.ok);
+  },
+};
+// 要通知權限一定要在「使用者按下去的那一刻」：按鈕帶 data-perm="notify" 的，在點擊事件裡就先要（App 的處理流程晚一步才跑，Safari 會當成不是使用者要求的）
+document.addEventListener("click", (e) => {
+  const el = (e.target as Element | null)?.closest?.('[data-perm="notify"]');
+  if (el && pushOK() && Notification.permission === "default") g.__notifyPermission = Notification.requestPermission();
+}, true);
+if (pushOK()) g.__push.refresh();
+
 // ── WebView：畫面直接畫在這一頁 ──
 class WebView {
   async loadHTML(html: string) {

@@ -14,3 +14,15 @@ fallthrough = true
 type = "Data"
 globs = ["**/*.png"]
 fallthrough = true
+
+# 收藏電影的通知：訂閱資料存在一個 Durable Object 裡；每小時檢查一次有沒有要通知的事
+[[durable_objects.bindings]]
+name = "PUSH"
+class_name = "PushHub"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["PushHub"]
+
+[triggers]
+crons = ["41 * * * *"]

@@ -30,6 +30,7 @@
     FORMATS: () => FORMATS,
     MAPS_LABEL: () => MAPS_LABEL,
     META_URL: () => META_URL,
+    NOTIFY_KINDS: () => NOTIFY_KINDS,
     OFFICIAL_URL: () => OFFICIAL_URL,
     POSTERS_URL: () => POSTERS_URL,
     POSTER_TINTS: () => POSTER_TINTS,
@@ -170,6 +171,8 @@
     nearest: () => nearest,
     normImageUrl: () => normImageUrl,
     normTitle: () => normTitle,
+    notifyFavs: () => notifyFavs,
+    notifyPrefs: () => notifyPrefs,
     nowFilter: () => nowFilter,
     nowGroupLine: () => nowGroupLine,
     nowHM: () => nowHM,
@@ -783,6 +786,14 @@ function parseTwMovieDay(doc) {
   };
 
   // src/core.ts
+  var NOTIFY_KINDS = [
+    { id: "open", label: "開放場次時", note: "還沒排片的片，戲院開始排場次、可以訂票了" },
+    { id: "rel", label: "上映時", note: "收藏的片正式上映的那一天" },
+    { id: "end", label: "快下檔時", note: "放映的影城剩下三間以下" },
+    { id: "fest", label: "影展開始時", note: "收藏的影展片所屬的影展開始了" }
+  ];
+  var notifyPrefs = (s) => ({ open: true, rel: true, end: true, fest: true, ...s.notify || {} });
+  var notifyFavs = (s) => (s.favMovies || []).map((f) => ({ key: f.key, title: f.title, ...f.fest ? { fest: { id: f.fest.id, name: f.fest.name } } : {} }));
   var MAPS_LABEL = { apple: "Apple 地圖", google: "Google 地圖" };
   function mapsUrl(name, address, app = "apple") {
     if (app === "google")
@@ -3602,7 +3613,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   var extra = { boxOffice, filmList, soonList, nowShowing, nowShowingMulti, movieBoard: movieBoard2, festivalBoard, festivalFilm, nearby, patchSettings, fillMovie, formatList };
   var BRIDGE_LEVEL = 2;
   globalThis.MS = {
-    version: "2026.11.24-0125",
+    version: "2026.11.24-0141",
     level: BRIDGE_LEVEL,
     init(saved) {
       cache = saved || {};

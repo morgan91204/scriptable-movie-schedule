@@ -40,7 +40,20 @@ export interface Settings {
   tmdbToken?: string; // TMDB API Read Access Token：有填才會幫沒有片長的電影補片長
   maps?: MapsApp; // 導航用哪個地圖（預設 Apple 地圖）
   favMovies?: FavMovie[]; // 收藏的電影（含影展片）
+  notify?: NotifyPrefs; // 收藏電影的通知要哪幾種（網頁版；沒設過 = 全部都要）
 }
+/** 收藏電影的通知種類：open 開放場次了、rel 上映了、end 快下檔了、fest 影展開始了 */
+export interface NotifyPrefs { open: boolean; rel: boolean; end: boolean; fest: boolean }
+export const NOTIFY_KINDS: { id: keyof NotifyPrefs; label: string; note: string }[] = [
+  { id: "open", label: "開放場次時", note: "還沒排片的片，戲院開始排場次、可以訂票了" },
+  { id: "rel", label: "上映時", note: "收藏的片正式上映的那一天" },
+  { id: "end", label: "快下檔時", note: "放映的影城剩下三間以下" },
+  { id: "fest", label: "影展開始時", note: "收藏的影展片所屬的影展開始了" },
+];
+export const notifyPrefs = (s: Settings): NotifyPrefs => ({ open: true, rel: true, end: true, fest: true, ...(s.notify || {}) });
+/** 交給通知伺服器的收藏清單：只有片名鍵、片名、影展代碼（海報、收藏時間這些不傳） */
+export const notifyFavs = (s: Settings): { key: string; title: string; fest?: { id: string; name: string } }[] =>
+  (s.favMovies || []).map((f) => ({ key: f.key, title: f.title, ...(f.fest ? { fest: { id: f.fest.id, name: f.fest.name } } : {}) }));
 /** 收藏的一部電影：key = 去掉裝飾字的片名（跟觀眾評分同一把鍵，所以片名帶「重映」「特別場」也算同一部）。
  *  記下片名、英文片名、海報，下檔後清單上還是看得到；fest = 從哪個影展收藏的（影展結束後也連得回去） */
 export interface FavMovie { key: string; title: string; en?: string; poster?: string; fest?: { id: string; film: string; name: string }; at: number }

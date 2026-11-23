@@ -12,9 +12,9 @@ import {
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
   loadSettings, saveSettings, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, TW,
   FORMATS, formatsOf, filterVersions, filterVersionsAny, movieRows, movieDays, nearest, kmLabel, WINDOWS, findShowtimes, findShowtimesMulti, multiLabel, multiDetail, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText,
-  hallOf, tmdbTest, movieExtras, moviePoster, movieRuntime, posterSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxCountries, boxByCountry, boxInfo, boxInfoRows, boxCountryText, BOX_COUNTRY_NOTE, boxCountryTag, boxCountriesPicked, loadMovieBoard, loadSoonBoard, boxStatus, STATUS_LABEL, boxInfoBy, isFavMovie, toggleFavMovie, favMovieRows, favMovieBox, soonGroups, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityCached, communityVote, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalsReady, festivalNote, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, festivalDefaultDate, festivalStateLabel, festivalState, festivalFooter, linkMovies, nowGroupLine, nowFilter, festivalPick, movieAbout, festivalSearch, festivalSearchLines, festivalTrailer, festivalYears, festivalsAny, festivalGroups, festivalChipNote, festivalStatusLine, movieRatings, ratingTier,
+  hallOf, tmdbTest, movieExtras, moviePoster, movieRuntime, posterSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxCountries, boxByCountry, boxInfo, boxInfoRows, boxCountryText, BOX_COUNTRY_NOTE, boxCountryTag, boxCountriesPicked, loadMovieBoard, loadSoonBoard, notifyPrefs, notifyFavs, NOTIFY_KINDS, boxStatus, STATUS_LABEL, boxInfoBy, isFavMovie, toggleFavMovie, favMovieRows, favMovieBox, soonGroups, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityCached, communityVote, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalsReady, festivalNote, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, festivalDefaultDate, festivalStateLabel, festivalState, festivalFooter, linkMovies, nowGroupLine, nowFilter, festivalPick, movieAbout, festivalSearch, festivalSearchLines, festivalTrailer, festivalYears, festivalsAny, festivalGroups, festivalChipNote, festivalStatusLine, movieRatings, ratingTier,
 } from "./core";
-import type { MovieExtras, Ratings, Community, BoxOfficeItem, BoxSort, MovieEntry, SoonEntry, UpcomingFilm, FavMovie, FavRow, Festival, FestivalFilm, FestivalSession } from "./core";
+import type { MovieExtras, Ratings, Community, BoxOfficeItem, BoxSort, MovieEntry, SoonEntry, UpcomingFilm, FavMovie, FavRow, NotifyPrefs, Festival, FestivalFilm, FestivalSession } from "./core";
 import { setTabBar, setBackGuard, esc } from "./jsx";
 import type { TwMovie, TwMovieCinema, Format, LatLng, Hit } from "./core";
 
@@ -241,6 +241,61 @@ class App {
   }
 
   // ── 設定 ──
+  /** 網頁版的通知介面（web/shim.ts 的 __push）；Scriptable 版沒有 */
+  push(): any { return IS_WEB ? (globalThis as any).__push : null; }
+  /** 收藏或通知種類變了：把最新的清單同步給通知伺服器（沒開通知時什麼都不做） */
+  pushSync(): void {
+    const p = this.push();
+    if (p) p.sync(notifyPrefs(this.settings), notifyFavs(this.settings)).catch(() => null);
+  }
+  /** 設定頁的「收藏電影的通知」：依裝置的狀況顯示開啟按鈕、各種通知的開關，或說明為什麼不能用 */
+  async notifySection(): Promise<string> {
+    const p = this.push();
+    if (!p) return "";
+    const state: string = await p.refresh().catch(() => "unsupported");
+    const prefs = notifyPrefs(this.settings);
+    const n = (this.settings.favMovies || []).length;
+    if (state === "needs-install")
+      return (
+        <Section title="收藏電影的通知" hint="iPhone 和 iPad 要先把電影行程加到主畫面，從主畫面的圖示開啟後，才能開啟通知（這是 iOS 的規定）。">
+          <Item icon="🔔" title="先加到主畫面" subtitle="收藏的電影開放場次、上映、快下檔時通知你" onTap={() => this.go(() => this.installView())} />
+        </Section>
+      );
+    if (state === "unsupported")
+      return (
+        <Section title="收藏電影的通知">
+          <Item icon="🔕" title="這個瀏覽器不支援通知" subtitle="可以改用 Safari（iPhone 要加到主畫面）、Chrome 或 Edge" chevron={false} />
+        </Section>
+      );
+    if (state === "denied")
+      return (
+        <Section title="收藏電影的通知" hint="到手機或瀏覽器的設定，把電影行程的「通知」改成允許，再回來這裡開啟。">
+          <Item icon="🔕" title="通知被關掉了" subtitle="系統設定裡沒有允許電影行程發通知" chevron={false} />
+        </Section>
+      );
+    if (state !== "on")
+      return (
+        <Section title="收藏電影的通知" hint="開啟後，你收藏的片名會存在我們的伺服器上，用來判斷什麼時候通知你；不需要帳號，也不會記錄你是誰。隨時可以關閉，關閉時伺服器上的資料會一起刪掉。">
+          <Item icon="🔔" title="收藏的電影有動態時通知我" subtitle={n ? `目前收藏了 ${n} 部：開放場次、上映、快下檔、影展開始時通知` : "開放場次、上映、快下檔、影展開始時通知。先開著，之後收藏的片都會算進去"} chevron={false} />
+          <button class="btn primary" data-perm="notify" onTap={async () => {
+            try {
+              const st = await p.enable(prefs, notifyFavs(this.settings));
+              await this.ui.toast(st === "on" ? "通知已開啟" : st === "denied" ? "沒有取得通知的權限" : "沒有開啟通知");
+            } catch (e) { await this.ui.toast(String((e as Error)?.message || "開啟失敗，請稍後再試")); }
+          }}>開啟通知</button>
+        </Section>
+      );
+    const toggle = (id: keyof NotifyPrefs) => { this.settings.notify = { ...prefs, [id]: !prefs[id] }; saveSettings(this.settings); this.pushSync(); };
+    return (
+      <Section title="收藏電影的通知" hint={`已開啟${n ? `，目前收藏了 ${n} 部` : "；還沒有收藏的電影，到電影頁點愛心收藏"}。晚上十點到早上九點不會發通知，留到早上再發。你收藏的片名存在我們的伺服器上，只用來判斷什麼時候通知；關閉通知時會一起刪掉。`}>
+        {NOTIFY_KINDS.map((k) => (
+          <Item icon={prefs[k.id] ? "✅" : "⬜️"} title={k.label} subtitle={k.note} chevron={false} onTap={() => toggle(k.id)} />
+        ))}
+        <Item icon="📨" title="傳一則測試通知" subtitle="確認這台裝置收得到" chevron={false} onTap={async () => { await this.ui.toast((await p.test()) ? "已送出，幾秒內應該會收到" : "送不出去，請關閉通知後重新開啟"); }} />
+        <Item icon="🔕" title="關閉通知" subtitle="停止通知，並刪除伺服器上的資料" chevron={false} onTap={async () => { await p.disable(); await this.ui.toast("通知已關閉"); }} />
+      </Section>
+    );
+  }
   async settingsView(): Promise<string> {
     this.calendarName = (await currentCalendar(this.settings)).title;
     return (
@@ -253,6 +308,7 @@ class App {
             saveSettings(this.settings);
           }} />
         </Section>
+        {await this.notifySection()}
         <Section title="關於" hint="連鎖影城的場次來自場次通（twshowtimes.com），感謝場次通的整理；其他來自開眼電影網，以及誠品、光點、樂聲、內惟戲院官網。實際場次以影城公告為準。">
           {IS_WEB && !this.isStandalone() ? <Item icon="📲" title="加到主畫面" subtitle="像 App 一樣從主畫面開啟，看圖示教學" onTap={() => this.go(() => this.installView())} /> : null}
           <Item icon="ℹ️" title="關於與資料來源" accent chevron={false} onTap={() => Safari.open(ABOUT_URL)} />
@@ -536,7 +592,13 @@ class App {
 
   /** 海報旁邊那顆收藏的愛心：電影頁、影展片、即將上映、已下檔的片都用同一顆 */
   favOf(m: { title: string; en?: string; poster?: string; fest?: FavMovie["fest"] }): { on: boolean; onTap: () => void } {
-    return { on: isFavMovie(this.settings, m.title), onTap: () => { const on = toggleFavMovie(this.settings, m); saveSettings(this.settings); this.ui.toast(on ? "已收藏，在首頁可以快速打開" : "已取消收藏"); } };
+    return { on: isFavMovie(this.settings, m.title), onTap: () => {
+      const on = toggleFavMovie(this.settings, m);
+      saveSettings(this.settings);
+      this.pushSync(); // 有開通知的話，把最新的收藏清單同步過去
+      const p = this.push();
+      this.ui.toast(!on ? "已取消收藏" : p && p.state() === "on" ? "已收藏，有動態會通知你" : p && (p.state() === "off" || p.state() === "needs-install") ? "已收藏。到「設定」可以開啟通知" : "已收藏，在首頁可以快速打開");
+    } };
   }
   /** 收藏的片目前哪裡都沒有場次：票房排行（2016 年至今）找得到就開那一頁；找不到就只顯示海報、評分、預告 */
   async favMovieView(fav: FavMovie): Promise<string> {
@@ -1483,7 +1545,7 @@ class App {
   }
 
   favOpen = false; // 首頁的常去影城清單有沒有展開（預設收合）
-  favMovOpen = false; // 首頁的收藏電影清單有沒有展開（預設收合）
+  favMovOpen = IS_WEB && /[?&]fav=1/.test(String((globalThis as any).location?.search || "")); // 首頁的收藏電影清單有沒有展開（預設收合；從通知點進來時直接展開）
   nowFolded: string[] = []; // 「現在有什麼可以看」結果裡收合起來的片（只留片名列）
   nowFoldFor = ""; // 上面那份收合狀態是哪一次查詢的
   nowQuery = ""; // 在結果裡再搜尋的字
