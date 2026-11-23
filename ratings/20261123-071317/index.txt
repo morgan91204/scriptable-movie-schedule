@@ -1,0 +1,7 @@
+01.html 200 340 https://movie-ratings.twmovietime.workers.dev/v2/all
+02.html 200 260 https://movie-ratings.twmovietime.workers.dev/v1/all
+03.html 200 53 https://movie-ratings.twmovietime.workers.dev/v2/stats?m=%E5%A5%A7%E5%BE%B7%E8%B3%BD
+04.html 200 45 https://movie-ratings.twmovietime.workers.dev/v1/stats?m=%E5%A5%A7%E5%BE%B7%E8%B3%BD
+05.html 200 53 https://movie-ratings.twmovietime.workers.dev/v2/stats?m=%E6%8C%96%E6%8E%98%E8%80%85
+06.html 200 340 https://movie-ratings.twmovietime.workers.dev/v2/all
+07.html 200 260 https://movie-ratings.twmovietime.workers.dev/v1/all
