@@ -28,6 +28,7 @@
     MAPS_LABEL: () => MAPS_LABEL,
     META_URL: () => META_URL,
     OFFICIAL_URL: () => OFFICIAL_URL,
+    POSTERS_URL: () => POSTERS_URL,
     POSTER_TINTS: () => POSTER_TINTS,
     PRIVACY_URL: () => PRIVACY_URL,
     SCRIPTING_IMPORT_URL: () => SCRIPTING_IMPORT_URL,
@@ -1287,7 +1288,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   async function movieExtras(title, slug) {
     const hasToken = !!((await loadSettings()).tmdbToken || "").trim();
     const k = (hasToken ? "t|" : "n|") + (slug || "") + "|" + title;
-    return extrasCache[k] ||= (async () => {
+    return (extrasCache[k] ||= (async () => {
       const ck = (hasToken ? "t|" : "n|") + normTitle(title);
       const read = readExtras;
       const hit = read()[ck];
@@ -1303,7 +1304,10 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
       all[ck] = { ...keep, at: Date.now(), v: EXTRAS_V };
       cacheSet("extras.json", JSON.stringify(all));
       return out;
-    })();
+    })()).then((r) => {
+      const sure = yearPosterSeen[normTitle(title)];
+      return sure ? { ...r, poster: sure, posterKind: "poster" } : r;
+    });
   }
   var EXTRAS_V = 9;
   function normImageUrl(u) {
@@ -1490,10 +1494,35 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     return u;
   }
   var posterLightMem = {};
+  var POSTERS_URL = "https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/data/posters.json";
+  var yearPostersMem = null;
+  function yearPosters() {
+    return yearPostersMem ||= (async () => {
+      let disk = null;
+      try {
+        disk = JSON.parse(cacheGet("posters.json") || "null");
+      } catch (_) {
+      }
+      if (disk && disk.posters && Date.now() - disk.at < 24 * 36e5) return disk.posters;
+      try {
+        const r = await platform().fetchText(POSTERS_URL + "?t=" + Math.floor(Date.now() / 36e5), { accept: "application/json" });
+        const d = r.status === 200 ? JSON.parse(r.body) : null;
+        if (d && d.posters && typeof d.posters === "object") {
+          cacheSet("posters.json", JSON.stringify({ at: Date.now(), posters: d.posters }));
+          return d.posters;
+        }
+      } catch (_) {
+      }
+      return disk && disk.posters ? disk.posters : {};
+    })();
+  }
+  var yearPosterSeen = {};
   function posterLight(title, release) {
     const k = "|" + title;
     return posterLightMem[k] ||= (async () => {
       const nk = normTitle(title);
+      const sure = (await yearPosters())[nk + "|" + (release || "").slice(0, 4)];
+      if (sure && /^\/[\w.-]+$/.test(sure)) return yearPosterSeen[nk] = "https://image.tmdb.org/t/p/w342" + sure;
       const all = readExtras();
       const hits = [all["t|" + nk], all["n|" + nk], all["p|" + nk]].filter((x) => x && x.poster);
       const hit = hits.find((x) => !/ytimg\.com/.test(x.poster));
@@ -1531,6 +1560,8 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     });
   }
   function moviePoster(title, slug, en) {
+    const sure = yearPosterSeen[normTitle(title)];
+    if (sure && !slug) return Promise.resolve(sure);
     const k = (slug || "") + "|" + title;
     return posterOnly[k] ||= (async () => {
       const nk = normTitle(title);
@@ -2830,7 +2861,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   var extra = { boxOffice, nowShowing, nowShowingMulti, movieBoard, festivalBoard, festivalFilm, nearby, patchSettings, fillMovie, formatList };
   var BRIDGE_LEVEL = 2;
   globalThis.MS = {
-    version: "2026.11.23-1730",
+    version: "2026.11.23-1733",
     level: BRIDGE_LEVEL,
     init(saved) {
       cache = saved || {};

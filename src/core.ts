@@ -782,7 +782,11 @@ export async function movieExtras(title: string, slug?: string): Promise<MovieEx
     all[ck] = { ...keep, at: Date.now(), v: EXTRAS_V } as MovieExtras & { at: number };
     cacheSet("extras.json", JSON.stringify(all));
     return out;
-  })());
+  })()).then((r) => {
+    // 年度排行那邊伺服器確認過這部片的海報：電影頁也用同一張（清單和點進去看到的才會一樣）
+    const sure = yearPosterSeen[normTitle(title)];
+    return sure ? { ...r, poster: sure, posterKind: "poster" as const } : r;
+  });
 }
 /** extras.json 紀錄的版本：預告查法改了就加 1，讓舊的「沒預告」紀錄重查 */
 const EXTRAS_V = 9;
@@ -1000,10 +1004,37 @@ const posterLightMem: Record<string, Promise<string>> = {};
 /** 已下檔舊片用的輕量查法：先看已經有的；沒有就只問 IMDb 的搜尋建議一次（一個很小的請求，回應裡就有海報圖），
  *  年份要跟上映年相差 1 年內才採用。不走完整查詢（那要連場次通、開眼、YouTube 好幾個網站，舊片幾乎都查不到）。
  *  結果記在手機上：找到的 30 天、沒找到的 3 天 */
+export const POSTERS_URL = "https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/data/posters.json";
+/** 年度票房排行的海報對照表（伺服器用 TMDB 的中文片名確認過的，見 tools/posters.mjs）：片名鍵|上映年 → TMDB 海報路徑。
+ *  手機上記 24 小時；讀不到就是空的（清單改用自己查的） */
+let yearPostersMem: Promise<Record<string, string>> | null = null;
+function yearPosters(): Promise<Record<string, string>> {
+  return (yearPostersMem ||= (async () => {
+    let disk: { at: number; posters: Record<string, string> } | null = null;
+    try {
+      disk = JSON.parse(cacheGet("posters.json") || "null");
+    } catch (_) {}
+    if (disk && disk.posters && Date.now() - disk.at < 24 * 3600e3) return disk.posters;
+    try {
+      const r = await platform().fetchText(POSTERS_URL + "?t=" + Math.floor(Date.now() / 3600e3), { accept: "application/json" });
+      const d = r.status === 200 ? JSON.parse(r.body) : null;
+      if (d && d.posters && typeof d.posters === "object") {
+        cacheSet("posters.json", JSON.stringify({ at: Date.now(), posters: d.posters }));
+        return d.posters as Record<string, string>;
+      }
+    } catch (_) {}
+    return disk && disk.posters ? disk.posters : {};
+  })());
+}
+/** 這次執行裡，年度排行從對照表拿到海報的片（片名鍵 → 網址）：電影頁要用同一張 */
+const yearPosterSeen: Record<string, string> = {};
 export function posterLight(title: string, release?: string): Promise<string> {
   const k = "|" + title;
   return (posterLightMem[k] ||= (async () => {
     const nk = normTitle(title);
+    // 伺服器確認過的最優先：比手機自己上網猜的準，也不用再發請求
+    const sure = (await yearPosters())[nk + "|" + (release || "").slice(0, 4)];
+    if (sure && /^\/[\w.-]+$/.test(sure)) return (yearPosterSeen[nk] = "https://image.tmdb.org/t/p/w342" + sure);
     const all = readExtras();
     // 進過這部片的電影頁、那邊找到的海報（來源比較多：開眼、場次通…）：清單直接沿用，兩邊才會一致
     const hits = [all["t|" + nk], all["n|" + nk], all["p|" + nk]].filter((x) => x && x.poster);
@@ -1050,6 +1081,8 @@ export function posterLight(title: string, release?: string): Promise<string> {
   }));
 }
 export function moviePoster(title: string, slug?: string, en?: string): Promise<string> {
+  const sure = yearPosterSeen[normTitle(title)]; // 年度排行那邊伺服器確認過的海報
+  if (sure && !slug) return Promise.resolve(sure);
   const k = (slug || "") + "|" + title;
   return (posterOnly[k] ||= (async () => {
     const nk = normTitle(title);

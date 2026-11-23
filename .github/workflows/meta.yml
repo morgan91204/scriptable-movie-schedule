@@ -47,6 +47,13 @@ jobs:
         run: |
           curl -fsSL "https://raw.githubusercontent.com/${{ github.repository }}/data/festival.json?t=$(date +%s)" -o "$RUNNER_TEMP/prev-festival.json" || echo "還沒有影展檔"
           FESTIVAL_BASE="https://raw.githubusercontent.com/${{ github.repository }}/data" node tools/festival.mjs "$RUNNER_TEMP/festival.json" "$RUNNER_TEMP/prev-festival.json" || echo "影展場次這次略過"
+      - name: 年度票房排行的海報（TMDB；查過的不再查，一次最多 3000 部）
+        run: |
+          curl -fsSL "https://raw.githubusercontent.com/${{ github.repository }}/data/posters.json?t=$(date +%s)" -o "$RUNNER_TEMP/prev-posters.json" || echo "還沒有海報對照表"
+          curl -fsSL "https://raw.githubusercontent.com/${{ github.repository }}/data/posters-miss.json?t=$(date +%s)" -o "$RUNNER_TEMP/prev-posters-miss.json" || true
+          node tools/posters.mjs "$RUNNER_TEMP/prev-posters.json" "$RUNNER_TEMP/prev-posters-miss.json" "$RUNNER_TEMP/posters.json" "$RUNNER_TEMP/posters-miss.json" || echo "年度排行海報這次略過"
+        env:
+          TMDB_TOKEN: ${{ secrets.TMDB_TOKEN }}
       - name: 發佈到 data 分支
         run: tools/publish-data.sh "$RUNNER_TEMP/meta.json" meta.json "更新資料"
       - name: 發佈開眼場次到 data 分支
@@ -63,6 +70,11 @@ jobs:
           tools/publish-data.sh "$RUNNER_TEMP/official.json" official.json "更新資料"
           git checkout -q -f "$GITHUB_SHA"
           tools/publish-data.sh "$RUNNER_TEMP/festival.json" festival.json "更新資料"
+          # 年度票房排行的海報對照表（和「查過沒有」的紀錄）
+          git checkout -q -f "$GITHUB_SHA"
+          tools/publish-data.sh "$RUNNER_TEMP/posters.json" posters.json "更新資料"
+          git checkout -q -f "$GITHUB_SHA"
+          tools/publish-data.sh "$RUNNER_TEMP/posters-miss.json" posters-miss.json "更新資料"
           # 各影展來源這次的讀取狀態（每週的檢查會看）
           git checkout -q -f "$GITHUB_SHA"
           tools/publish-data.sh "$RUNNER_TEMP/festival-status.json" festival-status.json "更新資料"
