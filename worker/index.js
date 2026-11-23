@@ -30,6 +30,10 @@ const stats5 = (o) => {
   return { n: o.n, avg: o.n ? Math.round((sum / o.n) * 10) / 10 : 0, dist, mine: Math.ceil((o.mine || 0) / 2) };
 };
 
+// 2026-11-23 改成 10 分制時，站長決定把在那之前的評分全部清掉、重新開始（不讓舊的 5 星換算結果影響新制）。
+// 這個時間點以前投的票：每部片第一次被讀到時刪掉，總表也清空一次。之後投的不受影響
+const RESET_BEFORE = 1795418236644;
+
 // 同一個 IP 10 分鐘內最多投 60 次（擋灌票，一般人不會碰到）
 const LIMIT_MAX = 60;
 const LIMIT_WINDOW = 600e3;
@@ -94,6 +98,13 @@ export class Movie extends DurableObject {
         this.sql.exec("INSERT INTO meta (k, v) VALUES ('scale', '10')");
       });
     }
+    // 清掉改制以前的舊評分（一次性；刪除和「已經清過」的記號寫在同一筆交易裡）
+    if (!this.sql.exec("SELECT v FROM meta WHERE k = 'reset'").toArray().length) {
+      ctx.storage.transactionSync(() => {
+        this.sql.exec("DELETE FROM votes WHERE at < ?", RESET_BEFORE);
+        this.sql.exec("INSERT INTO meta (k, v) VALUES ('reset', ?)", String(RESET_BEFORE));
+      });
+    }
   }
   /** 把這部片的統計同步到總表（有變才送）；失敗不影響投票 */
   async sync(key, dist) {
@@ -107,7 +118,7 @@ export class Movie extends DurableObject {
   }
   async stats(dev, key) {
     const out = this.count(dev);
-    if (out.n > 0) await this.sync(key, out.dist); // 總表上線前就有的評分：有人來讀時補進總表
+    await this.sync(key, out.dist); // 跟總表對一次（有變才送）：有評分的補進去，清空了的從總表拿掉
     return out;
   }
   async vote(dev, score, key) {
@@ -137,6 +148,14 @@ export class Index extends DurableObject {
     super(ctx, env);
     this.sql = ctx.storage.sql;
     this.sql.exec("CREATE TABLE IF NOT EXISTS summary (k TEXT PRIMARY KEY, d TEXT NOT NULL)");
+    // 改制時把總表清空一次（舊評分全部不算）；之後有人投票，那部片會再同步進來
+    this.sql.exec("CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT NOT NULL)");
+    if (!this.sql.exec("SELECT v FROM meta WHERE k = 'reset'").toArray().length) {
+      ctx.storage.transactionSync(() => {
+        this.sql.exec("DELETE FROM summary");
+        this.sql.exec("INSERT INTO meta (k, v) VALUES ('reset', ?)", String(RESET_BEFORE));
+      });
+    }
   }
   put(key, dist) {
     if (dist.every((x) => !x)) this.sql.exec("DELETE FROM summary WHERE k = ?", key);

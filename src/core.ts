@@ -2249,7 +2249,7 @@ function loadSummary(): Promise<Summary | null> {
 interface MyVote { s: number; at: number; dist?: number[]; dat?: number }
 const readMyVotes = (): Record<string, MyVote> => {
   try {
-    return JSON.parse(cacheGet("my-votes10.json") || "{}") || {}; // 10 分制換了檔名：舊檔記的是 5 星制的分數，不能沿用
+    return JSON.parse(cacheGet("my-votes10b.json") || "{}") || {}; // 10 分制換了檔名：舊檔記的是 5 星制的分數，不能沿用（再換一次：改制時舊評分全部清掉了）
   } catch (_) {
     return {};
   }
@@ -2258,7 +2258,7 @@ function saveMyVote(k: string, c: Community, fresh: boolean) {
   const all = readMyVotes();
   for (const [key, v] of Object.entries(all)) if (!v.s && Date.now() - v.at > 60 * 86400e3) delete all[key]; // 沒投票的舊紀錄清掉
   all[k] = fresh ? { s: c.mine, at: Date.now(), dist: c.dist, dat: Date.now() } : { s: c.mine, at: Date.now() };
-  cacheSet("my-votes10.json", JSON.stringify(all));
+  cacheSet("my-votes10b.json", JSON.stringify(all));
 }
 const fromDist = (dist: number[], mine: number): Community => {
   const d = Array.from({ length: 10 }, (_, i) => Number(dist[i]) || 0);
