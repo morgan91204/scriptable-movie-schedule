@@ -199,10 +199,11 @@ export function Item(props: {
   thumb?: { src: string; url?: string; pending?: boolean };
   rank?: number; // 排行名次（前三名橘色）
   head?: boolean; // 一組資料最上面的標題列（片名）：字大、有底色，跟底下的列分得開
+  kv?: boolean; // 「標題：內容」的資料列：左邊標題只佔自己的寬度，右邊內容用掉剩下的整行（不受 40% 寬度限制，放得下就不換行）
   /** 最右邊另外一顆小按鈕（例如收合這一組），跟整列的點擊分開 */
   action?: { label: string; hint?: string; onTap: Handler };
 }): string {
-  const cls = ["item", props.head ? "head" : "", props.onTap ? "tap" : "", props.muted ? "muted" : "", props.accent ? "accent" : "", props.onLongPress ? "long" : ""].join(" ");
+  const cls = ["item", props.head ? "head" : "", props.kv ? "kv" : "", props.onTap ? "tap" : "", props.muted ? "muted" : "", props.accent ? "accent" : "", props.onLongPress ? "long" : ""].join(" ");
   const fallback = "if(this.dataset.url&&this.src!==this.dataset.url){this.src=this.dataset.url}else{this.remove()}";
   return (
     <div class={cls} onTap={props.onTap} onLongPress={props.onLongPress}>

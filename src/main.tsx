@@ -1162,7 +1162,7 @@ class App {
         {this.hero(e, x.name, [boxCountryText(x.country), `${date} 上映`])}
         {/* 個別資訊：跟官方網站列的欄位一樣（國別、發行、出品、上映日期、院數、票數、金額） */}
         <Section title="票房資訊" hint="資料來源：國家電影及視聽文化中心「全國電影票房統計」。">
-          {boxInfoRows(x, info).map(([label, value]) => <Item title={label} right={value} />)}
+          {boxInfoRows(x, info).map(([label, value]) => <Item kv title={label} right={value} />)}
         </Section>
         <Note text="場次通目前沒有這部片的場次，可能已經下檔，或只在少數戲院放映。" />
       </Page>

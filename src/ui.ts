@@ -62,6 +62,8 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .item .sub.one{display:block;white-space:nowrap}
 .item .sub.dim{font-size:12px;opacity:.75;margin-top:1px}
 .item .right{font-size:14px;color:var(--fg2);flex:none;max-width:40%;text-align:right}
+.item.kv .body{flex:0 0 auto}
+.item.kv .right{flex:1 1 auto;max-width:none;min-width:0}
 .item .badge{flex:none;font-size:12px;padding:2px 8px;border-radius:999px;background:var(--chip);color:var(--chip-fg)}
 .item .chev{color:var(--fg2);opacity:.55;font-size:22px;line-height:1;flex:none}
 .item.muted .title,.item.muted .sub{color:var(--fg2)}
