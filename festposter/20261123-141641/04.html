@@ -1,0 +1,938 @@
+<!DOCTYPE html>
+<html lang="zh_tw" class="orbit">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<link rel="stylesheet" media="all" href="/assets/frontend_extend-ce16b1044b08ac1e969fb2044b679072277b46ead2f79a421b1f8db70b1f6408.css">
+<link rel="stylesheet" media="all" href="/assets/front_end-356e454b2d19e86291266709954b9e46858a4194e92c4ce48e9d379bffb5c9c4.css">
+<meta property="og:description" content="
+有些謎題沒有標準答案，卻值得我們勇敢靠近。 讓我們帶著好奇與想像力，探索 神秘物件、傾聽獨特聲音，也試著理解看不見的情緒。在未知的星球上，每一次理解，都是珍貴的發現。
+">
+<meta property="og:type" content="Article">
+<meta property="og:image" content="https://www.ticff.org.tw/uploads/asset/data/6a56f8f05921783cd690e037/cover__3_.png">
+<meta property="og:image:width" content="1024">
+<meta property="og:image:height" content="576">
+<meta property="og:title" content="登陸你的星球">
+<meta property="og:site_name" content="台灣國際兒童影展TICFF">
+<meta property="og:url" content="/zh_tw/26tiffi_p/26tiffi_program/26tiffi_8">
+  <script src="/assets/jquery-2a83d06853bd343c7bfc2e5d4539814cfa934676e2948ed348311435eca862f5.js"></script>
+<script src="/assets/jquery_prefix-5c5a0bbb9dfff7d410703a0565bc948dca28ec736d1a0e725050111c330805d3.js"></script>
+<script src="/assets/jquery_ujs_custom-a76b6cd8d652c18d24ed38d1f7a4d18f51d1f594a88a0f2ade82afec33966e2b.js"></script>
+<script src="/assets/jquery.cycle2.min-ec60b272289a05b845d7613d074237d008c08a069dc283c2e4c62dfc513242db.js"></script>
+<script src="/assets/jquery.cycle2.carousel.min-3d226d0713bcf58909be7c7e753fa1eef4409eee278299adfe70ff4ea646d65f.js"></script>
+<script src="/assets/jquery.cycle2.scrollVert.min-ce8da4c3f5e336753d998c9f02e64cc8b7e3977f5f6988133faf24a44c90b427.js"></script>
+<script src="/assets/jquery.cycle2.tile.min-83b4b0c4c2604b9c9acb20199a740f4b9e83c227ae46c1a430aa67bf97ff5457.js"></script>
+<link rel="stylesheet" media="all" href="/assets/datatables.min-7446416dca719e42fb55ff5fbf69879ccebe1ab56c6bb6833e2db781eccfddf9.css">
+<script src="/assets/datatables.min-598993c579b423583458a17773ed1e86103dc54e60eae7ab6c27b426af16df6f.js"></script>
+<meta name="csrf-param" content="authenticity_token">
+<meta name="csrf-token" content="YKEfB1ZC7pVblZLFMtYJ/llLBgbYIJlnMGCQ+GJ3qWRcnojKNQinlhOOqShutMJNiyXH6qIkkUzYwgM3cxB2mQ==">
+<script>
+    $.fn.dataTable.defaults.initComplete = function(settings) {
+        $(this).find('td:first-child').trigger('click');
+    };
+</script>
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="shortcut icon" type="image/x-icon" href="/uploads/site/favicon/671077a2367376f7b7972c4b/logo-ticff-favicon.png">
+  <title>台灣國際兒童影展TICFF</title>
+  <link rel="stylesheet" media="all" href="//stackpath.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css">
+  <link rel="stylesheet" media="all" href="/assets/bootstrap/bootstrap.min-c36b0860fa3ccf6a898fa1a436dc802cf6333c72dd02932473d4dd9cb6739974.css">
+  <link rel="stylesheet" media="all" href="/assets/template/template-2a80da799eef7413e2986c1f50db7035557d72103a1653a14de3434f5b4b511c.css">
+  <link rel="stylesheet" media="all" href="/assets/template/jquery.scrolling-tabs.min-0aaa5bfc7b51e5bacb1b208e1bc8d8cf1b8daba5c234626bc7fda4be4effb5df.css">
+  <link rel="stylesheet" media="print" type="text/css" href="/assets/template/print.css">
+  <script src="/assets/plugin/modernizr-d5770395993b83f1cd01c625a62f0cc2a8f2536f7288ef3a45f2863f2e20a9c1.js"></script>
+  <script src="/assets/plugin/picturefill.min-1e1f7d4e867ad1ec3d5886ad5e69512b6692509c939a89634ffcf63ba17b6b7d.js"></script>
+  <script src="/assets/plugin/jquery.mobile.custom.min-94832de9dd3faaf354dabd20e980b49bfe549a3750d73e5855bc4104b53afe9d.js"></script>
+  <script src="/assets/bootstrap.min-18024db0d6a0bc75ca740863a3b491b7f9b9cbd080ba3ee25e22265801d0b0c9.js"></script>
+  
+  
+  <script src="/assets/plugin/jquery.cycle2.video.min-384b34504c43f5962ffa3295b0b28947fd8a4498968853be0477a5dc664bd9b9.js"></script>
+  <script src="/assets/plugin/jquery-bullseye-min-8149d6adb748bd9561e9f1fd822e59337a75d065e017c7891699d50d69414bc2.js"></script>
+  <script src="/assets/plugin/jquery.scrolling-tabs.min-2ca04680a371ceee7710b234d1e8795bf3d4247da7327300094cf74ed64829fa.js"></script>
+
+  <script src="/assets/plugin/owl.carousel.min-ec9585fb4e14679aaa65e0d62fac99d496ce23ea8052fc718d5b3fbc84525e61.js"></script>
+  <link rel="stylesheet" type="text/css" href="/assets/template/owl.carousel.min.css">
+  <link rel="stylesheet" type="text/css" href="/assets/template/owl.theme.default.min.css">
+  
+  <script src="/assets/app-67a0e09763a1da5df9681ae3955da892ffd20d12a8f0accb4ee5d8c940d564d8.js"></script>
+  <script src="/assets/frontend-121b87925d20c2b21764d1c5053c911976bcf14ba23128fed1904f6b7a19033d.js"></script>
+  <script src="https://apis.google.com/js/platform.js" async defer></script>
+  <meta name="google-site-verification" content="2Sq7PhjqKSNKxXeY08JNHcWv-j7dmsAln0yn9fSdCt0">
+<!-- Google tag (gtag.js) --> <script async src="https://www.googletagmanager.com/gtag/js?id=G-9C2L99067S"></script> <script> window.dataLayer = window.dataLayer || []; function gtag(){dataLayer.push(arguments);} gtag('js', new Date()); gtag('config', 'G-9C2L99067S'); </script>
+  <!--[if lt IE 9]>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/respond.js/1.4.2/respond.min.js"></script>
+  <![endif]-->
+
+  <link rel="stylesheet" href="https://pro.fontawesome.com/releases/v5.10.0/css/all.css" integrity="sha384-AYmEC3Yw5cVb3ZcuHtOA93w35dYTsvhLPVnYs9eStHfGJvOvKxVfELGroGkvsg+p" crossorigin="anonymous">
+
+
+<script src="/assets/frontend_extend-999decf38e68d49ef81c07f7c8ed615fffdbf532aa93c37e6a6ff279894d38d2.js"></script>
+</head>
+<body class="internal-page mobile_device prohibit_proxy_feature banner_height_setting_1 no_orbit_bar" data-module="page_content">
+  <link rel="stylesheet" media="all" href="/assets/fontawesome-6.2.1.min-8aec0118643d34254cb9f5c27b931239c9de8008c849c9800d8651a5da1abcb2.css">
+<link rel="stylesheet" media="all" href="/assets/fontawesome-6.7.2-fix.min-6b0ec22db108e36fd2c1936185ca470f3da0b00f673f4bb0b6cfddd29cc40d92.css">
+<link rel="stylesheet" media="all" href="/assets/lib/jquery-ui-1.13.2/jquery-ui.min-bc39b4e583177d1bfb4d31e880558d84fd307a5b3c87a91f2fadaf0bc4f1cc96.css">
+<link rel="stylesheet" media="all" href="/assets/jquery-ui-timepicker-addon-ee91708eac547223792975e0d9a9aae62127da4b28a58d40c0634927f19665f0.css">
+  <script src="/assets/lib/jquery-ui-1.13.2/jquery-ui.min-b88d0b98b7b90a20cae0fc32eaf0845ac1ffdc0e4b3176c501e353d45c975064.js"></script>
+  <script src="/assets/jquery.ui.datepicker.monthyearpicker-6126b863aa1c4b399bf657869bbc51389d83ff5101b069ff7e1d0b02793c67e1.js"></script>
+<script type="text/javascript">
+  var I18n = {};
+  Object.defineProperty(I18n,"locale",{
+    value: "zh_tw"
+  });
+  Object.defineProperty(I18n,"validLocales",{
+    value: ["zh_tw","en"]
+  });
+</script>
+  <div class="background" data-pp="100"></div>
+  
+
+<div id="fb-root"></div>
+<script>(function(d, s, id) {
+  var js, fjs = d.getElementsByTagName(s)[0];
+  if (d.getElementById(id)) return;
+  js = d.createElement(s); js.id = id;
+  js.src = "";
+  fjs.parentNode.insertBefore(js, fjs);
+}(document, 'script', 'facebook-jssdk'));</script>
+
+<script>!function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0];if(!d.getElementById(id)){js=d.createElement(s);js.id=id;js.src="https://platform.twitter.com/widgets.js";fjs.parentNode.insertBefore(js,fjs);}}(document,"script","twitter-wjs");</script>
+<div class="mobile-menu">
+  <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#layout-navigation">
+        <span class="sr-only">Toggle navigation</span>
+        <span class="icon-bar icon-bar-top"></span>
+        <span class="icon-bar icon-bar-middle"></span>
+        <span class="icon-bar icon-bar-bottom"></span>
+  </button>
+  <div class="cover"></div>
+</div>
+<header class="navbar layout-header no-print" role="navigation">
+  <div class="outdropdowns">
+  <div class="container dropdowns">
+    <div class="navbar-header">
+      <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#layout-navigation">
+        <span class="sr-only">Toggle navigation</span>
+        <span class="icon-bar icon-bar-top"></span>
+        <span class="icon-bar icon-bar-middle"></span>
+        <span class="icon-bar icon-bar-bottom"></span>
+      </button>
+	    
+	    <script>$(document).ready(function(){var url =$('.site-logo').eq(0).attr('src');if(url == "/assets/default-site-logo.png"){$('.navbar-brand').eq(0).remove();};if($('.navbar-brand').length == 2){$('.site-logo').css('height','auto')};$('.site-logo').eq(0).css('margin-right',0);$('.navbar-brand').css('padding-right',0)})</script>
+      <a title="主頁" class="navbar-brand" href="/"><h1 class="default_site_h1">
+<img class="site-logo" src="/uploads/site/site_logo/671077a2367376f7b7972c4b/logo-ticff-d.png" alt="台灣國際兒童影展TICFF的Logo"> <span style="display: none;">台灣國際兒童影展TICFF</span>
+</h1></a>
+    </div>
+    <div class="header-nav">
+      <a id="accesskey_top" accesskey="U" title="accesskey top" href="#">:::</a>
+        <ul>
+	<li>
+<a class="carnival-link" href="https://ticybf.moc.gov.tw/home/zh-tw" rel="noopener noreferrer" target="_blank" rel="noopener noreferrer" title="開啟新視窗前往 臺灣國際兒童及青少年嘉年華"><img alt="臺灣國際兒童及青少年嘉年華" src="/uploads/asset/data/6a2781a4592178db8e6ab128/%E5%85%92%E5%B0%91%E5%98%89%E5%B9%B4%E8%8F%AF.png" title="臺灣國際兒童及青少年嘉年華"> </a>   </li>
+	<li>
+<i class="fa-solid fa-magnifying-glass search-click" style="transform:translateY(18px);"></i>
+	<div class="ken-info">
+	<div style="text-align: center;">請輸入關鍵字</div>
+
+	<form action="https://www.google.com/custom" id="search" method="get" style="margin-bottom: 1em; border: 0 !important;" target="_blank" title="另開新視窗">
+	<div style="text-align: center;">
+<input name="authenticity_token" type="hidden" value="bCU3UbS3uXNeP8WJj4/wAOHkiLYTdt9I2/QvWA4U3RENuiymX5jwPxpbFRPK4GJMPq0fgPsl5DhxxRFfkCyvNA=="> <input name="client" type="hidden" value="pub-&amp;amp"> <input id="ie" name="ie" type="hidden" value="utf-8"> <input id="oe" name="oe" type="hidden" value="utf-8"> <input id="cof" name="cof" type="hidden" value="AH:center;AWFID:03de271f1940eea3;"> <input name="domains" type="hidden" value="ticff.org.tw"> <input name="sitesearch" type="hidden" value="ticff.org.tw"> <label accesskey="S" for="q" style="display:none;"> Google Search </label> <input id="q" name="q" placeholder="全站搜尋" style="
+                            border-radius: 100px;
+                            border: 1px solid #ccc;
+                            padding: 0.5em;
+                            font-size: 0.8em;
+                            width: 200px;
+                            background: #fff;" title="search" type="search" value="" x-webkit-speech="">
+</div>
+	</form>
+	</div>
+	</li>
+	<li><a class="wpml-ls-link" href="/?locale=en" id="en" style="
+      display:inline-block;
+      position:relative;
+      top:3px;
+   "><span class="wpml-ls-native" lang="en"> en </span> </a></li>
+</ul>
+<style type="text/css">.carnival-link {
+    position: relative;
+    display: inline-block;
+    border-radius: 10px;
+    cursor: pointer;
+    text-decoration: none;
+}
+
+.carnival-link img {
+    display: block;
+    width: 100px;
+    border-radius: 10px
+    transition: all .25s ease;
+
+    /* 平常微陰影 */
+    box-shadow:
+        0 2px 8px rgba(0,0,0,.08);
+}
+
+/* 外部連結提示 */
+.carnival-link::after {
+    content: "↗";
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    width: 20px;
+    height: 20px;
+    line-height: 20px;
+    text-align: center;
+    border-radius: 50%;
+    background: #5ab7ff;
+    color: #fff;
+    font-size: 11px;
+    font-weight: bold;
+    opacity: 0;
+    transition: all .25s ease;
+    z-index: 2;
+}
+
+.carnival-link:hover img,
+.carnival-link:focus img {
+
+    /* 不改變尺寸 */
+    transform: translateY(-5px);
+
+    /* 微亮 */
+    filter: brightness(1.08);
+
+    /* 淡藍色光暈 */
+    box-shadow:
+        0 0 0 3px rgba(120,200,255,.25),
+        0 10px 25px rgba(120,200,255,.35);
+}
+
+.carnival-link:hover::after,
+.carnival-link:focus::after {
+    opacity: 1;
+}
+
+.carnival-link:active img {
+    transform: translateY(-2px);
+}
+</style>
+
+    </div>
+    <div class="collapse navbar-collapse modules-menu" id="layout-navigation">
+    <a id="accesskey_menu" title="accesskey menu" accesskey="M" href="#">:::</a>
+      <ul id="main-nav" class="navbar-right navbar-nav modules-menu-level-0 nav-level-0 no-print" data-menu-level="0">
+<li>
+    <a href="/zh_tw/aboutthis/about" title="關於影展" data-menu-link="true" class="dropdown-toggle" target="_self">關於影展<i class="fa-solid fa-caret-down desktopdawn"></i></a>
+    <ul class="modules-menu-level-1 nav-level-1" data-menu-level="1">
+<li>
+        <a href="/zh_tw/aboutthis/about" title="影展介紹" data-menu-link="true" target="_self">影展介紹</a>
+        
+      </li>
+<li>
+        <a href="/zh_tw/about#news" title="最新消息" data-menu-link="true" target="_self">最新消息</a>
+        
+      </li>
+<li>
+        <a href="/zh_tw/about#history" title="歷屆官網" data-menu-link="true" target="_self">歷屆官網</a>
+        
+      </li>
+</ul>
+  </li>
+<li>
+    <a href="/zh_tw/26tiffi_p" title="影展節目" data-menu-link="true" class="dropdown-toggle" target="_self">影展節目<i class="fa-solid fa-caret-down desktopdawn"></i></a>
+    <ul class="modules-menu-level-1 nav-level-1" data-menu-level="1">
+<li>
+        <a href="/zh_tw/26tiffi_p" title="年度單元" data-menu-link="true" target="_self">年度單元</a>
+        
+      </li>
+<li>
+        <a href="/zh_tw/26tiffi_p/tiffi26" title="影片總覽" data-menu-link="true" target="_self">影片總覽</a>
+        <ul class="modules-menu-level-2 nav-level-2" data-menu-level="2">
+<li>
+            <a href="/zh_tw/26tiffi_p/tiffi26/26Tiffi4" title="4+" data-menu-link="true" target="_self">4+</a>
+          </li>
+<li>
+            <a href="/zh_tw/26tiffi_p/tiffi26/26tiffi8" title="8+" data-menu-link="true" target="_self">8+</a>
+          </li>
+<li>
+            <a href="/zh_tw/26tiffi_p/tiffi26/26tiffi11" title="11+" data-menu-link="true" target="_self">11+</a>
+          </li>
+<li>
+            <a href="/zh_tw/26tiffi_p/tiffi26/26tiffi_teen" title="青少年" data-menu-link="true" target="_self">青少年</a>
+          </li>
+<li>
+            <a href="/zh_tw/26tiffi_p/tiffi26/26tiffi_drama" title="劇情長片" data-menu-link="true" target="_self">劇情長片</a>
+          </li>
+<li>
+            <a href="/zh_tw/26tiffi_p/tiffi26/26tiffi_animation" title="動畫長片" data-menu-link="true" target="_self">動畫長片</a>
+          </li>
+<li>
+            <a href="/zh_tw/26tiffi_p/tiffi26/26tiffi_dramas" title="劇情短片" data-menu-link="true" target="_self">劇情短片</a>
+          </li>
+<li>
+            <a href="/zh_tw/26tiffi_p/tiffi26/26tiffi_animations" title="動畫短片" data-menu-link="true" target="_self">動畫短片</a>
+          </li>
+<li>
+            <a href="/zh_tw/26tiffi_p/tiffi26/mandarin" title="華語配音" data-menu-link="true" target="_self">華語配音</a>
+          </li>
+<li>
+            <a href="/zh_tw/26tiffi_p/tiffi26/26tiffi_tvprogram" title="電視／網路節目" data-menu-link="true" target="_self">電視／網路節目</a>
+          </li>
+</ul>
+      </li>
+<li>
+        <a href="/zh_tw/26tiffi_p/tiffischedule26" title="場次表" data-menu-link="true" target="_self">場次表</a>
+        
+      </li>
+<li>
+        <a href="/aboutthis/news/%E5%BD%B1%E5%B1%95%E6%89%8B%E5%86%8A%E4%B8%8A%E7%B7%9A-Tiffi%E5%A4%96%E9%80%81%E4%B8%AD%E5%85%92%E5%B0%91%E5%BD%B1%E5%B1%95-%E7%B4%99%E6%9C%AC%EF%BC%86%E7%B7%9A%E4%B8%8A%E7%89%88%E4%B8%80%E6%AC%A1%E7%9C%8B-7284169" title="影展手冊" data-menu-link="true" target="_self">影展手冊</a>
+        
+      </li>
+</ul>
+  </li>
+<li>
+    <a href="/aboutthis/news/2026%E5%B9%B4%E7%AC%AC%E5%8D%81%E4%BA%8C%E5%B1%86TICFF%E5%8F%B0%E7%81%A3%E5%9C%8B%E9%9A%9B%E5%85%92%E7%AB%A5%E5%BD%B1%E5%B1%95%EF%BC%8D%E5%9C%8B%E9%9A%9B%E7%AB%B6%E8%B3%BD%EF%BD%9C%E5%AE%8C%E6%95%B4%E5%85%A5%E5%9C%8D%E5%90%8D%E5%96%AE%E5%85%AC%E4%BD%88-81162560" title="國際競賽" data-menu-link="true" class="dropdown-toggle" target="_self">國際競賽<i class="fa-solid fa-caret-down desktopdawn"></i></a>
+    <ul class="modules-menu-level-1 nav-level-1" data-menu-level="1"><li>
+        <a href="/zh_tw/Nominees2026/2026Finallists" title="2026 得獎暨評審名單" data-menu-link="true" target="_self">2026 得獎暨評審名單</a>
+        
+      </li></ul>
+  </li>
+<li>
+    <a href="/zh_tw/events" title="年度活動" data-menu-link="true" class="dropdown-toggle" target="_self">年度活動<i class="fa-solid fa-caret-down desktopdawn"></i></a>
+    <ul class="modules-menu-level-1 nav-level-1" data-menu-level="1">
+<li>
+        <a href="/zh_tw/events" title="影展活動" data-menu-link="true" target="_self">影展活動</a>
+        
+      </li>
+<li>
+        <a href="/aboutthis/news/%E5%BD%B1%E5%B1%95%E6%B2%99%E9%BE%8D%E5%A0%B4%E6%AC%A1%E5%A4%A7%E5%85%AC%E9%96%8B-%E9%AB%98%E9%9B%84%E5%B1%95%E8%A6%BD%E9%A4%A813%E5%A0%B4%E8%AC%9B%E5%BA%A7%E9%87%8D%E7%A3%85%E7%99%BB%E5%A0%B4-%E5%89%B5%E4%BD%9C-%E9%9B%BB%E5%BD%B1%E8%88%87%E5%85%92%E5%B0%91%E5%BD%B1%E5%83%8F-6315023" title="影展沙龍" data-menu-link="true" target="_self">影展沙龍</a>
+        
+      </li>
+<li>
+        <a href="/zh_tw/more_announcement/%E5%9C%8B%E9%9A%9B%E5%BD%B1%E4%BA%BA%E9%9D%A2%E5%B0%8D%E9%9D%A2-%E5%BD%B1%E4%BA%BA%E5%87%BA%E5%B8%AD%E5%A0%B4%E6%AC%A1%E4%B8%80%E8%A6%BD%E8%A1%A8%EF%BD%9CTiffi%E5%A4%96%E9%80%81%E4%B8%AD%E5%85%92%E5%B0%91%E5%BD%B1%E5%B1%95-96510019" title="影人出席" data-menu-link="true" target="_self">影人出席</a>
+        
+      </li>
+</ul>
+  </li>
+<li>
+    <a href="/zh_tw/service" title="公播服務" data-menu-link="true" class="dropdown-toggle" target="_self">公播服務<i class="fa-solid fa-caret-down desktopdawn"></i></a>
+    <ul class="modules-menu-level-1 nav-level-1" data-menu-level="1">
+<li>
+        <a href="/zh_tw/service/Public_Service_Film" title="公播片單" data-menu-link="true" target="_self">公播片單</a>
+        
+      </li>
+<li>
+        <a href="/zh_tw/aboutthis/news/%E5%8F%B0%E7%81%A3%E5%9C%8B%E9%9A%9B%E5%85%92%E7%AB%A5%E5%BD%B1%E5%B1%95%EF%BD%9C%E5%85%AC%E6%92%AD%E6%9C%8D%E5%8B%99%E5%AF%A6%E6%96%BD%E8%BE%A6%E6%B3%95-42377695" title="實施辦法" data-menu-link="true" target="_self">實施辦法</a>
+        
+      </li>
+<li>
+        <a href="https://docs.google.com/forms/d/1KO1BQ6qNvXW9Yhchs3FvtY4oHesKZrJXTu3acB85w9E/viewform?edit_requested=true" title="立即申請" data-menu-link="true" target="_blank" rel="noopener noreferrer">立即申請</a>
+        
+      </li>
+</ul>
+  </li>
+<li>
+    <a href="https://events.pts.org.tw/dreamer12/" title="小導演大夢想" data-menu-link="true" class="dropdown-toggle" target="_blank" rel="noopener noreferrer">小導演大夢想<i class="fa-solid fa-caret-down desktopdawn"></i></a>
+    
+  </li>
+</ul>
+    </div>
+    <!-- <div class="header-buttom layout-content-box " data-pp="200"></div> -->
+   </div>
+    <div class="headerhover">
+      <div class="mountain mountain-1"><svg width="180" height="60" viewbox="0 0 180 60"><polygon points="90,0 180,60 0,60"></polygon></svg></div>
+      <div class="mountain mountain-2"><svg width="180" height="60" viewbox="0 0 180 60"><polygon points="90,0 180,60 0,60"></polygon></svg></div>
+    </div>
+  </div>
+
+</header>
+
+
+  <div class="layout-slide no-print homebanner" data-pp="300"></div>
+  <div class="circlesection">
+    <div class="video-banner container2" data-pp="301"></div>
+    <div class="bg-circle bg-xl bg-circle-blue"></div>
+    <div class="bg-circle bg-xl bg-circle-yellow"></div>
+  </div>
+  <div class="circlesection2">
+    <div class="container">
+      <section class="body-banner" data-pp="302"></section>
+    </div>
+  </div>
+  <!-- <div class="contentwrap">
+    <div class="container ">
+        <div class="extra-box col-sm-12" data-pp="388"></div>
+    </div>
+  </div> -->
+  <div class="verticalhome circlesectioninner">
+  
+    <div class="layout-content">
+      <div class="layout-content-inner inner-page">
+        <div class="sitemenu">
+          <div class="sitemenu-wrap container" data-pp="400"></div>
+        </div>
+        <div class="breadcrumb-wrap container" data-pp="500"></div>
+
+        <div class="content  container">
+          <section class="page-content-box col-sm-3" data-pp="901"></section>
+          <section class="page-content-box col-sm-6" data-pp="902"></section>
+          <section class="page-content-box col-sm-3" data-pp="903"></section>
+        </div>
+
+        <div class="row  container">
+          <aside class="layout-content-box aside leftCol col-sm-3" data-pp="904"></aside>
+          <aside class="layout-content-box aside rightCol col-sm-9" data-pp="905"></aside>
+        </div>
+
+        <div class="row container">
+          <section class="layout-content-box left-column col-sm-9">
+            <div class="extra " data-pp="600"></div>
+                        <div class="extra sitemenu-wrap2" data-pp="700">
+<div data-subpart-id="6a5d6aff5921783cd5e89fa5">
+<div class="film-hero">
+<div class="film-hero-image"><img alt="登陸你的星球" src="/uploads/asset/data/6a56f8f05921783cd690e037/cover__3_.png" title="登陸你的星球"></div>
+
+<div class="film-hero-content">
+<p>有些謎題沒有標準答案，卻值得我們勇敢靠近。 讓我們帶著好奇與想像力，探索 神秘物件、傾聽獨特聲音，也試著理解看不見的情緒。在未知的星球上，每一次理解，都是珍貴的發現。</p>
+</div>
+</div>
+<style type="text/css">/* ==========================================================
+   Film Hero Banner
+   ========================================================== */
+
+.film-hero{
+    position:relative;
+    overflow:hidden;
+
+    margin:2em 0;
+
+    border-radius:1.5em;
+
+    background:#000;
+
+    box-shadow:0 .5em 1.5em rgba(0,0,0,.12);
+}
+
+/* =========================
+   圖片
+   ========================= */
+
+.film-hero-image{
+    overflow:hidden;
+}
+
+.film-hero-image img{
+    display:block;
+    width:100%;
+    height:auto;
+
+    transition:
+        transform .8s ease,
+        filter .35s ease;
+}
+
+/* =========================
+   文字覆蓋
+   ========================= */
+
+.film-hero-content{
+
+    position:absolute;
+
+    left:0;
+    right:0;
+    bottom:0;
+
+    display:flex;
+    justify-content:center;
+    align-items:flex-end;
+
+    padding:2.5em 2em;
+
+    box-sizing:border-box;
+
+    background:linear-gradient(
+        to top,
+        rgba(0,0,0,.85) 0%,
+        rgba(0,0,0,.72) 38%,
+        rgba(0,0,0,.42) 70%,
+        rgba(0,0,0,0) 100%
+    );
+
+    backdrop-filter:blur(2px);
+
+    transition:
+        background .35s ease,
+        backdrop-filter .35s ease;
+}
+
+/* =========================
+   文字內容
+   ========================= */
+
+.film-hero-content p{
+
+    width:100%;
+    max-width:900px;
+
+    margin:0 auto;
+
+    color:rgba(255,255,255,.94);
+
+    font-size:1.06rem;
+    line-height:2;
+
+    text-align:justify;
+    text-justify:inter-ideograph;
+
+    letter-spacing:.03em;
+
+    text-shadow:
+        0 2px 6px rgba(0,0,0,.75);
+
+    transition:
+        color .35s ease,
+        text-shadow .35s ease;
+}
+
+/* =========================
+   Hover
+   ========================= */
+
+.film-hero:hover .film-hero-content{
+
+    background:linear-gradient(
+        to top,
+        rgba(0,0,0,.96) 0%,
+        rgba(0,0,0,.90) 42%,
+        rgba(0,0,0,.68) 72%,
+        rgba(0,0,0,.15) 100%
+    );
+
+    backdrop-filter:blur(8px);
+
+}
+
+.film-hero:hover .film-hero-content p{
+
+    color:#fff;
+
+    text-shadow:
+        0 0 .3em rgba(255,255,255,.18),
+        0 .2em .75em rgba(0,0,0,.95);
+
+}
+
+.film-hero:hover .film-hero-image img{
+
+    transform:scale(1.03);
+
+}
+
+/* =========================
+   平板
+   ========================= */
+
+@media (max-width:1024px){
+
+    .film-hero-content{
+
+        padding:2em 1.8em;
+
+    }
+
+    .film-hero-content p{
+
+        max-width:760px;
+
+        font-size:1rem;
+        line-height:1.9;
+
+    }
+
+}
+
+/* =========================
+   手機版
+   ========================= */
+
+@media (max-width:768px){
+
+    .film-hero{
+
+        display:flex;
+        flex-direction:column;
+
+        border-radius:1em;
+
+        box-shadow:0 .25em .8em rgba(0,0,0,.08);
+
+    }
+
+    .film-hero-image img{
+
+        transform:none !important;
+
+    }
+
+    .film-hero-content{
+
+        position:static;
+
+        display:block;
+
+        padding:1.6em;
+
+        background:#212121;
+
+        backdrop-filter:none;
+
+    }
+
+    .film-hero-content p{
+
+        max-width:100%;
+
+        font-size:1rem;
+        line-height:1.9;
+
+        color:#fff;
+
+        text-align:justify;
+        text-justify:inter-ideograph;
+
+        text-shadow:none;
+
+    }
+
+    .film-hero:hover .film-hero-content{
+
+        background:#212121;
+
+        backdrop-filter:none;
+
+    }
+
+    .film-hero:hover .film-hero-content p{
+
+        color:#fff;
+
+        text-shadow:none;
+
+    }
+
+}
+</style>
+</div>
+        <script>
+          $(document).ready(function(){
+            $("[data-subpart-id=\"6a5d6aff5921783cd5e89fa7\"] .w-event_news__more").text("更多→");
+          })
+        </script>
+      <div class="w-annc  widget-announcement-20" data-subpart-id="6a5d6aff5921783cd5e89fa7">
+  <div class="w-annc__more-wrap clearfix">
+    <h3 class="w-annc__widget-title">
+      <span></span>
+    </h3>
+  </div>
+  <ul class="w-annc__list  row" data-level="0" data-list="event_news">
+    <li class="w-annc__item  col-md-4" data-category="26 Tiffi 8+" data-tags="['6a54dd27592178712db100d2', '685938495921785eb8888424', '6979f16b592178f06a843879']">
+    <div class="w-annc__img-wrap bullseye">
+      <a href="/zh_tw/26tiffi_p/tiffi26/%E5%A7%8A%E5%A7%8A%E7%9A%84%E9%B1%B7%E9%AD%9A-19185510">
+      <img class="w-annc__img" src="/uploads/event_news/image/6a54e0f0592178712db1030a/thumb_cover.png" alt="event_news image" title="event_news image">
+      <div class="transitionfade"></div>
+      </a>
+    </div>
+    <div class="w-annc__content-wrap card">
+      <div class="w-annc__meta">
+        <span class="w-annc__status-wrap" data-list="statuses" data-level="1"></span>
+        <span class="w-annc__postdate-wrap" date-format="%Y-%m-%d">
+          <i class="fa fa-calendar-o"></i>
+          <span class="w-annc__postdate"> 2026-09-23</span>
+        </span>
+        <span class="w-annc__category-wrap">
+          <i class="fa fa-tasks"></i>
+          <span class="w-annc__category">26 Tiffi 8+</span>
+          </span>
+      </div>
+      <h4 class="w-annc__entry-title">
+        <a class="w-annc__title" href="/zh_tw/26tiffi_p/tiffi26/%E5%A7%8A%E5%A7%8A%E7%9A%84%E9%B1%B7%E9%AD%9A-19185510">姊姊的鱷魚</a>
+      </h4>
+      <p class="w-annc__subtitle"><style type="text/css"><!--td {border: 1px solid #cccccc;}br {mso-data-placement:same-cell;}-->
+</style>
+動畫短片｜16 min｜age: 8+<br>
+Lore Mechelaere｜比利時｜2024</p>
+    </div>
+    </li>
+  
+    <li class="w-annc__item  col-md-4" data-category="26 Tiffi 8+" data-tags="['6a54dd27592178712db100d2', '685938495921785eb8888424', '6979f16b592178f06a843879']">
+    <div class="w-annc__img-wrap bullseye">
+      <a href="/zh_tw/26tiffi_p/tiffi26/%E6%88%91%E7%99%BC%E7%8F%BE%E4%BA%86%E4%B8%80%E5%80%8B%E7%9B%92%E5%AD%90-1105830">
+      <img class="w-annc__img" src="/uploads/event_news/image/6a54dfc3592178712c6ac42b/thumb_cover.png" alt="event_news image" title="event_news image">
+      <div class="transitionfade"></div>
+      </a>
+    </div>
+    <div class="w-annc__content-wrap card">
+      <div class="w-annc__meta">
+        <span class="w-annc__status-wrap" data-list="statuses" data-level="1"></span>
+        <span class="w-annc__postdate-wrap" date-format="%Y-%m-%d">
+          <i class="fa fa-calendar-o"></i>
+          <span class="w-annc__postdate"> 2026-09-23</span>
+        </span>
+        <span class="w-annc__category-wrap">
+          <i class="fa fa-tasks"></i>
+          <span class="w-annc__category">26 Tiffi 8+</span>
+          </span>
+      </div>
+      <h4 class="w-annc__entry-title">
+        <a class="w-annc__title" href="/zh_tw/26tiffi_p/tiffi26/%E6%88%91%E7%99%BC%E7%8F%BE%E4%BA%86%E4%B8%80%E5%80%8B%E7%9B%92%E5%AD%90-1105830">我發現了一個盒子</a>
+      </h4>
+      <p class="w-annc__subtitle"><style type="text/css"><!--td {border: 1px solid #cccccc;}br {mso-data-placement:same-cell;}-->
+</style>
+動畫短片｜9 min｜age: 8+<br>
+Éric Montchaud｜法國｜2025</p>
+    </div>
+    </li>
+  
+    <li class="w-annc__item  col-md-4" data-category="26 Tiffi 8+" data-tags="['6a54dd27592178712db100d2', '685938495921785eb8888424', '6979f16b592178f06a843879']">
+    <div class="w-annc__img-wrap bullseye">
+      <a href="/zh_tw/26tiffi_p/tiffi26/%E8%98%BF%E6%8B%89%E7%9A%84%E9%AD%94%E6%B3%95%E9%8B%BC%E7%90%B4-85514939">
+      <img class="w-annc__img" src="/uploads/event_news/image/6a54de88592178712db101a2/thumb_cover.jpg" alt="event_news image" title="event_news image">
+      <div class="transitionfade"></div>
+      </a>
+    </div>
+    <div class="w-annc__content-wrap card">
+      <div class="w-annc__meta">
+        <span class="w-annc__status-wrap" data-list="statuses" data-level="1"></span>
+        <span class="w-annc__postdate-wrap" date-format="%Y-%m-%d">
+          <i class="fa fa-calendar-o"></i>
+          <span class="w-annc__postdate"> 2026-09-23</span>
+        </span>
+        <span class="w-annc__category-wrap">
+          <i class="fa fa-tasks"></i>
+          <span class="w-annc__category">26 Tiffi 8+</span>
+          </span>
+      </div>
+      <h4 class="w-annc__entry-title">
+        <a class="w-annc__title" href="/zh_tw/26tiffi_p/tiffi26/%E8%98%BF%E6%8B%89%E7%9A%84%E9%AD%94%E6%B3%95%E9%8B%BC%E7%90%B4-85514939">蘿拉的魔法鋼琴</a>
+      </h4>
+      <p class="w-annc__subtitle"><style type="text/css"><!--td {border: 1px solid #cccccc;}br {mso-data-placement:same-cell;}-->
+</style>
+動畫短片｜28 min｜age: 8+<br>
+Augusto Zanovello｜法國｜2024</p>
+    </div>
+    </li>
+  </ul>
+
+</div>
+<script>
+	function combineul_6a5d6aff5921783cd5e89fa7(){
+		var parents = $('[data-subpart-id=\"6a5d6aff5921783cd5e89fa7\"] ul.w-annc__list').parent();
+		parents.each(function(i,v){
+			for(var i=1;i<$(v).find('ul.w-annc__list').length;i++)
+				$(v).find('ul.w-annc__list').eq(0).find('>li').eq(-1).after($(v).find('ul.w-annc__list').eq(i).html());
+			var ullength = $(v).find('ul.w-annc__list').length;
+			for(var i = 1;i < ullength;i++)
+				$(v).find('ul.w-annc__list').eq(-1).remove();
+		})
+	};
+	var num;
+	var lilength = $('[data-subpart-id=\"6a5d6aff5921783cd5e89fa7\"] li.w-annc__item').length;
+	function reorganize_6a5d6aff5921783cd5e89fa7(num){
+		combineul_6a5d6aff5921783cd5e89fa7();
+		var parents = $('[data-subpart-id=\"6a5d6aff5921783cd5e89fa7\"] ul.w-annc__list').parent();
+		parents.each(function(i,v){
+			var lilength = $(v).find('li.w-annc__item').length;
+			var ul_length = Math.ceil(lilength/num);
+			for(var ii=1;ii< ul_length;ii++){
+				var clone_ul = $(v).find('ul.w-annc__list').eq(-1).clone();
+				clone_ul.empty();
+				clone_ul.removeClass("active");
+				clone_ul.css("display","");
+				$(v).find('ul.w-annc__list').eq(-1).after(clone_ul.prop("outerHTML"));
+				var lihtml="";
+				if(ii != (ul_length-1)){
+					for(var j=0;j<num;j++){
+						lihtml += $(v).find('li.w-annc__item').eq(ii*num+j).prop("outerHTML");
+					};
+				}else{
+					for(var j=0;j< lilength - num *(ul_length-1) ;j++){
+						lihtml += $(v).find('li.w-annc__item').eq(ii*num+j).prop("outerHTML");
+					};
+				};
+				$(v).find('ul.w-annc__list').eq(-1).html(lihtml);
+			}
+			if(ul_length != 1 )
+				for(var i=0;i< lilength -num ; i++)
+					$(v).find('ul.w-annc__list').eq(0).find("li.w-annc__item").eq(num).remove();
+		})
+		$('[data-subpart-id=\"6a5d6aff5921783cd5e89fa7\"] ul.w-annc__list >li').css('width','calc('+100/num+'% - '+20/20+'em)'); //20px=>li的margin
+		$('[data-subpart-id=\"6a5d6aff5921783cd5e89fa7\"] ul.w-annc__list >li').css("float","left");
+	};
+	$(window).resize(function(){
+		if($(window).width()>1024){
+			reorganize_6a5d6aff5921783cd5e89fa7(3);
+			num=3;
+		}else if($(window).width()>576){
+			reorganize_6a5d6aff5921783cd5e89fa7(2);
+			num=2;
+		}else{
+			reorganize_6a5d6aff5921783cd5e89fa7(1);
+			num=1;
+		}
+	})
+	$(document).ready(function(){
+		if($(window).width()>1024){
+			reorganize_6a5d6aff5921783cd5e89fa7(3);
+			num=3;
+		}else if($(window).width()>576){
+			reorganize_6a5d6aff5921783cd5e89fa7(2);
+			num=2;
+		}else{
+			reorganize_6a5d6aff5921783cd5e89fa7(1);
+			num=1;
+		}
+	})
+</script>
+<style>
+
+</style>
+
+      <script>
+        $("[data-subpart-id=\"6a5d6aff5921783cd5e89fa7\"] .w-event_news__more").attr("href","/zh_tw/sections/films?category%5B%5D=6a4c6a29592178392279003b&category%5B%5D=6a4c62a1592178392278feb2&category%5B%5D=6a4c6a3e592178392279004f&category%5B%5D=6a4c65e1592178392278ff55&tags%5B%5D=6a54dd27592178712db100d2");
+      </script>
+      </div>
+            <main id="main-content" class="main-content" data-content="true"><div class="view_count pull-right">
+	<i class="fa fa-eye">瀏覽人次:</i>
+	<span class="view-count">847</span>
+</div>
+<style>
+    h3.page-module-title br {
+        display: none;
+    }
+</style>
+<h3 class="page-module-title">登陸你的星球</h3>
+
+
+<p style="display:none;">有些謎題沒有標準答案，卻值得我們勇敢靠近。 讓我們帶著好奇與想像力，探索 神秘物件、傾聽獨特聲音，也試著理解看不見的情緒。在未知的星球上，每一次理解，都是珍貴的發現。<img alt="登陸你的星球" src="/uploads/asset/data/6a56f8f05921783cd690e037/cover__3_.png" title="登陸你的星球"></p>
+
+
+</main>
+            <div class="box-social-share no-print"></div>
+
+          </section>
+          <aside class="layout-content-box aside right-column col-sm-3" data-pp="906"></aside>
+        </div>
+
+        <div class="row container">
+          <section class="page-content-box " data-pp="907"><div data-subpart-id="6a5d6aff5921783cd5e89fa3">
+<div class="flexcenter box-btn-more">
+<a class="btn-schedule me-3" href="/zh_tw/26tiffi_p/tiffischedule26" title="場次表(在本視窗開啟)"><svg fill="none" height="37" viewbox="0 0 124 37" width="124" xmlns="http://www.w3.org/2000/svg"> <path d="M5.79747 8.36842L21.7468 1H103.772L118.203 8.36842L122 18.193L116.684 29.8596L101.494 36H21.7468L5.79747 28.0175L2 18.193L5.79747 8.36842Z" fill="white" stroke="#EF7D1B" stroke-width="2"></path> </svg> <b>場次表 <i class="fa-solid fa-arrow-right"></i> </b> </a> <a class="btn-more-films" href="/zh_tw/26tiffi_p/tiffi26" title="影片總覽(在本視窗開啟)"> <svg fill="none" height="37" viewbox="0 0 124 37" width="124" xmlns="http://www.w3.org/2000/svg"> <path d="M5.79747 8.36842L21.7468 1H103.772L118.203 8.36842L122 18.193L116.684 29.8596L101.494 36H21.7468L5.79747 28.0175L2 18.193L5.79747 8.36842Z" fill="white" stroke="#EF7D1B" stroke-width="2"></path> </svg> <b>影片總覽 <i class="fa-solid fa-arrow-right"></i> </b></a>
+</div>
+</div></section>
+          <section class="page-content-box col-sm-6" data-pp="908"></section>
+          <section class="page-content-box col-sm-6" data-pp="909"></section>
+          <section class="page-content-box col-sm-7" data-pp="910"></section>
+          <section class="page-content-box col-sm-5" data-pp="911"></section>
+          <section class="page-content-box col-sm-5" data-pp="912"></section>
+          <section class="page-content-box col-sm-7" data-pp="913"></section>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="extra-box zero col-sm-12" data-pp="890"></div>
+
+    <div class="row zero">
+        <section class="layout-content-box zero col-sm-4" data-pp="866"></section>
+        <section class="layout-content-box zero col-sm-4" data-pp="877"></section>
+        <section class="layout-content-box zero col-sm-4" data-pp="855"></section>
+    </div>
+  </div>
+
+    <div class="layout-content-inner inner-page contentwrap circlebg">
+        <div class="container">
+         <div class="extra" data-pp="8000"></div>
+        </div>
+    </div>
+
+    <div class="layout-content-inner inner-page circlesectioninner">
+      <div class="container">
+         <div class="extra" data-pp="8001"></div>
+      </div>
+    </div>
+
+    <div class="layout-content-inner inner-page contentwrap3">
+        <div class="box-units">
+          <svg width="100%" viewbox="0 0 200 50" xmlns="http://www.w3.org/2000/svg">
+            <polygon points="0,50 50,25 100,10 150,25 200,50">
+          </polygon></svg>
+          <div class="unit-bgwrapper "><div class="unit-bg container"></div></div>
+        </div>
+        <div class="container">
+        <div class="extra" data-pp="800"></div>
+        <div class="row ">
+          <section class="layout-content-box col-sm-6" data-pp="886"></section>
+          <section class="layout-content-box col-sm-6" data-pp="887"></section>
+        </div>
+      </div>
+    </div>
+
+
+  <div class="footer-curve"></div>
+  
+
+<footer class="layout-footer no-print">
+  <div class="container layout-footer-inner">
+    <div class="row">
+      <!-- <div class="btn-fatfooter">
+      <div class="btn  close" name="展開選單/OPEN" type="button"><i class="dropdown-toggle-icon level-1 fa fa-chevron-down"></i></div>
+      </div> -->
+      <section class="extra-box col-sm-12" data-pp="23"></section>
+    </div>
+      <div class="layout-footer-content">
+<div class="row">
+<div class="col-sm-4 imgfooter">
+<img alt="台灣國際兒童影展Logo" src="/uploads/asset/data/6740190236737693d3c91a52/logo-ticff-d.svg" style="width: 60%;" title="台灣國際兒童影展Logo">
+<ul class="list-social" style="      font-size: 1.5em;  list-style: none;
+    margin: 0 0 0 6px;
+    padding: 0;
+    display: flex;
+    align-items: center;">
+	<li style="padding-right: 0.5em;"><a href="https://www.facebook.com/TICFF.tw" target="_blank" rel="noopener noreferrer" title="在新視窗開啟 facebook"><i class="fa-brands fa-facebook"></i></a></li>
+	<li style="padding-right: 0.5em;"><a href="https://www.instagram.com/ticff.tw/" target="_blank" rel="noopener noreferrer" title="在新視窗開啟 Instagram"><i class="fa-brands fa-instagram"></i></a></li>
+	<li style="padding-right: 0.5em;"><a href="https://www.youtube.com/c/%E5%8F%B0%E7%81%A3%E5%9C%8B%E9%9A%9B%E5%85%92%E7%AB%A5%E5%BD%B1%E5%B1%95TICFF" target="_blank" rel="noopener noreferrer" title="在新視窗開啟 YouTube頻道"><i class="fa-brands fa-youtube"></i></a></li>
+</ul>
+</div>
+
+<div class="col-sm-4 ">
+<ul class="flexwrap" style="    margin: 0;">
+	<li style="width: 50%;margin-bottom: 1rem;"><a href="/zh_tw/faq" title="在本視窗開啟 常見問答">常見問答</a></li>
+	<li style="width: 50%;margin-bottom: 1rem;"><a href="/zh_tw/service" title="在本視窗開啟 公播服務">公播服務</a></li>
+	<li style="width: 50%;margin-bottom: 1rem;"><a href="/zh_tw/events" title="在本視窗開啟 2024年度活動">年度活動</a></li>
+	<li style="width: 50%;margin-bottom: 1rem;"><a href="https://events.pts.org.tw/dreamer12/" target="_blank" rel="noopener noreferrer" title="在新視窗開啟 小導演大夢想">小導演大夢想</a></li>
+	<li style="width: 50%;margin-bottom: 1rem;"><a href="/zh_tw/privacy" title="在本視窗開啟 隱私權政策">隱私權政策</a></li>
+</ul>
+</div>
+
+<div class="col-sm-4 ">
+<ul>
+	<li>聯絡我們</li>
+	<li>財團法人公共電視文化事業基金會</li>
+	<li>客服專線：02-2633-2000</li>
+	<li>114 台北市內湖區康寧路三段75巷50號</li>
+	<li>Email：ticff@mail.pts.org.tw</li>
+</ul>
+</div>
+
+<hr style="    width: 120px;
+    margin: 2rem auto;">
+<div class="col-sm-12" style="    text-align: center;">Public Television Service Foundation. All Rights Reserved.</div>
+</div>
+</div>
+      <div class="footer-counter">
+<a href="https://ruling.digital/"><img src="/assets/ruling_logo.png" alt="奧博科技"></a>造訪人次 : 3452854</div>
+      <div class="footer-updated-date"></div>
+  </div>
+</footer>
+
+
+</body>
+</html>

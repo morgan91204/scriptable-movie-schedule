@@ -1,0 +1,7 @@
+01.html 200 115159 https://twtiaf.com/2026/film.php?id=103
+02.html 200 112544 https://twtiaf.com/2026/film.php?id=2
+03.html 200 49905 https://www.ticff.org.tw/zh_tw/26tiffi_p/tiffi26/26tiffi_teen/%E5%A5%A7%E5%88%A9%E7%B6%AD%E4%BA%9E%E7%9A%84%E5%8B%87%E6%B0%A3%E5%8A%87%E6%9C%AC-9855296
+04.html 200 40379 https://www.ticff.org.tw/zh_tw/26tiffi_p/26tiffi_program/26tiffi_8
+05.html 200 48680 https://www.ticff.org.tw/zh_tw/26/26film/%E5%AF%AB%E7%B5%A6%E8%87%AA%E5%B7%B1%E7%9A%84%E9%82%A3%E6%9C%AC%E6%9B%B8-48450723
+06.html 200 68074 https://2026tihrff.kktix.cc/events/taipei26
+07.html 200 317425 https://www.taipeiff.taipei/tw/movies/69F4D9c5D81A
