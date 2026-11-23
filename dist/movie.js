@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.24-0254
+// @movie-schedule-app 電影行程 v2026.11.24-0302
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/parsers.gen.ts
@@ -4013,14 +4013,14 @@ var App = class {
   }
   /** 最新版本是多少。網頁版問的是自己網站現在上線的版本（重新整理就會拿到的那一版），不是 GitHub 上的 */
   checkVersion() {
-    if (true) return checkLatest("2026.11.24-0254");
+    if (true) return checkLatest("2026.11.24-0302");
     return (async () => {
       try {
         const r = await globalThis.fetch("/api/version?t=" + Date.now(), { cache: "no-store" });
         const latest = String((await r.json()).version || "");
         if (!latest) return null;
         const num = (v) => Number(v.replace(/\D/g, "")) || 0;
-        return { latest, isLatest: num("2026.11.24-0254") >= num(latest) };
+        return { latest, isLatest: num("2026.11.24-0302") >= num(latest) };
       } catch (_) {
         return null;
       }
@@ -4112,14 +4112,7 @@ var App = class {
     const favMovies = this.settings.favMovies || [];
     const favIssuers = this.settings.favIssuers || [];
     const favRows = this.favMovOpen && favMovies.length ? await favMovieRows(this.settings).catch(() => []) : [];
-    const openFav = (r) => {
-      const t = r.target;
-      if (t.kind === "movie") this.go(() => this.movieView(t.m, ""), `讀取《${t.m.title}》的放映影城…`);
-      else if (t.kind === "soon") this.go(() => this.soonMovieView(t.u), `讀取《${t.u.title}》…`);
-      else if (t.kind === "fest") this.go(() => this.festivalFilmView(t.f, t.film));
-      else if (t.kind === "box") this.go(() => this.boxMovieView(t.x), `讀取《${t.x.name}》…`);
-      else this.go(() => this.favMovieView(r.fav), `讀取《${r.fav.title}》…`);
-    };
+    const openFav = (r) => this.openFavRow(r);
     return /* @__PURE__ */ h(Page, { title: "🎬 電影行程", subtitle: `${this.cinemas.length} 間影城｜選影城 → 日期 → 電影 → 場次` }, /* @__PURE__ */ h(Section, null, /* @__PURE__ */ h(Item, { icon: "🕘", title: "現在有什麼可以看", subtitle: "依時段找收藏、附近或各縣市的場次", onTap: () => this.go(() => this.nowView()) }), /* @__PURE__ */ h(Item, { icon: "🎞️", title: "依電影找場次", subtitle: "先選電影，再看哪些影城有放映", onTap: () => this.go(() => this.movieListView(), "讀取電影清單…") }), /* @__PURE__ */ h(Item, { icon: "🧭", title: "附近的影城", subtitle: "依目前位置排序", onTap: () => this.go(() => this.nearbyView(), "取得目前位置…") }), /* @__PURE__ */ h(Item, { icon: "🎦", title: "依縣市找影院", subtitle: `全台 ${this.cinemas.length} 間，也可以搜尋影城`, onTap: () => this.go(() => this.citiesView()) })), favs.length ? /* @__PURE__ */ h(Section, { hint: this.favOpen ? "在影城頁可以收藏或取消收藏影城。" : "" }, /* @__PURE__ */ h(Item, { head: true, icon: "★", title: `收藏影城（${favs.length} 間）`, subtitle: this.favOpen ? "點一下收合" : "點一下展開", chevron: false, onTap: () => {
       this.favOpen = !this.favOpen;
     }, action: { label: this.favOpen ? "▾" : "▸", hint: this.favOpen ? "收合收藏影城" : "展開收藏影城", onTap: () => {
@@ -4162,8 +4155,53 @@ var App = class {
     const note = state === "on" ? on.length ? on.length > 3 ? `${on.slice(0, 3).join("、")}等 ${on.length} 種` : on.join("、") : "每一種通知都關著" : state === "needs-install" ? "要先把電影行程加到主畫面" : state === "unsupported" ? "這個瀏覽器不支援" : state === "denied" ? "系統設定裡沒有允許通知" : "開放場次、上映、快下檔、影展開始時通知你";
     return /* @__PURE__ */ h(Section, { title: "通知" }, /* @__PURE__ */ h(Item, { icon: state === "on" ? "🔔" : "🔕", title: "收藏電影通知", subtitle: note, right: state === "on" ? "已開啟" : "未開啟", onTap: () => this.go(() => this.notifyView()) }));
   }
+  /** 收藏的一部片：依它現在的狀態開對的頁面（有場次的電影頁、即將上映、影展片、票房資訊） */
+  openFavRow(r) {
+    const t = r.target;
+    if (t.kind === "movie") this.go(() => this.movieView(t.m, ""), `讀取《${t.m.title}》的放映影城…`);
+    else if (t.kind === "soon") this.go(() => this.soonMovieView(t.u), `讀取《${t.u.title}》…`);
+    else if (t.kind === "fest") this.go(() => this.festivalFilmView(t.f, t.film));
+    else if (t.kind === "box") this.go(() => this.boxMovieView(t.x), `讀取《${t.x.name}》…`);
+    else this.go(() => this.favMovieView(r.fav), `讀取《${r.fav.title}》…`);
+  }
+  /** 最近的通知：這台裝置收過的（存在裝置上，最多 50 則、30 天），新的在前；點了開那部片 */
+  async notifyLogView() {
+    const p = this.push();
+    const list = p && p.log ? await p.log().catch(() => []) : [];
+    const favs = this.settings.favMovies || [];
+    const today = todayTPE();
+    const when = (at) => {
+      const d = new Date(at + 8 * 36e5), day = d.toISOString().slice(0, 10), hm = d.toISOString().slice(11, 16);
+      return day === today ? `今天 ${hm}` : `${Number(day.slice(5, 7))}/${Number(day.slice(8, 10))} ${hm}`;
+    };
+    const open = async (e) => {
+      const kind = e.tag.split(":")[0], key = e.tag.slice(kind.length + 1);
+      if (kind === "week") {
+        this.movieMode = "soon";
+        return this.switchTab("movies");
+      }
+      if (kind === "flist") {
+        this.movieMode = "fest";
+        return this.switchTab("movies");
+      }
+      const fav = favs.find((f) => f.key === key);
+      if (!fav) return void await this.ui.toast(kind === "test" ? "這是測試通知" : "這部片已經不在收藏裡了");
+      const row = (await favMovieRows(this.settings).catch(() => [])).find((r) => r.fav.key === key);
+      if (row) this.openFavRow(row);
+      else this.go(() => this.favMovieView(fav), `讀取《${fav.title}》…`);
+    };
+    return /* @__PURE__ */ h(Page, { title: "最近的通知", subtitle: list.length ? `${list.length} 則` : "", onBack: () => this.back() }, list.length ? /* @__PURE__ */ h(Section, { hint: "只保留這台裝置最近 30 天收到的通知（最多 50 則），存在裝置上、不會傳到伺服器。" }, list.map((e) => {
+      const fav = favs.find((f) => f.key === e.tag.slice(e.tag.indexOf(":") + 1));
+      return /* @__PURE__ */ h(Item, { thumb: fav ? { src: fav.poster ? posterSrc(fav.poster) : "", url: fav.poster } : void 0, icon: fav ? void 0 : e.tag.startsWith("week") ? "🗓" : e.tag.startsWith("flist") ? "🎪" : "🔔", title: e.title, subtitle: [e.body, when(e.at)].filter(Boolean).join("\n"), onTap: () => open(e) });
+    }), /* @__PURE__ */ h(Item, { icon: "🗑", title: "清除紀錄", chevron: false, onTap: async () => {
+      await p.clearLog();
+      await this.ui.toast("已清除");
+    } })) : /* @__PURE__ */ h(Empty, { icon: "🔔", text: "還沒有收到通知。之後收到的會列在這裡。" }));
+  }
   async notifyView() {
-    return /* @__PURE__ */ h(Page, { title: "收藏電影通知", onBack: () => this.back() }, await this.notifySection());
+    const p = this.push();
+    const logCount = p && p.log && p.state() === "on" ? (await p.log().catch(() => [])).length : -1;
+    return /* @__PURE__ */ h(Page, { title: "收藏電影通知", onBack: () => this.back() }, logCount >= 0 ? /* @__PURE__ */ h(Section, null, /* @__PURE__ */ h(Item, { icon: "🕘", title: "最近的通知", right: logCount ? `${logCount} 則` : "還沒有", onTap: () => this.go(() => this.notifyLogView()) })) : null, await this.notifySection());
   }
   async notifySection() {
     const p = this.push();
@@ -4236,11 +4274,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.24-0254"}`);
+          Pasteboard.copy(`版本 ${"2026.11.24-0302"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.24-0254"}`,
+      `版本 ${"2026.11.24-0302"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -4585,7 +4623,7 @@ var App = class {
     if (false) {
       if (!r) return /* @__PURE__ */ h(Note, { text: "（無法確認是否為最新版：連不到網站）" });
       if (r.isLatest) return /* @__PURE__ */ h(Note, { text: "✅ 已是最新版" });
-      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.24-0254"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
+      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.24-0302"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
         globalThis.location.reload();
       } }));
     }

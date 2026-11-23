@@ -2,9 +2,33 @@
 // 不快取網頁、不攔截連線，所以不會影響網站更新。
 self.addEventListener("install", () => self.skipWaiting());
 self.addEventListener("activate", (e) => e.waitUntil(self.clients.claim()));
+// 通知紀錄：存在這台裝置的瀏覽器資料庫裡（不傳到伺服器），最多 50 則、30 天
+function logDB() {
+  return new Promise((ok, no) => {
+    const q = indexedDB.open("notify-log", 1);
+    q.onupgradeneeded = () => q.result.createObjectStore("log", { keyPath: "at" });
+    q.onsuccess = () => ok(q.result);
+    q.onerror = () => no(q.error);
+  });
+}
+async function logAdd(d) {
+  try {
+    const db = await logDB();
+    await new Promise((ok) => {
+      const tx = db.transaction("log", "readwrite"), st = tx.objectStore("log");
+      st.put({ at: Date.now(), title: String(d.title || ""), body: String(d.body || ""), tag: String(d.tag || ""), url: String(d.url || "/") });
+      // 舊的清掉：超過 30 天的，或超過 50 則的
+      const all = st.getAllKeys();
+      all.onsuccess = () => { const keys = all.result || [], old = Date.now() - 30 * 864e5; keys.forEach((k, i) => { if (k < old || i < keys.length - 50) st.delete(k); }); };
+      tx.oncomplete = tx.onerror = tx.onabort = () => ok();
+    });
+    db.close();
+  } catch (_) { /* 記不了就算了，通知照樣顯示 */ }
+}
 self.addEventListener("push", (e) => {
   let d = {};
   try { d = e.data ? e.data.json() : {}; } catch (_) {}
+  e.waitUntil(logAdd(d));
   e.waitUntil(self.registration.showNotification(d.title || "電影行程", {
     body: d.body || "",
     tag: d.tag || undefined,

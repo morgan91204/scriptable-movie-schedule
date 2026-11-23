@@ -215,6 +215,14 @@ const standalone = () => (window.matchMedia && window.matchMedia("(display-mode:
 const keyBytes = (s: string) => Uint8Array.from(atob(s.replace(/-/g, "+").replace(/_/g, "/")), (c) => c.charCodeAt(0));
 const post = (path: string, body: unknown) => fetch(path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }).then((r) => r.json());
 let pushState = "off";
+function logDB(): Promise<IDBDatabase> {
+  return new Promise((ok, no) => {
+    const q = indexedDB.open("notify-log", 1);
+    q.onupgradeneeded = () => q.result.createObjectStore("log", { keyPath: "at" });
+    q.onsuccess = () => ok(q.result);
+    q.onerror = () => no(q.error);
+  });
+}
 async function currentSub(): Promise<PushSubscription | null> {
   const reg = await navigator.serviceWorker.getRegistration("/");
   return reg ? reg.pushManager.getSubscription() : null;
@@ -255,6 +263,18 @@ g.__push = {
       await sub.unsubscribe().catch(() => false);
     }
     return (pushState = "off");
+  },
+  /** 這台裝置收過的通知（背景程式 sw.js 收到時記下來的），新的在前 */
+  async log(): Promise<{ at: number; title: string; body: string; tag: string; url: string }[]> {
+    try {
+      const db = await logDB();
+      const list = await new Promise<any[]>((ok) => { const q = db.transaction("log").objectStore("log").getAll(); q.onsuccess = () => ok(q.result || []); q.onerror = () => ok([]); });
+      db.close();
+      return list.sort((a, b) => b.at - a.at);
+    } catch (_) { return []; }
+  },
+  async clearLog(): Promise<void> {
+    try { const db = await logDB(); await new Promise<void>((ok) => { const tx = db.transaction("log", "readwrite"); tx.objectStore("log").clear(); tx.oncomplete = tx.onerror = () => ok(); }); db.close(); } catch (_) {}
   },
   async test(): Promise<boolean> {
     const sub = pushOK() ? await currentSub() : null;

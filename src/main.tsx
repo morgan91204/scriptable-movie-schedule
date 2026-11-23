@@ -204,14 +204,7 @@ class App {
     const favMovies = this.settings.favMovies || [];
     const favIssuers = this.settings.favIssuers || [];
     const favRows = this.favMovOpen && favMovies.length ? await favMovieRows(this.settings).catch(() => [] as FavRow[]) : [];
-    const openFav = (r: FavRow) => {
-      const t = r.target;
-      if (t.kind === "movie") this.go(() => this.movieView(t.m, ""), `讀取《${t.m.title}》的放映影城…`);
-      else if (t.kind === "soon") this.go(() => this.soonMovieView(t.u), `讀取《${t.u.title}》…`);
-      else if (t.kind === "fest") this.go(() => this.festivalFilmView(t.f, t.film));
-      else if (t.kind === "box") this.go(() => this.boxMovieView(t.x), `讀取《${t.x.name}》…`);
-      else this.go(() => this.favMovieView(r.fav), `讀取《${r.fav.title}》…`);
-    };
+    const openFav = (r: FavRow) => this.openFavRow(r);
     return (
       <Page title="🎬 電影行程" subtitle={`${this.cinemas.length} 間影城｜選影城 → 日期 → 電影 → 場次`}>
         <Section>
@@ -280,9 +273,58 @@ class App {
       </Section>
     );
   }
+  /** 收藏的一部片：依它現在的狀態開對的頁面（有場次的電影頁、即將上映、影展片、票房資訊） */
+  openFavRow(r: FavRow) {
+    const t = r.target;
+    if (t.kind === "movie") this.go(() => this.movieView(t.m, ""), `讀取《${t.m.title}》的放映影城…`);
+    else if (t.kind === "soon") this.go(() => this.soonMovieView(t.u), `讀取《${t.u.title}》…`);
+    else if (t.kind === "fest") this.go(() => this.festivalFilmView(t.f, t.film));
+    else if (t.kind === "box") this.go(() => this.boxMovieView(t.x), `讀取《${t.x.name}》…`);
+    else this.go(() => this.favMovieView(r.fav), `讀取《${r.fav.title}》…`);
+  }
+  /** 最近的通知：這台裝置收過的（存在裝置上，最多 50 則、30 天），新的在前；點了開那部片 */
+  async notifyLogView(): Promise<string> {
+    const p = this.push();
+    const list: { at: number; title: string; body: string; tag: string; url: string }[] = p && p.log ? await p.log().catch(() => []) : [];
+    const favs = this.settings.favMovies || [];
+    const today = todayTPE();
+    const when = (at: number) => {
+      const d = new Date(at + 8 * 3600e3), day = d.toISOString().slice(0, 10), hm = d.toISOString().slice(11, 16);
+      return day === today ? `今天 ${hm}` : `${Number(day.slice(5, 7))}/${Number(day.slice(8, 10))} ${hm}`;
+    };
+    const open = async (e: { tag: string }) => {
+      const kind = e.tag.split(":")[0], key = e.tag.slice(kind.length + 1);
+      if (kind === "week") { this.movieMode = "soon"; return this.switchTab("movies"); }
+      if (kind === "flist") { this.movieMode = "fest"; return this.switchTab("movies"); }
+      const fav = favs.find((f) => f.key === key);
+      if (!fav) return void (await this.ui.toast(kind === "test" ? "這是測試通知" : "這部片已經不在收藏裡了"));
+      const row = (await favMovieRows(this.settings).catch(() => [] as FavRow[])).find((r) => r.fav.key === key);
+      if (row) this.openFavRow(row); else this.go(() => this.favMovieView(fav), `讀取《${fav.title}》…`);
+    };
+    return (
+      <Page title="最近的通知" subtitle={list.length ? `${list.length} 則` : ""} onBack={() => this.back()}>
+        {list.length ? (
+          <Section hint="只保留這台裝置最近 30 天收到的通知（最多 50 則），存在裝置上、不會傳到伺服器。">
+            {list.map((e) => {
+              const fav = favs.find((f) => f.key === e.tag.slice(e.tag.indexOf(":") + 1));
+              return <Item thumb={fav ? { src: fav.poster ? posterSrc(fav.poster) : "", url: fav.poster } : undefined} icon={fav ? undefined : e.tag.startsWith("week") ? "🗓" : e.tag.startsWith("flist") ? "🎪" : "🔔"} title={e.title} subtitle={[e.body, when(e.at)].filter(Boolean).join("\n")} onTap={() => open(e)} />;
+            })}
+            <Item icon="🗑" title="清除紀錄" chevron={false} onTap={async () => { await p.clearLog(); await this.ui.toast("已清除"); }} />
+          </Section>
+        ) : <Empty icon="🔔" text="還沒有收到通知。之後收到的會列在這裡。" />}
+      </Page>
+    );
+  }
   async notifyView(): Promise<string> {
+    const p = this.push();
+    const logCount = p && p.log && p.state() === "on" ? (await p.log().catch(() => [])).length : -1;
     return (
       <Page title="收藏電影通知" onBack={() => this.back()}>
+        {logCount >= 0 ? (
+          <Section>
+            <Item icon="🕘" title="最近的通知" right={logCount ? `${logCount} 則` : "還沒有"} onTap={() => this.go(() => this.notifyLogView())} />
+          </Section>
+        ) : null}
         {await this.notifySection()}
       </Page>
     );
