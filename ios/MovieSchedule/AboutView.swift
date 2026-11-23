@@ -44,7 +44,7 @@ struct AboutView: View {
     ]
     private let others = [
         Source(name: "全國電影票房統計", detail: "國家電影及視聽文化中心開放資料，依政府資料開放授權條款第 1 版使用", url: "https://boxofficetw.tfai.org.tw/"),
-        Source(name: "The Movie Database（TMDB）", detail: "填入自己的金鑰時，用來補片長、海報與預告", url: "https://www.themoviedb.org"),
+        Source(name: "The Movie Database（TMDB）", detail: "部分海報、片長，以及官網沒有劇照的影展片", url: "https://www.themoviedb.org"),
         Source(name: "YouTube", detail: "預告片連結", url: "https://www.youtube.com"),
         Source(name: "IMDb", detail: "電影評分頁連結", url: "https://www.imdb.com"),
         Source(name: "Rotten Tomatoes", detail: "電影評分頁連結", url: "https://www.rottentomatoes.com"),

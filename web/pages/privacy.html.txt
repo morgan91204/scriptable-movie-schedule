@@ -58,7 +58,7 @@ footer a{margin-right:14px}
 <ul>
 <li><strong>位置</strong>：只有在你使用「附近的影城」或選「附近 10 間」時才會取得，用來在裝置上計算與各影城的距離，不會傳到我們的伺服器。</li>
 <li><strong>行事曆</strong>：App 只要求「新增行程」的權限，讀不到你行事曆裡原有的內容。網頁版是下載一個行事曆檔，由你自己打開加入。</li>
-<li><strong>設定</strong>：常去影城、廣告時間、提醒、地圖偏好，以及你自行填入的 TMDB 金鑰，都只存在裝置上（網頁版存在瀏覽器的本機儲存空間）。</li>
+<li><strong>設定</strong>：常去影城、廣告時間、提醒、地圖偏好，都只存在裝置上（網頁版存在瀏覽器的本機儲存空間）。</li>
 <li><strong>快取</strong>：場次、海報等資料會暫存在裝置上以加快顯示。刪除 App，或清除瀏覽器的網站資料，就會一併清除。</li>
 </ul>
 
@@ -66,7 +66,7 @@ footer a{margin-right:14px}
 <p>我們不使用 Cookie，沒有放任何廣告，也沒有使用流量分析或追蹤工具。</p>
 <p>網頁版會用到瀏覽器的「本機儲存空間」（localStorage、sessionStorage）。它和 Cookie 一樣是存在你瀏覽器裡的資料，但只有這個網站自己讀得到，不會隨著連線自動送出，也不會用來追蹤你。存的東西只有讓功能運作所需要的：</p>
 <ul>
-<li><strong>設定</strong>：常去影城、廣告時間、提醒、地圖偏好，以及你自行填入的 TMDB 金鑰。</li>
+<li><strong>設定</strong>：常去影城、廣告時間、提醒、地圖偏好。</li>
 <li><strong>快取</strong>：查過的場次、電影資料與海報網址，用來加快顯示；會自動過期、空間不夠時自動清掉。</li>
 <li><strong>評分用的匿名代號與你評過的分數</strong>：讓評分一台裝置只算一票，並在畫面上顯示你給過的分數。</li>
 <li><strong>版本記號</strong>：網站更新後自動重新載入一次用的，關掉分頁就消失。</li>
@@ -79,7 +79,7 @@ footer a{margin-right:14px}
 <li>場次通（twshowtimes.com）、開眼電影網（atmovies.com.tw）與各影城官網：場次、片長、海報</li>
 <li>GitHub（raw.githubusercontent.com）：我們整理好的電影資料、場次、票房排行、即將上映片單、影展場次、觀眾評分統計</li>
 <li>IMDb、爛番茄：電影評分</li>
-<li>The Movie Database（TMDB）：部分海報圖片放在 TMDB 的圖片伺服器；查詢電影資料則只有在你填入自己的 TMDB 金鑰時才會連線</li>
+<li>The Movie Database（TMDB）：部分海報圖片放在 TMDB 的圖片伺服器</li>
 <li>海報與劇照圖片：畫面上的圖片由你的裝置直接向圖片所在的網站下載（TMDB、IMDb、開眼電影網、YouTube，以及各影展官網）</li>
 <li>YouTube：尋找與開啟預告片</li>
 </ul>

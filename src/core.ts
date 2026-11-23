@@ -1343,8 +1343,17 @@ async function ytTrailer(title: string, en?: string): Promise<{ key: string; nam
 
 /** 沒有片長的電影，從 TMDB 補上（會標記 runtimeFrom）；沒設定 Token 或查詢失敗就原樣回傳 */
 export async function fillRuntimes<T extends { title: string; runtime: number; runtimeFrom?: string }>(movies: T[]): Promise<T[]> {
+  if (!movies.some((m) => !m.runtime)) return movies;
+  // 先用伺服器查好的片長（伺服器每小時統一用 TMDB、開眼查，大家共用，不用各自設定金鑰）
+  const meta = await loadMeta().catch(() => null);
+  if (meta) for (const m of movies) {
+    if (m.runtime) continue;
+    const e = meta.movies[normTitle(m.title)] || meta.movies[normTitle(baseTitle(m.title))];
+    if (e && e.rt) { m.runtime = e.rt; m.runtimeFrom = e.rf || "開眼電影網"; }
+  }
   const todo = movies.filter((m) => !m.runtime);
   if (!todo.length) return movies;
+  // 以前可以在設定填自己的 TMDB 金鑰；設定已經拿掉，還留著金鑰的舊使用者照樣會用到
   const token = ((await loadSettings()).tmdbToken || "").trim();
   if (!token) return movies;
   const queue = todo.slice();

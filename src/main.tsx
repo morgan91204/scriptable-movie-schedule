@@ -232,7 +232,6 @@ class App {
             this.settings.maps = this.settings.maps === "google" ? "apple" : "google";
             saveSettings(this.settings);
           }} />
-          <Item icon="⏱" title="補片長（TMDB）" subtitle={this.settings.tmdbToken ? "已設定：沒有片長的電影會自動補上" : "未設定"} onTap={() => this.go(() => this.tmdbView())} />
         </Section>
         <Section title="關於" hint="連鎖影城的場次來自場次通（twshowtimes.com），感謝場次通的整理；其他來自開眼電影網，以及誠品、光點、樂聲官網。實際場次以影城公告為準。">
           {IS_WEB && !this.isStandalone() ? <Item icon="📲" title="加到主畫面" subtitle="像 App 一樣從主畫面開啟，看圖示教學" onTap={() => this.go(() => this.installView())} /> : null}
@@ -333,51 +332,6 @@ class App {
             />
           ))}
         </Section>
-      </Page>
-    );
-  }
-
-  tmdbStatus = "";
-  async saveTmdb(raw: string) {
-    const t = extractTmdbKey(raw);
-    if (!t) {
-      this.settings.tmdbToken = "";
-      saveSettings(this.settings);
-      this.tmdbStatus = "已清除，之後沒有片長的電影不會自動補。";
-      return;
-    }
-    try {
-      const r = await tmdbTest(t);
-      this.settings.tmdbToken = t;
-      saveSettings(this.settings);
-      this.tmdbStatus = `✅ 設定完成（測試：${r}）`;
-    } catch (e) {
-      this.tmdbStatus = `❌ ${String((e as Error)?.message || e)}`;
-    }
-  }
-
-  tmdbView(): string {
-    const open = (url: string) => async () => {
-      await Safari.openInApp(url, false); // 在 App 內開網頁，關掉就回到這裡
-    };
-    return (
-      <Page title="補片長（TMDB）" onBack={() => { this.tmdbStatus = ""; this.back(); }}>
-        <Note text="場次通的重映、修復版、演唱會有時沒有片長。設定 TMDB 金鑰後，會自動用片名查片長，也會顯示海報和預告片。免費，金鑰只存在你的手機。" />
-        <Section title="① 註冊並登入 TMDB">
-          <Item icon="👤" title="註冊 TMDB 帳號" subtitle="填完後到信箱點驗證信" accent chevron={false} onTap={open(TMDB_LINKS.signup)} />
-          <Item icon="🔑" title="已經有帳號：登入" accent chevron={false} onTap={open(TMDB_LINKS.login)} />
-        </Section>
-        <Section title="② 申請 API">
-          <Item icon="📝" title="開啟 API 申請頁" subtitle="選 Developer → 同意條款 → 用途填 Personal use（個人使用）、網址可填 https://github.com" accent chevron={false} onTap={open(TMDB_LINKS.request)} />
-          <Item icon="📋" title="開啟 API 金鑰頁" subtitle="複製「API Read Access Token」（eyJ 開頭）或「API Key」（32 碼）都可以" accent chevron={false} onTap={open(TMDB_LINKS.api)} />
-        </Section>
-        <Section title="③ 回到這裡貼上">
-          <Item icon="📥" title="從剪貼簿貼上並測試" subtitle="複製好金鑰後點這裡" accent chevron={false} onTap={() => this.saveTmdb(Pasteboard.paste() || "")} />
-          <input class="field" name="v" value={this.settings.tmdbToken || ""} placeholder="或手動貼上金鑰" />
-        </Section>
-        {this.tmdbStatus ? <Note kind={this.tmdbStatus.startsWith("❌") ? "error" : undefined} text={this.tmdbStatus} /> : null}
-        <Button kind="primary" enter label="儲存並測試" onTap={(v: Record<string, string>) => this.saveTmdb(String(v.v || ""))} />
-        {this.settings.tmdbToken ? <Button kind="danger" label="清除金鑰" onTap={() => this.saveTmdb("")} /> : null}
       </Page>
     );
   }

@@ -1811,6 +1811,16 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     return b ? { key: b.key, name: b.name } : { err: err || "搜尋結果裡沒有確定是這部片預告的影片" };
   }
   async function fillRuntimes(movies) {
+    if (!movies.some((m) => !m.runtime)) return movies;
+    const meta = await loadMeta().catch(() => null);
+    if (meta) for (const m of movies) {
+      if (m.runtime) continue;
+      const e = meta.movies[normTitle(m.title)] || meta.movies[normTitle(baseTitle(m.title))];
+      if (e && e.rt) {
+        m.runtime = e.rt;
+        m.runtimeFrom = e.rf || "開眼電影網";
+      }
+    }
     const todo = movies.filter((m) => !m.runtime);
     if (!todo.length) return movies;
     const token = ((await loadSettings()).tmdbToken || "").trim();
@@ -3234,7 +3244,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   var extra = { boxOffice, filmList, soonList, nowShowing, nowShowingMulti, movieBoard: movieBoard2, festivalBoard, festivalFilm, nearby, patchSettings, fillMovie, formatList };
   var BRIDGE_LEVEL = 2;
   globalThis.MS = {
-    version: "2026.11.23-2316",
+    version: "2026.11.23-2323",
     level: BRIDGE_LEVEL,
     init(saved) {
       cache = saved || {};

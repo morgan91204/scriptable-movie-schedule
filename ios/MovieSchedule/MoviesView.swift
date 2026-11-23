@@ -60,8 +60,10 @@ struct MoviesView: View {
     @ViewBuilder private func row(_ e: SoonEntry) -> some View {
         if let m = e.m {
             NavigationLink { MovieDetailView(movie: m) } label: { rowLabel(e) }.accessibilityIdentifier("soon-row")
+        } else if let u = e.u {
+            NavigationLink { SoonFilmView(film: u) } label: { rowLabel(e) } // 還沒有場次：進簡介頁（海報、評分、預告、上映日）
         } else {
-            rowLabel(e) // 還沒有場次：只列出來，不能點進去找場次
+            rowLabel(e)
         }
     }
 
@@ -90,6 +92,32 @@ struct MoviesView: View {
         } catch {
             if soon.value == nil { soon = .failed(errorText(error)) }
         }
+    }
+}
+
+/// 還沒有場次的即將上映片：海報、評分、預告，加上映日期
+struct SoonFilmView: View {
+    let film: UpcomingFilm
+    @Environment(\.openURL) private var openURL
+
+    var body: some View {
+        let date = film.release.replacingOccurrences(of: "-", with: "/")
+        let info = ["\(date) \((film.approx ?? false) ? "當週" : "")上映", film.rating ?? "", (film.runtime ?? 0) > 0 ? "\(film.runtime ?? 0) 分" : ""].filter { !$0.isEmpty }.joined(separator: "｜")
+        List {
+            Section {
+                MovieHero(title: film.title, en: film.en, lines: [film.en ?? "", info])
+            }
+            CommunitySection(title: film.title)
+            Section {
+                if let s = film.url, let u = URL(string: s) {
+                    Button { openURL(u) } label: { Label("開眼電影網的介紹", systemImage: "safari") }
+                }
+            } footer: {
+                Text("戲院還沒有排這部片的場次。通常上映前一到兩週會開放，到時候這裡會自動變成可以查場次。上映日期可能再調整。")
+            }
+        }
+        .navigationTitle(film.title)
+        .navigationBarTitleDisplayMode(.inline)
     }
 }
 

@@ -217,6 +217,7 @@ struct UpcomingFilm: Codable, Hashable {
     var en: String?
     var poster: String?
     var url: String?
+    var approx: Bool? // 只知道是哪一週上映，日期是大約的
 }
 /// 「即將上映」的一列：m = 已經有場次的片，u = 還沒有場次的片
 struct SoonEntry: Codable, Identifiable {
