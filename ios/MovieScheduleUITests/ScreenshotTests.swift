@@ -91,9 +91,9 @@ final class ScreenshotTests: XCTestCase {
             back()
         }
 
-        // 3. 票房排行
+        // 3. 年度排行（「電影」清單的範圍切到年度）
         app.swipeDown()
-        tap(app.segmentedControls.buttons["票房排行"], "票房排行", timeout: 10)
+        tap(app.segmentedControls.buttons["年度"], "年度排行", timeout: 10)
         shot("boxoffice", wait: 8)
 
         // 4. 影城分頁 → 影城 → 某一天的片單

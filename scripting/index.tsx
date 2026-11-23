@@ -14,9 +14,9 @@ import {
   Cinema, Movie, Settings, Version, TwMovie, TwMovieCinema, CITY_ORDER, TW,
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
   loadSettings, saveSettings, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, cinemaAddress,
-  FORMATS, formatsOf, filterVersions, filterVersionsAny, movieRows, movieDays, nearest, kmLabel, WINDOWS, findShowtimes, findShowtimesMulti, multiLabel, multiDetail, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText, hallOf, tmdbTest, movieExtras, moviePoster, posterReady, posterTint, POSTER_TINTS, normImageUrl, movieRuntime, posterSrc, isLocalSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxCountries, boxByCountry, boxInfo, boxInfoRows, boxCountryText, BOX_COUNTRY_NOTE, boxCountryTag, boxCountriesPicked, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityVote, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, SCRIPTING_IMPORT_URL, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, festivalDefaultDate, festivalStateLabel, festivalState, festivalFooter, linkMovies, nowGroupLine, nowFilter, festivalPick, movieAbout, festivalSearch, festivalSearchLines, festivalTrailer, festivalYears, festivalGroups, festivalChipNote, festivalStatusLine, movieRatings, ratingTier,
+  FORMATS, formatsOf, filterVersions, filterVersionsAny, movieRows, movieDays, nearest, kmLabel, WINDOWS, findShowtimes, findShowtimesMulti, multiLabel, multiDetail, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText, hallOf, tmdbTest, movieExtras, moviePoster, posterReady, posterTint, POSTER_TINTS, normImageUrl, movieRuntime, posterSrc, isLocalSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxCountries, boxByCountry, boxInfo, boxInfoRows, boxCountryText, BOX_COUNTRY_NOTE, boxCountryTag, boxCountriesPicked, movieBoard, loadBoxFor, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityVote, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, SCRIPTING_IMPORT_URL, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, festivalDefaultDate, festivalStateLabel, festivalState, festivalFooter, linkMovies, nowGroupLine, nowFilter, festivalPick, movieAbout, festivalSearch, festivalSearchLines, festivalTrailer, festivalYears, festivalGroups, festivalChipNote, festivalStatusLine, movieRatings, ratingTier,
 } from "./core"
-import type { Format, LatLng, Hit, Community, BoxOfficeItem, BoxSort, Festival, FestivalFilm, FestivalSession } from "./core"
+import type { Format, LatLng, Hit, Community, BoxOfficeItem, BoxSort, BoxOffice, MovieEntry, Festival, FestivalFilm, FestivalSession } from "./core"
 
 declare const Safari: any
 declare const Dialog: any
@@ -957,69 +957,77 @@ function BoxOfficeMoviePage({ item: x }: { item: BoxOfficeItem }) {
   </List>
 }
 
-/** 票房排行（官方開放資料，每週更新）；每一部都可以點：有場次的進電影頁，沒有的進精簡頁 */
+/** 「電影」清單：上映中與票房排行合成一份（範圍、排序、出品國別都在這裡選）。每一部都可以點：有場次的進電影頁，沒有的進精簡頁 */
 function BoxOfficeSections({ movies, query }: { movies: TwMovie[]; query: string }) {
-  const [by, setBy] = useState<string>("week") // 排法：本週／累計／年度
-  // 年度排行的其他年份是另一個檔，切到「年度」才下載
+  const [pickedScope, setScope] = useState<string>("now") // 範圍：上映中／年度（含已下檔）
+  const [pickedSort, setSort] = useState<string>("") // 上映中的排法（空 = 第一種：本週票房）
   const [pickedWeek, setPickedWeek] = useState<string>("") // 週票房看哪一週（空 = 最新）
-  // 過去的週票房也是另一個檔，選了過去的週次才下載
-  const needWeeks = by === "week" && !!pickedWeek
-  const box = useLoad(() => (by === "year" ? loadBoxOfficeFull() : needWeeks ? loadBoxOfficeWeeks() : loadBoxOffice()), [by === "year" ? 1 : needWeeks ? 2 : 0])
-  const b = box.data
-  const sorts = b ? boxSorts(b) : []
-  const sort: BoxSort = sorts.some((x) => x.id === by) ? (by as BoxSort) : "week"
+  // 年度排行的其他年份、過去的週票房各是另一個檔，用到才下載；票房讀不到時清單照樣出來，只是少了依票房排的選項
+  const needWeeks = pickedScope !== "year" && (pickedSort || "week") === "week" && !!pickedWeek
+  const box = useLoad(() => loadBoxFor(pickedScope, pickedSort || "week", pickedWeek).then((b) => ({ b: b as BoxOffice | null }), () => ({ b: null as BoxOffice | null })), [pickedScope === "year" ? 1 : needWeeks ? 2 : 0])
   const [pickedYears, setPickedYears] = useState<string[]>([]) // 年度可以複選（空 = 最新的一年）
   const [yearOpen, setYearOpen] = useState(false)
-  const yearOptions = b ? boxYears(b) : []
-  const years = b ? boxYearsPicked(b, pickedYears) : []
-  const weekOptions = b ? boxWeekOptions(b) : []
-  const week = b ? boxWeekPicked(b, pickedWeek) : { id: "", past: false }
-  const pastWeek = sort === "week" && week.past
-  const match = useMemo(() => boxMatcher(movies), [movies.length])
-  // 搜尋片名：中文片名或對得到的英文片名
-  const everyone = b ? boxOfficeBy(b, sort, years, week.id) : []
-  const countries = boxCountries(everyone) // 這份排行裡有哪些國別（多的在前）
   const [pickedCountry, setPickedCountry] = useState<string[]>([]) // 只看哪幾個出品國別（可以複選；空 = 全部）
   const [countryOpen, setCountryOpen] = useState(false)
-  const country = boxCountriesPicked(countries, pickedCountry)
-  const found = boxByCountry(everyone, country).filter((x) => !query || `${x.name} ${match(x.name)?.en || ""}`.toLowerCase().includes(query))
+  const b = box.data ? box.data.b : null
+  const board = useMemo(
+    () => movieBoard(b, movies, { scope: pickedScope, sort: pickedSort, years: pickedYears, week: pickedWeek, countries: pickedCountry, query }),
+    [b, movies.length, pickedScope, pickedSort, pickedYears.join(","), pickedWeek, pickedCountry.join(","), query])
+  const { years: yearOptions, selYears: years, countries, selCountries: country } = board
   // 年度排行一年有六百部左右、全選是好幾千部：先顯示 100 列，滑到底自動接著載入（不用按）。換了排法、年份或搜尋字就從頭開始
-  const paged = sort === "year"
-  const pageKey = `${sort}|${years.join(",")}|${week.id}|${query}|${country.join(",")}`
+  const paged = board.paged
+  const pageKey = `${board.scope}|${board.sort}|${years.join(",")}|${board.selWeek}|${query}|${country.join(",")}`
   const [page, setPage] = useState<{ key: string; n: number }>({ key: "", n: BOX_PAGE })
   const limit = page.key === pageKey ? page.n : BOX_PAGE
-  const shown = paged ? found.slice(0, limit) : found
-  // 年度排行大多是已下檔的舊片：用輕量查法，而且只查畫面上這一批；畫面先出來，海報好了再補上
-  const films = shown.map((x) => { const m = match(x.name); return { title: m ? m.title : x.name, slug: m?.slug, en: m?.en, light: (paged || pastWeek) && !m, release: x.release } })
-  const thumbOf = useThumbs(films, `${b ? b.list.length : 0}|${movies.length}|${query}|${sort}|${years.join(",")}|${week.id}|${shown.length}`)
-  if (box.error) return <ErrorRow error={box.error} retry={box.reload} />
-  if (!b) return <Section><Loading text={"讀取票房排行…"} /></Section>
+  const shown = paged ? board.entries.slice(0, limit) : board.entries
+  const every = [...shown, ...board.rest]
+  // 已下檔的舊片用輕量查法，而且只查畫面上這一批；畫面先出來，海報好了再補上
+  const films = every.map((e) => ({ title: e.m ? e.m.title : e.name, slug: e.m?.slug, en: e.m?.en, light: e.light, release: e.x ? e.x.release : "" }))
+  const thumbOf = useThumbs(box.data ? films : [], `${b ? b.list.length : 0}|${movies.length}|${pageKey}|${every.length}`)
+  if (!box.data) return <Section><Loading text={"讀取電影清單…"} /></Section>
   const thumbs = films.map(thumbOf)
   const bad = shown.filter((_, i) => thumbs[i].why)
   const failNote = bad.length
-    ? `\n第 ${bad.map((x) => x.rank).join("、")} 名的海報讀不到（${Array.from(new Set(thumbs.map((t) => t.why).filter(Boolean))).join("；")}），下次進來會再試。`
+    ? `\n${bad.slice(0, 8).map((e) => `《${e.name}》`).join("")}${bad.length > 8 ? ` 等 ${bad.length} 部` : ""}的海報讀不到（${Array.from(new Set(thumbs.map((t) => t.why).filter(Boolean))).join("；")}），下次進來會再試。`
     : ""
+  const row = (e: MovieEntry, i: number) => {
+    const body = <HStack spacing={10}>
+      {e.rank === null ? null : <Text font={e.rank >= 1000 ? "caption" : e.rank >= 100 ? "subheadline" : "title3"} fontWeight={"bold"} monospacedDigit foregroundStyle={e.rank <= 3 ? "systemOrange" : "secondaryLabel"} lineLimit={1} minScaleFactor={0.6} frame={{ width: 34 }}>{String(e.rank)}</Text>}
+      {PosterBox({ w: 44, h: 66, r: 6, img: thumbs[i].img, ver: 0, pending: thumbs[i].pending, title: e.name })}
+      <VStack alignment={"leading"} spacing={2}>
+        <Text foregroundStyle={"label"} lineLimit={2}>{e.name}</Text>
+        {/* 兩行說明各自一行不換行，窄螢幕也對得齊 */}
+        {e.lines[0] ? <Text font={"subheadline"} foregroundStyle={"secondaryLabel"} lineLimit={1} minScaleFactor={0.8}>{e.lines[0]}</Text> : null}
+        {e.lines[1] ? <Text font={"caption"} foregroundStyle={"tertiaryLabel"} lineLimit={1} minScaleFactor={0.8}>{e.lines[1]}</Text> : null}
+      </VStack>
+      <Spacer />
+    </HStack>
+    if (e.m) return <NavigationLink key={e.key} destination={<MoviePage movie={e.m} />}>{body}</NavigationLink>
+    if (e.x) return <NavigationLink key={e.key} destination={<BoxOfficeMoviePage item={e.x} />}>{body}</NavigationLink>
+    return body
+  }
   return <>
-  {sorts.length > 1 ? <Section footer={<Text>本週、累計只排上映中的電影；年度包含已經下檔的。</Text>}>
-    <Picker title={"排行"} value={sort} onChanged={(v: string) => setBy(v)} pickerStyle={"segmented"}>
-      {sorts.map((x) => <Text key={x.id} tag={x.id}>{x.label}</Text>)}
-    </Picker>
-  </Section> : null}
-  {sort === "week" && weekOptions.length > 1 ? <Section footer={<Text>可以回頭看過去幾週的排行。</Text>}>
-    <Picker title={"週次"} value={week.id} onChanged={(v: string) => setPickedWeek(v === b.end ? "" : v)}>
-      {weekOptions.map((o) => <Text key={o.id} tag={o.id}>{`${o.label}（${o.note}）`}</Text>)}
-    </Picker>
-  </Section> : null}
+  <Section footer={<Text>{board.scope === "year" ? "年度：那一年上映的電影，已經下檔的也在裡面。" : "上映中：現在查得到場次的電影，可以換排序。"}</Text>}>
+    {board.scopes.length > 1 ? <Picker title={"範圍"} value={board.scope} onChanged={(v: string) => setScope(v)} pickerStyle={"segmented"}>
+      {board.scopes.map((x) => <Text key={x.id} tag={x.id}>{x.id === "year" ? `${x.label}（${x.sub}）` : x.label}</Text>)}
+    </Picker> : null}
+    {board.sorts.length > 1 ? <Picker title={"排序"} value={board.sort} onChanged={(v: string) => setSort(v)}>
+      {board.sorts.map((x) => <Text key={x.id} tag={x.id}>{x.label}</Text>)}
+    </Picker> : null}
+    {board.weeks.length > 1 ? <Picker title={"週次"} value={board.selWeek} onChanged={(v: string) => setPickedWeek(b && v === b.end ? "" : v)}>
+      {board.weeks.map((o) => <Text key={o.id} tag={o.id}>{`${o.label}（${o.note}）`}</Text>)}
+    </Picker> : null}
+  </Section>
   {countries.length > 1 ? multiPick({
     title: "出品國別", open: countryOpen, onOpen: () => setCountryOpen(!countryOpen),
-    summary: country.length ? country.join("、") : `全部（${everyone.length} 部）`,
+    summary: country.length ? country.join("、") : `全部（${board.everyone} 部）`,
     // 第一個選項是「全部」：點了就清掉所有勾選
-    options: [{ id: "", label: `全部（${everyone.length} 部）` }, ...countries.map((c) => ({ id: c.id, label: `${c.id}（${c.count} 部）` }))],
+    options: [{ id: "", label: `全部（${board.everyone} 部）` }, ...countries.map((c) => ({ id: c.id, label: `${c.id}（${c.count} 部）` }))],
     selected: country.length ? country : [""],
     onToggle: (id) => setPickedCountry(!id ? [] : country.indexOf(id) < 0 ? [...country, id] : country.filter((z) => z !== id)),
     footer: BOX_COUNTRY_NOTE,
   }) : null}
-  {sort === "year" && yearOptions.length > 1 ? multiPick({
+  {board.scope === "year" && yearOptions.length > 1 ? multiPick({
     title: "年份", open: yearOpen, onOpen: () => setYearOpen(!yearOpen),
     summary: years.length === yearOptions.length ? `全部（${yearOptions[yearOptions.length - 1]}–${yearOptions[0]}）` : years.join("、"),
     // 第一個選項是「全選」：再點一次回到只看最新的一年
@@ -1028,30 +1036,18 @@ function BoxOfficeSections({ movies, query }: { movies: TwMovie[]; query: string
     onToggle: (y) => setPickedYears(y === "all" ? (years.length === yearOptions.length ? [] : yearOptions.slice()) : years.indexOf(y) < 0 ? [...years, y] : years.length > 1 ? years.filter((z) => z !== y) : years),
     footer: "可以複選，選了幾年就合在一起排。點「全選」一次選完，再點一次回到最新的一年。",
   }) : null}
-  <Section header={<Text>{boxOfficeTitle(b, sort, years, week.id) + boxCountryTag(country)}</Text>} footer={<Text>{`${shown.length ? "" : "排行上找不到相符的電影。\n"}${boxOfficeFooter(b, sort, years, week.id)}${failNote}`}</Text>}>
-    {shown.map((x, i) => {
-      const m = match(x.name)
-      const lines = boxOfficeLines(x, sort, pastWeek)
-      const body = <HStack spacing={10}>
-        <Text font={x.rank >= 1000 ? "caption" : x.rank >= 100 ? "subheadline" : "title3"} fontWeight={"bold"} monospacedDigit foregroundStyle={x.rank <= 3 ? "systemOrange" : "secondaryLabel"} lineLimit={1} minScaleFactor={0.6} frame={{ width: 34 }}>{String(x.rank)}</Text>
-        {PosterBox({ w: 44, h: 66, r: 6, img: thumbs[i].img, ver: 0, pending: thumbs[i].pending, title: x.name })}
-        <VStack alignment={"leading"} spacing={2}>
-          <Text foregroundStyle={"label"} lineLimit={2}>{x.name}</Text>
-          {/* 第一行金額、第二行上映日期與戲院數：各自一行不換行，窄螢幕也對得齊 */}
-          <Text font={"subheadline"} foregroundStyle={"secondaryLabel"} lineLimit={1} minScaleFactor={0.8}>{lines[0]}</Text>
-          {lines[1] ? <Text font={"caption"} foregroundStyle={"tertiaryLabel"} lineLimit={1} minScaleFactor={0.8}>{lines[1]}</Text> : null}
-        </VStack>
-        <Spacer />
-      </HStack>
-      return <NavigationLink key={x.rank} destination={m ? <MoviePage movie={m} /> : <BoxOfficeMoviePage item={x} />}>{body}</NavigationLink>
-    })}
-    {paged && found.length > shown.length
+  <Section header={<Text>{board.title}</Text>} footer={<Text>{`${every.length ? "" : "找不到相符的電影。\n"}${board.footer}${failNote}`}</Text>}>
+    {shown.map(row)}
+    {paged && board.entries.length > shown.length
       // 不用按：滑到這一列就自動接著載入下一批（也可以點）
       ? <Button action={() => setPage({ key: pageKey, n: limit + BOX_PAGE * 2 })}>
-          <Text font={"footnote"} foregroundStyle={"secondaryLabel"} onAppear={() => setPage({ key: pageKey, n: limit + BOX_PAGE * 2 })}>{`載入中…已顯示 ${shown.length}／${found.length} 部`}</Text>
+          <Text font={"footnote"} foregroundStyle={"secondaryLabel"} onAppear={() => setPage({ key: pageKey, n: limit + BOX_PAGE * 2 })}>{`載入中…已顯示 ${shown.length}／${board.entries.length} 部`}</Text>
         </Button>
       : null}
   </Section>
+  {board.rest.length ? <Section header={<Text>{board.restTitle}</Text>} footer={<Text>{board.restFooter}</Text>}>
+    {board.rest.map((e, i) => row(e, shown.length + i))}
+  </Section> : null}
   </>
 }
 
@@ -1198,13 +1194,12 @@ function MoviesPage() {
   const movies = useLoad(() => loadMovies(), [])
   const fests = useLoad(() => loadFestivals(), []) // 有進行中或即將開始的影展，才多出「影展」分類
   const festList = fests.data || []
-  const [mode, setMode] = useState<string>("now")
+  const [mode, setMode] = useState<string>("box") // box = 「電影」清單（上映中與票房排行合成一份）
   const [query, setQuery] = useState("")
   const k = query.trim().toLowerCase()
-  const list = (movies.data || []).filter((m) => (mode === "box" || !!m.comingSoon === (mode === "soon")) && (!k || `${m.title} ${m.en}`.toLowerCase().includes(k)))
-  useEffect(() => { if (movies.data) prefetchPosters(list) }, [movies.data, k, mode]) // 背景先抓海報，進電影頁就不用等
-  const now = list.filter((m) => !m.comingSoon)
-  const soon = list.filter((m) => m.comingSoon)
+  const list = (movies.data || []).filter((m) => m.comingSoon && (!k || `${m.title} ${m.en}`.toLowerCase().includes(k)))
+  useEffect(() => { if (movies.data && mode === "soon") prefetchPosters(list) }, [movies.data, k, mode]) // 背景先抓海報，進電影頁就不用等
+  const soon = list
   const thumbOf = useThumbs(mode === "box" || mode === "fest" ? [] : list, `${(movies.data || []).length}|${k}|${mode}`) // 每一列的小海報
   const row = (m: TwMovie) => {
     const t = thumbOf(m)
@@ -1229,8 +1224,7 @@ function MoviesPage() {
   >
     <Section>
       <Picker title={"顯示"} value={mode} onChanged={(v: string) => setMode(v)} pickerStyle={"segmented"}>
-        <Text tag={"now"}>上映中</Text>
-        <Text tag={"box"}>票房排行</Text>
+        <Text tag={"box"}>電影</Text>
         <Text tag={"soon"}>即將上映</Text>
         {festList.length ? <Text tag={"fest"}>影展</Text> : null}
       </Picker>
@@ -1238,7 +1232,6 @@ function MoviesPage() {
     {mode === "fest" ? <FestivalSections list={festList} query={k} /> : mode === "box" ? <BoxOfficeSections movies={movies.data || []} query={k} /> : <>
       {movies.error ? <ErrorRow error={movies.error} retry={movies.reload} /> : null}
       {!movies.data && !movies.error ? <Section><Loading text={"讀取電影清單…"} /></Section> : null}
-      {now.length ? <Section header={<Text>{`上映中（${now.length}）`}</Text>} footer={<Text>依今天放映的影城數排序；今天沒有場次、過幾天才有的排在最後。資料來自場次通。</Text>}>{now.map(row)}</Section> : null}
       {soon.length ? <Section header={<Text>{`即將上映（${soon.length}）`}</Text>} footer={<Text>還沒上映、但已經可以查到場次的片，依上映日期排序。</Text>}>{soon.map(row)}</Section> : null}
     </>}
   </List>

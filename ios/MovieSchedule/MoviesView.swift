@@ -1,9 +1,9 @@
 import SwiftUI
 
-/// 「電影」分頁：上映中／票房排行
+/// 「電影」分頁：電影（上映中與票房排行合成一份）／即將上映／影展
 struct MoviesView: View {
     @State private var movies: Loadable<[TwMovie]> = .loading
-    @State private var mode = "now"
+    @State private var mode = "box" // box = 「電影」清單
     @State private var hasFestival = false // 有進行中或即將開始的影展
     @State private var query = ""
 
@@ -12,8 +12,7 @@ struct MoviesView: View {
             List {
                 Section {
                     Picker("顯示", selection: $mode) {
-                        Text("上映中").tag("now")
-                        Text("票房排行").tag("box")
+                        Text("電影").tag("box")
                         Text("即將上映").tag("soon")
                         if hasFestival { Text("影展").tag("fest") } // 有進行中或即將開始的影展才出現
                     }
@@ -46,17 +45,7 @@ struct MoviesView: View {
         case .loaded(let all):
             let k = query.trimmingCharacters(in: .whitespaces).lowercased()
             let list = all.filter { k.isEmpty || "\($0.title) \($0.en ?? "")".lowercased().contains(k) }
-            let now = mode == "soon" ? [] : list.filter { !($0.comingSoon ?? false) }
-            let soon = mode == "soon" ? list.filter { $0.comingSoon ?? false } : []
-            if !now.isEmpty {
-                Section {
-                    ForEach(now) { row($0) }
-                } header: {
-                    Text("上映中（\(now.count)）")
-                } footer: {
-                    Text("依今天放映的影城數排序；今天沒有場次、過幾天才有的排在最後。資料來自場次通。")
-                }
-            }
+            let soon = list.filter { $0.comingSoon ?? false }
             if !soon.isEmpty {
                 Section {
                     ForEach(soon) { row($0) }
@@ -97,7 +86,7 @@ struct MoviesView: View {
                 Spacer(minLength: 4)
             }
         }
-        .accessibilityIdentifier("movie-row")
+        .accessibilityIdentifier("soon-row")
     }
 
     private func load() async {
@@ -109,11 +98,12 @@ struct MoviesView: View {
     }
 }
 
-/// 票房排行（官方開放資料，每週更新）
+/// 「電影」清單：上映中與票房排行合成一份（範圍、排序、出品國別都在這裡選）
 struct BoxOfficeSection: View {
     var query: String = ""
-    @State private var board: Loadable<BoxOfficeBoard> = .loading
-    @State private var sort = "week" // 排法：本週／累計／年度
+    @State private var board: Loadable<FilmList> = .loading
+    @State private var scope = "now" // 範圍：上映中／年度（含已下檔）
+    @State private var sort = "" // 上映中的排法（空 = 第一種：本週票房）
     @State private var years: Set<String> = [] // 年度排行選了哪幾年（空 = 最新的一年）
     @State private var limit = 100 // 年度排行目前顯示幾列（一年六百部左右，分批顯示）
     @State private var week = "" // 週票房看哪一週（空 = 最新）
@@ -121,144 +111,184 @@ struct BoxOfficeSection: View {
 
     var body: some View {
         Group {
-            if let sorts = board.value?.sorts, sorts.count > 1 {
-                Section {
-                    Picker("排行", selection: $sort) {
-                        ForEach(sorts) { Text($0.label).tag($0.id) }
-                    }
-                    .pickerStyle(.segmented)
-                } footer: {
-                    Text("本週、累計只排上映中的電影；年度包含已經下檔的。")
-                }
-            }
-            if sort == "week", let options = board.value?.weeks, options.count > 1 {
-                Section {
-                    Picker("週次", selection: Binding(
-                        get: { week.isEmpty ? (options.first?.id ?? "") : week },
-                        set: { week = ($0 == options.first?.id) ? "" : $0 }
-                    )) {
-                        ForEach(options) { Text("\($0.label)（\($0.note)）").tag($0.id) }
-                    }
-                } footer: {
-                    Text("可以回頭看過去幾週的排行。")
-                }
-            }
-            if let lands = board.value?.countries, lands.count > 1 {
-                let picked = board.value?.selCountries ?? []
-                Section {
-                    // 出品國別可以複選：選單點了不會關，可以連續勾
-                    Menu {
-                        Button {
-                            countries = []
-                        } label: {
-                            if picked.isEmpty { Label("全部（\(board.value?.everyone ?? 0) 部）", systemImage: "checkmark") } else { Text("全部（\(board.value?.everyone ?? 0) 部）") }
-                        }
-                        ForEach(lands) { c in
-                            Button {
-                                var next = Set(picked)
-                                if next.contains(c.id) { next.remove(c.id) } else { next.insert(c.id) }
-                                countries = next
-                            } label: {
-                                if picked.contains(c.id) { Label(c.label, systemImage: "checkmark") } else { Text(c.label) }
-                            }
-                        }
-                    } label: {
-                        HStack {
-                            Text("出品國別").foregroundStyle(Color.primary)
-                            Spacer()
-                            Text(picked.isEmpty ? "全部" : picked.joined(separator: "、")).foregroundStyle(.secondary).lineLimit(1)
-                            Image(systemName: "chevron.up.chevron.down").font(.caption).foregroundStyle(.tertiary)
-                        }
-                    }
-                    .menuActionDismissBehavior(.disabled)
-                } footer: {
-                    Text(board.value?.countryNote ?? "全台灣票房，只篩選出品國，可複選。")
-                }
-            }
-            if sort == "year", let options = board.value?.years, options.count > 1 {
-                let picked = board.value?.selYears ?? []
-                Section {
-                    // 年份可以複選：選單點了不會關，可以連續勾
-                    Menu {
-                        // 全選：再點一次回到只看最新的一年
-                        Button {
-                            years = picked.count == options.count ? [] : Set(options)
-                        } label: {
-                            if picked.count == options.count { Label("全選", systemImage: "checkmark") } else { Text("全選") }
-                        }
-                        ForEach(options, id: \.self) { y in
-                            Button {
-                                var next = Set(picked)
-                                if next.contains(y) { if next.count > 1 { next.remove(y) } } else { next.insert(y) }
-                                years = next
-                            } label: {
-                                if picked.contains(y) { Label("\(y) 年", systemImage: "checkmark") } else { Text("\(y) 年") }
-                            }
-                        }
-                    } label: {
-                        HStack {
-                            Text("年份").foregroundStyle(Color.primary)
-                            Spacer()
-                            Text(picked.count == options.count ? "全部（\(options.last ?? "")–\(options.first ?? "")）" : picked.joined(separator: "、")).foregroundStyle(.secondary).lineLimit(1)
-                            Image(systemName: "chevron.up.chevron.down").font(.caption).foregroundStyle(.tertiary)
-                        }
-                    }
-                    .menuActionDismissBehavior(.disabled)
-                } footer: {
-                    Text("可以複選，選了幾年就合在一起排。點「全選」一次選完，再點一次回到最新的一年。")
-                }
-            }
-            switch board {
-            case .loading:
-                Section { LoadingRow(text: "讀取票房排行…") }
-            case .failed(let message):
-                Section { ErrorRow(message: message) { Task { await load() } } }
-            case .loaded(let b):
-                let rows = b.rows // 搜尋與分批都由共用資料層處理
-                Section {
-                    ForEach(rows) { r in
-                        if let m = r.m {
-                            NavigationLink { MovieDetailView(movie: m) } label: { rowLabel(r) }.accessibilityIdentifier("box-row")
-                        } else {
-                            rowLabel(r)
-                        }
-                    }
-                    if let total = b.total, total > rows.count {
-                        // 不用按：滑到這一列就自動接著載入下一批
-                        HStack {
-                            ProgressView()
-                            Text("載入中…已顯示 \(rows.count)／\(total) 部").font(.footnote).foregroundStyle(.secondary)
-                        }
-                        .onAppear { limit = rows.count + 200 }
-                    }
-                } header: {
-                    Text(b.label)
-                } footer: {
-                    Text("\(rows.isEmpty ? "排行上找不到相符的電影。\n" : "")\(b.footer ?? "資料來源：\(b.source)。官方每週更新一次。")")
-                }
-            }
+            pickers
+            countryPicker
+            yearPicker
+            results
         }
-        .task(id: [sort, years.sorted().joined(separator: ","), query, String(limit), week, countries.sorted().joined(separator: ",")].joined(separator: "|")) { await load() }
+        .task(id: loadKey) { await load() }
+        .onChange(of: scope) { _, _ in limit = 100 }
         .onChange(of: sort) { _, _ in limit = 100 }
         .onChange(of: years) { _, _ in limit = 100 }
         .onChange(of: query) { _, _ in limit = 100 }
         .onChange(of: countries) { _, _ in limit = 100 }
     }
 
-    private func rowLabel(_ r: BoxOfficeRow) -> some View {
+    private var loadKey: String {
+        [scope, sort, years.sorted().joined(separator: ","), query, String(limit), week, countries.sorted().joined(separator: ",")].joined(separator: "|")
+    }
+
+    @ViewBuilder private var pickers: some View {
+        if let b = board.value {
+            Section {
+                if b.scopes.count > 1 {
+                    Picker("範圍", selection: $scope) {
+                        ForEach(b.scopes) { Text($0.label).tag($0.id) }
+                    }
+                    .pickerStyle(.segmented)
+                }
+                if b.sorts.count > 1 {
+                    Picker("排序", selection: Binding(get: { b.sort }, set: { sort = $0 })) {
+                        ForEach(b.sorts) { Text($0.label).tag($0.id) }
+                    }
+                }
+                if b.weeks.count > 1 {
+                    Picker("週次", selection: Binding(
+                        get: { week.isEmpty ? (b.weeks.first?.id ?? "") : week },
+                        set: { week = ($0 == b.weeks.first?.id) ? "" : $0 }
+                    )) {
+                        ForEach(b.weeks) { Text("\($0.label)（\($0.note)）").tag($0.id) }
+                    }
+                }
+            } footer: {
+                Text(b.scope == "year" ? "年度：那一年上映的電影，已經下檔的也在裡面。" : "上映中：現在查得到場次的電影，可以換排序。")
+            }
+        }
+    }
+
+    @ViewBuilder private var countryPicker: some View {
+        if let b = board.value, b.countries.count > 1 {
+            let picked = b.selCountries
+            Section {
+                // 出品國別可以複選：選單點了不會關，可以連續勾
+                Menu {
+                    Button {
+                        countries = []
+                    } label: {
+                        if picked.isEmpty { Label("全部（\(b.everyone) 部）", systemImage: "checkmark") } else { Text("全部（\(b.everyone) 部）") }
+                    }
+                    ForEach(b.countries) { c in
+                        Button {
+                            var next = Set(picked)
+                            if next.contains(c.id) { next.remove(c.id) } else { next.insert(c.id) }
+                            countries = next
+                        } label: {
+                            if picked.contains(c.id) { Label(c.label, systemImage: "checkmark") } else { Text(c.label) }
+                        }
+                    }
+                } label: {
+                    HStack {
+                        Text("出品國別").foregroundStyle(Color.primary)
+                        Spacer()
+                        Text(picked.isEmpty ? "全部" : picked.joined(separator: "、")).foregroundStyle(.secondary).lineLimit(1)
+                        Image(systemName: "chevron.up.chevron.down").font(.caption).foregroundStyle(.tertiary)
+                    }
+                }
+                .menuActionDismissBehavior(.disabled)
+            } footer: {
+                Text(b.countryNote ?? "全台灣票房，只篩選出品國，可複選。")
+            }
+        }
+    }
+
+    @ViewBuilder private var yearPicker: some View {
+        if let b = board.value, b.scope == "year", b.years.count > 1 {
+            let options = b.years
+            let picked = b.selYears
+            Section {
+                // 年份可以複選：選單點了不會關，可以連續勾
+                Menu {
+                    // 全選：再點一次回到只看最新的一年
+                    Button {
+                        years = picked.count == options.count ? [] : Set(options)
+                    } label: {
+                        if picked.count == options.count { Label("全選", systemImage: "checkmark") } else { Text("全選") }
+                    }
+                    ForEach(options, id: \.self) { y in
+                        Button {
+                            var next = Set(picked)
+                            if next.contains(y) { if next.count > 1 { next.remove(y) } } else { next.insert(y) }
+                            years = next
+                        } label: {
+                            if picked.contains(y) { Label("\(y) 年", systemImage: "checkmark") } else { Text("\(y) 年") }
+                        }
+                    }
+                } label: {
+                    HStack {
+                        Text("年份").foregroundStyle(Color.primary)
+                        Spacer()
+                        Text(picked.count == options.count ? "全部（\(options.last ?? "")–\(options.first ?? "")）" : picked.joined(separator: "、")).foregroundStyle(.secondary).lineLimit(1)
+                        Image(systemName: "chevron.up.chevron.down").font(.caption).foregroundStyle(.tertiary)
+                    }
+                }
+                .menuActionDismissBehavior(.disabled)
+            } footer: {
+                Text("可以複選，選了幾年就合在一起排。點「全選」一次選完，再點一次回到最新的一年。")
+            }
+        }
+    }
+
+    @ViewBuilder private var results: some View {
+        switch board {
+        case .loading:
+            Section { LoadingRow(text: "讀取電影清單…") }
+        case .failed(let message):
+            Section { ErrorRow(message: message) { Task { await load() } } }
+        case .loaded(let b):
+            let rows = b.entries // 搜尋與分批都由共用資料層處理
+            Section {
+                ForEach(rows) { entry($0) }
+                if b.total > rows.count {
+                    // 不用按：滑到這一列就自動接著載入下一批
+                    HStack {
+                        ProgressView()
+                        Text("載入中…已顯示 \(rows.count)／\(b.total) 部").font(.footnote).foregroundStyle(.secondary)
+                    }
+                    .onAppear { limit = rows.count + 200 }
+                }
+            } header: {
+                Text(b.title)
+            } footer: {
+                Text("\(rows.isEmpty && b.rest.isEmpty ? "找不到相符的電影。\n" : "")\(b.footer)")
+            }
+            if !b.rest.isEmpty {
+                Section {
+                    ForEach(b.rest) { entry($0) }
+                } header: {
+                    Text(b.restTitle)
+                } footer: {
+                    Text(b.restFooter)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder private func entry(_ r: FilmEntry) -> some View {
+        if let m = r.m {
+            NavigationLink { MovieDetailView(movie: m) } label: { rowLabel(r) }.accessibilityIdentifier("movie-row")
+        } else {
+            rowLabel(r)
+        }
+    }
+
+    private func rowLabel(_ r: FilmEntry) -> some View {
         HStack(spacing: 10) {
-            Text("\(r.x.rank)")
-                .font(r.x.rank >= 1000 ? .caption.bold() : r.x.rank >= 100 ? .subheadline.bold() : .title3.bold()).monospacedDigit()
-                .foregroundStyle(r.x.rank <= 3 ? Color.orange : Color.secondary)
-                .lineLimit(1).minimumScaleFactor(0.6)
-                .frame(width: 36)
-            PosterView(title: r.m?.title ?? r.x.name, slug: r.m?.slug, en: r.m?.en, lightRelease: (r.light ?? false) ? (r.x.release ?? "") : nil)
+            if let rank = r.rank {
+                Text("\(rank)")
+                    .font(rank >= 1000 ? .caption.bold() : rank >= 100 ? .subheadline.bold() : .title3.bold()).monospacedDigit()
+                    .foregroundStyle(rank <= 3 ? Color.orange : Color.secondary)
+                    .lineLimit(1).minimumScaleFactor(0.6)
+                    .frame(width: 36)
+            }
+            PosterView(title: r.m?.title ?? r.name, slug: r.m?.slug, en: r.m?.en, lightRelease: (r.light ?? false) ? (r.x?.release ?? "") : nil)
             VStack(alignment: .leading, spacing: 2) {
-                Text(r.x.name).lineLimit(2)
-                // 第一行金額、第二行上映日期與戲院數：各自一行不換行（文字由共用資料層依排法算好）
-                let first = r.lines?.first ?? "累計 \(Fmt.money(r.x.total))"
-                let second = (r.lines?.count ?? 0) > 1 ? (r.lines?[1] ?? "") : ""
-                Text(first).font(.subheadline).foregroundStyle(.secondary).lineLimit(1).minimumScaleFactor(0.8)
+                Text(r.name).lineLimit(2)
+                // 兩行說明各自一行不換行（文字由共用資料層依排法算好）
+                let first = r.lines.first ?? ""
+                let second = r.lines.count > 1 ? r.lines[1] : ""
+                if !first.isEmpty {
+                    Text(first).font(.subheadline).foregroundStyle(.secondary).lineLimit(1).minimumScaleFactor(0.8)
+                }
                 if !second.isEmpty {
                     Text(second).font(.caption).foregroundStyle(.tertiary).lineLimit(1).minimumScaleFactor(0.8)
                 }
@@ -269,7 +299,7 @@ struct BoxOfficeSection: View {
 
     private func load() async {
         do {
-            board = .loaded(try await Bridge.shared.call("boxOffice", [sort, years.sorted(), query.trimmingCharacters(in: .whitespaces), limit, week, countries.sorted()]))
+            board = .loaded(try await Bridge.shared.call("filmList", [scope, sort, years.sorted(), query.trimmingCharacters(in: .whitespaces), limit, week, countries.sorted()]))
         } catch {
             board = .failed(errorText(error))
         }

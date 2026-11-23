@@ -39,6 +39,8 @@ struct TwMovie: Codable, Hashable, Identifiable {
     var comingSoon: Bool?
     var release: String?
     var noShowToday: Bool?
+    var score: Double?
+    var scoreFew: Bool?
     var id: String { slug }
 }
 
@@ -161,6 +163,41 @@ struct BoxOfficeBoard: Codable {
     var everyone: Int?        // 不分國別的總數
     var countryNote: String?  // 「出品國別」底下的說明（排行是台灣的票房，國別只是篩選出品國）
     var rows: [BoxOfficeRow]
+}
+
+/// 「電影」清單的一列：x = 票房資料（沒進榜沒有），m = 場次通的電影（已下檔沒有）
+struct FilmEntry: Codable, Identifiable {
+    var key: String
+    var rank: Int?
+    var name: String
+    var x: BoxOfficeItem?
+    var m: TwMovie?
+    var lines: [String]   // 兩行說明（共用資料層依排法算好）
+    var light: Bool?      // 已下檔的舊片：海報用輕量查法
+    var id: String { key }
+}
+/// 「電影」清單整頁：上映中與票房排行合成一份
+struct FilmList: Codable {
+    struct Option: Codable, Hashable, Identifiable { var id: String; var label: String; var sub: String? }
+    var scope: String          // 範圍：now 上映中／year 年度（含已下檔）
+    var scopes: [Option]
+    var sort: String           // 上映中的排法
+    var sorts: [Option]        // 範圍是年度時是空的
+    var years: [String]
+    var selYears: [String]
+    var weeks: [BoxOfficeBoard.Week]
+    var selWeek: String
+    var countries: [BoxOfficeBoard.Country]
+    var selCountries: [String]
+    var everyone: Int
+    var countryNote: String?
+    var entries: [FilmEntry]
+    var rest: [FilmEntry]      // 上映中但沒進榜的
+    var title: String
+    var footer: String
+    var restTitle: String
+    var restFooter: String
+    var total: Int             // 符合條件的總數（比 entries 多的話還有下一批）
 }
 
 /// 選好的一場，交給確認頁

@@ -339,6 +339,8 @@ export interface TwMovie {
   comingSoon: boolean; // 還沒上映（場次通的「即將上映」裡，已經上映過、只是今天沒場次的不算，見 noShowToday）
   release?: string; // 上映日期 YYYY-MM-DD（伺服器查好的，沒有就是不知道）
   noShowToday?: boolean; // 已經上映，今天沒有場次、之後幾天才有
+  score?: number; // IMDb 評分（伺服器查好的，沒有就是不知道；清單依評分排序用）
+  scoreFew?: boolean; // 評分的人還很少（不到 500 人）：分數不太準，排序時排在後面
 }
 export interface TwMovieCinema {
   id: string; // 場次通影城代碼
