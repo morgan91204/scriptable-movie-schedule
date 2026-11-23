@@ -48,6 +48,7 @@
     boxCountries: () => boxCountries,
     boxInfo: () => boxInfo,
     boxInfoRows: () => boxInfoRows,
+    boxMainCountry: () => boxMainCountry,
     boxMatcher: () => boxMatcher,
     boxOfficeBy: () => boxOfficeBy,
     boxOfficeFooter: () => boxOfficeFooter,
@@ -1861,7 +1862,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
       // 排的是哪一種，就把那個數字放前面
       by === "year" ? total : by === "total" ? [total, week].filter(Boolean).join("｜") : x.since ? `上映至${past ? "當時" : "今"} ${money(x.total)}` : [week, total].filter(Boolean).join("｜"),
       // 年度排行混著已經下檔的片：還在上映的標出來
-      [by === "year" && x.showing ? "上映中" : "", x.country, releaseLabel(x.release), x.theaters ? `${x.theaters} 間戲院` : ""].filter(Boolean).join("｜")
+      [by === "year" && x.showing ? "上映中" : "", boxMainCountry(x.country), releaseLabel(x.release), x.theaters ? `${x.theaters} 間戲院` : ""].filter(Boolean).join("｜")
     ];
   }
   function boxSorts(b) {
@@ -1895,14 +1896,22 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     if (by !== "total") return b.list;
     return b.list.slice().sort((x, y) => y.total - x.total).map((x, i) => ({ ...x, rank: i + 1 }));
   }
+  var COUNTRY_ALIAS = { 中國大陸: "中國", 大陸: "中國", 台灣: "中華民國", 臺灣: "中華民國", 南韓: "韓國", 澳大利亞: "澳洲", Australia: "澳洲", France: "法國", 美: "美國", 法: "法國", 日: "日本", 德: "德國", 北馬其頓: "馬其頓" };
+  function boxMainCountry(country) {
+    const first = String(country || "").split(/##|[\/、,，;；]/)[0].trim();
+    return COUNTRY_ALIAS[first] || first;
+  }
   function boxCountries(list) {
     const n = {};
-    for (const x of list) if (x.country) n[x.country] = (n[x.country] || 0) + 1;
+    for (const x of list) {
+      const c = boxMainCountry(x.country);
+      if (c) n[c] = (n[c] || 0) + 1;
+    }
     return Object.keys(n).map((id) => ({ id, count: n[id] })).sort((a, b) => b.count - a.count || a.id.localeCompare(b.id));
   }
   function boxByCountry(list, country) {
     if (!country) return list;
-    return list.filter((x) => x.country === country).map((x, i) => ({ ...x, rank: i + 1 }));
+    return list.filter((x) => boxMainCountry(x.country) === country).map((x, i) => ({ ...x, rank: i + 1 }));
   }
   var BOXOFFICE_INFO_URL = "https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/main/dist/boxoffice-info-";
   var boxInfoMem = {};
@@ -1923,7 +1932,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   function boxInfoRows(x, info) {
     const num = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
     const rows = [];
-    if (x.country) rows.push(["國別", x.country]);
+    if (x.country) rows.push(["國別", x.country.replace(/##/g, "、").replace(/\s*\/\s*/g, "、")]);
     if (info && info.issue) rows.push(["發行", info.issue]);
     if (info && info.produce) rows.push(["出品", info.produce]);
     rows.push(["上映日期", x.release.replace(/-/g, "/")]);
@@ -2919,7 +2928,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   var extra = { boxOffice, nowShowing, nowShowingMulti, movieBoard, festivalBoard, festivalFilm, nearby, patchSettings, fillMovie, formatList };
   var BRIDGE_LEVEL = 2;
   globalThis.MS = {
-    version: "2026.11.23-1932",
+    version: "2026.11.23-1933",
     level: BRIDGE_LEVEL,
     init(saved) {
       cache = saved || {};

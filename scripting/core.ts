@@ -1423,7 +1423,7 @@ export function boxOfficeLines(x: BoxOfficeItem, by: BoxSort = "week", past = fa
     // 排的是哪一種，就把那個數字放前面
     by === "year" ? total : by === "total" ? [total, week].filter(Boolean).join("｜") : x.since ? `上映至${past ? "當時" : "今"} ${money(x.total)}` : [week, total].filter(Boolean).join("｜"),
     // 年度排行混著已經下檔的片：還在上映的標出來
-    [by === "year" && x.showing ? "上映中" : "", x.country, releaseLabel(x.release), x.theaters ? `${x.theaters} 間戲院` : ""].filter(Boolean).join("｜"),
+    [by === "year" && x.showing ? "上映中" : "", boxMainCountry(x.country), releaseLabel(x.release), x.theaters ? `${x.theaters} 間戲院` : ""].filter(Boolean).join("｜"),
   ];
 }
 /** 票房排行的三種排法。week、total 排的都是「上映中」的片（這一週還有賣出票的）：week 依這一週的票房、total 依上映以來的累計；
@@ -1464,16 +1464,23 @@ export function boxOfficeBy(b: BoxOffice, by: BoxSort, years?: string[], week?: 
   if (by !== "total") return b.list;
   return b.list.slice().sort((x, y) => y.total - x.total).map((x, i) => ({ ...x, rank: i + 1 }));
 }
-/** 這份排行裡有哪些國別、各幾部（多的在前），給「國別」篩選用 */
+// 官方的國別欄位是各片商自己填的，寫法很亂：合拍片寫成「中國大陸/香港」「中華民國##中華民國」，同一國有「中國大陸／大陸／中國」「澳洲／澳大利亞／Australia」幾種寫法。
+// 篩選用的是「主要出品國」：取第一個，再把同一國的不同寫法併在一起（個別資訊那一頁仍然照官方原文顯示）
+const COUNTRY_ALIAS: Record<string, string> = { 中國大陸: "中國", 大陸: "中國", 台灣: "中華民國", 臺灣: "中華民國", 南韓: "韓國", 澳大利亞: "澳洲", Australia: "澳洲", France: "法國", 美: "美國", 法: "法國", 日: "日本", 德: "德國", 北馬其頓: "馬其頓" };
+export function boxMainCountry(country: string): string {
+  const first = String(country || "").split(/##|[\/、,，;；]/)[0].trim();
+  return COUNTRY_ALIAS[first] || first;
+}
+/** 這份排行裡有哪些國別（主要出品國）、各幾部（多的在前），給「國別」篩選用 */
 export function boxCountries(list: BoxOfficeItem[]): { id: string; count: number }[] {
   const n: Record<string, number> = {};
-  for (const x of list) if (x.country) n[x.country] = (n[x.country] || 0) + 1;
+  for (const x of list) { const c = boxMainCountry(x.country); if (c) n[c] = (n[c] || 0) + 1; }
   return Object.keys(n).map((id) => ({ id, count: n[id] })).sort((a, b) => b.count - a.count || a.id.localeCompare(b.id));
 }
 /** 只留某個國別的片，名次在這個國別裡重排（跟官方網站篩選國別後的排法一樣）；country 空的 = 全部 */
 export function boxByCountry(list: BoxOfficeItem[], country: string): BoxOfficeItem[] {
   if (!country) return list;
-  return list.filter((x) => x.country === country).map((x, i) => ({ ...x, rank: i + 1 }));
+  return list.filter((x) => boxMainCountry(x.country) === country).map((x, i) => ({ ...x, rank: i + 1 }));
 }
 export const BOXOFFICE_INFO_URL = "https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/main/dist/boxoffice-info-";
 export interface BoxInfo { issue: string; produce: string; tickets: number }
@@ -1494,7 +1501,7 @@ export async function boxInfo(x: { name: string; release: string }): Promise<Box
 export function boxInfoRows(x: BoxOfficeItem, info: BoxInfo | null): [string, string][] {
   const num = (n: number) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
   const rows: [string, string][] = [];
-  if (x.country) rows.push(["國別", x.country]);
+  if (x.country) rows.push(["國別", x.country.replace(/##/g, "、").replace(/\s*\/\s*/g, "、")]);
   if (info && info.issue) rows.push(["發行", info.issue]);
   if (info && info.produce) rows.push(["出品", info.produce]);
   rows.push(["上映日期", x.release.replace(/-/g, "/")]);

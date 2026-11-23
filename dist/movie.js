@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.23-1932
+// @movie-schedule-app 電影行程 v2026.11.23-1933
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/parsers.gen.ts
@@ -1660,7 +1660,7 @@ function boxOfficeLines(x, by = "week", past = false) {
     // 排的是哪一種，就把那個數字放前面
     by === "year" ? total : by === "total" ? [total, week].filter(Boolean).join("｜") : x.since ? `上映至${past ? "當時" : "今"} ${money(x.total)}` : [week, total].filter(Boolean).join("｜"),
     // 年度排行混著已經下檔的片：還在上映的標出來
-    [by === "year" && x.showing ? "上映中" : "", x.country, releaseLabel(x.release), x.theaters ? `${x.theaters} 間戲院` : ""].filter(Boolean).join("｜")
+    [by === "year" && x.showing ? "上映中" : "", boxMainCountry(x.country), releaseLabel(x.release), x.theaters ? `${x.theaters} 間戲院` : ""].filter(Boolean).join("｜")
   ];
 }
 function boxSorts(b) {
@@ -1694,14 +1694,22 @@ function boxOfficeBy(b, by, years, week) {
   if (by !== "total") return b.list;
   return b.list.slice().sort((x, y) => y.total - x.total).map((x, i) => ({ ...x, rank: i + 1 }));
 }
+var COUNTRY_ALIAS = { 中國大陸: "中國", 大陸: "中國", 台灣: "中華民國", 臺灣: "中華民國", 南韓: "韓國", 澳大利亞: "澳洲", Australia: "澳洲", France: "法國", 美: "美國", 法: "法國", 日: "日本", 德: "德國", 北馬其頓: "馬其頓" };
+function boxMainCountry(country) {
+  const first = String(country || "").split(/##|[\/、,，;；]/)[0].trim();
+  return COUNTRY_ALIAS[first] || first;
+}
 function boxCountries(list) {
   const n = {};
-  for (const x of list) if (x.country) n[x.country] = (n[x.country] || 0) + 1;
+  for (const x of list) {
+    const c = boxMainCountry(x.country);
+    if (c) n[c] = (n[c] || 0) + 1;
+  }
   return Object.keys(n).map((id) => ({ id, count: n[id] })).sort((a, b) => b.count - a.count || a.id.localeCompare(b.id));
 }
 function boxByCountry(list, country) {
   if (!country) return list;
-  return list.filter((x) => x.country === country).map((x, i) => ({ ...x, rank: i + 1 }));
+  return list.filter((x) => boxMainCountry(x.country) === country).map((x, i) => ({ ...x, rank: i + 1 }));
 }
 var BOXOFFICE_INFO_URL = "https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/main/dist/boxoffice-info-";
 var boxInfoMem = {};
@@ -1722,7 +1730,7 @@ async function boxInfo(x) {
 function boxInfoRows(x, info) {
   const num = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
   const rows = [];
-  if (x.country) rows.push(["國別", x.country]);
+  if (x.country) rows.push(["國別", x.country.replace(/##/g, "、").replace(/\s*\/\s*/g, "、")]);
   if (info && info.issue) rows.push(["發行", info.issue]);
   if (info && info.produce) rows.push(["出品", info.produce]);
   rows.push(["上映日期", x.release.replace(/-/g, "/")]);
@@ -3217,14 +3225,14 @@ var App = class {
   }
   /** 最新版本是多少。網頁版問的是自己網站現在上線的版本（重新整理就會拿到的那一版），不是 GitHub 上的 */
   checkVersion() {
-    if (true) return checkLatest("2026.11.23-1932");
+    if (true) return checkLatest("2026.11.23-1933");
     return (async () => {
       try {
         const r = await globalThis.fetch("/api/version?t=" + Date.now(), { cache: "no-store" });
         const latest = String((await r.json()).version || "");
         if (!latest) return null;
         const num = (v) => Number(v.replace(/\D/g, "")) || 0;
-        return { latest, isLatest: num("2026.11.23-1932") >= num(latest) };
+        return { latest, isLatest: num("2026.11.23-1933") >= num(latest) };
       } catch (_) {
         return null;
       }
@@ -3325,11 +3333,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.23-1932"}`);
+          Pasteboard.copy(`版本 ${"2026.11.23-1933"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.23-1932"}`,
+      `版本 ${"2026.11.23-1933"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -3671,7 +3679,7 @@ var App = class {
     if (false) {
       if (!r) return /* @__PURE__ */ h(Note, { text: "（無法確認是否為最新版：連不到網站）" });
       if (r.isLatest) return /* @__PURE__ */ h(Note, { text: "✅ 已是最新版" });
-      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.23-1932"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
+      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.23-1933"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
         globalThis.location.reload();
       } }));
     }
