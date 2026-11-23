@@ -6,17 +6,21 @@ on:
   workflow_dispatch:
     inputs:
       max:
-        description: 這一輪查幾部（預設 60）
-        default: "60"
+        description: 這一輪最多查幾部
+        default: "1200"
+      lanes:
+        description: 幾條線同時查（1～4）
+        default: "3"
 permissions:
   contents: write
+# 自己一組：一輪要跑半小時以上，跟其他排程排同一組會讓它們一直等
 concurrency:
-  group: data-branch
+  group: ratings-years
   cancel-in-progress: false
 jobs:
   ratings:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 55
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -30,6 +34,14 @@ jobs:
         run: node tools/ratings-years.mjs "$RUNNER_TEMP/prev-ratings.json" "$RUNNER_TEMP/ratings-years.json"
         env:
           TMDB_TOKEN: ${{ secrets.TMDB_TOKEN }}
-          RATINGS_MAX: ${{ inputs.max || '60' }}
-      - name: 發佈到 data 分支
-        run: tools/publish-data.sh "$RUNNER_TEMP/ratings-years.json" ratings-years.json "更新資料"
+          # 第一次建立（七千多部）時加快：三條線、一輪最多 1200 部、跑 42 分鐘；全部查完後每輪只剩新片和要重查的幾部，自然就慢下來
+          RATINGS_MAX: ${{ inputs.max || '1200' }}
+          RATINGS_LANES: ${{ inputs.lanes || '3' }}
+          RATINGS_MINUTES: "42"
+      - name: 發佈到 data 分支（跟其他排程同時發佈時可能被蓋掉，所以確認一次，沒上去就再發一次）
+        run: |
+          tools/publish-data.sh "$RUNNER_TEMP/ratings-years.json" ratings-years.json "更新資料"
+          sleep 20
+          git checkout -q -f "$GITHUB_SHA"
+          git fetch -q origin data
+          if ! git show FETCH_HEAD:ratings-years.json | cmp -s - "$RUNNER_TEMP/ratings-years.json"; then echo "被蓋掉了，再發一次"; tools/publish-data.sh "$RUNNER_TEMP/ratings-years.json" ratings-years.json "更新資料"; fi

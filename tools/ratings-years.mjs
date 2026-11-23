@@ -87,28 +87,38 @@ async function identify(title, releaseYear) {
   return null;
 }
 
-let done = 0, found = 0, none = 0, unknown = 0, failed = 0, streak = 0;
-for (const m of todo.slice(0, MAX)) {
-  if (streak >= 6) { console.log("連續 6 部讀不到（可能被擋或網路有問題），這一輪提早結束，下一輪再試"); break; }
-  await new Promise((r) => setTimeout(r, 2500)); // 一部一部隔開，不要一下子打太多
-  try {
-    const who = await identify(m.name, m.year);
-    if (!who) { miss[m.k] = today; delete ratings[m.k]; unknown++; done++; continue; }
-    const r = await core.ratingsOfIdent(who);
-    if (r.err && !(r.imdb || r.tomato || r.popcorn)) { failed++; streak++; continue; } // 連線問題：不記，下次再查
-    streak = 0;
-    const rec = { id: who.id, a: today };
-    if (r.imdb) { rec.i = r.imdb.score; rec.v = r.imdb.votes; }
-    if (r.tomato) { rec.t = r.tomato.score; if (r.tomato.certified) rec.c = 1; }
-    if (r.popcorn) rec.p = r.popcorn.score;
-    const u = ((r.tomato || r.popcorn || {}).url || "").match(/rottentomatoes\.com\/m\/([\w-]+)/);
-    if (u) rec.u = u[1];
-    ratings[m.k] = rec;
-    delete miss[m.k];
-    if (r.imdb || r.tomato || r.popcorn) found++; else none++;
-    done++;
-  } catch (_) { failed++; streak++; }
-}
+// 幾條線同時查（RATINGS_LANES，預設 1）：每條線自己一部一部隔開；連續讀不到太多次就全部停下來
+const LANES = Math.max(1, Math.min(4, Number(process.env.RATINGS_LANES) || 1));
+const GAP = Number(process.env.RATINGS_GAP_MS) || 2500;
+const STOP_AT = now + (Number(process.env.RATINGS_MINUTES) || 15) * 60e3; // 這一輪最多跑多久（留時間發佈）
+let done = 0, found = 0, none = 0, unknown = 0, failed = 0, streak = 0, stopped = "";
+const queue = todo.slice(0, MAX);
+await Promise.all(Array.from({ length: LANES }, async (_, lane) => {
+  await new Promise((r) => setTimeout(r, lane * (GAP / LANES))); // 各條線錯開
+  for (let m = queue.shift(); m; m = queue.shift()) {
+    if (streak >= 8) { stopped = "連續 8 部讀不到（可能被擋或網路有問題）"; return; }
+    if (Date.now() > STOP_AT) { stopped = "時間到"; return; }
+    await new Promise((r) => setTimeout(r, GAP)); // 一部一部隔開，不要一下子打太多
+    try {
+      const who = await identify(m.name, m.year);
+      if (!who) { miss[m.k] = today; delete ratings[m.k]; unknown++; done++; continue; }
+      const r = await core.ratingsOfIdent(who);
+      if (r.err && !(r.imdb || r.tomato || r.popcorn)) { failed++; streak++; continue; } // 連線問題：不記，下次再查
+      streak = 0;
+      const rec = { id: who.id, a: today };
+      if (r.imdb) { rec.i = r.imdb.score; rec.v = r.imdb.votes; }
+      if (r.tomato) { rec.t = r.tomato.score; if (r.tomato.certified) rec.c = 1; }
+      if (r.popcorn) rec.p = r.popcorn.score;
+      const u = ((r.tomato || r.popcorn || {}).url || "").match(/rottentomatoes\.com\/m\/([\w-]+)/);
+      if (u) rec.u = u[1];
+      ratings[m.k] = rec;
+      delete miss[m.k];
+      if (r.imdb || r.tomato || r.popcorn) found++; else none++;
+      done++;
+    } catch (_) { failed++; streak++; }
+  }
+}));
+if (stopped) console.log(`這一輪提早結束：${stopped}；剩下的下一輪再查`);
 for (const k of Object.keys(miss)) if (!seen.has(k)) delete miss[k];
 for (const k of Object.keys(ratings)) if (!seen.has(k)) delete ratings[k];
 const sorted = (o) => Object.fromEntries(Object.keys(o).sort().map((k) => [k, o[k]]));
