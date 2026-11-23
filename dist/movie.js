@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.24-0250
+// @movie-schedule-app 電影行程 v2026.11.24-0254
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/parsers.gen.ts
@@ -3343,6 +3343,9 @@ function Chip(props) {
 function Search(props) {
   return /* @__PURE__ */ h("input", { class: "field", name: "q", type: "search", enterkeyhint: "search", autocomplete: "off", value: props.value, placeholder: props.placeholder, autofocus: props.autofocus, onInput: (v) => props.onInput(v.q || "") });
 }
+function PickRow(props) {
+  return /* @__PURE__ */ h("div", { class: "item kv" }, /* @__PURE__ */ h("div", { class: "body" }, /* @__PURE__ */ h("div", { class: "title" }, esc(props.title))), /* @__PURE__ */ h("select", { class: "sel", name: props.name, onInput: (v) => props.onPick(v[props.name] || "") }, props.options.map((o) => /* @__PURE__ */ h("option", { value: o.id, selected: o.id === props.value }, esc(o.label)))));
+}
 function Button(props) {
   return /* @__PURE__ */ h("button", { class: "btn " + (props.kind || "primary"), onTap: props.onTap, "data-enter": props.enter ? "" : void 0 }, esc(props.label));
 }
@@ -3457,6 +3460,7 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .item .badge{flex:none;font-size:12px;padding:2px 8px;border-radius:999px;background:var(--chip);color:var(--chip-fg)}
 .item .chev{color:var(--fg2);opacity:.55;font-size:22px;line-height:1;flex:none}
 .item .title.tagged{display:block;overflow:visible;-webkit-line-clamp:unset;text-overflow:clip}
+.item .sel{flex:none;font:inherit;font-size:16px;color:var(--accent);background:var(--bg);border:0;border-radius:10px;padding:7px 10px;-webkit-appearance:menulist-button;appearance:auto}
 .item.muted .title,.item.muted .sub{color:var(--fg2)}
 .item.accent .title{color:var(--accent)}
 .chips{display:flex;flex-wrap:wrap;gap:8px;padding:12px 14px}
@@ -4009,14 +4013,14 @@ var App = class {
   }
   /** 最新版本是多少。網頁版問的是自己網站現在上線的版本（重新整理就會拿到的那一版），不是 GitHub 上的 */
   checkVersion() {
-    if (true) return checkLatest("2026.11.24-0250");
+    if (true) return checkLatest("2026.11.24-0254");
     return (async () => {
       try {
         const r = await globalThis.fetch("/api/version?t=" + Date.now(), { cache: "no-store" });
         const latest = String((await r.json()).version || "");
         if (!latest) return null;
         const num = (v) => Number(v.replace(/\D/g, "")) || 0;
-        return { latest, isLatest: num("2026.11.24-0250") >= num(latest) };
+        return { latest, isLatest: num("2026.11.24-0254") >= num(latest) };
       } catch (_) {
         return null;
       }
@@ -4193,6 +4197,7 @@ var App = class {
     };
     const fmts = prefs.fmts || [], preDays = prefs.preDays || 3, quiet = notifyQuiet(prefs);
     const hh = (h2) => `${String(h2).padStart(2, "0")}:00`;
+    const hours = Array.from({ length: 24 }, (_, h2) => ({ id: String(h2), label: hh(h2) }));
     const noteOf = (k) => k.id === "end" ? endNote : k.id === "pre" ? `上映前 ${preDays} 天提醒一次` : k.id === "fmt" ? fmts.length ? `${fmts.join("、")} 開始有場次` : k.note : k.id === "favc" ? `${k.note}；目前收藏 ${this.settings.favorites.length} 間` : k.note;
     const row = (k) => /* @__PURE__ */ h(Item, { icon: prefs[k.id] ? "✅" : "⬜️", title: k.label, subtitle: noteOf(k), chevron: false, onTap: () => toggle(k.id) });
     const max = prefs.endMax || 3;
@@ -4211,7 +4216,7 @@ var App = class {
       set({ endMax: n2 });
     } }), /* @__PURE__ */ h(Item, { kv: true, title: "算哪些影城", right: `${notifyEndScope(prefs)} ${this.notifyOpen ? "▾" : "▸"}`, chevron: false, onTap: () => {
       this.notifyOpen = !this.notifyOpen;
-    } }), this.notifyOpen ? /* @__PURE__ */ h(Chips, { scroll: true }, /* @__PURE__ */ h(Chip, { label: "全台", muted: pick.fav || picked.length > 0, onTap: () => pickSet(false, []) }), /* @__PURE__ */ h(Chip, { label: "收藏影城", sub: `${this.settings.favorites.length} 間`, muted: !pick.fav, onTap: () => pickSet(!pick.fav, picked) }), cities.map((c) => /* @__PURE__ */ h(Chip, { label: c, muted: picked.indexOf(c) < 0, onTap: () => pickSet(pick.fav, picked.indexOf(c) < 0 ? [...picked, c] : picked.filter((z) => z !== c)) }))) : null) : null, /* @__PURE__ */ h(Section, { title: "不用收藏也會通知", hint: "預設關閉，想要再打開。" }, NOTIFY_KINDS.filter((k) => k.group === "all").map(row)), /* @__PURE__ */ h(Section, { title: "勿擾時段", hint: quiet.on ? `${hh(quiet.from)} 到${quiet.from > quiet.to ? "隔天" : ""} ${hh(quiet.to)} 不發通知，這段時間的通知留到之後再發。` : "任何時間都可能發通知。" }, /* @__PURE__ */ h(Item, { icon: quiet.on ? "✅" : "⬜️", title: "晚上不要通知我", chevron: false, onTap: () => set({ quietOn: !quiet.on }) }), quiet.on ? /* @__PURE__ */ h(Item, { kv: true, title: "開始", right: `${hh(quiet.from)} ⇄`, chevron: false, onTap: () => set({ quietFrom: [20, 21, 22, 23, 0, 1][([20, 21, 22, 23, 0, 1].indexOf(quiet.from) + 1) % 6] }) }) : null, quiet.on ? /* @__PURE__ */ h(Item, { kv: true, title: "結束", right: `${hh(quiet.to)} ⇄`, chevron: false, onTap: () => set({ quietTo: [6, 7, 8, 9, 10, 11, 12][([6, 7, 8, 9, 10, 11, 12].indexOf(quiet.to) + 1) % 7] }) }) : null), /* @__PURE__ */ h(Section, { hint: `已開啟${n ? `，目前收藏了 ${n} 部` : "；還沒有收藏的電影，到電影頁點愛心收藏"}。你收藏的片名存在我們的伺服器上，只用來判斷什麼時候通知；關閉通知時會一起刪掉。` }, /* @__PURE__ */ h(Item, { icon: "📨", title: "傳一則測試通知", subtitle: "確認這台裝置收得到", chevron: false, onTap: async () => {
+    } }), this.notifyOpen ? /* @__PURE__ */ h(Chips, { scroll: true }, /* @__PURE__ */ h(Chip, { label: "全台", muted: pick.fav || picked.length > 0, onTap: () => pickSet(false, []) }), /* @__PURE__ */ h(Chip, { label: "收藏影城", sub: `${this.settings.favorites.length} 間`, muted: !pick.fav, onTap: () => pickSet(!pick.fav, picked) }), cities.map((c) => /* @__PURE__ */ h(Chip, { label: c, muted: picked.indexOf(c) < 0, onTap: () => pickSet(pick.fav, picked.indexOf(c) < 0 ? [...picked, c] : picked.filter((z) => z !== c)) }))) : null) : null, /* @__PURE__ */ h(Section, { title: "不用收藏也會通知", hint: "預設關閉，想要再打開。" }, NOTIFY_KINDS.filter((k) => k.group === "all").map(row)), /* @__PURE__ */ h(Section, { title: "勿擾時段", hint: quiet.on ? `${hh(quiet.from)} 到${quiet.from > quiet.to ? "隔天" : ""} ${hh(quiet.to)} 不發通知，這段時間的通知留到之後再發。` : "任何時間都可能發通知。" }, /* @__PURE__ */ h(Item, { icon: quiet.on ? "✅" : "⬜️", title: "晚上不要通知我", chevron: false, onTap: () => set({ quietOn: !quiet.on }) }), quiet.on ? /* @__PURE__ */ h(PickRow, { title: "開始", name: "qfrom", value: String(quiet.from), options: hours, onPick: (v) => set({ quietFrom: Number(v) }) }) : null, quiet.on ? /* @__PURE__ */ h(PickRow, { title: "結束", name: "qto", value: String(quiet.to), options: hours, onPick: (v) => set({ quietTo: Number(v) }) }) : null), /* @__PURE__ */ h(Section, { hint: `已開啟${n ? `，目前收藏了 ${n} 部` : "；還沒有收藏的電影，到電影頁點愛心收藏"}。你收藏的片名存在我們的伺服器上，只用來判斷什麼時候通知；關閉通知時會一起刪掉。` }, /* @__PURE__ */ h(Item, { icon: "📨", title: "傳一則測試通知", subtitle: "確認這台裝置收得到", chevron: false, onTap: async () => {
       await this.ui.toast(await p.test() ? "已送出，幾秒內應該會收到" : "送不出去，請關閉通知後重新開啟");
     } }), /* @__PURE__ */ h(Item, { icon: "🔕", title: "關閉通知", subtitle: "停止通知，並刪除伺服器上的資料", chevron: false, onTap: async () => {
       await p.disable();
@@ -4231,11 +4236,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.24-0250"}`);
+          Pasteboard.copy(`版本 ${"2026.11.24-0254"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.24-0250"}`,
+      `版本 ${"2026.11.24-0254"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -4450,6 +4455,11 @@ var App = class {
     const isToday = date === todayTPE();
     const now = nowHM();
     const x = await this.extras(m.title);
+    const tw = (await loadMovies().catch(() => [])).find((t) => communityKey(t.title) === communityKey(m.title));
+    const dayJob = tw ? movieDay(tw.slug, void 0).catch(() => null) : Promise.resolve(null);
+    const day = await Promise.race([dayJob, sleep(this.rerendering ? 0 : 1200).then(() => void 0)]);
+    if (day === void 0) this.late = [dayJob];
+    const about = movieAbout(day || null);
     return /* @__PURE__ */ h(Page, { title: m.title, subtitle: `${c.name}｜${dateLabel(date)}`, onBack: () => this.back() }, this.hero(x, m.title, [
       m.runtime ? `片長 ${m.runtime} 分鐘` + (m.runtimeFrom ? `（${m.runtimeFrom}）` : "") : "片長未提供，下一步可手動輸入",
       m.rating || ""
@@ -4472,7 +4482,7 @@ var App = class {
           }
         }
       );
-    })))));
+    })))), about.text || about.credits ? /* @__PURE__ */ h(Section, { title: "劇情簡介", hint: "簡介來自場次通。" }, /* @__PURE__ */ h(Para, { text: about.text || about.credits, dim: about.text ? about.credits : "" })) : null);
   }
   // ── 確認 ──
   start(p) {
@@ -4575,7 +4585,7 @@ var App = class {
     if (false) {
       if (!r) return /* @__PURE__ */ h(Note, { text: "（無法確認是否為最新版：連不到網站）" });
       if (r.isLatest) return /* @__PURE__ */ h(Note, { text: "✅ 已是最新版" });
-      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.24-0250"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
+      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.24-0254"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
         globalThis.location.reload();
       } }));
     }

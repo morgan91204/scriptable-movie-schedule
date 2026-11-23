@@ -269,6 +269,18 @@ export function Search(props: { value: string; placeholder: string; onInput: (te
   return <input class="field" name="q" type="search" enterkeyhint="search" autocomplete="off" value={props.value} placeholder={props.placeholder} autofocus={props.autofocus} onInput={(v: Record<string, string>) => props.onInput(v.q || "")} />;
 }
 
+/** 一列「標題＋下拉選單」：用系統的選單選（例如時間）；name 在同一頁不能重複 */
+export function PickRow(props: { title: string; name: string; value: string; options: { id: string; label: string }[]; onPick: (id: string) => void }): string {
+  return (
+    <div class="item kv">
+      <div class="body"><div class="title">{esc(props.title)}</div></div>
+      <select class="sel" name={props.name} onInput={(v: Record<string, string>) => props.onPick(v[props.name] || "")}>
+        {props.options.map((o) => <option value={o.id} selected={o.id === props.value}>{esc(o.label)}</option>)}
+      </select>
+    </div>
+  );
+}
+
 export function Button(props: { label: string; onTap?: Handler; kind?: "primary" | "secondary" | "danger"; enter?: boolean }): string {
   return (
     <button class={"btn " + (props.kind || "primary")} onTap={props.onTap} data-enter={props.enter ? "" : undefined}>

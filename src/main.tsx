@@ -2,7 +2,7 @@
 // 執行環境：Scriptable（iOS）。原始碼用 TSX 撰寫，編譯後的 .js 放進 Scriptable 執行。
 // 畫面：WebView（HTML/CSS），事件迴圈在 run()。資料層在 core.ts，網頁解析在 parsers.ts。
 
-import { h, Fragment, Page, Section, Item, Chips, Chip, Button, Search, Note, Para, Loading, Empty, Hero, Steps } from "./jsx";
+import { h, Fragment, Page, Section, Item, Chips, Chip, Button, Search, PickRow, Note, Para, Loading, Empty, Hero, Steps } from "./jsx";
 import type { RatingBadge } from "./jsx";
 import { UI } from "./ui";
 import { setPlatform } from "./platform";
@@ -10,7 +10,7 @@ import { scriptablePlatform } from "./platform-scriptable";
 import {
   Cinema, Settings, Movie, Version, EXTRA, CITY_ORDER, AD_STEPS,
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
-  loadSettings, saveSettings, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, TW,
+  loadSettings, saveSettings, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, communityKey, TW,
   FORMATS, formatsOf, filterVersions, filterVersionsAny, movieRows, movieDays, nearest, kmLabel, WINDOWS, findShowtimes, findShowtimesMulti, multiLabel, multiDetail, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText,
   hallOf, tmdbTest, movieExtras, moviePoster, movieRuntime, posterSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxCountries, boxByCountry, boxInfo, boxInfoRows, boxCountryText, BOX_COUNTRY_NOTE, boxCountryTag, boxCountriesPicked, loadMovieBoard, loadSoonBoard, notifyPrefs, notifyPayload, notifyEndScope, notifyEndPick, notifyQuiet, NOTIFY_PRE_STEPS, NOTIFY_KINDS, boxStatus, STATUS_LABEL, boxInfoBy, isFavMovie, toggleFavMovie, favMovieRows, favMovieBox, soonGroups, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityCached, communityVote, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalsReady, festivalNote, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, festivalDefaultDate, festivalStateLabel, festivalState, festivalFooter, linkMovies, nowGroupLine, nowFilter, festivalPick, movieAbout, festivalSearch, festivalSearchLines, festivalTrailer, festivalYears, festivalsAny, festivalGroups, festivalChipNote, festivalStatusLine, movieRatings, ratingTier,
 } from "./core";
@@ -331,6 +331,7 @@ class App {
     };
     const fmts = prefs.fmts || [], preDays = prefs.preDays || 3, quiet = notifyQuiet(prefs);
     const hh = (h: number) => `${String(h).padStart(2, "0")}:00`;
+    const hours = Array.from({ length: 24 }, (_, h) => ({ id: String(h), label: hh(h) }));
     const noteOf = (k: { id: NotifyKind; note: string }) =>
       k.id === "end" ? endNote : k.id === "pre" ? `上映前 ${preDays} 天提醒一次` : k.id === "fmt" ? (fmts.length ? `${fmts.join("、")} 開始有場次` : k.note) : k.id === "favc" ? `${k.note}；目前收藏 ${this.settings.favorites.length} 間` : k.note;
     const row = (k: (typeof NOTIFY_KINDS)[number]) => <Item icon={prefs[k.id] ? "✅" : "⬜️"} title={k.label} subtitle={noteOf(k)} chevron={false} onTap={() => toggle(k.id)} />;
@@ -385,8 +386,8 @@ class App {
         </Section>
         <Section title="勿擾時段" hint={quiet.on ? `${hh(quiet.from)} 到${quiet.from > quiet.to ? "隔天" : ""} ${hh(quiet.to)} 不發通知，這段時間的通知留到之後再發。` : "任何時間都可能發通知。"}>
           <Item icon={quiet.on ? "✅" : "⬜️"} title="晚上不要通知我" chevron={false} onTap={() => set({ quietOn: !quiet.on })} />
-          {quiet.on ? <Item kv title="開始" right={`${hh(quiet.from)} ⇄`} chevron={false} onTap={() => set({ quietFrom: [20, 21, 22, 23, 0, 1][([20, 21, 22, 23, 0, 1].indexOf(quiet.from) + 1) % 6] })} /> : null}
-          {quiet.on ? <Item kv title="結束" right={`${hh(quiet.to)} ⇄`} chevron={false} onTap={() => set({ quietTo: [6, 7, 8, 9, 10, 11, 12][([6, 7, 8, 9, 10, 11, 12].indexOf(quiet.to) + 1) % 7] })} /> : null}
+          {quiet.on ? <PickRow title="開始" name="qfrom" value={String(quiet.from)} options={hours} onPick={(v) => set({ quietFrom: Number(v) })} /> : null}
+          {quiet.on ? <PickRow title="結束" name="qto" value={String(quiet.to)} options={hours} onPick={(v) => set({ quietTo: Number(v) })} /> : null}
         </Section>
         <Section hint={`已開啟${n ? `，目前收藏了 ${n} 部` : "；還沒有收藏的電影，到電影頁點愛心收藏"}。你收藏的片名存在我們的伺服器上，只用來判斷什麼時候通知；關閉通知時會一起刪掉。`}>
           <Item icon="📨" title="傳一則測試通知" subtitle="確認這台裝置收得到" chevron={false} onTap={async () => { await this.ui.toast((await p.test()) ? "已送出，幾秒內應該會收到" : "送不出去，請關閉通知後重新開啟"); }} />
@@ -763,6 +764,12 @@ class App {
     const isToday = date === todayTPE();
     const now = nowHM();
     const x = await this.extras(m.title);
+    // 劇情簡介：跟「依電影找場次」的電影頁同一份（場次通的電影頁）。先找出這部片在場次通的那一頁；讀太久就先畫場次，讀好再補上
+    const tw = (await loadMovies().catch(() => [] as TwMovie[])).find((t) => communityKey(t.title) === communityKey(m.title));
+    const dayJob = tw ? movieDay(tw.slug, undefined).catch(() => null) : Promise.resolve(null);
+    const day = await Promise.race([dayJob, sleep(this.rerendering ? 0 : 1200).then(() => undefined)]);
+    if (day === undefined) this.late = [dayJob];
+    const about = movieAbout(day || null);
     return (
       <Page title={m.title} subtitle={`${c.name}｜${dateLabel(date)}`} onBack={() => this.back()}>
         {this.hero(x, m.title, [
@@ -794,6 +801,11 @@ class App {
             </Chips>
           </Section>
         ))}
+        {about.text || about.credits ? (
+          <Section title="劇情簡介" hint="簡介來自場次通。">
+            <Para text={about.text || about.credits} dim={about.text ? about.credits : ""} />
+          </Section>
+        ) : null}
       </Page>
     );
   }
