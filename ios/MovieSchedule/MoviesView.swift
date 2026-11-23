@@ -69,7 +69,7 @@ struct MoviesView: View {
         HStack(spacing: 10) {
             PosterView(title: e.title, slug: e.m?.slug, en: e.m?.en ?? e.u?.en)
             VStack(alignment: .leading, spacing: 2) {
-                Text(e.title).lineLimit(2)
+                Text(e.title).lineLimit(2).minimumScaleFactor(0.75)
                 // 兩行說明各自一行不換行，跟票房排行同一種排版
                 let first = e.lines.first ?? ""
                 let second = e.lines.count > 1 ? e.lines[1] : ""
@@ -284,7 +284,7 @@ struct BoxOfficeSection: View {
             }
             PosterView(title: r.m?.title ?? r.name, slug: r.m?.slug, en: r.m?.en, lightRelease: (r.light ?? false) ? (r.x?.release ?? "") : nil)
             VStack(alignment: .leading, spacing: 2) {
-                Text(r.name).lineLimit(2)
+                Text(r.name).lineLimit(2).minimumScaleFactor(0.75)
                 // 兩行說明各自一行不換行（文字由共用資料層依排法算好）
                 let first = r.lines.first ?? ""
                 let second = r.lines.count > 1 ? r.lines[1] : ""

@@ -121,7 +121,7 @@ struct FestivalFilmRow: View {
             HStack(spacing: 10) {
                 FestivalPoster(film: film, width: 44)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(film.title).lineLimit(2)
+                    Text(film.title).lineLimit(2).minimumScaleFactor(0.75)
                     if let first = lines.first, !first.isEmpty {
                         Text(first).font(.subheadline).foregroundStyle(.secondary).lineLimit(1).minimumScaleFactor(0.8)
                     }

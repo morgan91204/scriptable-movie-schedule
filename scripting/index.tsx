@@ -1011,7 +1011,7 @@ function BoxOfficeSections({ movies, query }: { movies: TwMovie[]; query: string
       {e.rank === null ? null : <Text font={e.rank >= 1000 ? "caption" : e.rank >= 100 ? "subheadline" : "title3"} fontWeight={"bold"} monospacedDigit foregroundStyle={e.rank <= 3 ? "systemOrange" : "secondaryLabel"} lineLimit={1} minScaleFactor={0.6} frame={{ width: 34 }}>{String(e.rank)}</Text>}
       {PosterBox({ w: 44, h: 66, r: 6, img: thumbs[i].img, ver: 0, pending: thumbs[i].pending, title: e.name })}
       <VStack alignment={"leading"} spacing={2}>
-        <Text foregroundStyle={"label"} lineLimit={2}>{e.name}</Text>
+        <Text foregroundStyle={"label"} lineLimit={2} minScaleFactor={0.75}>{e.name}</Text>
         {/* 兩行說明各自一行不換行，窄螢幕也對得齊 */}
         {e.lines[0] ? <Text font={"subheadline"} foregroundStyle={"secondaryLabel"} lineLimit={1} minScaleFactor={0.8}>{e.lines[0]}</Text> : null}
         {e.lines[1] ? <Text font={"caption"} foregroundStyle={"tertiaryLabel"} lineLimit={1} minScaleFactor={0.8}>{e.lines[1]}</Text> : null}
@@ -1116,7 +1116,7 @@ function FestivalSections({ list: first, query }: { list: Festival[]; query: str
     <HStack spacing={10}>
       {PosterBox({ w: 44, h: 66, r: 6, img: imgOf(film.poster || ""), ver: 0, pending: false, title: film.title })}
       <VStack alignment={"leading"} spacing={2}>
-        <Text foregroundStyle={"label"} lineLimit={2}>{film.title}</Text>
+        <Text foregroundStyle={"label"} lineLimit={2} minScaleFactor={0.75}>{film.title}</Text>
         {lines[0] ? <Text font={"subheadline"} foregroundStyle={"secondaryLabel"} lineLimit={1} minScaleFactor={0.8}>{lines[0]}</Text> : null}
         {lines[1] ? <Text font={"caption"} foregroundStyle={"tertiaryLabel"} lineLimit={2}>{lines[1]}</Text> : null}
       </VStack>
@@ -1154,7 +1154,7 @@ function FestivalSections({ list: first, query }: { list: Festival[]; query: str
           <HStack spacing={10}>
             {PosterBox({ w: 44, h: 66, r: 6, img: imgOf(film.poster || ""), ver: 0, pending: false, title: film.title })}
             <VStack alignment={"leading"} spacing={2}>
-              <Text foregroundStyle={"label"} lineLimit={2}>{film.title}</Text>
+              <Text foregroundStyle={"label"} lineLimit={2} minScaleFactor={0.75}>{film.title}</Text>
               {lines[0] ? <Text font={"subheadline"} foregroundStyle={"secondaryLabel"} lineLimit={1} minScaleFactor={0.8}>{lines[0]}</Text> : null}
               {lines[1] ? <Text font={"caption"} foregroundStyle={"tertiaryLabel"} lineLimit={2}>{lines[1]}</Text> : null}
             </VStack>
@@ -1230,7 +1230,7 @@ function MoviesPage() {
     const body = <HStack spacing={10}>
       {PosterBox({ w: 44, h: 66, r: 6, img: t.img, ver: 0, pending: t.pending, title: e.title })}
       <VStack alignment={"leading"} spacing={2}>
-        <Text foregroundStyle={"label"} lineLimit={2}>{e.title}</Text>
+        <Text foregroundStyle={"label"} lineLimit={2} minScaleFactor={0.75}>{e.title}</Text>
         {/* 兩行說明各自一行不換行，跟票房排行同一種排版 */}
         {e.lines[0] ? <Text font={"subheadline"} foregroundStyle={"secondaryLabel"} lineLimit={1} minScaleFactor={0.8}>{e.lines[0]}</Text> : null}
         {e.lines[1] ? <Text font={"caption"} foregroundStyle={"tertiaryLabel"} lineLimit={1}>{e.lines[1]}</Text> : null}
