@@ -14,9 +14,9 @@ import {
   Cinema, Movie, Settings, Version, TwMovie, TwMovieCinema, CITY_ORDER, TW,
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
   loadSettings, saveSettings, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, cinemaAddress,
-  FORMATS, formatsOf, filterVersions, filterVersionsAny, movieRows, movieDays, nearest, kmLabel, WINDOWS, findShowtimes, findShowtimesMulti, multiLabel, multiDetail, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText, hallOf, tmdbTest, movieExtras, moviePoster, posterReady, posterTint, POSTER_TINTS, normImageUrl, movieRuntime, posterSrc, isLocalSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxCountries, boxByCountry, boxInfo, boxInfoRows, boxCountryText, BOX_COUNTRY_NOTE, boxCountryTag, boxCountriesPicked, movieBoard, loadBoxFor, loadCommunitySummary, loadUpcoming, soonBoard, soonGroups, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityVote, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, SCRIPTING_IMPORT_URL, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, festivalDefaultDate, festivalStateLabel, festivalState, festivalFooter, linkMovies, nowGroupLine, nowFilter, festivalPick, movieAbout, festivalSearch, festivalSearchLines, festivalTrailer, festivalYears, festivalGroups, festivalChipNote, festivalStatusLine, movieRatings, ratingTier,
+  FORMATS, formatsOf, filterVersions, filterVersionsAny, movieRows, movieDays, nearest, kmLabel, WINDOWS, findShowtimes, findShowtimesMulti, multiLabel, multiDetail, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText, hallOf, tmdbTest, movieExtras, moviePoster, posterReady, posterTint, POSTER_TINTS, normImageUrl, movieRuntime, posterSrc, isLocalSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxCountries, boxByCountry, boxInfo, boxInfoRows, boxCountryText, BOX_COUNTRY_NOTE, boxCountryTag, boxCountriesPicked, movieBoard, loadBoxFor, loadCommunitySummary, loadUpcoming, soonBoard, isFavMovie, toggleFavMovie, favMovieRows, favMovieBox, soonGroups, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityVote, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, SCRIPTING_IMPORT_URL, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, festivalDefaultDate, festivalStateLabel, festivalState, festivalFooter, linkMovies, nowGroupLine, nowFilter, festivalPick, movieAbout, festivalSearch, festivalSearchLines, festivalTrailer, festivalYears, festivalGroups, festivalChipNote, festivalStatusLine, movieRatings, ratingTier,
 } from "./core"
-import type { Ratings, Format, LatLng, Hit, Community, BoxOfficeItem, BoxSort, BoxOffice, MovieEntry, SoonEntry, UpcomingFilm, Festival, FestivalFilm, FestivalSession } from "./core"
+import type { Ratings, FavMovie, FavRow, Format, LatLng, Hit, Community, BoxOfficeItem, BoxSort, BoxOffice, MovieEntry, SoonEntry, UpcomingFilm, Festival, FestivalFilm, FestivalSession } from "./core"
 
 declare const Safari: any
 declare const Dialog: any
@@ -208,6 +208,9 @@ function Home({ cinemas }: { cinemas: CinemasLoad }) {
   const list = cinemas.data || []
   const favs = settings.favorites.map((id) => list.find((c) => c.id === id)).filter(Boolean) as Cinema[]
   const [favOpen, setFavOpen] = useState(false) // 常去影城清單有沒有展開（預設收合）
+  const [favMovOpen, setFavMovOpen] = useState(false) // 收藏的電影清單有沒有展開（預設收合；展開才查每部片現在的狀態）
+  const favMovies = settings.favMovies || []
+  const favRows = useLoad(() => (favMovOpen && favMovies.length ? favMovieRows(settings) : Promise.resolve([] as FavRow[])), [favMovOpen, favMovies.map((f) => f.key).join("|")])
 
   return <NavigationStack>
     <List
@@ -245,6 +248,19 @@ function Home({ cinemas }: { cinemas: CinemasLoad }) {
             </HStack>
           </Button>
           {(favOpen ? favs : []).map((c) => <CinemaLink key={c.id} cinema={c} showCity />)}
+        </Section> : null}
+        {favMovies.length ? <Section footer={favMovOpen ? <Text>在電影頁點「收藏這部電影」加入；再點一次取消。下檔的片也會留在這裡。</Text> : undefined}>
+          {/* 預設收合，只留這一列；點一下展開清單 */}
+          <Button action={() => setFavMovOpen(!favMovOpen)}>
+            <HStack spacing={8}>
+              <Image systemName={"heart.fill"} foregroundStyle={"systemPink"} />
+              <Text font={"headline"} foregroundStyle={"label"}>{`收藏的電影（${favMovies.length} 部）`}</Text>
+              <Spacer />
+              <Image systemName={favMovOpen ? "chevron.down.circle" : "chevron.right.circle"} font={"title3"} foregroundStyle={"secondaryLabel"} />
+            </HStack>
+          </Button>
+          {favMovOpen && !favRows.data ? <Loading text={"讀取收藏的電影…"} /> : null}
+          {(favMovOpen ? favRows.data || [] : []).map((r) => <FavMovieLink key={r.fav.key} row={r} />)}
         </Section> : null}
       </>}
     </List>
@@ -463,6 +479,53 @@ function useThumbs(items: { title: string; slug?: string; en?: string; light?: b
 }
 
 /** 電影頁頂端：海報在左，資訊、評分與紅色預告按鈕在右（跟 Scriptable 版一樣） */
+/** 「收藏這部電影」那一列：電影頁、影展片、即將上映、已下檔的片都放同一個 */
+function FavMovieRow({ title, en, poster, fest }: { title: string; en?: string; poster?: string; fest?: FavMovie["fest"] }) {
+  const [settings, update] = useSettings()
+  const on = isFavMovie(settings, title)
+  const toggle = () => {
+    const next = { ...settings, favMovies: (settings.favMovies || []).slice() }
+    toggleFavMovie(next, { title, en, poster, fest })
+    update({ favMovies: next.favMovies })
+  }
+  return <Section footer={<Text>{on ? "在首頁「收藏的電影」可以快速打開。" : "收藏後在首頁就能快速打開；下檔後也找得到。"}</Text>}>
+    <Button action={toggle}>
+      <HStack spacing={8}>
+        <Image systemName={on ? "heart.fill" : "heart"} foregroundStyle={"systemPink"} />
+        <Text foregroundStyle={"label"}>{on ? "已收藏（點一下取消）" : "收藏這部電影"}</Text>
+        <Spacer />
+      </HStack>
+    </Button>
+  </Section>
+}
+/** 收藏的片目前哪裡都沒有場次：票房排行（2016 年至今）找得到就顯示票房資訊；找不到就只有海報、評分、預告 */
+function FavMoviePage({ fav }: { fav: FavMovie }) {
+  const box = useLoad(() => favMovieBox(fav).then((x) => ({ x })), [fav.key])
+  if (box.data && box.data.x) return <BoxOfficeMoviePage item={box.data.x} />
+  return <List navigationTitle={fav.title} navigationBarTitleDisplayMode={"inline"}>
+    <MovieHero title={fav.title} en={fav.en} lines={[fav.en || "", fav.fest ? `收藏自${fav.fest.name}` : ""].filter(Boolean)} poster={fav.poster} fest={fav.fest} />
+    <Section footer={<Text>目前查不到這部片的場次，可能已經下檔，或還沒排片。之後有場次時，從首頁「收藏的電影」點進來就會直接到場次頁。</Text>}>
+      <Text foregroundStyle={"secondaryLabel"}>{box.data ? "目前沒有場次" : "讀取中…"}</Text>
+    </Section>
+  </List>
+}
+/** 首頁「收藏的電影」的一列：依這部片現在的狀態連到對的頁面（有場次的電影頁、即將上映、影展片、票房資訊） */
+function FavMovieLink({ row: r }: { row: FavRow }) {
+  const imgOf = useDirectImages([r.fav.poster || ""], r.fav.key)
+  const t = r.target
+  const dest = t.kind === "movie" ? <MoviePage movie={t.m} /> : t.kind === "soon" ? <SoonMoviePage film={t.u} /> : t.kind === "fest" ? <FestivalFilmPage festival={t.f} film={t.film} /> : t.kind === "box" ? <BoxOfficeMoviePage item={t.x} /> : <FavMoviePage fav={r.fav} />
+  return <NavigationLink destination={dest}>
+    <HStack spacing={10}>
+      {PosterBox({ w: 44, h: 66, r: 6, img: imgOf(r.fav.poster || ""), ver: 0, pending: false, title: r.fav.title })}
+      <VStack alignment={"leading"} spacing={2}>
+        <Text foregroundStyle={"label"} lineLimit={2} minScaleFactor={0.75}>{r.fav.title}</Text>
+        <Text font={"subheadline"} foregroundStyle={"secondaryLabel"} lineLimit={1} minScaleFactor={0.8}>{r.line}</Text>
+      </VStack>
+      <Spacer />
+    </HStack>
+  </NavigationLink>
+}
+
 /** 三大評分徽章（IMDb、番茄、爆米花）：電影頁和影展片共用同一個樣式。讀好後三個都顯示，沒有那項評分就是「-」（跟「還沒抓到」分得開） */
 function RatingLine({ rt }: { rt: { data: Ratings | null; error: string | null } }) {
   const r = rt.data
@@ -479,7 +542,7 @@ function RatingLine({ rt }: { rt: { data: Ratings | null; error: string | null }
   </>
 }
 
-function MovieHero({ title, slug, lines, en }: { title: string; slug?: string; lines: string[]; en?: string }) {
+function MovieHero({ title, slug, lines, en, poster, fest }: { title: string; slug?: string; lines: string[]; en?: string; poster?: string; fest?: FavMovie["fest"] }) {
   const x = useLoad(() => movieExtras(title, slug), [title, slug || ""])
   const rt = useLoad(() => movieRatings(title, en, slug), [title, en || ""])
   const p = useLoad(() => moviePoster(title, slug, en), [title, slug || ""]) // 海報網址快查（不等預告）
@@ -517,6 +580,7 @@ function MovieHero({ title, slug, lines, en }: { title: string; slug?: string; l
     </HStack>
   </Section>
   <CommunitySection title={title} />
+  <FavMovieRow title={title} en={en} poster={posterUrl || poster} fest={fest} />
   </>
 }
 
@@ -1135,6 +1199,7 @@ function FestivalFilmPage({ festival: f, film }: { festival: Festival; film: Fes
       </HStack>
     </Section>
     <CommunitySection title={film.title} />
+    <FavMovieRow title={film.title} poster={film.poster} fest={{ id: f.id, film: film.id, name: f.name }} />
     {film.intro || film.credits ? <Section header={<Text>介紹</Text>} footer={<Text>{`介紹來自${f.source}。`}</Text>}>
       {film.intro ? <Text font={"subheadline"}>{film.intro}</Text> : null}
       {film.credits ? <Text font={"footnote"} foregroundStyle={"secondaryLabel"}>{film.credits}</Text> : null}

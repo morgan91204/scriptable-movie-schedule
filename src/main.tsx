@@ -12,9 +12,9 @@ import {
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
   loadSettings, saveSettings, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, TW,
   FORMATS, formatsOf, filterVersions, filterVersionsAny, movieRows, movieDays, nearest, kmLabel, WINDOWS, findShowtimes, findShowtimesMulti, multiLabel, multiDetail, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText,
-  hallOf, tmdbTest, movieExtras, moviePoster, movieRuntime, posterSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxCountries, boxByCountry, boxInfo, boxInfoRows, boxCountryText, BOX_COUNTRY_NOTE, boxCountryTag, boxCountriesPicked, loadMovieBoard, loadSoonBoard, soonGroups, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityCached, communityVote, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalsReady, festivalNote, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, festivalDefaultDate, festivalStateLabel, festivalState, festivalFooter, linkMovies, nowGroupLine, nowFilter, festivalPick, movieAbout, festivalSearch, festivalSearchLines, festivalTrailer, festivalYears, festivalsAny, festivalGroups, festivalChipNote, festivalStatusLine, movieRatings, ratingTier,
+  hallOf, tmdbTest, movieExtras, moviePoster, movieRuntime, posterSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxCountries, boxByCountry, boxInfo, boxInfoRows, boxCountryText, BOX_COUNTRY_NOTE, boxCountryTag, boxCountriesPicked, loadMovieBoard, loadSoonBoard, isFavMovie, toggleFavMovie, favMovieRows, favMovieBox, soonGroups, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityCached, communityVote, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalsReady, festivalNote, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, festivalDefaultDate, festivalStateLabel, festivalState, festivalFooter, linkMovies, nowGroupLine, nowFilter, festivalPick, movieAbout, festivalSearch, festivalSearchLines, festivalTrailer, festivalYears, festivalsAny, festivalGroups, festivalChipNote, festivalStatusLine, movieRatings, ratingTier,
 } from "./core";
-import type { MovieExtras, Ratings, Community, BoxOfficeItem, BoxSort, MovieEntry, SoonEntry, UpcomingFilm, Festival, FestivalFilm, FestivalSession } from "./core";
+import type { MovieExtras, Ratings, Community, BoxOfficeItem, BoxSort, MovieEntry, SoonEntry, UpcomingFilm, FavMovie, FavRow, Festival, FestivalFilm, FestivalSession } from "./core";
 import { setTabBar, setBackGuard, esc } from "./jsx";
 import type { TwMovie, TwMovieCinema, Format, LatLng, Hit } from "./core";
 
@@ -197,6 +197,17 @@ class App {
     if (!this.cinemas.length) this.cinemas = await loadCinemas();
     this.calendarName = (await currentCalendar(this.settings)).title;
     const favs = this.settings.favorites.map((id) => this.cinemas.find((c) => c.id === id)).filter(Boolean) as Cinema[];
+    // 收藏的電影：收合時只顯示有幾部（不用讀資料）；展開才查每部片現在的狀態
+    const favMovies = this.settings.favMovies || [];
+    const favRows = this.favMovOpen && favMovies.length ? await favMovieRows(this.settings).catch(() => [] as FavRow[]) : [];
+    const openFav = (r: FavRow) => {
+      const t = r.target;
+      if (t.kind === "movie") this.go(() => this.movieView(t.m, ""), `讀取《${t.m.title}》的放映影城…`);
+      else if (t.kind === "soon") this.go(() => this.soonMovieView(t.u), `讀取《${t.u.title}》…`);
+      else if (t.kind === "fest") this.go(() => this.festivalFilmView(t.f, t.film));
+      else if (t.kind === "box") this.go(() => this.boxMovieView(t.x), `讀取《${t.x.name}》…`);
+      else this.go(() => this.favMovieView(r.fav), `讀取《${r.fav.title}》…`);
+    };
     return (
       <Page title="🎬 電影行程" subtitle={`${this.cinemas.length} 間影城｜選影城 → 日期 → 電影 → 場次`}>
         <Section>
@@ -211,6 +222,15 @@ class App {
             <Item head icon="★" title={`常去影城（${favs.length} 間）`} subtitle={this.favOpen ? "點一下收合" : "點一下展開"} chevron={false} onTap={() => { this.favOpen = !this.favOpen; }} action={{ label: this.favOpen ? "▾" : "▸", hint: this.favOpen ? "收合常去影城" : "展開常去影城", onTap: () => { this.favOpen = !this.favOpen; } }} />
             {(this.favOpen ? favs : []).map((c) => (
               <Item icon="★" title={c.name} subtitle={`${c.city} ${c.district}`} onTap={() => this.go(() => this.cinemaView(c), `讀取 ${c.name} 的場次…`)} />
+            ))}
+          </Section>
+        ) : null}
+        {favMovies.length ? (
+          <Section hint={this.favMovOpen ? "在電影頁點「收藏這部電影」加入；再點一次取消。下檔的片也會留在這裡。" : ""}>
+            {/* 預設收合，只留這一列；點一下展開清單 */}
+            <Item head icon="♥" title={`收藏的電影（${favMovies.length} 部）`} subtitle={this.favMovOpen ? "點一下收合" : "點一下展開"} chevron={false} onTap={() => { this.favMovOpen = !this.favMovOpen; }} action={{ label: this.favMovOpen ? "▾" : "▸", hint: this.favMovOpen ? "收合收藏的電影" : "展開收藏的電影", onTap: () => { this.favMovOpen = !this.favMovOpen; } }} />
+            {favRows.map((r) => (
+              <Item thumb={{ src: r.fav.poster ? posterSrc(r.fav.poster) : "", url: r.fav.poster }} title={r.fav.title} subtitle={r.line} onTap={() => openFav(r)} />
             ))}
           </Section>
         ) : null}
@@ -514,6 +534,28 @@ class App {
     );
   }
 
+  /** 「收藏這部電影」那一列：電影頁、影展片、即將上映、已下檔的片都放同一個 */
+  favMovieItem(m: { title: string; en?: string; poster?: string; fest?: FavMovie["fest"] }): string {
+    const on = isFavMovie(this.settings, m.title);
+    return (
+      <Section>
+        <Item icon={on ? "♥" : "♡"} title={on ? "已收藏（點一下取消）" : "收藏這部電影"} subtitle={on ? "在首頁「收藏的電影」可以快速打開" : "之後在首頁就能快速打開；下檔後也找得到"} chevron={false} onTap={() => { toggleFavMovie(this.settings, m); saveSettings(this.settings); }} />
+      </Section>
+    );
+  }
+  /** 收藏的片目前哪裡都沒有場次：票房排行（2016 年至今）找得到就開那一頁；找不到就只顯示海報、評分、預告 */
+  async favMovieView(fav: FavMovie): Promise<string> {
+    const x = await favMovieBox(fav);
+    if (x) return this.boxMovieView(x);
+    const e = await this.extras(fav.title, undefined, fav.en);
+    return (
+      <Page title={fav.title} subtitle="收藏的電影" onBack={() => this.back()}>
+        {this.hero(e, fav.title, [fav.en || "", fav.fest ? `收藏自${fav.fest.name}` : ""].filter(Boolean))}
+        {this.favMovieItem(fav)}
+        <Note text="目前查不到這部片的場次，可能已經下檔，或還沒排片。之後有場次時，從首頁「收藏的電影」點進來就會直接到場次頁。" />
+      </Page>
+    );
+  }
   /** 三大評分徽章（IMDb、番茄、爆米花）：電影頁和影展片共用。讀好後三個都顯示，沒有那項評分就是「-」（跟「還沒抓到」分得開） */
   ratingBadges(r: Ratings | null | undefined): RatingBadge[] {
     const badges: RatingBadge[] = [];
@@ -995,6 +1037,7 @@ class App {
       <Page title={film.title} subtitle={f.name} onBack={() => this.back()}>
         <Hero title={film.title} poster={film.poster || undefined} lines={[[film.rating, film.mins ? `${film.mins} 分鐘` : ""].filter(Boolean).join("｜"), `${f.name}（${festivalStateLabel(f)}）`, "影展片名，院線上映時可能不同", ...(r === undefined ? ["評分讀取中…"] : [])]} badges={this.ratingBadges(r)} trailerLabel={festivalTrailer(film).label} onTrailer={() => Safari.open(festivalTrailer(film).url)} />
         {this.community(film.title, rated)}
+        {this.favMovieItem({ title: film.title, poster: film.poster, fest: { id: f.id, film: film.id, name: f.name } })}
         {film.intro || film.credits ? (
           <Section title="介紹" hint={`介紹來自${f.source}。`}>
             <Para text={film.intro || film.credits || ""} dim={film.intro ? film.credits : ""} />
@@ -1136,6 +1179,7 @@ class App {
     return (
       <Page title={x.name} subtitle={`票房第 ${x.rank} 名`} onBack={() => this.back()}>
         {this.hero(e, x.name, [boxCountryText(x.country), `${date} 上映`])}
+        {this.favMovieItem({ title: x.name, poster: e.x?.poster || e.p })}
         {/* 個別資訊：跟官方網站列的欄位一樣（國別、發行、出品、上映日期、院數、票數、金額） */}
         <Section title="票房資訊" hint="資料來源：國家電影及視聽文化中心「全國電影票房統計」。">
           {boxInfoRows(x, info).map(([label, value]) => <Item kv title={label} right={value} />)}
@@ -1195,6 +1239,7 @@ class App {
     return (
       <Page title={u.title} subtitle={`${date} 上映`} onBack={() => this.back()}>
         {this.hero(e, u.title, [u.en, [`${date} ${u.approx ? "當週" : ""}上映`, u.rating, u.runtime ? `${u.runtime} 分` : ""].filter(Boolean).join("｜")].filter(Boolean))}
+        {this.favMovieItem({ title: u.title, en: u.en, poster: u.poster || e.x?.poster || e.p })}
         <Note text="戲院還沒有排這部片的場次。通常上映前一到兩週會開放，到時候這裡會自動變成可以查場次。上映日期可能再調整。" />
         <Button label="🌐 開眼電影網的介紹" kind="secondary" onTap={() => Safari.open(u.url)} />
       </Page>
@@ -1252,6 +1297,7 @@ class App {
     return (
       <Page title={m.title} subtitle={[m.rating || d.rating, runtime ? `${runtime} 分鐘` : "", `${d.cinemas.length} 間影城`].filter(Boolean).join("｜")} onBack={() => this.back()}>
         {this.hero(x, m.title, [m.en, [m.rating || d.rating, runtime ? `${runtime} 分鐘` : ""].filter(Boolean).join("｜"), releaseLabel(d.release || m.release || releaseOf(m.title)), `${d.cinemas.length} 間影城有放映`])}
+        {this.favMovieItem({ title: m.title, en: m.en, poster: x.x?.poster || x.p })}
         {about.text || about.credits ? (
           <Section title="劇情簡介" hint="簡介來自場次通。">
             <Para text={about.text || about.credits} dim={about.text ? about.credits : ""} />
@@ -1412,6 +1458,7 @@ class App {
   }
 
   favOpen = false; // 首頁的常去影城清單有沒有展開（預設收合）
+  favMovOpen = false; // 首頁的收藏電影清單有沒有展開（預設收合）
   nowFolded: string[] = []; // 「現在有什麼可以看」結果裡收合起來的片（只留片名列）
   nowFoldFor = ""; // 上面那份收合狀態是哪一次查詢的
   nowQuery = ""; // 在結果裡再搜尋的字

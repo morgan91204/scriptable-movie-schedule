@@ -82,6 +82,8 @@
     datesOf: () => datesOf,
     distanceKm: () => distanceKm,
     extractTmdbKey: () => extractTmdbKey,
+    favMovieBox: () => favMovieBox,
+    favMovieRows: () => favMovieRows,
     festivalChipNote: () => festivalChipNote,
     festivalCinema: () => festivalCinema,
     festivalDates: () => festivalDates,
@@ -116,6 +118,7 @@
     formatsOf: () => formatsOf,
     groupByMovie: () => groupByMovie,
     hallOf: () => hallOf,
+    isFavMovie: () => isFavMovie,
     isLate: () => isLate,
     isLocalSrc: () => isLocalSrc,
     isReissue: () => isReissue,
@@ -182,6 +185,7 @@
     tmdbRuntime: () => tmdbRuntime,
     tmdbTest: () => tmdbTest,
     todayTPE: () => todayTPE,
+    toggleFavMovie: () => toggleFavMovie,
     tpeDate: () => tpeDate,
     twDayLive: () => twDayLive,
     twReleaseDate: () => twReleaseDate,
@@ -711,7 +715,6 @@ function parseTwMovieDay(doc) {
     ["t02a03", "a02", "微風影城", "台北市松山區復興南路一段39號(微風廣場8樓)"],
     ["t02a05", "a02", "總督影城", "台北市松山區長安東路二段219號5樓之1"],
     ["t02a06", "a02", "哈拉影城", "台北市內湖區康寧路三段72號"],
-    ["t02c01", "a02", "百老匯影城公館店", "台北市中正區羅斯福路四段200號3~5樓"],
     ["t02d06", "a02", "美麗新大直皇家影城", "台北市中山區北安路780號B2"],
     ["t02e03", "a02", "新莊鴻金寶麻吉影城", "新北市新莊區民安路188巷5號"],
     ["t02e04", "a02", "三重天台戲院", "新北市三重區重新路二段78號4樓"],
@@ -723,7 +726,6 @@ function parseTwMovieDay(doc) {
     ["t03303", "a03", "威尼斯影城", "桃園市中壢區九和一街48號3樓之2"],
     ["t03311", "a03", "桃園光影文化館", "桃園市桃園區埔新路12號"],
     ["t03312", "a03", "中壢光影電影館", "桃園市中壢區龍清街116巷31號"],
-    ["t03510", "a35", "百老匯影城竹北店", "新竹縣竹北市自強南路36號3~5樓"],
     ["t04404", "a04", "日日新影城", "台中市中區中華路一段58號"],
     ["t04405", "a04", "親親戲院", "台中市北區北屯路14號"],
     ["t04424", "a04", "全球影城", "台中市西區中華路一段1-1號"],
@@ -746,7 +748,7 @@ function parseTwMovieDay(doc) {
     ["t03905", "a39", "新月豪華影城", "宜蘭縣宜蘭市民權路二段38巷6號"],
     ["t03804", "a38", "花蓮鐵道電影院", "花蓮縣花蓮市中山路71號"]
   ];
-  var AT_COVERED = new Set("t02a01 t02a08 t02a09 t02a11 t02a12 t02a13 t02b01 t02b03 t02b05 t02b06 t02b07 t02b08 t02b14 t02b16 t02d02 t02d03 t02d04 t02d05 t02d20 t02e07 t02e10 t02e11 t02e12 t02e13 t02e15 t02e17 t02e18 t02e20 t02e21 t02g04 t03304 t03307 t03308 t03315 t03317 t03505 t03508 t03701 t03801 t03803 t04401 t04402 t04407 t04409 t04410 t04411 t04412 t04413 t04504 t05504 t05505 t06607 t06609 t06610 t06611 t06628 t06902 t07702 t07703 t07705 t07707 t07708 t07728 t07729 t07730 t08701 t08703 t08902".split(" "));
+  var AT_COVERED = new Set("t02c01 t03510 t02a01 t02a08 t02a09 t02a11 t02a12 t02a13 t02b01 t02b03 t02b05 t02b06 t02b07 t02b08 t02b14 t02b16 t02d02 t02d03 t02d04 t02d05 t02d20 t02e07 t02e10 t02e11 t02e12 t02e13 t02e15 t02e17 t02e18 t02e20 t02e21 t02g04 t03304 t03307 t03308 t03315 t03317 t03505 t03508 t03701 t03801 t03803 t04401 t04402 t04407 t04409 t04410 t04411 t04412 t04413 t04504 t05504 t05505 t06607 t06609 t06610 t06611 t06628 t06902 t07702 t07703 t07705 t07707 t07708 t07728 t07729 t07730 t08701 t08703 t08902".split(" "));
   var AT_SKIP = /* @__PURE__ */ new Set(["t07727", "t07731"]);
   var AT_REGIONS = {
     a01: "基隆市",
@@ -883,7 +885,17 @@ function parseTwMovieDay(doc) {
     const def = { favorites: ["vscinemas-xinyi", "eslite", "spot-hs", "spot-taipei"], ads: 10 };
     try {
       const json = await platform().loadSettingsJSON();
-      return json ? { ...def, ...JSON.parse(json) } : def;
+      const s = json ? { ...def, ...JSON.parse(json) } : def;
+      let alias = cinemaAlias;
+      if (!alias) {
+        try {
+          alias = JSON.parse(platform().cacheGet("cinema-alias.json") || "{}") || {};
+        } catch (_) {
+          alias = {};
+        }
+      }
+      if (alias && s.favorites.some((id) => alias[id])) s.favorites = s.favorites.map((id) => alias[id] || id).filter((id, i, all) => all.indexOf(id) === i);
+      return s;
     } catch (_) {
       return def;
     }
@@ -921,7 +933,37 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
       list = JSON.parse(c);
     }
     const tw = list.map((c) => ({ ...c, source: "tw", url: `${TW}/cinemas/${c.id}/` }));
-    return tw.concat(EXTRA, await loadAtTheaters());
+    const main = tw.concat(EXTRA);
+    const alias = {};
+    const others = (await loadAtTheaters()).filter((c) => {
+      const twin = sameCinema(c, main);
+      if (twin) alias[c.id] = twin.id;
+      return !twin;
+    });
+    cinemaAlias = alias;
+    cacheSet("cinema-alias.json", JSON.stringify(alias));
+    return main.concat(others);
+  }
+  var cinemaAlias = null;
+  var cinemaNameKey = (name) => String(name || "").replace(/臺/g, "台").replace(/影城|電影院|大戲院|戲院|影院|數位|[\s_（）()・·\-－—,，.]/g, "").replace(/[店館]$/, "").toLowerCase();
+  function sameCinema(c, list) {
+    const k = cinemaNameKey(c.name);
+    if (!k) return null;
+    const grams = (s) => {
+      const g = {};
+      for (let i = 0; i < s.length - 1; i++) g[s.slice(i, i + 2)] = true;
+      return g;
+    };
+    const a = grams(k), na = Object.keys(a).length;
+    for (const x of list) {
+      const xk = cinemaNameKey(x.name);
+      if (xk === k) return x;
+      if (x.city !== c.city || na < 3) continue;
+      const b = grams(xk), nb = Object.keys(b).length;
+      const both = Object.keys(a).filter((g) => b[g]).length;
+      if (both / Math.max(1, na + nb - both) >= 0.75) return x;
+    }
+    return null;
   }
   var AT = "https://www.atmovies.com.tw";
   function splitAddress(addr, region) {
@@ -2298,6 +2340,52 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     const [movies, upcoming] = await Promise.all([loadMovies(), loadUpcoming().catch(() => [])]);
     return soonBoard(movies, upcoming, query);
   }
+  var isFavMovie = (s, title) => (s.favMovies || []).some((f) => f.key === communityKey(title));
+  function toggleFavMovie(s, m) {
+    const key = communityKey(m.title);
+    const list = s.favMovies || [];
+    if (list.some((f) => f.key === key)) {
+      s.favMovies = list.filter((f) => f.key !== key);
+      return false;
+    }
+    s.favMovies = [{ key, title: m.title, ...m.en ? { en: m.en } : {}, ...m.poster && /^https:/.test(m.poster) ? { poster: m.poster } : {}, ...m.fest ? { fest: m.fest } : {}, at: Date.now() }, ...list].slice(0, 200);
+    return true;
+  }
+  async function favMovieRows(s) {
+    const favs = s.favMovies || [];
+    if (!favs.length) return [];
+    const festIds = Array.from(new Set(favs.map((f) => f.fest ? f.fest.id : "").filter(Boolean)));
+    const [movies, upcoming, box, ...fests] = await Promise.all([
+      loadMovies().catch(() => []),
+      loadUpcoming().catch(() => []),
+      loadBoxOffice().catch(() => null),
+      ...festIds.map((id) => festivalFind(id).catch(() => null))
+    ]);
+    const today = todayTPE();
+    const rows = favs.map((fav) => {
+      const m = movies.find((x2) => communityKey(x2.title) === fav.key);
+      if (m) return { fav, kind: "movie", target: { kind: "movie", m }, line: m.comingSoon ? [m.release ? `${mdOf(m.release)} 上映` : "即將上映", "可查場次"].join("｜") : [m.noShowToday ? "上映中｜今天無場次" : "上映中", m.cinemaCount ? `${m.cinemaCount} 間影城` : ""].filter(Boolean).join("｜") };
+      const f = fav.fest ? fests[festIds.indexOf(fav.fest.id)] : null;
+      const film = f ? f.films.find((x2) => x2.id === fav.fest.film) || f.films.find((x2) => communityKey(x2.title) === fav.key) : null;
+      if (f && film) return { fav, kind: "fest", target: { kind: "fest", f, film }, line: `${f.name}（${festivalStateLabel(f)}）` };
+      const u = upcoming.find((x2) => communityKey(x2.title) === fav.key && x2.release > today);
+      if (u) return { fav, kind: "soon", target: { kind: "soon", u }, line: `${u.release.slice(0, 4) === today.slice(0, 4) ? "" : u.release.slice(0, 4) + "/"}${mdOf(u.release)} ${u.approx ? "當週" : ""}上映｜尚未開放場次` };
+      const x = box ? box.list.find((b) => communityKey(b.name) === fav.key) : null;
+      if (x) return { fav, kind: "box", target: { kind: "box", x }, line: `目前沒有場次｜累計票房 ${money(x.total)}` };
+      return { fav, kind: "none", target: { kind: "none" }, line: fav.fest ? `${fav.fest.name}｜目前沒有場次` : "目前沒有場次（可能已下檔）" };
+    });
+    const order = { movie: 0, soon: 1, fest: 2, box: 3, none: 4 };
+    return rows.sort((a, b) => order[a.kind] - order[b.kind] || b.fav.at - a.fav.at);
+  }
+  async function favMovieBox(fav) {
+    const b = await loadBoxOfficeFull().catch(() => null);
+    if (!b || !b.years) return null;
+    for (const y of Object.keys(b.years).sort().reverse()) {
+      const x = b.years[y].find((i) => communityKey(i.name) === fav.key);
+      if (x) return x;
+    }
+    return null;
+  }
   function soonGroups(list) {
     const out = [];
     for (const m of list) {
@@ -3319,7 +3407,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   var extra = { boxOffice, filmList, soonList, nowShowing, nowShowingMulti, movieBoard: movieBoard2, festivalBoard, festivalFilm, nearby, patchSettings, fillMovie, formatList };
   var BRIDGE_LEVEL = 2;
   globalThis.MS = {
-    version: "2026.11.23-2343",
+    version: "2026.11.23-2356",
     level: BRIDGE_LEVEL,
     init(saved) {
       cache = saved || {};

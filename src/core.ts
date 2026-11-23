@@ -39,7 +39,11 @@ export interface Settings {
   ads: number;
   tmdbToken?: string; // TMDB API Read Access Token：有填才會幫沒有片長的電影補片長
   maps?: MapsApp; // 導航用哪個地圖（預設 Apple 地圖）
+  favMovies?: FavMovie[]; // 收藏的電影（含影展片）
 }
+/** 收藏的一部電影：key = 去掉裝飾字的片名（跟觀眾評分同一把鍵，所以片名帶「重映」「特別場」也算同一部）。
+ *  記下片名、英文片名、海報，下檔後清單上還是看得到；fest = 從哪個影展收藏的（影展結束後也連得回去） */
+export interface FavMovie { key: string; title: string; en?: string; poster?: string; fest?: { id: string; film: string; name: string }; at: number }
 
 export type MapsApp = "apple" | "google";
 export const MAPS_LABEL: Record<MapsApp, string> = { apple: "Apple 地圖", google: "Google 地圖" };
@@ -153,7 +157,12 @@ export async function loadSettings(): Promise<Settings> {
   const def: Settings = { favorites: ["vscinemas-xinyi", "eslite", "spot-hs", "spot-taipei"], ads: 10 };
   try {
     const json = await platform().loadSettingsJSON();
-    return json ? { ...def, ...JSON.parse(json) } : def;
+    const s: Settings = json ? { ...def, ...JSON.parse(json) } : def;
+    // 常去影城裡被併掉的重複戲院，換成留下來的那一筆
+    let alias = cinemaAlias;
+    if (!alias) { try { alias = JSON.parse(platform().cacheGet("cinema-alias.json") || "{}") || {}; } catch (_) { alias = {}; } }
+    if (alias && s.favorites.some((id) => alias![id])) s.favorites = s.favorites.map((id) => alias![id] || id).filter((id, i, all) => all.indexOf(id) === i);
+    return s;
   } catch (_) {
     return def;
   }
@@ -206,7 +215,38 @@ export async function loadCinemas(): Promise<Cinema[]> {
     list = JSON.parse(c);
   }
   const tw: Cinema[] = list.map((c) => ({ ...c, source: "tw" as Source, url: `${TW}/cinemas/${c.id}/` }));
-  return tw.concat(EXTRA, await loadAtTheaters());
+  // 同一間戲院只留一筆：場次通後來才收的連鎖（百老匯）、有專屬解析的戲院，開眼那邊也有 → 拿掉開眼那一筆。
+  // 以後場次通再收新的戲院，也會自動去重，不用等人發現
+  const main = tw.concat(EXTRA);
+  const alias: Record<string, string> = {};
+  const others = (await loadAtTheaters()).filter((c) => {
+    const twin = sameCinema(c, main);
+    if (twin) alias[c.id] = twin.id;
+    return !twin;
+  });
+  cinemaAlias = alias;
+  cacheSet("cinema-alias.json", JSON.stringify(alias)); // 下次啟動時，常去影城裡被併掉的那一筆會換成留下來的那一筆
+  return main.concat(others);
+}
+/** 被併掉的戲院代碼 → 留下來的那一筆（常去影城用） */
+let cinemaAlias: Record<string, string> | null = null;
+/** 戲院名稱比對用：去掉「影城、電影院、店」這些通稱和空白符號 */
+const cinemaNameKey = (name: string) => String(name || "").replace(/臺/g, "台").replace(/影城|電影院|大戲院|戲院|影院|數位|[\s_（）()・·\-－—,，.]/g, "").replace(/[店館]$/, "").toLowerCase();
+/** list 裡有沒有跟 c 同一間的戲院：名稱（去掉通稱後）完全一樣；或同一個縣市、名稱有七成五以上相同 */
+function sameCinema(c: Cinema, list: Cinema[]): Cinema | null {
+  const k = cinemaNameKey(c.name);
+  if (!k) return null;
+  const grams = (s: string) => { const g: Record<string, boolean> = {}; for (let i = 0; i < s.length - 1; i++) g[s.slice(i, i + 2)] = true; return g; };
+  const a = grams(k), na = Object.keys(a).length;
+  for (const x of list) {
+    const xk = cinemaNameKey(x.name);
+    if (xk === k) return x;
+    if (x.city !== c.city || na < 3) continue;
+    const b = grams(xk), nb = Object.keys(b).length;
+    const both = Object.keys(a).filter((g) => b[g]).length;
+    if (both / Math.max(1, na + nb - both) >= 0.75) return x;
+  }
+  return null;
 }
 
 // ───────── 開眼電影網：場次通沒收的戲院 ─────────
@@ -1843,6 +1883,65 @@ export function soonBoard(movies: TwMovie[], upcoming: UpcomingFilm[], query?: s
 export async function loadSoonBoard(query?: string): Promise<SoonBoard> {
   const [movies, upcoming] = await Promise.all([loadMovies(), loadUpcoming().catch(() => [] as UpcomingFilm[])]);
   return soonBoard(movies, upcoming, query);
+}
+// ───────────────────────── 收藏的電影 ─────────────────────────
+export const isFavMovie = (s: Settings, title: string): boolean => (s.favMovies || []).some((f) => f.key === communityKey(title));
+/** 收藏／取消收藏（直接改 s，呼叫的人負責存檔）；回傳現在是不是收藏中 */
+export function toggleFavMovie(s: Settings, m: { title: string; en?: string; poster?: string; fest?: FavMovie["fest"] }): boolean {
+  const key = communityKey(m.title);
+  const list = s.favMovies || [];
+  if (list.some((f) => f.key === key)) {
+    s.favMovies = list.filter((f) => f.key !== key);
+    return false;
+  }
+  s.favMovies = [{ key, title: m.title, ...(m.en ? { en: m.en } : {}), ...(m.poster && /^https:/.test(m.poster) ? { poster: m.poster } : {}), ...(m.fest ? { fest: m.fest } : {}), at: Date.now() }, ...list].slice(0, 200);
+  return true;
+}
+/** 收藏的片現在該連到哪裡：有場次的電影頁（movie）、還沒有場次的即將上映（soon）、影展片（fest）、已下檔但票房排行上有（box）、都沒有（none） */
+export type FavTarget =
+  | { kind: "movie"; m: TwMovie }
+  | { kind: "soon"; u: UpcomingFilm }
+  | { kind: "fest"; f: Festival; film: FestivalFilm }
+  | { kind: "box"; x: BoxOfficeItem }
+  | { kind: "none" };
+export interface FavRow { fav: FavMovie; target: FavTarget; line: string; kind: FavTarget["kind"] }
+/** 收藏清單：每部片現在的狀態（上映中幾間影城、幾號上映、哪個影展、已下檔）和該連到哪一頁。
+ *  順序：有場次的在前，再來是即將上映、影展、已下檔；同一類裡後收藏的在前 */
+export async function favMovieRows(s: Settings): Promise<FavRow[]> {
+  const favs = s.favMovies || [];
+  if (!favs.length) return [];
+  const festIds = Array.from(new Set(favs.map((f) => (f.fest ? f.fest.id : "")).filter(Boolean)));
+  const [movies, upcoming, box, ...fests] = await Promise.all([
+    loadMovies().catch(() => [] as TwMovie[]),
+    loadUpcoming().catch(() => [] as UpcomingFilm[]),
+    loadBoxOffice().catch(() => null),
+    ...festIds.map((id) => festivalFind(id).catch(() => null)),
+  ]);
+  const today = todayTPE();
+  const rows = favs.map((fav): FavRow => {
+    const m = movies.find((x) => communityKey(x.title) === fav.key);
+    if (m) return { fav, kind: "movie", target: { kind: "movie", m }, line: m.comingSoon ? [m.release ? `${mdOf(m.release)} 上映` : "即將上映", "可查場次"].join("｜") : [m.noShowToday ? "上映中｜今天無場次" : "上映中", m.cinemaCount ? `${m.cinemaCount} 間影城` : ""].filter(Boolean).join("｜") };
+    const f = fav.fest ? fests[festIds.indexOf(fav.fest.id)] : null;
+    const film = f ? f.films.find((x) => x.id === fav.fest!.film) || f.films.find((x) => communityKey(x.title) === fav.key) : null;
+    if (f && film) return { fav, kind: "fest", target: { kind: "fest", f, film }, line: `${f.name}（${festivalStateLabel(f)}）` };
+    const u = upcoming.find((x) => communityKey(x.title) === fav.key && x.release > today);
+    if (u) return { fav, kind: "soon", target: { kind: "soon", u }, line: `${u.release.slice(0, 4) === today.slice(0, 4) ? "" : u.release.slice(0, 4) + "/"}${mdOf(u.release)} ${u.approx ? "當週" : ""}上映｜尚未開放場次` };
+    const x = box ? box.list.find((b) => communityKey(b.name) === fav.key) : null;
+    if (x) return { fav, kind: "box", target: { kind: "box", x }, line: `目前沒有場次｜累計票房 ${money(x.total)}` };
+    return { fav, kind: "none", target: { kind: "none" }, line: fav.fest ? `${fav.fest.name}｜目前沒有場次` : "目前沒有場次（可能已下檔）" };
+  });
+  const order: Record<string, number> = { movie: 0, soon: 1, fest: 2, box: 3, none: 4 };
+  return rows.sort((a, b) => order[a.kind] - order[b.kind] || b.fav.at - a.fav.at);
+}
+/** 已下檔的收藏片：到年度票房排行（2016 年至今）找它的票房資料；找不到回傳 null */
+export async function favMovieBox(fav: FavMovie): Promise<BoxOfficeItem | null> {
+  const b = await loadBoxOfficeFull().catch(() => null);
+  if (!b || !b.years) return null;
+  for (const y of Object.keys(b.years).sort().reverse()) {
+    const x = b.years[y].find((i) => communityKey(i.name) === fav.key);
+    if (x) return x;
+  }
+  return null;
 }
 /** 「即將上映」依上映月份分段：「11 月（3）」「12 月（5）」…，不知道上映日期的放最後一段 */
 export function soonGroups<T extends { release?: string }>(list: T[]): { title: string; items: T[] }[] {
