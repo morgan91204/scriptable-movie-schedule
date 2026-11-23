@@ -1056,7 +1056,8 @@ class App {
   boxRate = ""; // 依評分排時用哪一種評分（空 = IMDb）
   boxFewLast = true; // 依 IMDb 排時，評分人數少的片排在後面（關掉就照分數一起排）
   boxOpen = ""; // 目前展開哪一組篩選（週次／年份／出品國別；空 = 都收合）
-  boxSort = ""; // 排法：本週票房／累計票房／上映日期／評分／影城數／年度排行（year，含已下檔）（空 = 第一種）
+  boxScope = "now"; // 範圍：now 上映中／year 某幾年上映的片（含已下檔）
+  boxSort = ""; // 排法：本週票房／累計票房／上映日期／評分／影城數（空 = 第一種）
   boxYears: string[] = []; // 年度排行選了哪幾年（空 = 最新的一年）
   boxWeek = ""; // 週票房看哪一週（空 = 最新）
   boxCountry: string[] = []; // 只看哪幾個出品國別（可以複選；空 = 全部）
@@ -1066,7 +1067,7 @@ class App {
   async boxOfficeView(): Promise<string> {
     // 票房、片單（依觀眾評分排時再加評分總表）一次讀好；票房讀不到時清單照樣出來，只是少了依票房排的選項
     const k = this.movieQuery.trim().toLowerCase();
-    const board = await loadMovieBoard({ sort: this.boxSort, years: this.boxYears, week: this.boxWeek, countries: this.boxCountry, query: k, asc: this.boxAsc, rate: this.boxRate, fewLast: this.boxFewLast });
+    const board = await loadMovieBoard({ scope: this.boxScope, sort: this.boxSort, years: this.boxYears, week: this.boxWeek, countries: this.boxCountry, query: k, asc: this.boxAsc, rate: this.boxRate, fewLast: this.boxFewLast });
     const { years, countries } = board;
     const selYears = board.selYears, country = board.selCountries;
     // 年度排行一年有六百部左右、全選是好幾千部：先畫 100 列，快滑到底時自動接著載入（不用按）。換了排法、年份或搜尋字就從頭開始
@@ -1116,17 +1117,31 @@ class App {
     return (
       <Page title="依電影找場次" subtitle={board.title} onBack={() => this.back()}>
         {this.movieModeChips()}
-        {/* 搜尋放最上面；範圍和排序併成一排（最後一項是年度排行） */}
+        {/* 搜尋放最上面；下面一排是排序（兩種範圍各自的排法） */}
         <Search value={this.movieQuery} placeholder="搜尋片名（中文或英文）" onInput={(t) => { this.movieQuery = t; }} />
         {board.orders.length > 1 ? (
           <Chips scroll>
             {/* 再點一次選中的那一顆 = 反過來排；箭頭標方向（↓ 高到低、新到舊、多到少） */}
-            {board.orders.map((x) => <Chip label={`${x.id === "year" ? "年度排行（含已下檔）" : x.label}${board.order === x.id ? (board.asc ? " ↑" : " ↓") : ""}`} muted={board.order !== x.id} onTap={() => { if (board.order === x.id) this.boxAsc = !this.boxAsc; else { this.boxSort = x.id; this.boxAsc = false; } }} />)}
+            {board.orders.map((x) => <Chip label={`${x.label}${board.order === x.id ? (board.asc ? " ↑" : " ↓") : ""}`} muted={board.order !== x.id} onTap={() => { if (board.order === x.id) this.boxAsc = !this.boxAsc; else { this.boxSort = x.id; this.boxAsc = false; } }} />)}
           </Chips>
         ) : null}
-        {/* 週次、出品國別、年份預設收合成一行，點了才展開 */}
-        {board.weeks.length > 1 || countries.length > 1 || board.rates.length > 1 || (board.scope === "year" && years.length > 1) ? (
-          <Section hint={this.boxOpen === "country" ? BOX_COUNTRY_NOTE + "可以左右滑動。" : this.boxOpen === "year" ? "可以複選，選了幾年就合在一起排；全選就是 2016 年至今的總排行。" : this.boxOpen === "week" ? "可以回頭看過去幾週的排行。" : this.boxOpen === "rate" ? "番茄指數是影評的分數、爆米花指數是觀眾的分數（都來自爛番茄）；觀眾評分是這個 App 的使用者打的。" : ""}>
+        {/* 範圍、評分來源、週次、出品國別預設收合成一行，點了才展開 */}
+        {board.weeks.length > 1 || countries.length > 1 || board.rates.length > 1 || years.length > 0 ? (
+          <Section hint={this.boxOpen === "country" ? BOX_COUNTRY_NOTE + "可以左右滑動。" : this.boxOpen === "range" ? "上映中：現在查得到場次的片。選年份：那一年上映的片，已經下檔的也在裡面；年份可以複選，選了幾年就合在一起排。" : this.boxOpen === "week" ? "可以回頭看過去幾週的排行。" : this.boxOpen === "rate" ? "番茄指數是影評的分數、爆米花指數是觀眾的分數（都來自爛番茄）；觀眾評分是這個 App 的使用者打的。" : ""}>
+            {/* 範圍：上映中，或某幾年上映的片（年份併在這裡選，不另外一列） */}
+            {years.length > 0 ? fold("range", "範圍", board.rangeSummary) : null}
+            {years.length > 0 && this.boxOpen === "range" ? (
+              <Chips scroll>
+                <Chip label="上映中" muted={board.scope !== "now"} onTap={() => { this.boxScope = "now"; if (this.boxSort === "total" && !board.orders.some((o) => o.id === "week")) this.boxSort = ""; this.boxAsc = false; }} />
+                {years.map((y) => (
+                  <Chip label={y} sub="年上映" muted={board.scope !== "year" || selYears.indexOf(y) < 0} onTap={() => {
+                    if (board.scope !== "year") { this.boxScope = "year"; this.boxYears = [y]; if (this.boxSort === "week") this.boxSort = "total"; this.boxAsc = false; } // 從上映中切過來：只看點的那一年
+                    else this.boxYears = selYears.indexOf(y) < 0 ? [...selYears, y] : selYears.length > 1 ? selYears.filter((z) => z !== y) : selYears;
+                  }} />
+                ))}
+                {years.length > 1 ? <Chip label="全部年份" muted={board.scope !== "year" || selYears.length !== years.length} onTap={() => { this.boxScope = "year"; this.boxYears = board.scope === "year" && selYears.length === years.length ? [] : years.slice(); if (this.boxSort === "week") this.boxSort = "total"; }} /> : null}
+              </Chips>
+            ) : null}
             {board.rates.length > 1 ? fold("rate", "評分來源", board.rateSummary) : null}
             {board.rates.length > 1 && this.boxOpen === "rate" ? (
               <Chips scroll>
@@ -1139,16 +1154,6 @@ class App {
             {board.weeks.length > 1 && this.boxOpen === "week" ? (
               <Chips>
                 {board.weeks.map((o) => <Chip label={o.label} sub={o.note} muted={board.selWeek !== o.id} onTap={() => { this.boxWeek = o.note === "最新" ? "" : o.id; }} />)}
-              </Chips>
-            ) : null}
-            {board.scope === "year" && years.length > 1 ? fold("year", "年份", board.yearSummary) : null}
-            {board.scope === "year" && years.length > 1 && this.boxOpen === "year" ? (
-              <Chips>
-                {/* 全選：再點一次回到只看最新的一年 */}
-                <Chip label="全選" muted={selYears.length !== years.length} onTap={() => { this.boxYears = selYears.length === years.length ? [] : years.slice(); }} />
-                {years.map((y) => (
-                  <Chip label={y} muted={selYears.indexOf(y) < 0} onTap={() => { this.boxYears = selYears.indexOf(y) < 0 ? [...selYears, y] : selYears.length > 1 ? selYears.filter((z) => z !== y) : selYears; }} />
-                ))}
               </Chips>
             ) : null}
             {countries.length > 1 ? fold("country", "出品國別", board.countrySummary) : null}
