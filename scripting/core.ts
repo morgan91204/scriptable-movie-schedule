@@ -1929,7 +1929,22 @@ export async function linkMovies<T extends { title: string }>(groups: T[]): Prom
   const list = await loadMovies().catch(() => [] as TwMovie[]);
   const linked = groups.map((g) => {
     const k = normTitle(g.title), b = normTitle(baseTitle(g.title));
-    const movie = list.find((m) => normTitle(m.title) === k) || list.find((m) => normTitle(baseTitle(m.title)) === b);
+    let movie = list.find((m) => normTitle(m.title) === k) || list.find((m) => normTitle(baseTitle(m.title)) === b);
+    if (!movie) {
+      // 有的戲院官網把英文片名接在中文後面（誠品：「黑球 The Black Ball」）：拿掉後面那段英文再比。
+      // 怕把「XX Part Two」這種續集併進第一集，要再對得上一項才算同一部：英文片名相同，或片長只差 3 分鐘以內
+      const cut = g.title.match(/^(.*[\u4e00-\u9fff][^A-Za-z]*?)\s+([A-Za-z][\x20-\x7e’‘“”：，！？·]*)$/);
+      const zh = cut ? normTitle(baseTitle(cut[1])) : "";
+      if (cut && zh) {
+        const en = normTitle(cut[2]);
+        const rt = Number((g as { runtime?: number }).runtime) || 0;
+        movie = list.find((m) => {
+          if (normTitle(m.title) !== zh && normTitle(baseTitle(m.title)) !== zh) return false;
+          const men = normTitle(m.en || "");
+          return (!!men && (men === en || men.indexOf(en) >= 0 || en.indexOf(men) >= 0)) || (rt > 0 && m.runtime > 0 && Math.abs(rt - m.runtime) <= 3);
+        });
+      }
+    }
     return movie ? { ...g, movie } : g;
   }) as (T & { movie?: TwMovie; hits?: Hit[]; runtime?: number; rating?: string })[];
   // 對到電影清單上「同一部片」的幾組合成一組（片名帶「特別場」「4K修復版」之類的字，場次通當成同一部）：

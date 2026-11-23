@@ -2213,7 +2213,20 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     const list = await loadMovies().catch(() => []);
     const linked = groups.map((g) => {
       const k = normTitle(g.title), b = normTitle(baseTitle(g.title));
-      const movie = list.find((m) => normTitle(m.title) === k) || list.find((m) => normTitle(baseTitle(m.title)) === b);
+      let movie = list.find((m) => normTitle(m.title) === k) || list.find((m) => normTitle(baseTitle(m.title)) === b);
+      if (!movie) {
+        const cut = g.title.match(/^(.*[\u4e00-\u9fff][^A-Za-z]*?)\s+([A-Za-z][\x20-\x7e’‘“”：，！？·]*)$/);
+        const zh = cut ? normTitle(baseTitle(cut[1])) : "";
+        if (cut && zh) {
+          const en = normTitle(cut[2]);
+          const rt = Number(g.runtime) || 0;
+          movie = list.find((m) => {
+            if (normTitle(m.title) !== zh && normTitle(baseTitle(m.title)) !== zh) return false;
+            const men = normTitle(m.en || "");
+            return !!men && (men === en || men.indexOf(en) >= 0 || en.indexOf(men) >= 0) || rt > 0 && m.runtime > 0 && Math.abs(rt - m.runtime) <= 3;
+          });
+        }
+      }
       return movie ? { ...g, movie } : g;
     });
     const out = [];
@@ -2787,7 +2800,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   var extra = { boxOffice, nowShowing, nowShowingMulti, movieBoard, festivalBoard, festivalFilm, nearby, patchSettings, fillMovie, formatList };
   var BRIDGE_LEVEL = 1;
   globalThis.MS = {
-    version: "2026.11.23-1447",
+    version: "2026.11.23-1452",
     level: BRIDGE_LEVEL,
     init(saved) {
       cache = saved || {};

@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.23-1447
+// @movie-schedule-app 電影行程 v2026.11.23-1452
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/parsers.gen.ts
@@ -1994,7 +1994,20 @@ async function linkMovies(groups) {
   const list = await loadMovies().catch(() => []);
   const linked = groups.map((g) => {
     const k = normTitle(g.title), b = normTitle(baseTitle(g.title));
-    const movie = list.find((m) => normTitle(m.title) === k) || list.find((m) => normTitle(baseTitle(m.title)) === b);
+    let movie = list.find((m) => normTitle(m.title) === k) || list.find((m) => normTitle(baseTitle(m.title)) === b);
+    if (!movie) {
+      const cut = g.title.match(/^(.*[\u4e00-\u9fff][^A-Za-z]*?)\s+([A-Za-z][\x20-\x7e’‘“”：，！？·]*)$/);
+      const zh = cut ? normTitle(baseTitle(cut[1])) : "";
+      if (cut && zh) {
+        const en = normTitle(cut[2]);
+        const rt = Number(g.runtime) || 0;
+        movie = list.find((m) => {
+          if (normTitle(m.title) !== zh && normTitle(baseTitle(m.title)) !== zh) return false;
+          const men = normTitle(m.en || "");
+          return !!men && (men === en || men.indexOf(en) >= 0 || en.indexOf(men) >= 0) || rt > 0 && m.runtime > 0 && Math.abs(rt - m.runtime) <= 3;
+        });
+      }
+    }
     return movie ? { ...g, movie } : g;
   });
   const out = [];
@@ -3089,14 +3102,14 @@ var App = class {
   }
   /** 最新版本是多少。網頁版問的是自己網站現在上線的版本（重新整理就會拿到的那一版），不是 GitHub 上的 */
   checkVersion() {
-    if (true) return checkLatest("2026.11.23-1447");
+    if (true) return checkLatest("2026.11.23-1452");
     return (async () => {
       try {
         const r = await globalThis.fetch("/api/version?t=" + Date.now(), { cache: "no-store" });
         const latest = String((await r.json()).version || "");
         if (!latest) return null;
         const num = (v) => Number(v.replace(/\D/g, "")) || 0;
-        return { latest, isLatest: num("2026.11.23-1447") >= num(latest) };
+        return { latest, isLatest: num("2026.11.23-1452") >= num(latest) };
       } catch (_) {
         return null;
       }
@@ -3197,11 +3210,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.23-1447"}`);
+          Pasteboard.copy(`版本 ${"2026.11.23-1452"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.23-1447"}`,
+      `版本 ${"2026.11.23-1452"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -3543,7 +3556,7 @@ var App = class {
     if (false) {
       if (!r) return /* @__PURE__ */ h(Note, { text: "（無法確認是否為最新版：連不到網站）" });
       if (r.isLatest) return /* @__PURE__ */ h(Note, { text: "✅ 已是最新版" });
-      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.23-1447"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
+      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.23-1452"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
         globalThis.location.reload();
       } }));
     }
