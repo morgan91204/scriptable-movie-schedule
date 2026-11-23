@@ -2469,7 +2469,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   }
   var readMyVotes = () => {
     try {
-      return JSON.parse(cacheGet("my-votes10.json") || "{}") || {};
+      return JSON.parse(cacheGet("my-votes10b.json") || "{}") || {};
     } catch (_) {
       return {};
     }
@@ -2478,7 +2478,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     const all = readMyVotes();
     for (const [key, v] of Object.entries(all)) if (!v.s && Date.now() - v.at > 60 * 864e5) delete all[key];
     all[k] = fresh ? { s: c.mine, at: Date.now(), dist: c.dist, dat: Date.now() } : { s: c.mine, at: Date.now() };
-    cacheSet("my-votes10.json", JSON.stringify(all));
+    cacheSet("my-votes10b.json", JSON.stringify(all));
   }
   var fromDist = (dist, mine) => {
     const d = Array.from({ length: 10 }, (_, i) => Number(dist[i]) || 0);
@@ -2800,7 +2800,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   var extra = { boxOffice, nowShowing, nowShowingMulti, movieBoard, festivalBoard, festivalFilm, nearby, patchSettings, fillMovie, formatList };
   var BRIDGE_LEVEL = 2;
   globalThis.MS = {
-    version: "2026.11.23-1515",
+    version: "2026.11.23-1518",
     level: BRIDGE_LEVEL,
     init(saved) {
       cache = saved || {};
