@@ -14,7 +14,7 @@ import {
   Cinema, Movie, Settings, Version, TwMovie, TwMovieCinema, CITY_ORDER, TW,
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
   loadSettings, saveSettings, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, cinemaAddress,
-  FORMATS, formatsOf, filterVersions, filterVersionsAny, movieRows, movieDays, nearest, kmLabel, WINDOWS, findShowtimes, findShowtimesMulti, multiLabel, multiDetail, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText, hallOf, tmdbTest, movieExtras, moviePoster, posterReady, posterTint, POSTER_TINTS, normImageUrl, movieRuntime, posterSrc, isLocalSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxCountries, boxByCountry, boxInfo, boxInfoRows, boxCountryText, BOX_COUNTRY_NOTE, boxCountryTag, boxCountriesPicked, movieBoard, loadBoxFor, loadCommunitySummary, loadYearRatings, loadUpcoming, soonBoard, isFavMovie, toggleFavMovie, favMovieRows, favMovieBox, soonGroups, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityVote, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, SCRIPTING_IMPORT_URL, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, festivalDefaultDate, festivalStateLabel, festivalState, festivalFooter, linkMovies, nowGroupLine, nowFilter, festivalPick, movieAbout, festivalSearch, festivalSearchLines, festivalTrailer, festivalYears, festivalGroups, festivalChipNote, festivalStatusLine, movieRatings, ratingTier,
+  FORMATS, formatsOf, filterVersions, filterVersionsAny, movieRows, movieDays, nearest, kmLabel, WINDOWS, findShowtimes, findShowtimesMulti, multiLabel, multiDetail, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText, hallOf, tmdbTest, movieExtras, moviePoster, posterReady, posterTint, POSTER_TINTS, normImageUrl, movieRuntime, posterSrc, isLocalSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxCountries, boxByCountry, boxInfo, boxInfoRows, boxCountryText, BOX_COUNTRY_NOTE, boxCountryTag, boxCountriesPicked, movieBoard, loadBoxFor, loadCommunitySummary, loadYearRatings, loadUpcoming, soonBoard, isFavMovie, toggleFavMovie, favMovieRows, favMovieBox, boxStatus, STATUS_LABEL, boxInfoBy, soonGroups, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityVote, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, SCRIPTING_IMPORT_URL, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, festivalDefaultDate, festivalStateLabel, festivalState, festivalFooter, linkMovies, nowGroupLine, nowFilter, festivalPick, movieAbout, festivalSearch, festivalSearchLines, festivalTrailer, festivalYears, festivalGroups, festivalChipNote, festivalStatusLine, movieRatings, ratingTier,
 } from "./core"
 import type { Ratings, FavMovie, FavRow, EntryHi, Format, LatLng, Hit, Community, BoxOfficeItem, BoxSort, BoxOffice, MovieEntry, SoonEntry, UpcomingFilm, Festival, FestivalFilm, FestivalSession } from "./core"
 
@@ -961,6 +961,19 @@ function ConfirmPage({ pick }: { pick: Pick }) {
 // ───────────────────────── 依電影找 ─────────────────────────
 
 /** 票房排行上、場次通已經沒有場次的片：海報、評分、預告、觀眾評分與票房 */
+/** 狀態標籤：上映中（綠底）／已下檔（紅底）／即將上映（橘底） */
+function StatusPill({ status }: { status: string }) {
+  const c = status === "now" ? { bg: "rgba(48,209,88,0.2)", fg: "systemGreen" } : status === "off" ? { bg: "rgba(255,69,58,0.18)", fg: "systemRed" } : { bg: "rgba(255,159,10,0.2)", fg: "systemOrange" }
+  return <Text font={"caption2"} fontWeight={"bold"} foregroundStyle={c.fg as any} lineLimit={1} fixedSize padding={{ horizontal: 7, vertical: 2 }} background={c.bg as any} clipShape={{ type: "capsule" } as any}>{STATUS_LABEL[status] || ""}</Text>
+}
+/** 「狀態」那一列：左邊標題，右邊色塊標籤 */
+function StatusRow({ status }: { status: string }) {
+  return <HStack spacing={12}>
+    <Text>狀態</Text>
+    <Spacer />
+    <StatusPill status={status} />
+  </HStack>
+}
 function BoxOfficeMoviePage({ item: x }: { item: BoxOfficeItem }) {
   const date = x.release.replace(/-/g, "/")
   const info = useLoad(() => boxInfo(x), [x.name, x.release]) // 發行、出品、累計票數（點進來才下載）
@@ -968,6 +981,7 @@ function BoxOfficeMoviePage({ item: x }: { item: BoxOfficeItem }) {
     <MovieHero title={x.name} lines={[boxCountryText(x.country), `${date} 上映`]} />
     {/* 個別資訊：跟官方網站列的欄位一樣（國別、發行、出品、上映日期、院數、票數、金額） */}
     <Section header={<Text>{`票房第 ${x.rank} 名`}</Text>} footer={<Text>資料來源：國家電影及視聽文化中心「全國電影票房統計」。場次通目前沒有這部片的場次，可能已經下檔，或只在少數戲院放映。</Text>}>
+      <StatusRow status={boxStatus(x)} />
       {/* 右邊的內容一行放不下時，字體自動縮小到放得下（最小縮到六成） */}
       {boxInfoRows(x, info.data || null).map(([label, value]) => <HStack key={label} spacing={12}>
         <Text>{label}</Text>
@@ -995,6 +1009,8 @@ function BoxOfficeSections({ movies, query, scope: pickedScope }: { movies: TwMo
   const [pickedSort, setSort] = useState<string>("") // 排法（空 = 第一種）
   const [asc, setAsc] = useState(false) // 反過來排（低到高、舊到新、少到多）；換一種排法就回到預設方向
   const [pickedRate, setRate] = useState<string>("") // 依評分排時用哪一種評分（空 = IMDb）
+  const [pickedIssuer, setPickedIssuer] = useState<string[]>([]) // 只看哪幾家發行商（可以複選；空 = 全部）
+  const [issuerOpen, setIssuerOpen] = useState(false)
   const [fewLast, setFewLast] = useState(true) // 依 IMDb 排時，評分人數少的片排在後面（關掉就照分數一起排）
   // 依觀眾評分排時才讀評分總表
   const needCommunity = pickedSort === "rating" && pickedRate === "community"
@@ -1012,12 +1028,12 @@ function BoxOfficeSections({ movies, query, scope: pickedScope }: { movies: TwMo
   const [countryOpen, setCountryOpen] = useState(false)
   const b = box.data ? box.data.b : null
   const board = useMemo(
-    () => movieBoard(b, movies, { scope: pickedScope, sort: pickedSort, years: pickedYears, week: pickedWeek, countries: pickedCountry, query, asc, rate: pickedRate, fewLast, community: community.data, yearRatings: yearRatings.data }),
-    [b, movies.length, asc, fewLast, yearRatings.data, pickedRate, community.data, pickedScope, pickedSort, pickedYears.join(","), pickedWeek, pickedCountry.join(","), query])
+    () => movieBoard(b, movies, { scope: pickedScope, sort: pickedSort, years: pickedYears, week: pickedWeek, countries: pickedCountry, query, asc, rate: pickedRate, fewLast, issuers: pickedIssuer, community: community.data, yearRatings: yearRatings.data }),
+    [b, movies.length, asc, fewLast, pickedIssuer.join(","), yearRatings.data, pickedRate, community.data, pickedScope, pickedSort, pickedYears.join(","), pickedWeek, pickedCountry.join(","), query])
   const { years: yearOptions, selYears: years, countries, selCountries: country } = board
   // 年度排行一年有六百部左右、全選是好幾千部：先顯示 100 列，滑到底自動接著載入（不用按）。換了排法、年份或搜尋字就從頭開始
   const paged = board.paged
-  const pageKey = `${board.asc}|${board.rate}|${board.scope}|${board.sort}|${years.join(",")}|${board.selWeek}|${query}|${country.join(",")}`
+  const pageKey = `${board.selIssuers.join(",")}|${board.asc}|${board.rate}|${board.scope}|${board.sort}|${years.join(",")}|${board.selWeek}|${query}|${country.join(",")}`
   const [page, setPage] = useState<{ key: string; n: number }>({ key: "", n: BOX_PAGE })
   const limit = page.key === pageKey ? page.n : BOX_PAGE
   const shown = paged ? board.entries.slice(0, limit) : board.entries
@@ -1036,7 +1052,10 @@ function BoxOfficeSections({ movies, query, scope: pickedScope }: { movies: TwMo
       {e.rank === null ? null : <Text font={e.rank >= 1000 ? "caption" : e.rank >= 100 ? "subheadline" : "title3"} fontWeight={"bold"} monospacedDigit foregroundStyle={e.rank <= 3 ? "systemOrange" : "secondaryLabel"} lineLimit={1} minScaleFactor={0.6} frame={{ width: 34 }}>{String(e.rank)}</Text>}
       {PosterBox({ w: 44, h: 66, r: 6, img: thumbs[i].img, ver: 0, pending: thumbs[i].pending, title: e.name })}
       <VStack alignment={"leading"} spacing={2}>
-        <Text foregroundStyle={"label"} lineLimit={2} minScaleFactor={0.75}>{e.name}</Text>
+        <HStack spacing={6}>
+          <Text foregroundStyle={"label"} lineLimit={2} minScaleFactor={0.75}>{e.name}</Text>
+          {e.status ? <StatusPill status={e.status} /> : null}
+        </HStack>
         {/* 兩行說明各自一行不換行，窄螢幕也對得齊 */}
         {e.lines[0] ? <Text font={"subheadline"} foregroundStyle={"secondaryLabel"} lineLimit={1} minScaleFactor={0.8}>{e.lines[0]}</Text> : null}
         {e.lines[1] ? <Text font={"caption"} foregroundStyle={"tertiaryLabel"} lineLimit={1} minScaleFactor={0.8}>{e.lines[1]}</Text> : null}
@@ -1073,6 +1092,14 @@ function BoxOfficeSections({ movies, query, scope: pickedScope }: { movies: TwMo
     selected: country.length ? country : [""],
     onToggle: (id) => setPickedCountry(!id ? [] : country.indexOf(id) < 0 ? [...country, id] : country.filter((z) => z !== id)),
     footer: BOX_COUNTRY_NOTE,
+  }) : null}
+  {board.issuers.length > 1 ? multiPick({
+    title: "發行商", open: issuerOpen, onOpen: () => setIssuerOpen(!issuerOpen),
+    summary: board.selIssuers.length ? board.selIssuers.join("、") : `全部（${board.everyone} 部）`,
+    options: [{ id: "", label: `全部（${board.everyone} 部）` }, ...board.issuers.map((c) => ({ id: c.id, label: `${c.id}（${c.count} 部）` }))],
+    selected: board.selIssuers.length ? board.selIssuers : [""],
+    onToggle: (id) => setPickedIssuer(!id ? [] : board.selIssuers.indexOf(id) < 0 ? [...board.selIssuers, id] : board.selIssuers.filter((z) => z !== id)),
+    footer: "發行商來自官方票房資料，可複選；聯合發行的片算第一家。",
   }) : null}
   {board.scope === "year" && yearOptions.length > 1 ? multiPick({
     title: "年份", open: yearOpen, onOpen: () => setYearOpen(!yearOpen),
@@ -1297,6 +1324,7 @@ function MoviesPage() {
 
 function MoviePage({ movie }: { movie: TwMovie }) {
   const [settings] = useSettings()
+  const box = useLoad(() => boxInfoBy(movie.title), [movie.title]) // 這部片在官方票房資料裡的那一筆（還沒列入是 null）
   // 日期、縣市、特殊廳都可以複選；空的 = 預設（日期是來源預設那天，其餘是全部）
   const [selDatesRaw, setSelDates] = useState<string[]>([])
   const [selCitiesRaw, setSelCities] = useState<string[]>([])
@@ -1356,6 +1384,15 @@ function MoviePage({ movie }: { movie: TwMovie }) {
       releaseLabel(data?.release || movie.release || releaseOf(movie.title)),
       data ? `${data.cinemas.length} 間影城有放映` : "",
     ]} />
+    {/* 狀態和票房資訊（跟歷年電影那一頁同一份官方資料）；票房資料還沒列入的片只顯示狀態 */}
+    <Section header={<Text>票房資訊</Text>} footer={box.data ? <Text>資料來源：國家電影及視聽文化中心「全國電影票房統計」，官方每週更新一次。</Text> : undefined}>
+      <StatusRow status={movie.comingSoon ? "soon" : "now"} />
+      {box.data ? boxInfoRows(box.data.x, box.data.info).map(([label, value]) => <HStack key={label} spacing={12}>
+        <Text>{label}</Text>
+        <Spacer />
+        <Text foregroundStyle={"secondaryLabel"} lineLimit={1} minScaleFactor={0.6}>{value}</Text>
+      </HStack>) : null}
+    </Section>
     {about.text || about.credits ? <Section header={<Text>劇情簡介</Text>} footer={<Text>簡介來自場次通。</Text>}>
       {about.text ? <Text font={"subheadline"}>{about.text}</Text> : null}
       {about.credits ? <Text font={"footnote"} foregroundStyle={"secondaryLabel"}>{about.credits}</Text> : null}

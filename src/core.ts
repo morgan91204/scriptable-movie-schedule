@@ -1605,6 +1605,8 @@ export function boxCountryText(country: string): string {
 }
 /** 「出品國別」篩選底下的說明：排行是台灣的票房，國別只是把某國出品的片篩出來 */
 export const BOX_COUNTRY_NOTE = "全台灣票房，只篩選出品國，可複選。";
+/** 排行標題後面接的發行商篩選說明：「｜華納兄弟發行」（沒篩選是空字串；超過兩家就寫「等 N 家」） */
+export const issuerTag = (picked: string[]): string => (!picked.length ? "" : `｜${picked.length > 2 ? `${picked[0]} 等 ${picked.length} 家` : picked.join("、")}發行`);
 /** 排行標題後面接的篩選說明：「｜日本出品」「｜日本、美國出品」（沒篩選是空字串；超過三個就寫「等 N 國」） */
 export const boxCountryTag = (picked: string[]): string =>
   !picked.length ? "" : `｜${picked.length > 3 ? `${picked.slice(0, 2).join("、")} 等 ${picked.length} 國` : picked.join("、")}出品`;
@@ -1621,6 +1623,31 @@ export function boxByCountry(list: BoxOfficeItem[], picked: string[]): BoxOffice
   if (!picked.length) return list;
   return list.filter((x) => picked.indexOf(boxMainCountry(x.country)) >= 0).map((x, i) => ({ ...x, rank: i + 1 }));
 }
+/** 發行商篩選用的名字：多家聯合發行取第一家；「股份有限公司」「台灣分公司」這些字尾拿掉，按鈕上才放得下 */
+export function boxMainIssuer(issue?: string): string {
+  const first = String(issue || "").split(/[、,，\/]/)[0].trim();
+  return first.replace(/(?:美商|香港商|英屬[^商]*商|新加坡商|日商)/g, "").replace(/(?:股份)?有限公司.*$/, "").replace(/台灣分公司$/, "").trim() || first;
+}
+/** 這份清單裡有哪些發行商、各幾部（多的在前） */
+export function boxIssuers(list: BoxOfficeItem[]): { id: string; count: number }[] {
+  const n: Record<string, number> = {};
+  for (const x of list) { const c = boxMainIssuer(x.issue); if (c) n[c] = (n[c] || 0) + 1; }
+  return Object.keys(n).map((id) => ({ id, count: n[id] })).sort((a, b) => b.count - a.count || a.id.localeCompare(b.id));
+}
+/** 只留選中的那幾家發行商的片（可以複選），名次在篩出來的片裡重排；沒選 = 全部 */
+export function boxByIssuer(list: BoxOfficeItem[], picked: string[]): BoxOfficeItem[] {
+  if (!picked.length) return list;
+  return list.filter((x) => picked.indexOf(boxMainIssuer(x.issue)) >= 0).map((x, i) => ({ ...x, rank: i + 1 }));
+}
+/** 票數的寫法：12,345 張 → 1.2 萬張 */
+export function ticketsText(n: number): string {
+  if (n >= 1e8) return `${(n / 1e8).toFixed(2).replace(/\.?0+$/, "")} 億`;
+  if (n >= 1e4) return `${(n / 1e4).toFixed(n >= 1e6 ? 0 : 1).replace(/\.0$/, "")} 萬`;
+  return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+}
+/** 這部片在票房資料裡的狀態：now = 上映中（這一週還有賣出票），off = 已下檔 */
+export const boxStatus = (x: BoxOfficeItem): "now" | "off" => (x.showing || x.week !== null ? "now" : "off");
+export const STATUS_LABEL: Record<string, string> = { now: "上映中", off: "已下檔", soon: "即將上映" };
 export const BOXOFFICE_INFO_URL = "https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/main/dist/boxoffice-info-";
 export interface BoxInfo { issue: string; produce: string; tickets: number }
 const boxInfoMem: Record<string, Promise<Record<string, [string, string, number]>>> = {};
@@ -1636,20 +1663,29 @@ export async function boxInfo(x: { name: string; release: string }): Promise<Box
   const v = all[x.name + "|" + x.release];
   return v ? { issue: v[0] || "", produce: v[1] || "", tickets: Number(v[2]) || 0 } : null;
 }
+/** 上映中的片在票房資料裡的那一筆，連同發行、出品、票數（電影頁的「票房資訊」用）；票房資料還沒列入回傳 null */
+export async function boxInfoBy(title: string): Promise<{ x: BoxOfficeItem; info: BoxInfo | null } | null> {
+  const b = await loadBoxOffice().catch(() => null);
+  const k = communityKey(title);
+  const x = b ? b.list.find((i) => communityKey(i.name) === k) : null;
+  if (!x) return null;
+  return { x, info: await boxInfo(x).catch(() => null) };
+}
 /** 票房頁「個別資訊」的各列：[標題, 內容]。跟官方網站列的欄位一樣（國別、發行、出品、上映日期、上映院數、累計票數、累計金額），沒有的不列 */
 export function boxInfoRows(x: BoxOfficeItem, info: BoxInfo | null): [string, string][] {
   const num = (n: number) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
   const rows: [string, string][] = [];
   if (x.country) rows.push(["出品國別", boxCountryText(x.country)]);
-  if (info && info.issue) rows.push(["發行", info.issue]);
+  if ((info && info.issue) || x.issue) rows.push(["發行", (info && info.issue) || x.issue || ""]);
   if (info && info.produce) rows.push(["出品", info.produce]);
   rows.push(["上映日期", x.release.replace(/-/g, "/")]);
   if (x.theaters) rows.push(["上映戲院", `${x.theaters} 間`]);
   if (x.week !== null && !x.since) rows.push(["本週票房", money(x.week)]);
   rows.push(["累計票房", `${money(x.total)}（${num(x.total)} 元）`]);
-  if (info && info.tickets) {
-    rows.push(["累計票數", `${num(info.tickets)} 張`]);
-    rows.push(["平均票價", `${num(x.total / info.tickets)} 元`]);
+  const tickets = (info && info.tickets) || x.tickets || 0;
+  if (tickets) {
+    rows.push(["累計票數", `${num(tickets)} 張`]);
+    rows.push(["平均票價", `${num(x.total / tickets)} 元`]);
   }
   return rows;
 }
@@ -1687,18 +1723,19 @@ export const RATE_SOURCES = [{ id: "imdb", label: "IMDb" }, { id: "tomato", labe
 /** 觀眾評分至少要幾個人評過才列入排序 */
 export const COMMUNITY_MIN = 5;
 export type MovieScope = "now" | "year";
-export type MovieSort = "week" | "total" | "date" | "rating" | "cinemas";
+export type MovieSort = "week" | "total" | "date" | "rating" | "cinemas" | "tickets" | "price";
 /** 清單的一列：x = 票房資料（沒進榜是 null），m = 場次通的電影（已下檔是 null） */
-export interface MovieEntry { key: string; rank: number | null; name: string; x: BoxOfficeItem | null; m: TwMovie | null; lines: [string, string]; light: boolean; hi?: EntryHi }
+export interface MovieEntry { key: string; rank: number | null; name: string; x: BoxOfficeItem | null; m: TwMovie | null; lines: [string, string]; light: boolean; hi?: EntryHi; status?: "now" | "off" /* 上映中（綠）／已下檔（紅）的標籤；不用標的沒有 */ }
 /** 每一列右邊的重點欄：目前排序依據的那個數字（評分、日期、影城數、票房），大字顯示；說明行就不再重複寫它。
  *  tier 是評分的顏色等級（good 綠／mid 黃／bad 紅），沒有這項資料是 none（灰色的「–」）；note 是底下的小字 */
-export interface EntryHi { kind: "imdb" | "tomato" | "popcorn" | "community" | "date" | "cinemas" | "money"; text: string; tier: "good" | "mid" | "bad" | "none"; note?: string }
+export interface EntryHi { kind: "imdb" | "tomato" | "popcorn" | "community" | "date" | "cinemas" | "money" | "tickets" | "price"; text: string; tier: "good" | "mid" | "bad" | "none"; note?: string }
 export interface MovieBoard {
   scope: MovieScope; scopes: { id: MovieScope; label: string; sub: string }[];
   sort: MovieSort; sorts: { id: MovieSort; label: string }[]; // 範圍是年度時 sorts 是空的（年度只依累計票房排）
   // 畫面上範圍和排序併成一排：上映中的幾種排法，最後一項是「年度排行」（含已下檔）
   order: string; orders: { id: string; label: string }[];
   weekSummary: string; countrySummary: string; yearSummary: string; // 收合起來時那一行顯示的字
+  issuers: { id: string; count: number }[]; selIssuers: string[]; issuerSummary: string; // 發行商篩選（可以複選）
   asc: boolean; dirs: { id: string; label: string }[]; // 方向：desc（預設：高到低、新到舊、多到少）／asc；字跟著排法換
   rate: string; rates: { id: string; label: string }[]; rateSummary: string; // 依評分排時用哪一種評分（不是依評分排時 rates 是空的）
   rangeSummary: string; // 「範圍」那一列顯示的字：「上映中」或「2026 年上映」
@@ -1716,17 +1753,18 @@ export function loadBoxFor(scope: string, sort: string, week: string): Promise<B
 }
 const mdOf = (d: string) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`;
 /** 把票房和場次通的清單合成畫面要的樣子。b 是 null（票房讀不到）時只剩不靠票房的排法 */
-export function movieBoard(b: BoxOffice | null, movies: TwMovie[], opt: { scope?: string; sort?: string; years?: string[]; week?: string; countries?: string[]; query?: string; asc?: boolean; rate?: string; fewLast?: boolean; community?: Record<string, number[]> | null; yearRatings?: YearRatings | null } = {}): MovieBoard {
+export function movieBoard(b: BoxOffice | null, movies: TwMovie[], opt: { scope?: string; sort?: string; years?: string[]; week?: string; countries?: string[]; query?: string; asc?: boolean; rate?: string; fewLast?: boolean; issuers?: string[]; community?: Record<string, number[]> | null; yearRatings?: YearRatings | null } = {}): MovieBoard {
   const yearOptions = b ? boxYears(b) : [];
   const scopes: MovieBoard["scopes"] = [{ id: "now", label: "上映中", sub: "有場次的" }];
   if (yearOptions.length) scopes.push({ id: "year", label: "年度", sub: "含已下檔" });
   const scope: MovieScope = (opt.scope === "year" || opt.sort === "year") && yearOptions.length ? "year" : "now"; // 舊版畫面把「年度排行」放在排序裡：sort 是 year 也算範圍是年度
   // 範圍是年度（那幾年上映的片，含已下檔）時的排法：票房只有累計；影城數是官方資料的「上映院數」
-  const yearSorts: MovieBoard["sorts"] = [{ id: "total", label: "票房" }, { id: "date", label: "上映日期" }, { id: "rating", label: "評分" }, { id: "cinemas", label: "累計院數" }];
+  const yearSorts: MovieBoard["sorts"] = [{ id: "total", label: "票房" }, { id: "date", label: "上映日期" }, { id: "rating", label: "評分" }, { id: "cinemas", label: "累計院數" }, { id: "tickets", label: "累計票數" }, { id: "price", label: "平均票價" }];
   const sortsAll: MovieBoard["sorts"] = [];
   if (b) sortsAll.push({ id: "week", label: b.mode === "week" ? "本週票房" : "近期票房" });
   if (b && b.mode === "week") sortsAll.push({ id: "total", label: "累計票房" });
   sortsAll.push({ id: "date", label: "上映日期" }, { id: "rating", label: "評分" }, { id: "cinemas", label: "影城數" });
+  if (b) sortsAll.push({ id: "tickets", label: "累計票數" }, { id: "price", label: "平均票價" });
   const sort: MovieSort = scope === "year" ? (yearSorts.some((x) => x.id === opt.sort) ? (opt.sort as MovieSort) : "total") : sortsAll.some((x) => x.id === opt.sort) ? (opt.sort as MovieSort) : sortsAll[0].id;
   const k = (opt.query || "").trim().toLowerCase();
   const hit = (name: string, en?: string) => !k || `${name} ${en || ""}`.toLowerCase().includes(k);
@@ -1737,7 +1775,7 @@ export function movieBoard(b: BoxOffice | null, movies: TwMovie[], opt: { scope?
   const yearSummary = selYears.length > 1 && selYears.length === yearOptions.length ? `全部（${yearOptions[yearOptions.length - 1]}–${yearOptions[0]}）` : selYears.join("、");
   const asc = !!opt.asc;
   const order: string = sort;
-  const dirs = order === "date" ? [{ id: "desc", label: "新到舊" }, { id: "asc", label: "舊到新" }] : order === "cinemas" ? [{ id: "desc", label: "多到少" }, { id: "asc", label: "少到多" }] : [{ id: "desc", label: "高到低" }, { id: "asc", label: "低到高" }];
+  const dirs = order === "date" ? [{ id: "desc", label: "新到舊" }, { id: "asc", label: "舊到新" }] : order === "cinemas" || order === "tickets" ? [{ id: "desc", label: "多到少" }, { id: "asc", label: "少到多" }] : [{ id: "desc", label: "高到低" }, { id: "asc", label: "低到高" }];
   const dirTag = asc ? `｜${dirs[1].label}` : ""; // 標題後面：反過來排時才標
   const rates = RATE_SOURCES;
   const rate = rates.some((r) => r.id === opt.rate) ? (opt.rate as string) : "imdb";
@@ -1745,6 +1783,11 @@ export function movieBoard(b: BoxOffice | null, movies: TwMovie[], opt: { scope?
   const rangeSummary = scope === "year" ? `${yearSummary} 年上映` : "上映中";
   const base = { rangeSummary, fewLast, fewOption: order === "rating" && rate === "imdb", asc, dirs, rate, rates: order === "rating" ? rates : [], rateSummary: rates.find((r) => r.id === rate)!.label, scope, scopes, sort, order, orders, years: yearOptions, selYears, weeks: [] as MovieBoard["weeks"], selWeek: wk.id, restTitle: "", restFooter: "", weekSummary: "", yearSummary };
   const landText = (land: string[], total: number) => (land.length ? land.join("、") : `全部（${total} 部）`);
+  // 票數、平均票價（票房 ÷ 票數）：沒有票數資料的排在最後
+  const priceOf = (x: BoxOfficeItem) => (x.tickets ? x.total / x.tickets : 0);
+  const moneyKey = (x: BoxOfficeItem): { tier: number; v: number; hi: EntryHi } =>
+    sort === "tickets" ? (x.tickets ? { tier: 1, v: x.tickets, hi: { kind: "tickets", text: ticketsText(x.tickets), tier: "none", note: "張票" } } : { tier: 0, v: 0, hi: { kind: "tickets", text: "–", tier: "none" } })
+    : (x.tickets ? { tier: 1, v: priceOf(x), hi: { kind: "price", text: `${Math.round(priceOf(x))} 元`, tier: "none", note: "平均票價" } } : { tier: 0, v: 0, hi: { kind: "price", text: "–", tier: "none" } });
   const boxEntry = (x: BoxOfficeItem, by: BoxSort, past: boolean, old: boolean): MovieEntry => {
     const m = match(x.name) || null;
     const [moneyLine, info] = boxOfficeLines(x, by, past);
@@ -1762,7 +1805,9 @@ export function movieBoard(b: BoxOffice | null, movies: TwMovie[], opt: { scope?
     const everyone = boxOfficeBy(b, "year", selYears, wk.id);
     const countries = boxCountries(everyone);
     const land = boxCountriesPicked(countries, opt.countries || []);
-    const pool = boxByCountry(everyone, land); // 名次已經依累計票房排好
+    const issuers = boxIssuers(everyone);
+    const firm = boxCountriesPicked(issuers, opt.issuers || []);
+    const pool = boxByIssuer(boxByCountry(everyone, land), firm); // 名次已經依累計票房排好
     const yr = opt.yearRatings ? opt.yearRatings.ratings : {};
     const noneHi = (kind: EntryHi["kind"], note?: string): EntryHi => ({ kind, text: "–", tier: "none", ...(note ? { note } : {}) });
     // 累計院數：官方票房資料的戲院數是「上映以來累計放映過的戲院數」，但官方資料慢一到兩週（只算到 b.end 那一天）。
@@ -1792,14 +1837,15 @@ export function movieBoard(b: BoxOffice | null, movies: TwMovie[], opt: { scope?
         if (rate === "popcorn") return p !== undefined ? { tier: 2, v: p, hi: { kind: "popcorn", text: `${p}%`, tier: ratingTier("pct", p) } } : { tier: 0, v: 0, hi: noneHi("popcorn") };
         return i ? { tier: i.few && fewLast ? 1 : 2, v: i.s, hi: { kind: "imdb", text: i.s.toFixed(1), tier: ratingTier("imdb", i.s), ...(i.few ? { note: "評分人數少" } : {}) } } : { tier: 0, v: 0, hi: noneHi("imdb") };
       }
+      if (sort === "tickets" || sort === "price") return moneyKey(x);
       return { tier: 1, v: x.total, hi: { kind: "money", text: money(x.total), tier: "none" } }; // 歷年只有一種票房（上映以來的累計），不用另外標
     };
     const keyed = pool.map((x) => { const m = match(x.name) || null; return { x, m, k: keyOf(x, m), rank: sort === "total" ? x.rank : (null as number | null) }; }).filter((e) => hit(e.x.name, e.m?.en));
-    if (sort === "rating" || sort === "cinemas") keyed.slice().sort((a, c) => c.k.tier - a.k.tier || c.k.v - a.k.v).forEach((e, i) => { if (e.k.tier > 0) e.rank = i + 1; });
+    if (sort === "rating" || sort === "cinemas" || sort === "tickets" || sort === "price") keyed.slice().sort((a, c) => c.k.tier - a.k.tier || c.k.v - a.k.v).forEach((e, i) => { if (e.k.tier > 0) e.rank = i + 1; });
     keyed.sort((a, c) => c.k.tier - a.k.tier || (asc ? a.k.v - c.k.v : c.k.v - a.k.v));
     const entries = keyed.map(({ x, m, k: kk, rank }): MovieEntry => {
-      const info = [x.showing ? "上映中" : "", boxMainCountry(x.country), sort === "date" ? "" : releaseLabel(dateOf(x, m)), theatersOf(x, m) && sort !== "cinemas" ? `${theatersOf(x, m)} 間戲院` : ""].filter(Boolean).join("｜");
-      return { key: `${x.name}|${x.release}`, rank, name: x.name, x, m, lines: sort === "total" ? [info, ""] : [`票房 ${money(x.total)}`, info], light: !m, hi: kk.hi };
+      const info = [boxMainCountry(x.country), sort === "date" ? "" : releaseLabel(dateOf(x, m)), theatersOf(x, m) && sort !== "cinemas" ? `${theatersOf(x, m)} 間戲院` : ""].filter(Boolean).join("｜");
+      return { key: `${x.name}|${x.release}`, rank, name: x.name, x, m, lines: sort === "total" ? [info, ""] : [`票房 ${money(x.total)}`, info], light: !m, hi: kk.hi, status: boxStatus(x) };
     });
     const rateName = rates.find((r) => r.id === rate)!.label;
     const md = (d: string) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`;
@@ -1809,23 +1855,34 @@ export function movieBoard(b: BoxOffice | null, movies: TwMovie[], opt: { scope?
     return {
       ...base, sorts: yearSorts, weeks: [], weekSummary: "",
       countries, selCountries: land, everyone: everyone.length, countrySummary: landText(land, everyone.length), entries, rest: [],
-      title: (sort === "total" ? `${yt} 年票房排行（截至 ${md(b.end)}）${dirTag}` : `${yt} 年上映 ${entries.length} 部｜${sort === "date" ? (asc ? "最早上映在前" : "最新上映在前") : sort === "rating" ? `${rateName}${asc ? "低到高" : "高到低"}` : `累計院數${asc ? "少到多" : "多到少"}`}`) + boxCountryTag(land),
+      issuers, selIssuers: firm, issuerSummary: landText(firm, everyone.length),
+      title: (sort === "total" ? `${yt} 年票房排行（截至 ${md(b.end)}）${dirTag}` : `${yt} 年上映 ${entries.length} 部｜${sort === "date" ? (asc ? "最早上映在前" : "最新上映在前") : sort === "rating" ? `${rateName}${asc ? "低到高" : "高到低"}` : sort === "tickets" ? `累計票數${asc ? "少到多" : "多到少"}` : sort === "price" ? `平均票價${asc ? "低到高" : "高到低"}` : `累計院數${asc ? "少到多" : "多到少"}`}`) + boxCountryTag(land) + issuerTag(firm),
       footer: sort === "total" ? boxOfficeFooter(b, "year", selYears, wk.id)
-        : `${yt} 年上映、有票房紀錄的電影（已經下檔的也在裡面）${sort === "date" ? "依上映日期排序" : sort === "rating" ? `依${rateName}排序。${rate === "community" ? `評分不到 ${COMMUNITY_MIN} 人的不列入。` : cov}` : `依累計院數排序：上映以來放映過的戲院數（官方票房資料，算到 ${md(b.end)}）。還在上映的片，今天有場次的影城如果比官方的數字多，就用今天的數字，所以上映中和已下檔的片算法相同`}。${src}`.replace("。。", "。"),
+        : `${yt} 年上映、有票房紀錄的電影（已經下檔的也在裡面）${sort === "date" ? "依上映日期排序" : sort === "tickets" ? "依累計票數排序（上映以來賣出的票數）" : sort === "price" ? "依平均票價排序（累計票房 ÷ 累計票數；特殊廳、演唱會轉播的票價較高）" : sort === "rating" ? `依${rateName}排序。${rate === "community" ? `評分不到 ${COMMUNITY_MIN} 人的不列入。` : cov}` : `依累計院數排序：上映以來放映過的戲院數（官方票房資料，算到 ${md(b.end)}）。還在上映的片，今天有場次的影城如果比官方的數字多，就用今天的數字，所以上映中和已下檔的片算法相同`}。${src}`.replace("。。", "。"),
       restTitle: "", restFooter: "", paged: true,
     };
   }
-  if (b && (sort === "week" || sort === "total")) {
-    const by: BoxSort = sort as BoxSort;
+  if (b && (sort === "week" || sort === "total" || sort === "tickets" || sort === "price")) {
+    const extra = sort === "tickets" || sort === "price"; // 依票數、平均票價排：一樣是這一週有票房的那些片，只是換一個數字排
+    const by: BoxSort = extra ? "total" : (sort as BoxSort);
     const past = by === "week" && wk.past;
-    const everyone = boxOfficeBy(b, by, selYears, wk.id);
+    const everyone = extra
+      ? b.list.map((x) => ({ x, k: moneyKey(x) })).sort((a, c) => c.k.tier - a.k.tier || c.k.v - a.k.v).map(({ x }, i) => ({ ...x, rank: i + 1 }))
+      : boxOfficeBy(b, by, selYears, wk.id);
     const countries = boxCountries(everyone);
     const land = boxCountriesPicked(countries, opt.countries || []);
-    const entries = boxByCountry(everyone, land).map((x) => boxEntry(x, by, past, by === "year" || past)).filter((e) => hit(e.name, e.m?.en));
+    const issuers = boxIssuers(everyone);
+    const firm = boxCountriesPicked(issuers, opt.issuers || []);
+    const entries = boxByIssuer(boxByCountry(everyone, land), firm).map((x) => {
+      const e = boxEntry(x, by, past, by === "year" || past);
+      if (!extra) return e;
+      const kk = moneyKey(x);
+      return { ...e, rank: kk.tier ? e.rank : null, hi: kk.hi, lines: [`累計 ${money(x.total)}`, e.lines[e.lines[1] ? 1 : 0]] as [string, string] };
+    }).filter((e) => hit(e.name, e.m?.en));
     if (asc) entries.reverse(); // 低到高：最後一名在最上面，名次數字照原本的
     // 上映中但沒進榜：場次通有場次、這一週的票房資料裡沒有的片（剛上映還沒統計到，或只在少數戲院放映）
     let rest: MovieEntry[] = [];
-    if (by !== "year" && !past && !land.length) {
+    if (by !== "year" && !past && !land.length && !firm.length) {
       const ranked: Record<string, boolean> = {};
       for (const x of b.list) ranked[communityKey(x.name)] = true;
       rest = movies.filter((m) => !m.comingSoon && !ranked[communityKey(m.title)] && hit(m.title, m.en))
@@ -1835,7 +1892,9 @@ export function movieBoard(b: BoxOffice | null, movies: TwMovie[], opt: { scope?
       ...base, sorts: scope === "year" ? [] : sortsAll, weeks: by === "week" ? boxWeekOptions(b) : [],
       weekSummary: by === "week" ? ((o) => (o ? `${o.label}（${o.note}）` : ""))(boxWeekOptions(b).find((o) => o.id === wk.id)) : "",
       countries, selCountries: land, everyone: everyone.length, countrySummary: landText(land, everyone.length), entries, rest,
-      title: boxOfficeTitle(b, by, selYears, wk.id) + dirTag + boxCountryTag(land), footer: boxOfficeFooter(b, by, selYears, wk.id),
+      issuers, selIssuers: firm, issuerSummary: landText(firm, everyone.length),
+      title: (extra ? `上映中｜${sort === "tickets" ? "累計票數" : "平均票價"}（截至 ${mdOf(b.end)}）` : boxOfficeTitle(b, by, selYears, wk.id)) + dirTag + boxCountryTag(land) + issuerTag(firm),
+      footer: extra ? `只排上映中的電影：這一週有賣出票的共 ${b.list.length} 部。${sort === "tickets" ? "累計票數是上映以來賣出的票數。" : "平均票價是累計票房 ÷ 累計票數；特殊廳、演唱會轉播的票價較高。"}這是全台灣戲院的票房。資料來源：${b.source}。官方每週更新一次。` : boxOfficeFooter(b, by, selYears, wk.id),
       restTitle: rest.length ? `其他上映中｜未進榜（${rest.length}）` : "", restFooter: "有場次、但這一週的票房資料裡還沒有的片：剛上映還沒統計到，或只在少數戲院放映。依今天放映的影城數排序。",
       paged: by === "year",
     };
@@ -1847,7 +1906,9 @@ export function movieBoard(b: BoxOffice | null, movies: TwMovie[], opt: { scope?
   for (const p of pool) if (!p.d && p.x) p.d = p.x.release.slice(0, 10);
   const countries = boxCountries(pool.filter((p) => p.x).map((p) => p.x as BoxOfficeItem));
   const land = boxCountriesPicked(countries, opt.countries || []);
-  const list = pool.filter((p) => (!land.length || (!!p.x && land.indexOf(boxMainCountry(p.x.country)) >= 0)) && hit(p.m.title, p.m.en));
+  const issuers = boxIssuers(pool.filter((p) => p.x).map((p) => p.x as BoxOfficeItem));
+  const firm = boxCountriesPicked(issuers, opt.issuers || []);
+  const list = pool.filter((p) => (!land.length || (!!p.x && land.indexOf(boxMainCountry(p.x.country)) >= 0)) && (!firm.length || (!!p.x && firm.indexOf(boxMainIssuer(p.x.issue)) >= 0)) && hit(p.m.title, p.m.en));
   // 排序：每一列算出「級別」和「數值」。級別高的永遠在前（沒有資料的不管升冪降冪都在最後），同一級別裡才依數值、方向排。
   // sort 是穩定的：數值一樣時維持原本（影城數多到少）的順序
   const none = (kind: EntryHi["kind"], note?: string): EntryHi => ({ kind, text: "–", tier: "none", ...(note ? { note } : {}) });
@@ -1883,13 +1944,14 @@ export function movieBoard(b: BoxOffice | null, movies: TwMovie[], opt: { scope?
     : `依今天放映的影城數排序，${asc ? "少到多" : "多到少"}；今天沒有場次、過幾天才有的在最後`;
   return {
     ...base, sorts: sortsAll, countries, selCountries: land, everyone: pool.length, countrySummary: landText(land, pool.length), entries, rest: [],
-    title: `上映中 ${entries.length} 部｜${sort === "date" ? (asc ? "最早上映在前" : "最新上映在前") : sort === "rating" ? `${rateName}${asc ? "低到高" : "高到低"}` : `放映影城${asc ? "少到多" : "多到少"}`}` + boxCountryTag(land),
-    footer: `${how}。場次資料來自場次通${b ? `；票房是全台灣戲院的票房，資料來源：${b.source}` : ""}。${land.length ? "篩選出品國別時，只列得出票房資料裡有的片。" : ""}`,
+    issuers, selIssuers: firm, issuerSummary: landText(firm, pool.length),
+    title: `上映中 ${entries.length} 部｜${sort === "date" ? (asc ? "最早上映在前" : "最新上映在前") : sort === "rating" ? `${rateName}${asc ? "低到高" : "高到低"}` : `放映影城${asc ? "少到多" : "多到少"}`}` + boxCountryTag(land) + issuerTag(firm),
+    footer: `${how}。場次資料來自場次通${b ? `；票房是全台灣戲院的票房，資料來源：${b.source}` : ""}。${land.length || firm.length ? "篩選出品國別、發行商時，只列得出票房資料裡有的片。" : ""}`,
     paged: false,
   };
 }
 /** 「電影」清單要的資料一次讀好（票房、場次通的片單；依觀眾評分排時才多讀評分總表）。票房讀不到時清單照樣出來 */
-export async function loadMovieBoard(opt: { scope?: string; sort?: string; years?: string[]; week?: string; countries?: string[]; query?: string; asc?: boolean; rate?: string; fewLast?: boolean }): Promise<MovieBoard> {
+export async function loadMovieBoard(opt: { scope?: string; sort?: string; years?: string[]; week?: string; countries?: string[]; query?: string; asc?: boolean; rate?: string; fewLast?: boolean; issuers?: string[] }): Promise<MovieBoard> {
   const year = opt.scope === "year" || opt.sort === "year";
   const needCommunity = opt.sort === "rating" && opt.rate === "community";
   const needYearRatings = year && opt.sort === "rating" && opt.rate !== "community"; // 年度依三大評分排：多讀伺服器的年度評分總表
@@ -3014,6 +3076,8 @@ export interface BoxOfficeItem {
   since?: boolean; // week 不是單週：官方上週還沒列入這部片，數字是上映至今的累計
   showing?: boolean; // 年度排行用：這週還有賣出票（還在上映）
   total: number; // 累計票房（元）
+  tickets?: number; // 累計票數（張）
+  issue?: string; // 發行商（多家用頓號接）
 }
 export interface BoxOffice {
   mode: "week" | "total"; // week = 週票房排行；total = 還沒有上週資料，先列近 8 週上映片的累計
@@ -3056,9 +3120,10 @@ export function loadBoxOfficeFull(): Promise<BoxOffice> {
     const b = await loadBoxOffice();
     let years: Record<string, BoxOfficeItem[]> | null = null;
     let countries: string[] = []; // 年份檔裡國別只存編號（c），名稱在這裡
+    let issuers: string[] = []; // 發行商也是編號（d）；累計票數在 k
     try {
-      const c = JSON.parse(cacheGet("boxoffice-years2.json") || "null"); // 檔名換過：新版每一筆多了國別
-      if (c && c.years && c.end === b.end && Date.now() - c.at < 6 * 3600e3) { years = c.years; countries = c.countries || []; }
+      const c = JSON.parse(cacheGet("boxoffice-years3.json") || "null"); // 檔名換過：新版每一筆多了發行商與票數
+      if (c && c.years && c.end === b.end && Date.now() - c.at < 6 * 3600e3) { years = c.years; countries = c.countries || []; issuers = c.issuers || []; }
     } catch (_) {}
     if (!years) {
       const r = await platform().fetchText(BOXOFFICE_YEARS_URL + "?t=" + Math.floor(Date.now() / 3600e3), { accept: "application/json" });
@@ -3067,11 +3132,12 @@ export function loadBoxOfficeFull(): Promise<BoxOffice> {
       if (!d || typeof d.years !== "object") throw new Error("年度排行格式不對");
       years = d.years as Record<string, BoxOfficeItem[]>;
       countries = Array.isArray(d.countries) ? d.countries : [];
-      cacheSet("boxoffice-years2.json", JSON.stringify({ at: Date.now(), end: d.end, years, countries }));
+      issuers = Array.isArray(d.issuers) ? d.issuers : [];
+      try { cacheSet("boxoffice-years3.json", JSON.stringify({ at: Date.now(), end: d.end, years, countries, issuers })); } catch (_) {}
     }
     // 年份檔為了省空間沒有 week、country 欄位：補上預設值
     const full: Record<string, BoxOfficeItem[]> = {};
-    for (const y of Object.keys(years)) full[y] = years[y].map((x) => ({ ...x, week: null, country: x.country || countries[(x as { c?: number }).c ?? -1] || "" }));
+    for (const y of Object.keys(years)) full[y] = years[y].map((x) => { const r = x as BoxOfficeItem & { c?: number; d?: number; k?: number }; return { ...x, week: null, country: x.country || countries[r.c ?? -1] || "", issue: x.issue || issuers[r.d ?? -1] || "", tickets: x.tickets || r.k || 0 }; });
     return { ...b, years: { ...(b.years || {}), ...full } };
   })().catch(async (e) => {
     boxYearsMem = null; // 下次再試

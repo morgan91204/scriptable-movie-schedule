@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.24-0109
+// @movie-schedule-app 電影行程 v2026.11.24-0124
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/parsers.gen.ts
@@ -1853,6 +1853,7 @@ function boxCountryText(country) {
   return parts.filter((c, i) => parts.indexOf(c) === i).join("、");
 }
 var BOX_COUNTRY_NOTE = "全台灣票房，只篩選出品國，可複選。";
+var issuerTag = (picked) => !picked.length ? "" : `｜${picked.length > 2 ? `${picked[0]} 等 ${picked.length} 家` : picked.join("、")}發行`;
 var boxCountryTag = (picked) => !picked.length ? "" : `｜${picked.length > 3 ? `${picked.slice(0, 2).join("、")} 等 ${picked.length} 國` : picked.join("、")}出品`;
 var boxCountriesPicked = (options, picked) => options.map((c) => c.id).filter((id) => picked.indexOf(id) >= 0);
 function boxCountries(list) {
@@ -1867,6 +1868,29 @@ function boxByCountry(list, picked) {
   if (!picked.length) return list;
   return list.filter((x) => picked.indexOf(boxMainCountry(x.country)) >= 0).map((x, i) => ({ ...x, rank: i + 1 }));
 }
+function boxMainIssuer(issue) {
+  const first = String(issue || "").split(/[、,，\/]/)[0].trim();
+  return first.replace(/(?:美商|香港商|英屬[^商]*商|新加坡商|日商)/g, "").replace(/(?:股份)?有限公司.*$/, "").replace(/台灣分公司$/, "").trim() || first;
+}
+function boxIssuers(list) {
+  const n = {};
+  for (const x of list) {
+    const c = boxMainIssuer(x.issue);
+    if (c) n[c] = (n[c] || 0) + 1;
+  }
+  return Object.keys(n).map((id) => ({ id, count: n[id] })).sort((a, b) => b.count - a.count || a.id.localeCompare(b.id));
+}
+function boxByIssuer(list, picked) {
+  if (!picked.length) return list;
+  return list.filter((x) => picked.indexOf(boxMainIssuer(x.issue)) >= 0).map((x, i) => ({ ...x, rank: i + 1 }));
+}
+function ticketsText(n) {
+  if (n >= 1e8) return `${(n / 1e8).toFixed(2).replace(/\.?0+$/, "")} 億`;
+  if (n >= 1e4) return `${(n / 1e4).toFixed(n >= 1e6 ? 0 : 1).replace(/\.0$/, "")} 萬`;
+  return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+}
+var boxStatus = (x) => x.showing || x.week !== null ? "now" : "off";
+var STATUS_LABEL = { now: "上映中", off: "已下檔", soon: "即將上映" };
 var BOXOFFICE_INFO_URL = "https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/main/dist/boxoffice-info-";
 var boxInfoMem = {};
 async function boxInfo(x) {
@@ -1883,19 +1907,27 @@ async function boxInfo(x) {
   const v = all[x.name + "|" + x.release];
   return v ? { issue: v[0] || "", produce: v[1] || "", tickets: Number(v[2]) || 0 } : null;
 }
+async function boxInfoBy(title) {
+  const b = await loadBoxOffice().catch(() => null);
+  const k = communityKey(title);
+  const x = b ? b.list.find((i) => communityKey(i.name) === k) : null;
+  if (!x) return null;
+  return { x, info: await boxInfo(x).catch(() => null) };
+}
 function boxInfoRows(x, info) {
   const num = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
   const rows = [];
   if (x.country) rows.push(["出品國別", boxCountryText(x.country)]);
-  if (info && info.issue) rows.push(["發行", info.issue]);
+  if (info && info.issue || x.issue) rows.push(["發行", info && info.issue || x.issue || ""]);
   if (info && info.produce) rows.push(["出品", info.produce]);
   rows.push(["上映日期", x.release.replace(/-/g, "/")]);
   if (x.theaters) rows.push(["上映戲院", `${x.theaters} 間`]);
   if (x.week !== null && !x.since) rows.push(["本週票房", money(x.week)]);
   rows.push(["累計票房", `${money(x.total)}（${num(x.total)} 元）`]);
-  if (info && info.tickets) {
-    rows.push(["累計票數", `${num(info.tickets)} 張`]);
-    rows.push(["平均票價", `${num(x.total / info.tickets)} 元`]);
+  const tickets = info && info.tickets || x.tickets || 0;
+  if (tickets) {
+    rows.push(["累計票數", `${num(tickets)} 張`]);
+    rows.push(["平均票價", `${num(x.total / tickets)} 元`]);
   }
   return rows;
 }
@@ -1932,11 +1964,12 @@ function movieBoard(b, movies, opt = {}) {
   const scopes = [{ id: "now", label: "上映中", sub: "有場次的" }];
   if (yearOptions.length) scopes.push({ id: "year", label: "年度", sub: "含已下檔" });
   const scope = (opt.scope === "year" || opt.sort === "year") && yearOptions.length ? "year" : "now";
-  const yearSorts = [{ id: "total", label: "票房" }, { id: "date", label: "上映日期" }, { id: "rating", label: "評分" }, { id: "cinemas", label: "累計院數" }];
+  const yearSorts = [{ id: "total", label: "票房" }, { id: "date", label: "上映日期" }, { id: "rating", label: "評分" }, { id: "cinemas", label: "累計院數" }, { id: "tickets", label: "累計票數" }, { id: "price", label: "平均票價" }];
   const sortsAll = [];
   if (b) sortsAll.push({ id: "week", label: b.mode === "week" ? "本週票房" : "近期票房" });
   if (b && b.mode === "week") sortsAll.push({ id: "total", label: "累計票房" });
   sortsAll.push({ id: "date", label: "上映日期" }, { id: "rating", label: "評分" }, { id: "cinemas", label: "影城數" });
+  if (b) sortsAll.push({ id: "tickets", label: "累計票數" }, { id: "price", label: "平均票價" });
   const sort = scope === "year" ? yearSorts.some((x) => x.id === opt.sort) ? opt.sort : "total" : sortsAll.some((x) => x.id === opt.sort) ? opt.sort : sortsAll[0].id;
   const k = (opt.query || "").trim().toLowerCase();
   const hit = (name, en) => !k || `${name} ${en || ""}`.toLowerCase().includes(k);
@@ -1947,7 +1980,7 @@ function movieBoard(b, movies, opt = {}) {
   const yearSummary = selYears.length > 1 && selYears.length === yearOptions.length ? `全部（${yearOptions[yearOptions.length - 1]}–${yearOptions[0]}）` : selYears.join("、");
   const asc = !!opt.asc;
   const order = sort;
-  const dirs = order === "date" ? [{ id: "desc", label: "新到舊" }, { id: "asc", label: "舊到新" }] : order === "cinemas" ? [{ id: "desc", label: "多到少" }, { id: "asc", label: "少到多" }] : [{ id: "desc", label: "高到低" }, { id: "asc", label: "低到高" }];
+  const dirs = order === "date" ? [{ id: "desc", label: "新到舊" }, { id: "asc", label: "舊到新" }] : order === "cinemas" || order === "tickets" ? [{ id: "desc", label: "多到少" }, { id: "asc", label: "少到多" }] : [{ id: "desc", label: "高到低" }, { id: "asc", label: "低到高" }];
   const dirTag = asc ? `｜${dirs[1].label}` : "";
   const rates = RATE_SOURCES;
   const rate = rates.some((r) => r.id === opt.rate) ? opt.rate : "imdb";
@@ -1955,6 +1988,8 @@ function movieBoard(b, movies, opt = {}) {
   const rangeSummary = scope === "year" ? `${yearSummary} 年上映` : "上映中";
   const base = { rangeSummary, fewLast, fewOption: order === "rating" && rate === "imdb", asc, dirs, rate, rates: order === "rating" ? rates : [], rateSummary: rates.find((r) => r.id === rate).label, scope, scopes, sort, order, orders, years: yearOptions, selYears, weeks: [], selWeek: wk.id, restTitle: "", restFooter: "", weekSummary: "", yearSummary };
   const landText = (land2, total) => land2.length ? land2.join("、") : `全部（${total} 部）`;
+  const priceOf = (x) => x.tickets ? x.total / x.tickets : 0;
+  const moneyKey = (x) => sort === "tickets" ? x.tickets ? { tier: 1, v: x.tickets, hi: { kind: "tickets", text: ticketsText(x.tickets), tier: "none", note: "張票" } } : { tier: 0, v: 0, hi: { kind: "tickets", text: "–", tier: "none" } } : x.tickets ? { tier: 1, v: priceOf(x), hi: { kind: "price", text: `${Math.round(priceOf(x))} 元`, tier: "none", note: "平均票價" } } : { tier: 0, v: 0, hi: { kind: "price", text: "–", tier: "none" } };
   const boxEntry = (x, by, past, old) => {
     const m = match(x.name) || null;
     const [moneyLine, info] = boxOfficeLines(x, by, past);
@@ -1968,7 +2003,9 @@ function movieBoard(b, movies, opt = {}) {
     const everyone = boxOfficeBy(b, "year", selYears, wk.id);
     const countries2 = boxCountries(everyone);
     const land2 = boxCountriesPicked(countries2, opt.countries || []);
-    const pool2 = boxByCountry(everyone, land2);
+    const issuers2 = boxIssuers(everyone);
+    const firm2 = boxCountriesPicked(issuers2, opt.issuers || []);
+    const pool2 = boxByIssuer(boxByCountry(everyone, land2), firm2);
     const yr = opt.yearRatings ? opt.yearRatings.ratings : {};
     const noneHi = (kind, note) => ({ kind, text: "–", tier: "none", ...note ? { note } : {} });
     const theatersOf = (x, m) => Math.max(x.theaters || 0, m && !m.comingSoon ? m.cinemaCount || 0 : 0);
@@ -1998,19 +2035,20 @@ function movieBoard(b, movies, opt = {}) {
         if (rate === "popcorn") return p !== void 0 ? { tier: 2, v: p, hi: { kind: "popcorn", text: `${p}%`, tier: ratingTier("pct", p) } } : { tier: 0, v: 0, hi: noneHi("popcorn") };
         return i ? { tier: i.few && fewLast ? 1 : 2, v: i.s, hi: { kind: "imdb", text: i.s.toFixed(1), tier: ratingTier("imdb", i.s), ...i.few ? { note: "評分人數少" } : {} } } : { tier: 0, v: 0, hi: noneHi("imdb") };
       }
+      if (sort === "tickets" || sort === "price") return moneyKey(x);
       return { tier: 1, v: x.total, hi: { kind: "money", text: money(x.total), tier: "none" } };
     };
     const keyed2 = pool2.map((x) => {
       const m = match(x.name) || null;
       return { x, m, k: keyOf2(x, m), rank: sort === "total" ? x.rank : null };
     }).filter((e) => hit(e.x.name, e.m?.en));
-    if (sort === "rating" || sort === "cinemas") keyed2.slice().sort((a, c) => c.k.tier - a.k.tier || c.k.v - a.k.v).forEach((e, i) => {
+    if (sort === "rating" || sort === "cinemas" || sort === "tickets" || sort === "price") keyed2.slice().sort((a, c) => c.k.tier - a.k.tier || c.k.v - a.k.v).forEach((e, i) => {
       if (e.k.tier > 0) e.rank = i + 1;
     });
     keyed2.sort((a, c) => c.k.tier - a.k.tier || (asc ? a.k.v - c.k.v : c.k.v - a.k.v));
     const entries2 = keyed2.map(({ x, m, k: kk, rank }) => {
-      const info = [x.showing ? "上映中" : "", boxMainCountry(x.country), sort === "date" ? "" : releaseLabel(dateOf(x, m)), theatersOf(x, m) && sort !== "cinemas" ? `${theatersOf(x, m)} 間戲院` : ""].filter(Boolean).join("｜");
-      return { key: `${x.name}|${x.release}`, rank, name: x.name, x, m, lines: sort === "total" ? [info, ""] : [`票房 ${money(x.total)}`, info], light: !m, hi: kk.hi };
+      const info = [boxMainCountry(x.country), sort === "date" ? "" : releaseLabel(dateOf(x, m)), theatersOf(x, m) && sort !== "cinemas" ? `${theatersOf(x, m)} 間戲院` : ""].filter(Boolean).join("｜");
+      return { key: `${x.name}|${x.release}`, rank, name: x.name, x, m, lines: sort === "total" ? [info, ""] : [`票房 ${money(x.total)}`, info], light: !m, hi: kk.hi, status: boxStatus(x) };
     });
     const rateName2 = rates.find((r) => r.id === rate).label;
     const md = (d) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`;
@@ -2028,23 +2066,34 @@ function movieBoard(b, movies, opt = {}) {
       countrySummary: landText(land2, everyone.length),
       entries: entries2,
       rest: [],
-      title: (sort === "total" ? `${yt} 年票房排行（截至 ${md(b.end)}）${dirTag}` : `${yt} 年上映 ${entries2.length} 部｜${sort === "date" ? asc ? "最早上映在前" : "最新上映在前" : sort === "rating" ? `${rateName2}${asc ? "低到高" : "高到低"}` : `累計院數${asc ? "少到多" : "多到少"}`}`) + boxCountryTag(land2),
-      footer: sort === "total" ? boxOfficeFooter(b, "year", selYears, wk.id) : `${yt} 年上映、有票房紀錄的電影（已經下檔的也在裡面）${sort === "date" ? "依上映日期排序" : sort === "rating" ? `依${rateName2}排序。${rate === "community" ? `評分不到 ${COMMUNITY_MIN} 人的不列入。` : cov}` : `依累計院數排序：上映以來放映過的戲院數（官方票房資料，算到 ${md(b.end)}）。還在上映的片，今天有場次的影城如果比官方的數字多，就用今天的數字，所以上映中和已下檔的片算法相同`}。${src}`.replace("。。", "。"),
+      issuers: issuers2,
+      selIssuers: firm2,
+      issuerSummary: landText(firm2, everyone.length),
+      title: (sort === "total" ? `${yt} 年票房排行（截至 ${md(b.end)}）${dirTag}` : `${yt} 年上映 ${entries2.length} 部｜${sort === "date" ? asc ? "最早上映在前" : "最新上映在前" : sort === "rating" ? `${rateName2}${asc ? "低到高" : "高到低"}` : sort === "tickets" ? `累計票數${asc ? "少到多" : "多到少"}` : sort === "price" ? `平均票價${asc ? "低到高" : "高到低"}` : `累計院數${asc ? "少到多" : "多到少"}`}`) + boxCountryTag(land2) + issuerTag(firm2),
+      footer: sort === "total" ? boxOfficeFooter(b, "year", selYears, wk.id) : `${yt} 年上映、有票房紀錄的電影（已經下檔的也在裡面）${sort === "date" ? "依上映日期排序" : sort === "tickets" ? "依累計票數排序（上映以來賣出的票數）" : sort === "price" ? "依平均票價排序（累計票房 ÷ 累計票數；特殊廳、演唱會轉播的票價較高）" : sort === "rating" ? `依${rateName2}排序。${rate === "community" ? `評分不到 ${COMMUNITY_MIN} 人的不列入。` : cov}` : `依累計院數排序：上映以來放映過的戲院數（官方票房資料，算到 ${md(b.end)}）。還在上映的片，今天有場次的影城如果比官方的數字多，就用今天的數字，所以上映中和已下檔的片算法相同`}。${src}`.replace("。。", "。"),
       restTitle: "",
       restFooter: "",
       paged: true
     };
   }
-  if (b && (sort === "week" || sort === "total")) {
-    const by = sort;
+  if (b && (sort === "week" || sort === "total" || sort === "tickets" || sort === "price")) {
+    const extra = sort === "tickets" || sort === "price";
+    const by = extra ? "total" : sort;
     const past = by === "week" && wk.past;
-    const everyone = boxOfficeBy(b, by, selYears, wk.id);
+    const everyone = extra ? b.list.map((x) => ({ x, k: moneyKey(x) })).sort((a, c) => c.k.tier - a.k.tier || c.k.v - a.k.v).map(({ x }, i) => ({ ...x, rank: i + 1 })) : boxOfficeBy(b, by, selYears, wk.id);
     const countries2 = boxCountries(everyone);
     const land2 = boxCountriesPicked(countries2, opt.countries || []);
-    const entries2 = boxByCountry(everyone, land2).map((x) => boxEntry(x, by, past, by === "year" || past)).filter((e) => hit(e.name, e.m?.en));
+    const issuers2 = boxIssuers(everyone);
+    const firm2 = boxCountriesPicked(issuers2, opt.issuers || []);
+    const entries2 = boxByIssuer(boxByCountry(everyone, land2), firm2).map((x) => {
+      const e = boxEntry(x, by, past, by === "year" || past);
+      if (!extra) return e;
+      const kk = moneyKey(x);
+      return { ...e, rank: kk.tier ? e.rank : null, hi: kk.hi, lines: [`累計 ${money(x.total)}`, e.lines[e.lines[1] ? 1 : 0]] };
+    }).filter((e) => hit(e.name, e.m?.en));
     if (asc) entries2.reverse();
     let rest = [];
-    if (by !== "year" && !past && !land2.length) {
+    if (by !== "year" && !past && !land2.length && !firm2.length) {
       const ranked = {};
       for (const x of b.list) ranked[communityKey(x.name)] = true;
       rest = movies.filter((m) => !m.comingSoon && !ranked[communityKey(m.title)] && hit(m.title, m.en)).map((m) => ({ key: m.slug, rank: null, name: m.title, x: null, m, lines: movieLines(m), light: false }));
@@ -2060,8 +2109,11 @@ function movieBoard(b, movies, opt = {}) {
       countrySummary: landText(land2, everyone.length),
       entries: entries2,
       rest,
-      title: boxOfficeTitle(b, by, selYears, wk.id) + dirTag + boxCountryTag(land2),
-      footer: boxOfficeFooter(b, by, selYears, wk.id),
+      issuers: issuers2,
+      selIssuers: firm2,
+      issuerSummary: landText(firm2, everyone.length),
+      title: (extra ? `上映中｜${sort === "tickets" ? "累計票數" : "平均票價"}（截至 ${mdOf(b.end)}）` : boxOfficeTitle(b, by, selYears, wk.id)) + dirTag + boxCountryTag(land2) + issuerTag(firm2),
+      footer: extra ? `只排上映中的電影：這一週有賣出票的共 ${b.list.length} 部。${sort === "tickets" ? "累計票數是上映以來賣出的票數。" : "平均票價是累計票房 ÷ 累計票數；特殊廳、演唱會轉播的票價較高。"}這是全台灣戲院的票房。資料來源：${b.source}。官方每週更新一次。` : boxOfficeFooter(b, by, selYears, wk.id),
       restTitle: rest.length ? `其他上映中｜未進榜（${rest.length}）` : "",
       restFooter: "有場次、但這一週的票房資料裡還沒有的片：剛上映還沒統計到，或只在少數戲院放映。依今天放映的影城數排序。",
       paged: by === "year"
@@ -2073,7 +2125,9 @@ function movieBoard(b, movies, opt = {}) {
   for (const p of pool) if (!p.d && p.x) p.d = p.x.release.slice(0, 10);
   const countries = boxCountries(pool.filter((p) => p.x).map((p) => p.x));
   const land = boxCountriesPicked(countries, opt.countries || []);
-  const list = pool.filter((p) => (!land.length || !!p.x && land.indexOf(boxMainCountry(p.x.country)) >= 0) && hit(p.m.title, p.m.en));
+  const issuers = boxIssuers(pool.filter((p) => p.x).map((p) => p.x));
+  const firm = boxCountriesPicked(issuers, opt.issuers || []);
+  const list = pool.filter((p) => (!land.length || !!p.x && land.indexOf(boxMainCountry(p.x.country)) >= 0) && (!firm.length || !!p.x && firm.indexOf(boxMainIssuer(p.x.issue)) >= 0) && hit(p.m.title, p.m.en));
   const none = (kind, note) => ({ kind, text: "–", tier: "none", ...note ? { note } : {} });
   const rated = (m) => {
     if (rate === "tomato") return m.tomato !== void 0 ? { tier: 2, v: m.tomato, hi: { kind: "tomato", text: `${m.tomato}%`, tier: ratingTier("pct", m.tomato) } } : { tier: 0, v: 0, hi: none("tomato") };
@@ -2107,8 +2161,11 @@ function movieBoard(b, movies, opt = {}) {
     countrySummary: landText(land, pool.length),
     entries,
     rest: [],
-    title: `上映中 ${entries.length} 部｜${sort === "date" ? asc ? "最早上映在前" : "最新上映在前" : sort === "rating" ? `${rateName}${asc ? "低到高" : "高到低"}` : `放映影城${asc ? "少到多" : "多到少"}`}` + boxCountryTag(land),
-    footer: `${how}。場次資料來自場次通${b ? `；票房是全台灣戲院的票房，資料來源：${b.source}` : ""}。${land.length ? "篩選出品國別時，只列得出票房資料裡有的片。" : ""}`,
+    issuers,
+    selIssuers: firm,
+    issuerSummary: landText(firm, pool.length),
+    title: `上映中 ${entries.length} 部｜${sort === "date" ? asc ? "最早上映在前" : "最新上映在前" : sort === "rating" ? `${rateName}${asc ? "低到高" : "高到低"}` : `放映影城${asc ? "少到多" : "多到少"}`}` + boxCountryTag(land) + issuerTag(firm),
+    footer: `${how}。場次資料來自場次通${b ? `；票房是全台灣戲院的票房，資料來源：${b.source}` : ""}。${land.length || firm.length ? "篩選出品國別、發行商時，只列得出票房資料裡有的片。" : ""}`,
     paged: false
   };
 }
@@ -2981,11 +3038,13 @@ function loadBoxOfficeFull() {
     const b = await loadBoxOffice();
     let years = null;
     let countries = [];
+    let issuers = [];
     try {
-      const c = JSON.parse(cacheGet("boxoffice-years2.json") || "null");
+      const c = JSON.parse(cacheGet("boxoffice-years3.json") || "null");
       if (c && c.years && c.end === b.end && Date.now() - c.at < 6 * 36e5) {
         years = c.years;
         countries = c.countries || [];
+        issuers = c.issuers || [];
       }
     } catch (_) {
     }
@@ -2996,10 +3055,17 @@ function loadBoxOfficeFull() {
       if (!d || typeof d.years !== "object") throw new Error("年度排行格式不對");
       years = d.years;
       countries = Array.isArray(d.countries) ? d.countries : [];
-      cacheSet("boxoffice-years2.json", JSON.stringify({ at: Date.now(), end: d.end, years, countries }));
+      issuers = Array.isArray(d.issuers) ? d.issuers : [];
+      try {
+        cacheSet("boxoffice-years3.json", JSON.stringify({ at: Date.now(), end: d.end, years, countries, issuers }));
+      } catch (_) {
+      }
     }
     const full = {};
-    for (const y of Object.keys(years)) full[y] = years[y].map((x) => ({ ...x, week: null, country: x.country || countries[x.c ?? -1] || "" }));
+    for (const y of Object.keys(years)) full[y] = years[y].map((x) => {
+      const r = x;
+      return { ...x, week: null, country: x.country || countries[r.c ?? -1] || "", issue: x.issue || issuers[r.d ?? -1] || "", tickets: x.tickets || r.k || 0 };
+    });
     return { ...b, years: { ...b.years || {}, ...full } };
   })().catch(async (e) => {
     boxYearsMem = null;
@@ -3206,7 +3272,7 @@ function Section(props) {
 function Item(props) {
   const cls = ["item", props.head ? "head" : "", props.kv ? "kv" : "", props.onTap ? "tap" : "", props.muted ? "muted" : "", props.accent ? "accent" : "", props.onLongPress ? "long" : ""].join(" ");
   const fallback = "if(this.dataset.url&&this.src!==this.dataset.url){this.src=this.dataset.url}else{this.remove()}";
-  return /* @__PURE__ */ h("div", { class: cls, onTap: props.onTap, onLongPress: props.onLongPress }, props.rank ? /* @__PURE__ */ h("span", { class: "rank" + (props.rank <= 3 ? " top" : "") + (props.rank >= 1e3 ? " d4" : props.rank >= 100 ? " d3" : "") }, props.rank) : null, props.thumb ? props.thumb.pending && !props.thumb.src ? /* @__PURE__ */ h("span", { class: "thumb none" }) : /* @__PURE__ */ h(GenPoster, { cls: "thumb", title: props.title }, props.thumb.src ? /* @__PURE__ */ h("img", { src: props.thumb.src, "data-url": props.thumb.url && props.thumb.url !== props.thumb.src ? props.thumb.url : void 0, alt: "", loading: "lazy", onerror: fallback }) : null) : null, props.icon ? /* @__PURE__ */ h("span", { class: "ico" }, props.icon) : null, /* @__PURE__ */ h("div", { class: "body" }, /* @__PURE__ */ h("div", { class: "title" }, esc(props.title)), props.subtitle ? props.subtitle.includes("\n") ? props.subtitle.split("\n").map((l, i) => /* @__PURE__ */ h("div", { class: "sub one" + (i ? " dim" : "") }, esc(l))) : /* @__PURE__ */ h("div", { class: "sub" }, esc(props.subtitle)) : null), props.badge ? /* @__PURE__ */ h("span", { class: "badge" }, esc(props.badge)) : null, props.right ? /* @__PURE__ */ h("span", { class: "right" }, esc(props.right)) : null, props.hi ? /* @__PURE__ */ h("span", { class: `hi ${props.hi.kind} ${props.hi.tier}` }, /* @__PURE__ */ h("span", { class: "hv" }, props.hi.kind === "imdb" ? /* @__PURE__ */ h("i", { class: "imdb" }, "IMDb") : props.hi.kind === "tomato" ? /* @__PURE__ */ h("i", { class: "emo" }, props.hi.tier === "bad" ? "🤢" : "🍅") : props.hi.kind === "popcorn" ? /* @__PURE__ */ h("i", { class: "emo" }, props.hi.tier === "bad" ? "🫗" : "🍿") : props.hi.kind === "community" ? /* @__PURE__ */ h("i", { class: "emo star" }, "★") : null, /* @__PURE__ */ h("b", null, esc(props.hi.text))), props.hi.note ? /* @__PURE__ */ h("small", null, esc(props.hi.note)) : null) : null, props.onTap && props.chevron !== false && !props.action ? /* @__PURE__ */ h("span", { class: "chev" }, "›") : null, props.action ? /* @__PURE__ */ h("button", { class: "act", "aria-label": props.action.hint || props.action.label, onTap: props.action.onTap }, esc(props.action.label)) : null);
+  return /* @__PURE__ */ h("div", { class: cls, onTap: props.onTap, onLongPress: props.onLongPress }, props.rank ? /* @__PURE__ */ h("span", { class: "rank" + (props.rank <= 3 ? " top" : "") + (props.rank >= 1e3 ? " d4" : props.rank >= 100 ? " d3" : "") }, props.rank) : null, props.thumb ? props.thumb.pending && !props.thumb.src ? /* @__PURE__ */ h("span", { class: "thumb none" }) : /* @__PURE__ */ h(GenPoster, { cls: "thumb", title: props.title }, props.thumb.src ? /* @__PURE__ */ h("img", { src: props.thumb.src, "data-url": props.thumb.url && props.thumb.url !== props.thumb.src ? props.thumb.url : void 0, alt: "", loading: "lazy", onerror: fallback }) : null) : null, props.icon ? /* @__PURE__ */ h("span", { class: "ico" }, props.icon) : null, /* @__PURE__ */ h("div", { class: "body" }, /* @__PURE__ */ h("div", { class: "title" }, esc(props.title), props.tag && !props.kv ? /* @__PURE__ */ h("span", { class: "pill " + props.tag.tone }, esc(props.tag.text)) : null), props.subtitle ? props.subtitle.includes("\n") ? props.subtitle.split("\n").map((l, i) => /* @__PURE__ */ h("div", { class: "sub one" + (i ? " dim" : "") }, esc(l))) : /* @__PURE__ */ h("div", { class: "sub" }, esc(props.subtitle)) : null), props.badge ? /* @__PURE__ */ h("span", { class: "badge" }, esc(props.badge)) : null, props.right ? /* @__PURE__ */ h("span", { class: "right" }, esc(props.right)) : null, props.tag && props.kv ? /* @__PURE__ */ h("span", { class: "right" }, /* @__PURE__ */ h("span", { class: "pill " + props.tag.tone }, esc(props.tag.text))) : null, props.hi ? /* @__PURE__ */ h("span", { class: `hi ${props.hi.kind} ${props.hi.tier}` }, /* @__PURE__ */ h("span", { class: "hv" }, props.hi.kind === "imdb" ? /* @__PURE__ */ h("i", { class: "imdb" }, "IMDb") : props.hi.kind === "tomato" ? /* @__PURE__ */ h("i", { class: "emo" }, props.hi.tier === "bad" ? "🤢" : "🍅") : props.hi.kind === "popcorn" ? /* @__PURE__ */ h("i", { class: "emo" }, props.hi.tier === "bad" ? "🫗" : "🍿") : props.hi.kind === "community" ? /* @__PURE__ */ h("i", { class: "emo star" }, "★") : null, /* @__PURE__ */ h("b", null, esc(props.hi.text))), props.hi.note ? /* @__PURE__ */ h("small", null, esc(props.hi.note)) : null) : null, props.onTap && props.chevron !== false && !props.action ? /* @__PURE__ */ h("span", { class: "chev" }, "›") : null, props.action ? /* @__PURE__ */ h("button", { class: "act", "aria-label": props.action.hint || props.action.label, onTap: props.action.onTap }, esc(props.action.label)) : null);
 }
 function Chips(props) {
   return /* @__PURE__ */ h("div", { class: props.tabs ? "chips tabs" : props.scroll ? "chips scroll" : "chips" }, props.children);
@@ -3319,6 +3385,12 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .item .hi.none .emo{filter:grayscale(1);opacity:.6}.item .hi.none .imdb{opacity:.5}
 .item .hi.money b,.item .hi.cinemas b,.item .hi.date b{color:var(--fg)}
 @media(prefers-color-scheme:dark){.item .hi.good b{color:#30d158}.item .hi.mid b{color:#ffb340}.item .hi.bad b{color:#ff6961}}
+.pill{display:inline-block;margin-left:6px;padding:1px 7px;border-radius:999px;font-size:11px;font-weight:700;line-height:1.5;vertical-align:middle;white-space:nowrap}
+.pill.now{background:rgba(48,209,88,.2);color:#1f9d45}
+.pill.off{background:rgba(255,69,58,.18);color:#d63a31}
+.pill.soon{background:rgba(255,159,10,.2);color:#c77700}
+@media(prefers-color-scheme:dark){.pill.now{color:#30d158}.pill.off{color:#ff6961}.pill.soon{color:#ffb340}}
+.item.kv .right .pill{margin-left:0;font-size:12px;padding:2px 9px}
 .item.kv .body{flex:0 0 auto}
 .item.kv .right{flex:1 1 auto;max-width:none;min-width:0;white-space:nowrap;overflow:hidden}
 .item .badge{flex:none;font-size:12px;padding:2px 8px;border-radius:999px;background:var(--chip);color:var(--chip-fg)}
@@ -3776,6 +3848,8 @@ var App = class {
     this.festYear = 0;
     this.boxRate = "";
     // 依評分排時用哪一種評分（空 = IMDb）
+    this.boxIssuer = [];
+    // 只看哪幾家發行商（可以複選；空 = 全部）
     this.boxFewLast = true;
     // 依 IMDb 排時，評分人數少的片排在後面（關掉就照分數一起排）
     this.boxOpen = "";
@@ -3793,6 +3867,8 @@ var App = class {
     // 年度排行目前顯示幾列
     this.boxPageKey = "";
     // 日期、縣市、特殊廳都可以複選（點一下選、再點一下取消）；換一部片時日期重來
+    this.infoOpen = false;
+    // 電影頁的票房資訊有沒有展開（預設收合）
     this.movieFor = "";
     this.movieDates = [];
     // 空 = 來源預設的那一天（通常是今天）
@@ -3846,14 +3922,14 @@ var App = class {
   }
   /** 最新版本是多少。網頁版問的是自己網站現在上線的版本（重新整理就會拿到的那一版），不是 GitHub 上的 */
   checkVersion() {
-    if (true) return checkLatest("2026.11.24-0109");
+    if (true) return checkLatest("2026.11.24-0124");
     return (async () => {
       try {
         const r = await globalThis.fetch("/api/version?t=" + Date.now(), { cache: "no-store" });
         const latest = String((await r.json()).version || "");
         if (!latest) return null;
         const num = (v) => Number(v.replace(/\D/g, "")) || 0;
-        return { latest, isLatest: num("2026.11.24-0109") >= num(latest) };
+        return { latest, isLatest: num("2026.11.24-0124") >= num(latest) };
       } catch (_) {
         return null;
       }
@@ -3968,11 +4044,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.24-0109"}`);
+          Pasteboard.copy(`版本 ${"2026.11.24-0124"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.24-0109"}`,
+      `版本 ${"2026.11.24-0124"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -4309,7 +4385,7 @@ var App = class {
     if (false) {
       if (!r) return /* @__PURE__ */ h(Note, { text: "（無法確認是否為最新版：連不到網站）" });
       if (r.isLatest) return /* @__PURE__ */ h(Note, { text: "✅ 已是最新版" });
-      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.24-0109"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
+      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.24-0124"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
         globalThis.location.reload();
       } }));
     }
@@ -4497,11 +4573,11 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
   async boxOfficeView() {
     const k = this.movieQuery.trim().toLowerCase();
     const sc = this.movieMode === "year" ? "year" : "now";
-    const board = await loadMovieBoard({ scope: sc, sort: this.sortBy[sc], years: this.boxYears, week: this.boxWeek, countries: this.boxCountry, query: k, asc: this.ascBy[sc], rate: this.boxRate, fewLast: this.boxFewLast });
+    const board = await loadMovieBoard({ scope: sc, sort: this.sortBy[sc], years: this.boxYears, week: this.boxWeek, countries: this.boxCountry, query: k, asc: this.ascBy[sc], rate: this.boxRate, fewLast: this.boxFewLast, issuers: this.boxIssuer });
     const { years, countries } = board;
     const selYears = board.selYears, country = board.selCountries;
     const paged = board.paged;
-    const pageKey = `${board.asc}|${board.rate}|${board.scope}|${board.sort}|${selYears.join(",")}|${board.selWeek}|${k}|${country.join(",")}`;
+    const pageKey = `${board.selIssuers.join(",")}|${board.asc}|${board.rate}|${board.scope}|${board.sort}|${selYears.join(",")}|${board.selWeek}|${k}|${country.join(",")}`;
     if (this.boxPageKey !== pageKey) {
       this.boxPageKey = pageKey;
       this.boxLimit = BOX_PAGE;
@@ -4535,6 +4611,7 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
           title: e.name,
           subtitle: e.lines.filter(Boolean).join("\n"),
           hi: e.hi,
+          tag: e.status ? { text: STATUS_LABEL[e.status], tone: e.status } : void 0,
           chevron: !e.hi,
           onTap: m ? () => this.go(() => this.movieView(m, ""), `讀取《${m.title}》的放映影城…`) : x ? () => this.go(() => this.boxMovieView(x), `讀取《${x.name}》…`) : void 0
         }
@@ -4554,7 +4631,7 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
       }
     } }))), /* @__PURE__ */ h("button", { class: "dir", "aria-label": "切換排序方向", onTap: () => {
       this.ascBy[sc] = !this.ascBy[sc];
-    } }, esc((board.asc ? board.dirs[1].label : board.dirs[0].label).replace("到", "→")))) : null, board.weeks.length > 1 || countries.length > 1 || board.rates.length > 1 ? /* @__PURE__ */ h(Section, { hint: this.boxOpen === "country" ? BOX_COUNTRY_NOTE + "可以左右滑動。" : this.boxOpen === "week" ? "可以回頭看過去幾週的排行。" : this.boxOpen === "rate" ? "番茄指數是影評的分數、爆米花指數是觀眾的分數（都來自爛番茄）；觀眾評分是這個 App 的使用者打的。" : "" }, board.rates.length > 1 ? fold("rate", "評分來源", board.rateSummary) : null, board.rates.length > 1 && this.boxOpen === "rate" ? /* @__PURE__ */ h(Chips, { scroll: true }, board.rates.map((r) => /* @__PURE__ */ h(Chip, { label: r.label, muted: board.rate !== r.id, onTap: () => {
+    } }, esc((board.asc ? board.dirs[1].label : board.dirs[0].label).replace("到", "→")))) : null, board.weeks.length > 1 || countries.length > 1 || board.rates.length > 1 || board.issuers.length > 1 ? /* @__PURE__ */ h(Section, { hint: this.boxOpen === "country" ? BOX_COUNTRY_NOTE + "可以左右滑動。" : this.boxOpen === "issuer" ? "發行商來自官方票房資料，可複選、可以左右滑動；聯合發行的片算第一家。" : this.boxOpen === "week" ? "可以回頭看過去幾週的排行。" : this.boxOpen === "rate" ? "番茄指數是影評的分數、爆米花指數是觀眾的分數（都來自爛番茄）；觀眾評分是這個 App 的使用者打的。" : "" }, board.rates.length > 1 ? fold("rate", "評分來源", board.rateSummary) : null, board.rates.length > 1 && this.boxOpen === "rate" ? /* @__PURE__ */ h(Chips, { scroll: true }, board.rates.map((r) => /* @__PURE__ */ h(Chip, { label: r.label, muted: board.rate !== r.id, onTap: () => {
       this.boxRate = r.id;
     } }))) : null, board.fewOption ? /* @__PURE__ */ h(Item, { kv: true, title: "評分人數少的片", right: board.fewLast ? "排在後面 ⇄" : "照分數一起排 ⇄", chevron: false, onTap: () => {
       this.boxFewLast = !this.boxFewLast;
@@ -4564,6 +4641,10 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
       this.boxCountry = [];
     } }), countries.map((c) => /* @__PURE__ */ h(Chip, { label: c.id, sub: `${c.count} 部`, muted: country.indexOf(c.id) < 0, onTap: () => {
       this.boxCountry = country.indexOf(c.id) < 0 ? [...country, c.id] : country.filter((z) => z !== c.id);
+    } }))) : null, board.issuers.length > 1 ? fold("issuer", "發行商", board.issuerSummary) : null, board.issuers.length > 1 && this.boxOpen === "issuer" ? /* @__PURE__ */ h(Chips, { scroll: true }, /* @__PURE__ */ h(Chip, { label: "全部", sub: `${board.everyone} 部`, muted: board.selIssuers.length > 0, onTap: () => {
+      this.boxIssuer = [];
+    } }), board.issuers.map((c) => /* @__PURE__ */ h(Chip, { label: c.id, sub: `${c.count} 部`, muted: board.selIssuers.indexOf(c.id) < 0, onTap: () => {
+      this.boxIssuer = board.selIssuers.indexOf(c.id) < 0 ? [...board.selIssuers, c.id] : board.selIssuers.filter((z) => z !== c.id);
     } }))) : null) : null, every.length ? null : /* @__PURE__ */ h(Empty, { icon: "🎞", text: "找不到相符的電影" }), rows.length ? /* @__PURE__ */ h(Section, { title: board.title, hint: board.footer }, rows.map(item)) : null, paged && board.entries.length > rows.length ? (
       // 不用按：快滑到底時自動接著載入下一批（一次全部畫出好幾千列會卡住，所以還是分批，只是自動）
       /* @__PURE__ */ h("button", { class: "auto-more", onTap: () => {
@@ -4575,7 +4656,7 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
   async boxMovieView(x) {
     const [e, info] = await Promise.all([this.extras(x.name), boxInfo(x).catch(() => null)]);
     const date = x.release.replace(/-/g, "/");
-    return /* @__PURE__ */ h(Page, { title: x.name, subtitle: `票房第 ${x.rank} 名`, onBack: () => this.back() }, this.hero(e, x.name, [boxCountryText(x.country), `${date} 上映`]), /* @__PURE__ */ h(Section, { title: "票房資訊", hint: "資料來源：國家電影及視聽文化中心「全國電影票房統計」。" }, boxInfoRows(x, info).map(([label, value]) => /* @__PURE__ */ h(Item, { kv: true, title: label, right: value }))), /* @__PURE__ */ h(Note, { text: "場次通目前沒有這部片的場次，可能已經下檔，或只在少數戲院放映。" }));
+    return /* @__PURE__ */ h(Page, { title: x.name, subtitle: `票房第 ${x.rank} 名`, onBack: () => this.back() }, this.hero(e, x.name, [boxCountryText(x.country), `${date} 上映`]), /* @__PURE__ */ h(Section, { title: "票房資訊", hint: "資料來源：國家電影及視聽文化中心「全國電影票房統計」。" }, /* @__PURE__ */ h(Item, { kv: true, title: "狀態", tag: { text: STATUS_LABEL[boxStatus(x)], tone: boxStatus(x) } }), boxInfoRows(x, info).map(([label, value]) => /* @__PURE__ */ h(Item, { kv: true, title: label, right: value }))), /* @__PURE__ */ h(Note, { text: boxStatus(x) === "now" ? "官方票房資料顯示這部片最近一週還有賣出票，但場次通目前查不到場次：可能只在少數戲院放映，或這幾天剛下檔。" : "這部片已經下檔，場次通目前沒有它的場次。" }));
   }
   async movieListView() {
     if (this.movieMode === "fest") return this.festivalListView();
@@ -4659,7 +4740,11 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
     if (!runtime) runtime = await this.fillRuntime(m, 1500);
     const shownCities = cities.filter((ct) => rows.some((r) => r.cinema.city === ct));
     const about = movieAbout(d);
-    return /* @__PURE__ */ h(Page, { title: m.title, subtitle: [m.rating || d.rating, runtime ? `${runtime} 分鐘` : "", `${d.cinemas.length} 間影城`].filter(Boolean).join("｜"), onBack: () => this.back() }, this.hero(x, m.title, [m.en, [m.rating || d.rating, runtime ? `${runtime} 分鐘` : ""].filter(Boolean).join("｜"), releaseLabel(d.release || m.release || releaseOf(m.title)), `${d.cinemas.length} 間影城有放映`]), about.text || about.credits ? /* @__PURE__ */ h(Section, { title: "劇情簡介", hint: "簡介來自場次通。" }, /* @__PURE__ */ h(Para, { text: about.text || about.credits, dim: about.text ? about.credits : "" })) : null, /* @__PURE__ */ h(Section, { title: "日期", hint: "日期、縣市、特殊廳都可以複選。" }, /* @__PURE__ */ h(Chips, null, allDates.map((dt) => /* @__PURE__ */ h(Chip, { label: dateLabel(dt).replace(/（.）.*$/, ""), sub: dt === todayTPE() ? "今天" : dateLabel(dt).match(/（(.)）/)?.[1] || "", muted: selDates.indexOf(dt) < 0, onTap: () => {
+    const box = await Promise.race([boxInfoBy(m.title).catch(() => null), sleep(this.rerendering ? 0 : 1200).then(() => null)]);
+    const status = m.comingSoon ? "soon" : "now";
+    return /* @__PURE__ */ h(Page, { title: m.title, subtitle: [m.rating || d.rating, runtime ? `${runtime} 分鐘` : "", `${d.cinemas.length} 間影城`].filter(Boolean).join("｜"), onBack: () => this.back() }, this.hero(x, m.title, [m.en, [m.rating || d.rating, runtime ? `${runtime} 分鐘` : ""].filter(Boolean).join("｜"), releaseLabel(d.release || m.release || releaseOf(m.title)), `${d.cinemas.length} 間影城有放映`]), about.text || about.credits ? /* @__PURE__ */ h(Section, { title: "劇情簡介", hint: "簡介來自場次通。" }, /* @__PURE__ */ h(Para, { text: about.text || about.credits, dim: about.text ? about.credits : "" })) : null, /* @__PURE__ */ h(Section, { hint: this.infoOpen && box ? `資料來源：國家電影及視聽文化中心「全國電影票房統計」，官方每週更新一次。` : "" }, /* @__PURE__ */ h(Item, { kv: true, title: "狀態", tag: { text: STATUS_LABEL[status], tone: status } }), box ? /* @__PURE__ */ h(Item, { kv: true, title: "票房資訊", right: `${money(box.x.total)} ${this.infoOpen ? "▾" : "▸"}`, chevron: false, onTap: () => {
+      this.infoOpen = !this.infoOpen;
+    } }) : /* @__PURE__ */ h(Item, { kv: true, title: "票房資訊", right: "官方資料還沒列入" }), box && this.infoOpen ? boxInfoRows(box.x, box.info).map(([label, value]) => /* @__PURE__ */ h(Item, { kv: true, title: label, right: value })) : null), /* @__PURE__ */ h(Section, { title: "日期", hint: "日期、縣市、特殊廳都可以複選。" }, /* @__PURE__ */ h(Chips, null, allDates.map((dt) => /* @__PURE__ */ h(Chip, { label: dateLabel(dt).replace(/（.）.*$/, ""), sub: dt === todayTPE() ? "今天" : dateLabel(dt).match(/（(.)）/)?.[1] || "", muted: selDates.indexOf(dt) < 0, onTap: () => {
       this.movieDates = toggle(selDates, dt, true);
     } })))), /* @__PURE__ */ h(Section, { title: "縣市" }, /* @__PURE__ */ h(Chips, null, /* @__PURE__ */ h(Chip, { label: "全部", muted: selCities.length > 0, onTap: () => {
       this.movieCities = [];

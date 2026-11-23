@@ -12,7 +12,7 @@ import {
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
   loadSettings, saveSettings, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, TW,
   FORMATS, formatsOf, filterVersions, filterVersionsAny, movieRows, movieDays, nearest, kmLabel, WINDOWS, findShowtimes, findShowtimesMulti, multiLabel, multiDetail, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText,
-  hallOf, tmdbTest, movieExtras, moviePoster, movieRuntime, posterSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxCountries, boxByCountry, boxInfo, boxInfoRows, boxCountryText, BOX_COUNTRY_NOTE, boxCountryTag, boxCountriesPicked, loadMovieBoard, loadSoonBoard, isFavMovie, toggleFavMovie, favMovieRows, favMovieBox, soonGroups, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityCached, communityVote, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalsReady, festivalNote, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, festivalDefaultDate, festivalStateLabel, festivalState, festivalFooter, linkMovies, nowGroupLine, nowFilter, festivalPick, movieAbout, festivalSearch, festivalSearchLines, festivalTrailer, festivalYears, festivalsAny, festivalGroups, festivalChipNote, festivalStatusLine, movieRatings, ratingTier,
+  hallOf, tmdbTest, movieExtras, moviePoster, movieRuntime, posterSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxCountries, boxByCountry, boxInfo, boxInfoRows, boxCountryText, BOX_COUNTRY_NOTE, boxCountryTag, boxCountriesPicked, loadMovieBoard, loadSoonBoard, boxStatus, STATUS_LABEL, boxInfoBy, isFavMovie, toggleFavMovie, favMovieRows, favMovieBox, soonGroups, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityCached, communityVote, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalsReady, festivalNote, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, festivalDefaultDate, festivalStateLabel, festivalState, festivalFooter, linkMovies, nowGroupLine, nowFilter, festivalPick, movieAbout, festivalSearch, festivalSearchLines, festivalTrailer, festivalYears, festivalsAny, festivalGroups, festivalChipNote, festivalStatusLine, movieRatings, ratingTier,
 } from "./core";
 import type { MovieExtras, Ratings, Community, BoxOfficeItem, BoxSort, MovieEntry, SoonEntry, UpcomingFilm, FavMovie, FavRow, Festival, FestivalFilm, FestivalSession } from "./core";
 import { setTabBar, setBackGuard, esc } from "./jsx";
@@ -1054,6 +1054,7 @@ class App {
   }
 
   boxRate = ""; // 依評分排時用哪一種評分（空 = IMDb）
+  boxIssuer: string[] = []; // 只看哪幾家發行商（可以複選；空 = 全部）
   boxFewLast = true; // 依 IMDb 排時，評分人數少的片排在後面（關掉就照分數一起排）
   boxOpen = ""; // 目前展開哪一組篩選（週次／年份／出品國別；空 = 都收合）
   // 排法與方向：「現正上映」和「歷年電影」兩個頁籤各記各的（空 = 第一種；asc = 反過來排）
@@ -1069,12 +1070,12 @@ class App {
     // 票房、片單（依觀眾評分排時再加評分總表）一次讀好；票房讀不到時清單照樣出來，只是少了依票房排的選項
     const k = this.movieQuery.trim().toLowerCase();
     const sc = this.movieMode === "year" ? "year" : "now"; // 看哪些片由頁籤決定
-    const board = await loadMovieBoard({ scope: sc, sort: this.sortBy[sc], years: this.boxYears, week: this.boxWeek, countries: this.boxCountry, query: k, asc: this.ascBy[sc], rate: this.boxRate, fewLast: this.boxFewLast });
+    const board = await loadMovieBoard({ scope: sc, sort: this.sortBy[sc], years: this.boxYears, week: this.boxWeek, countries: this.boxCountry, query: k, asc: this.ascBy[sc], rate: this.boxRate, fewLast: this.boxFewLast, issuers: this.boxIssuer });
     const { years, countries } = board;
     const selYears = board.selYears, country = board.selCountries;
     // 年度排行一年有六百部左右、全選是好幾千部：先畫 100 列，快滑到底時自動接著載入（不用按）。換了排法、年份或搜尋字就從頭開始
     const paged = board.paged;
-    const pageKey = `${board.asc}|${board.rate}|${board.scope}|${board.sort}|${selYears.join(",")}|${board.selWeek}|${k}|${country.join(",")}`;
+    const pageKey = `${board.selIssuers.join(",")}|${board.asc}|${board.rate}|${board.scope}|${board.sort}|${selYears.join(",")}|${board.selWeek}|${k}|${country.join(",")}`;
     if (this.boxPageKey !== pageKey) {
       this.boxPageKey = pageKey;
       this.boxLimit = BOX_PAGE;
@@ -1111,6 +1112,7 @@ class App {
           title={e.name}
           subtitle={e.lines.filter(Boolean).join("\n")}
           hi={e.hi}
+          tag={e.status ? { text: STATUS_LABEL[e.status], tone: e.status } : undefined}
           chevron={!e.hi}
           onTap={m ? () => this.go(() => this.movieView(m, ""), `讀取《${m.title}》的放映影城…`) : x ? () => this.go(() => this.boxMovieView(x), `讀取《${x.name}》…`) : undefined}
         />
@@ -1144,8 +1146,8 @@ class App {
           </div>
         ) : null}
         {/* 評分來源、週次、出品國別預設收合成一行，點了才展開 */}
-        {board.weeks.length > 1 || countries.length > 1 || board.rates.length > 1 ? (
-          <Section hint={this.boxOpen === "country" ? BOX_COUNTRY_NOTE + "可以左右滑動。" : this.boxOpen === "week" ? "可以回頭看過去幾週的排行。" : this.boxOpen === "rate" ? "番茄指數是影評的分數、爆米花指數是觀眾的分數（都來自爛番茄）；觀眾評分是這個 App 的使用者打的。" : ""}>
+        {board.weeks.length > 1 || countries.length > 1 || board.rates.length > 1 || board.issuers.length > 1 ? (
+          <Section hint={this.boxOpen === "country" ? BOX_COUNTRY_NOTE + "可以左右滑動。" : this.boxOpen === "issuer" ? "發行商來自官方票房資料，可複選、可以左右滑動；聯合發行的片算第一家。" : this.boxOpen === "week" ? "可以回頭看過去幾週的排行。" : this.boxOpen === "rate" ? "番茄指數是影評的分數、爆米花指數是觀眾的分數（都來自爛番茄）；觀眾評分是這個 App 的使用者打的。" : ""}>
             {board.rates.length > 1 ? fold("rate", "評分來源", board.rateSummary) : null}
             {board.rates.length > 1 && this.boxOpen === "rate" ? (
               <Chips scroll>
@@ -1165,6 +1167,13 @@ class App {
               <Chips scroll>
                 <Chip label="全部" sub={`${board.everyone} 部`} muted={country.length > 0} onTap={() => { this.boxCountry = []; }} />
                 {countries.map((c) => <Chip label={c.id} sub={`${c.count} 部`} muted={country.indexOf(c.id) < 0} onTap={() => { this.boxCountry = country.indexOf(c.id) < 0 ? [...country, c.id] : country.filter((z) => z !== c.id); }} />)}
+              </Chips>
+            ) : null}
+            {board.issuers.length > 1 ? fold("issuer", "發行商", board.issuerSummary) : null}
+            {board.issuers.length > 1 && this.boxOpen === "issuer" ? (
+              <Chips scroll>
+                <Chip label="全部" sub={`${board.everyone} 部`} muted={board.selIssuers.length > 0} onTap={() => { this.boxIssuer = []; }} />
+                {board.issuers.map((c) => <Chip label={c.id} sub={`${c.count} 部`} muted={board.selIssuers.indexOf(c.id) < 0} onTap={() => { this.boxIssuer = board.selIssuers.indexOf(c.id) < 0 ? [...board.selIssuers, c.id] : board.selIssuers.filter((z) => z !== c.id); }} />)}
               </Chips>
             ) : null}
           </Section>
@@ -1189,9 +1198,10 @@ class App {
         {this.hero(e, x.name, [boxCountryText(x.country), `${date} 上映`])}
         {/* 個別資訊：跟官方網站列的欄位一樣（國別、發行、出品、上映日期、院數、票數、金額） */}
         <Section title="票房資訊" hint="資料來源：國家電影及視聽文化中心「全國電影票房統計」。">
+          <Item kv title="狀態" tag={{ text: STATUS_LABEL[boxStatus(x)], tone: boxStatus(x) }} />
           {boxInfoRows(x, info).map(([label, value]) => <Item kv title={label} right={value} />)}
         </Section>
-        <Note text="場次通目前沒有這部片的場次，可能已經下檔，或只在少數戲院放映。" />
+        <Note text={boxStatus(x) === "now" ? "官方票房資料顯示這部片最近一週還有賣出票，但場次通目前查不到場次：可能只在少數戲院放映，或這幾天剛下檔。" : "這部片已經下檔，場次通目前沒有它的場次。"} />
       </Page>
     );
   }
@@ -1253,6 +1263,7 @@ class App {
   }
 
   // 日期、縣市、特殊廳都可以複選（點一下選、再點一下取消）；換一部片時日期重來
+  infoOpen = false; // 電影頁的票房資訊有沒有展開（預設收合）
   movieFor = "";
   movieDates: string[] = []; // 空 = 來源預設的那一天（通常是今天）
   movieCities: string[] = []; // 空 = 全部
@@ -1300,6 +1311,9 @@ class App {
     if (!runtime) runtime = await this.fillRuntime(m, 1500); // 來源沒給片長：查 TMDB／開眼補上
     const shownCities = cities.filter((ct) => rows.some((r) => r.cinema.city === ct));
     const about = movieAbout(d);
+    // 票房資訊（出品國別、發行、票房、票數…）：跟歷年電影那一頁同一份官方資料；票房資料還沒列入的片只顯示狀態
+    const box = await Promise.race([boxInfoBy(m.title).catch(() => null), sleep(this.rerendering ? 0 : 1200).then(() => null)]);
+    const status = m.comingSoon ? "soon" : "now";
     return (
       <Page title={m.title} subtitle={[m.rating || d.rating, runtime ? `${runtime} 分鐘` : "", `${d.cinemas.length} 間影城`].filter(Boolean).join("｜")} onBack={() => this.back()}>
         {this.hero(x, m.title, [m.en, [m.rating || d.rating, runtime ? `${runtime} 分鐘` : ""].filter(Boolean).join("｜"), releaseLabel(d.release || m.release || releaseOf(m.title)), `${d.cinemas.length} 間影城有放映`])}
@@ -1308,6 +1322,12 @@ class App {
             <Para text={about.text || about.credits} dim={about.text ? about.credits : ""} />
           </Section>
         ) : null}
+        {/* 狀態一直看得到；其餘的票房資訊預設收合，點了才展開（這一頁主要是找場次） */}
+        <Section hint={this.infoOpen && box ? `資料來源：國家電影及視聽文化中心「全國電影票房統計」，官方每週更新一次。` : ""}>
+          <Item kv title="狀態" tag={{ text: STATUS_LABEL[status], tone: status }} />
+          {box ? <Item kv title="票房資訊" right={`${money(box.x.total)} ${this.infoOpen ? "▾" : "▸"}`} chevron={false} onTap={() => { this.infoOpen = !this.infoOpen; }} /> : <Item kv title="票房資訊" right="官方資料還沒列入" />}
+          {box && this.infoOpen ? boxInfoRows(box.x, box.info).map(([label, value]) => <Item kv title={label} right={value} />) : null}
+        </Section>
         <Section title="日期" hint="日期、縣市、特殊廳都可以複選。">
           <Chips>
             {allDates.map((dt) => (

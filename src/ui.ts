@@ -75,6 +75,12 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .item .hi.none .emo{filter:grayscale(1);opacity:.6}.item .hi.none .imdb{opacity:.5}
 .item .hi.money b,.item .hi.cinemas b,.item .hi.date b{color:var(--fg)}
 @media(prefers-color-scheme:dark){.item .hi.good b{color:#30d158}.item .hi.mid b{color:#ffb340}.item .hi.bad b{color:#ff6961}}
+.pill{display:inline-block;margin-left:6px;padding:1px 7px;border-radius:999px;font-size:11px;font-weight:700;line-height:1.5;vertical-align:middle;white-space:nowrap}
+.pill.now{background:rgba(48,209,88,.2);color:#1f9d45}
+.pill.off{background:rgba(255,69,58,.18);color:#d63a31}
+.pill.soon{background:rgba(255,159,10,.2);color:#c77700}
+@media(prefers-color-scheme:dark){.pill.now{color:#30d158}.pill.off{color:#ff6961}.pill.soon{color:#ffb340}}
+.item.kv .right .pill{margin-left:0;font-size:12px;padding:2px 9px}
 .item.kv .body{flex:0 0 auto}
 .item.kv .right{flex:1 1 auto;max-width:none;min-width:0;white-space:nowrap;overflow:hidden}
 .item .badge{flex:none;font-size:12px;padding:2px 8px;border-radius:999px;background:var(--chip);color:var(--chip-fg)}

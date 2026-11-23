@@ -206,6 +206,8 @@ export function Item(props: {
   kv?: boolean; // 「標題：內容」的資料列：左邊標題只佔自己的寬度，右邊內容用掉剩下的整行（不受 40% 寬度限制，放得下就不換行）
   /** 最右邊另外一顆小按鈕（例如收合這一組），跟整列的點擊分開 */
   action?: { label: string; hint?: string; onTap: Handler };
+  /** 狀態標籤：上映中（綠底）／已下檔（紅底）。一般的列放在片名後面；kv 的資料列放在右邊 */
+  tag?: { text: string; tone: string };
   /** 右邊的重點欄：目前排序依據的那個數字（評分、日期、影城數、票房），大字顯示；評分依高低變色，樣式跟電影頁的評分徽章同一套 */
   hi?: { kind: string; text: string; tier: string; note?: string };
 }): string {
@@ -226,12 +228,13 @@ export function Item(props: {
       ) : null}
       {props.icon ? <span class="ico">{props.icon}</span> : null}
       <div class="body">
-        <div class="title">{esc(props.title)}</div>
+        <div class="title">{esc(props.title)}{props.tag && !props.kv ? <span class={"pill " + props.tag.tone}>{esc(props.tag.text)}</span> : null}</div>
         {/* 多行說明（用換行分開）：每行各自一行、太長就截斷，第二行起淡一階 */}
         {props.subtitle ? (props.subtitle.includes("\n") ? props.subtitle.split("\n").map((l, i) => <div class={"sub one" + (i ? " dim" : "")}>{esc(l)}</div>) : <div class="sub">{esc(props.subtitle)}</div>) : null}
       </div>
       {props.badge ? <span class="badge">{esc(props.badge)}</span> : null}
       {props.right ? <span class="right">{esc(props.right)}</span> : null}
+      {props.tag && props.kv ? <span class="right"><span class={"pill " + props.tag.tone}>{esc(props.tag.text)}</span></span> : null}
       {props.hi ? (
         <span class={`hi ${props.hi.kind} ${props.hi.tier}`}>
           <span class="hv">
