@@ -1489,7 +1489,8 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
       if (me && me.p) return normImageUrl(me.p);
       const own = all["l|" + nk];
       if (own && Date.now() - own.at < (own.poster ? 30 : own.v === 2 ? 3 : 0) * 864e5) return own.poster || thumb;
-      const year = isReissue(title) ? 0 : Number((release || "").slice(0, 4)) || 0;
+      const rerun = /修復|重映|重製|再映|經典|紀念|週年|[48]K/i.test(title);
+      const year = rerun ? 0 : Number((release || "").slice(0, 4)) || 0;
       const poster = await posterLane(async () => {
         try {
           const q = baseTitle(title).toLowerCase().replace(/[\\/?#%]/g, " ").trim();

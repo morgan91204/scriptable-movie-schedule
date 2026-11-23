@@ -1004,7 +1004,9 @@ export function posterLight(title: string, release?: string): Promise<string> {
     if (own && Date.now() - own.at < (own.poster ? 30 : own.v === 2 ? 3 : 0) * 86400e3) return own.poster || thumb;
     // 年份用來擋同名的別部片；重映、修復版的上映日期是重映日，跟原片年份對不上，所以不比
     //（《夏日大作戰 全新4K修復版》2026 上映，原片是 2009）
-    const year = isReissue(title) ? 0 : Number((release || "").slice(0, 4)) || 0;
+    // 只認明確是舊片再上映的字樣；「數位2D版」這種只是放映規格，那一年的新片照樣要比年份
+    const rerun = /修復|重映|重製|再映|經典|紀念|週年|[48]K/i.test(title);
+    const year = rerun ? 0 : Number((release || "").slice(0, 4)) || 0;
     const poster = await posterLane(async () => {
       try {
         const q = baseTitle(title).toLowerCase().replace(/[\\/?#%]/g, " ").trim();
