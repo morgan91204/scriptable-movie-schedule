@@ -350,6 +350,17 @@ class App {
       </>
     );
   }
+  async aboutView(): Promise<string> {
+    return (
+      <Page title="關於" onBack={() => this.back()}>
+        <Section hint="連鎖影城的場次來自場次通（twshowtimes.com），感謝場次通的整理；其他來自開眼電影網，以及誠品、光點、樂聲、內惟戲院官網。實際場次以影城公告為準。">
+          <Item icon="ℹ️" title="關於與資料來源" accent chevron={false} onTap={() => Safari.open(ABOUT_URL)} />
+          <Item icon="🔒" title="隱私權政策" accent chevron={false} onTap={() => Safari.open(PRIVACY_URL)} />
+          <Item icon="🙏" title="前往場次通" subtitle="比較各影城場次、看上映場數排行" accent chevron={false} onTap={() => Safari.open("https://twshowtimes.com/")} />
+        </Section>
+      </Page>
+    );
+  }
   async settingsView(): Promise<string> {
     this.calendarName = (await currentCalendar(this.settings)).title;
     return (
@@ -363,11 +374,9 @@ class App {
           }} />
         </Section>
         {await this.notifyLink()}
-        <Section title="關於" hint="連鎖影城的場次來自場次通（twshowtimes.com），感謝場次通的整理；其他來自開眼電影網，以及誠品、光點、樂聲、內惟戲院官網。實際場次以影城公告為準。">
+        <Section title="關於">
           {IS_WEB && !this.isStandalone() ? <Item icon="📲" title="加到主畫面" subtitle="像 App 一樣從主畫面開啟，看圖示教學" onTap={() => this.go(() => this.installView())} /> : null}
-          <Item icon="ℹ️" title="關於與資料來源" accent chevron={false} onTap={() => Safari.open(ABOUT_URL)} />
-          <Item icon="🔒" title="隱私權政策" accent chevron={false} onTap={() => Safari.open(PRIVACY_URL)} />
-          <Item icon="🙏" title="前往場次通" subtitle="比較各影城場次、看上映場數排行" accent chevron={false} onTap={() => Safari.open("https://twshowtimes.com/")} />
+          <Item icon="ℹ️" title="關於" subtitle="資料來源、隱私權政策、場次通" onTap={() => this.go(() => this.aboutView())} />
         </Section>
         <p
           class="note version"
