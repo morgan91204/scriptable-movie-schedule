@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.25-0042
+// @movie-schedule-app 電影行程 v2026.11.25-0044
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/brand.ts
@@ -4686,6 +4686,16 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .lb-opts{display:flex;flex-wrap:wrap;gap:6px;margin-top:7px}
 .lb-opts .cm-tag{padding:4px 10px;font-size:12.5px}
 .lb-bar{display:flex;flex-wrap:wrap;gap:6px;padding:12px 16px 2px}
+.nb{display:flex;align-items:center;gap:10px;margin:0 16px 14px;padding:11px 12px;border-radius:14px;background:rgba(10,132,255,.14)}
+.nb-i{flex:none;font-size:18px;line-height:1}
+.nb-t{flex:1;min-width:0;font-size:13.5px;line-height:1.4;color:var(--fg)}
+.nb-go{flex:none;padding:6px 13px;border-radius:999px;background:var(--accent);color:#fff;font-size:13.5px;font-weight:600;white-space:nowrap}
+.nb-x{flex:none;padding:4px 2px 4px 4px;font-size:13px;color:var(--fg2)}
+.nb-ask{padding:22px 20px 6px;text-align:center}
+.nb-ico{font-size:44px;line-height:1}
+.nb-ask b{display:block;margin-top:12px;font-size:19px}
+.nb-ask p{margin:10px 0 0;font-size:14.5px;line-height:1.55;color:var(--fg2)}
+.nb-ask .nb-warn{color:#ff9f0a}
 .fd-list{padding:4px 16px 6px}
 .fd{display:flex;align-items:flex-start;gap:12px;padding:12px 0}
 .fd+.fd{border-top:1px solid var(--line)}
@@ -5086,6 +5096,7 @@ var CHANGELOG = [
     id: "2026-11-25",
     date: "2026/11/25",
     items: [
+      { kind: "better", text: "還沒開通知的人：寫短評、回覆或追蹤別人之後會問一次要不要開；社群頁籤上也會有一條提醒，可以直接按「開啟」" },
       { kind: "better", text: "通知的勿擾時段改成預設關閉：想要晚上不被打擾，到通知設定打開「晚上不要通知我」" },
       { kind: "better", text: "自己的短評發出後可以補標「有雷」或取消（短評右下的 ⋯ 選單）" },
       { kind: "new", text: "可以從 Letterboxd 匯入（設定 → 我的片單 → 從 Letterboxd 匯入，網頁版）：評分、觀影日期、影評一次搬過來，匯入前可以逐筆勾選" },
@@ -5215,6 +5226,7 @@ var App = class {
     this.followedAfterLogin = "";
     // 登入前按了誰的「登入後追蹤」（登入完成時填上）
     this.hasProfile = null;
+    this.pushSt = "";
     /** 管理員：帳號管理。被檢舉的、被停用的帳號；可以停用個人頁、清掉檢舉、強制改暱稱 */
     this.adminUserQ = "";
     this.socialTab = "";
@@ -5401,7 +5413,7 @@ var App = class {
   }
   /** 最新版本是多少。網頁版問的是自己網站現在上線的版本（重新整理就會拿到的那一版），不是 GitHub 上的 */
   checkVersion() {
-    if (true) return checkLatest("2026.11.25-0042");
+    if (true) return checkLatest("2026.11.25-0044");
     return (async () => {
       try {
         let r = await globalThis.fetch("/version.json?t=" + Date.now(), { cache: "no-store" });
@@ -5409,7 +5421,7 @@ var App = class {
         const latest = String((await r.json()).version || "");
         if (!latest) return null;
         const num = (v) => Number(v.replace(/\D/g, "")) || 0;
-        return { latest, isLatest: num("2026.11.25-0042") >= num(latest) };
+        return { latest, isLatest: num("2026.11.25-0044") >= num(latest) };
       } catch (_) {
         return null;
       }
@@ -6202,7 +6214,49 @@ var App = class {
     if (!this.hasProfile) {
       this.profileDraft = null;
       this.go(() => this.profileEditView(null, true, true));
+      return;
     }
+    await this.askNotify();
+  }
+  // 這台裝置的通知狀態（on／off／needs-install／denied／unsupported），社群頁籤上的提醒用
+  /** 開通知的按鈕（data-perm：按下去的那一刻就跟系統要權限，iPhone 規定要這樣） */
+  notifyButton(label, cls, after) {
+    return /* @__PURE__ */ h("button", { class: cls, "data-perm": "notify", onTap: async () => {
+      const p = this.push();
+      try {
+        const st = p ? await p.enable(notifyPayload(this.settings)) : "unsupported";
+        this.pushSt = st;
+        await this.ui.toast(st === "on" ? "通知已開啟" : st === "denied" ? "沒有取得通知的權限，可以到 iPhone 的「設定 → 通知 → 片刻」打開" : "沒有開啟通知");
+      } catch (e) {
+        await this.ui.toast(String(e?.message || "開啟失敗，請稍後再試"));
+      }
+      if (after) after();
+    } }, esc(label));
+  }
+  /** 寫了短評、回覆或追蹤別人之後：還沒開通知的話問一次要不要開（只問一次；之後社群頁籤上還是有一條提醒） */
+  async askNotify() {
+    const p = this.push();
+    if (!p || !signedIn() || this.settings.notifyAsked) return;
+    const st = await p.refresh().catch(() => "");
+    this.pushSt = st;
+    if (st !== "off" && st !== "needs-install") return;
+    this.settings.notifyAsked = true;
+    saveSettings(this.settings);
+    this.go(() => /* @__PURE__ */ h(Page, { title: "要開通知嗎？", onBack: () => this.back() }, /* @__PURE__ */ h(Section, null, /* @__PURE__ */ h("div", { class: "nb-ask" }, /* @__PURE__ */ h("div", { class: "nb-ico", "aria-hidden": "true" }, "🔔"), /* @__PURE__ */ h("b", null, "有人回覆你的時候，馬上知道"), /* @__PURE__ */ h("p", null, "開了通知，有人回覆或提到你、追蹤你，手機會跳通知，主畫面的片刻圖示也會顯示數字。推和噓不會吵你，只會列在「社群」裡。"), this.pushSt === "needs-install" ? /* @__PURE__ */ h("p", { class: "nb-warn" }, "iPhone 要先把片刻「加入主畫面」，從主畫面打開才能開通知。") : null), /* @__PURE__ */ h("div", { class: "nt-form" }, this.pushSt === "needs-install" ? /* @__PURE__ */ h(Button, { label: "看怎麼加入主畫面", onTap: () => {
+      this.back();
+      this.go(() => this.notifyView(), "讀取中…");
+    } }) : this.notifyButton("開啟通知", "btn primary", () => this.back()), /* @__PURE__ */ h(Button, { label: "稍後再說", kind: "secondary", onTap: () => this.back() }))), /* @__PURE__ */ h("p", { class: "hint" }, "之後可以在 設定 → 通知 隨時開關，也可以只關掉其中幾種。")));
+  }
+  /** 社群頁籤最上面的提醒：這台還沒開通知（可以按掉，按掉後只在「通知」那一格裡留著） */
+  pushNudge() {
+    const st = this.pushSt;
+    if (!this.push() || !st || st === "on" || st === "unsupported") return "";
+    if (this.settings.notifyNudgeOff && this.socialTab !== "act") return "";
+    const text = st === "denied" ? "通知被關掉了。到 iPhone 的「設定 → 通知 → 片刻」打開，才收得到回覆和追蹤的通知。" : st === "needs-install" ? "把片刻加入主畫面，才能在有人回覆、追蹤你時收到通知。" : "還沒開通知：有人回覆、提到或追蹤你時，你不會馬上知道。";
+    return /* @__PURE__ */ h("div", { class: "nb" }, /* @__PURE__ */ h("span", { class: "nb-i", "aria-hidden": "true" }, "🔔"), /* @__PURE__ */ h("span", { class: "nb-t" }, text), st === "off" ? this.notifyButton("開啟", "nb-go") : st === "needs-install" ? /* @__PURE__ */ h("button", { class: "nb-go", onTap: () => this.go(() => this.notifyView(), "讀取中…") }, "怎麼做") : null, this.socialTab !== "act" ? /* @__PURE__ */ h("button", { class: "nb-x", "aria-label": "不再提醒", onTap: () => {
+      this.settings.notifyNudgeOff = true;
+      saveSettings(this.settings);
+    } }, "✕") : null);
   }
   /** first = 第一次設定（有歡迎說明和「稍後再說」）；pushed = 是另外開的一頁（存好、跳過都要退回原本那一頁） */
   profileEditView(user, first = false, pushed = false) {
@@ -6407,13 +6461,13 @@ var App = class {
   /** 社群頁籤上面那一排：動態｜通知｜找人 */
   socialTabs() {
     const seg = this.socialTab;
-    return /* @__PURE__ */ h(Chips, { tabs: true }, /* @__PURE__ */ h(Chip, { label: "動態", muted: seg !== "feed", onTap: () => {
+    return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Chips, { tabs: true }, /* @__PURE__ */ h(Chip, { label: "動態", muted: seg !== "feed", onTap: () => {
       this.socialTab = "feed";
     } }), /* @__PURE__ */ h(Chip, { label: this.unread > 0 ? `通知 ${this.unread > 99 ? "99+" : this.unread}` : "通知", muted: seg !== "act", onTap: () => {
       this.socialTab = "act";
     } }), /* @__PURE__ */ h(Chip, { label: "搜尋片友", muted: seg !== "people", onTap: () => {
       this.socialTab = "people";
-    } }));
+    } })), this.pushNudge());
   }
   /** 動態裡的一則：頭像＋「誰 給《片名》幾分／看了《片名》」＋時間，下面是他的短評（點了到討論區） */
   feedRow(e) {
@@ -6435,6 +6489,10 @@ var App = class {
     if (!sy || !sy.on())
       return /* @__PURE__ */ h(Page, { title: "社群" }, /* @__PURE__ */ h(Section, { hint: "登入後可以追蹤別人、看他們最近看了什麼；有人推或回覆你的短評、追蹤你，也會列在這裡。" }, /* @__PURE__ */ h(Item, { icon: "👤", title: "用 Google 登入", subtitle: "登入後才有動態和通知", accent: true, onTap: () => sy && sy.login() })));
     if (!this.socialTab) this.socialTab = this.unread > 0 ? "act" : "feed";
+    {
+      const p = this.push();
+      this.pushSt = p ? await p.refresh().catch(() => "") : "";
+    }
     if (this.socialTab === "feed") {
       const r = await social("feed").catch(() => null);
       return /* @__PURE__ */ h(Page, { title: "社群" }, this.socialTabs(), !r ? /* @__PURE__ */ h(Section, null, /* @__PURE__ */ h(Note, { kind: "warn", text: "動態暫時讀不到" })) : r.list.length ? /* @__PURE__ */ h(Section, null, /* @__PURE__ */ h("div", { class: "fd-list" }, r.list.filter((e) => e.by).map((e) => this.feedRow(e)))) : /* @__PURE__ */ h(Section, null, /* @__PURE__ */ h(Note, { text: r.following ? "你追蹤的人最近還沒有新的紀錄。" : "還沒有追蹤任何人。追蹤之後，他們評分、寫短評、記錄看過的片會出現在這裡。" }), /* @__PURE__ */ h(Item, { icon: "🔍", title: "搜尋片友", subtitle: "看看誰公開了片單", onTap: () => {
@@ -6509,7 +6567,7 @@ var App = class {
         return;
       }
       try {
-        await sendFeedback(cat.id, text, false ? this.isStandalone() ? "web-app" : "web" : "scriptable", "2026.11.25-0042");
+        await sendFeedback(cat.id, text, false ? this.isStandalone() ? "web-app" : "web" : "scriptable", "2026.11.25-0044");
         this.fbDraft = "";
         this.fbCat = "";
         await this.ui.toast("已送出，謝謝你的回饋");
@@ -6847,7 +6905,7 @@ var App = class {
       this.settings.seenLog = CHANGELOG_LATEST;
       saveSettings(this.settings);
     }
-    return /* @__PURE__ */ h(Page, { title: "更新內容", subtitle: `目前版本 ${"2026.11.25-0042"}`, onBack: () => this.back() }, CHANGELOG.map((e) => /* @__PURE__ */ h(Section, { title: e.date }, e.items.map((it) => /* @__PURE__ */ h(Item, { title: it.text, tag: { text: it.kind === "new" ? "新功能" : "改進", tone: it.kind === "new" ? "now" : "soon" }, chevron: false })))), /* @__PURE__ */ h(Note, { text: "只列出比較有感的變動；修小錯、調整文字這類不會寫在這裡。" }));
+    return /* @__PURE__ */ h(Page, { title: "更新內容", subtitle: `目前版本 ${"2026.11.25-0044"}`, onBack: () => this.back() }, CHANGELOG.map((e) => /* @__PURE__ */ h(Section, { title: e.date }, e.items.map((it) => /* @__PURE__ */ h(Item, { title: it.text, tag: { text: it.kind === "new" ? "新功能" : "改進", tone: it.kind === "new" ? "now" : "soon" }, chevron: false })))), /* @__PURE__ */ h(Note, { text: "只列出比較有感的變動；修小錯、調整文字這類不會寫在這裡。" }));
   }
   async aboutView() {
     return /* @__PURE__ */ h(Page, { title: "關於", onBack: () => this.back() }, /* @__PURE__ */ h(Section, { hint: "連鎖影城的場次來自場次通（twshowtimes.com），感謝場次通的整理；其他來自開眼電影網，以及誠品、光點、樂聲、內惟戲院官網。實際場次以影城公告為準。" }, /* @__PURE__ */ h(Item, { icon: "ℹ️", title: "關於與資料來源", accent: true, chevron: false, onTap: () => Safari.open(ABOUT_URL) }), /* @__PURE__ */ h(Item, { icon: "🔒", title: "隱私權政策", accent: true, chevron: false, onTap: () => Safari.open(PRIVACY_URL) }), /* @__PURE__ */ h(Item, { icon: "🙏", title: "前往場次通", subtitle: "比較各影城場次、看上映場數排行", accent: true, chevron: false, onTap: () => Safari.open("https://twshowtimes.com/") })));
@@ -6878,11 +6936,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.25-0042"}`);
+          Pasteboard.copy(`版本 ${"2026.11.25-0044"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.25-0042"}`,
+      `版本 ${"2026.11.25-0044"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -7527,7 +7585,7 @@ var App = class {
     if (false) {
       if (!r) return /* @__PURE__ */ h(Note, { text: "（無法確認是否為最新版：連不到網站）" });
       if (r.isLatest) return /* @__PURE__ */ h(Note, { text: "✅ 已是最新版" });
-      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.25-0042"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
+      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.25-0044"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
         globalThis.location.reload();
       } }));
     }

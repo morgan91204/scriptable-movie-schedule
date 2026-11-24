@@ -1136,7 +1136,66 @@ class App {
       if (!me) return;
       this.hasProfile = !!me.user;
     }
-    if (!this.hasProfile) { this.profileDraft = null; this.go(() => this.profileEditView(null, true, true)); }
+    if (!this.hasProfile) { this.profileDraft = null; this.go(() => this.profileEditView(null, true, true)); return; }
+    await this.askNotify();
+  }
+  pushSt = ""; // 這台裝置的通知狀態（on／off／needs-install／denied／unsupported），社群頁籤上的提醒用
+  /** 開通知的按鈕（data-perm：按下去的那一刻就跟系統要權限，iPhone 規定要這樣） */
+  notifyButton(label: string, cls: string, after?: () => void): string {
+    return <button class={cls} data-perm="notify" onTap={async () => {
+      const p = this.push();
+      try {
+        const st: string = p ? await p.enable(notifyPayload(this.settings)) : "unsupported";
+        this.pushSt = st;
+        await this.ui.toast(st === "on" ? "通知已開啟" : st === "denied" ? "沒有取得通知的權限，可以到 iPhone 的「設定 → 通知 → 片刻」打開" : "沒有開啟通知");
+      } catch (e) { await this.ui.toast(String((e as Error)?.message || "開啟失敗，請稍後再試")); }
+      if (after) after();
+    }}>{esc(label)}</button>;
+  }
+  /** 寫了短評、回覆或追蹤別人之後：還沒開通知的話問一次要不要開（只問一次；之後社群頁籤上還是有一條提醒） */
+  async askNotify(): Promise<void> {
+    const p = this.push();
+    if (!p || !signedIn() || this.settings.notifyAsked) return;
+    const st: string = await p.refresh().catch(() => "");
+    this.pushSt = st;
+    if (st !== "off" && st !== "needs-install") return;
+    this.settings.notifyAsked = true; saveSettings(this.settings);
+    this.go(() => (
+      <Page title="要開通知嗎？" onBack={() => this.back()}>
+        <Section>
+          <div class="nb-ask">
+            <div class="nb-ico" aria-hidden="true">🔔</div>
+            <b>有人回覆你的時候，馬上知道</b>
+            <p>開了通知，有人回覆或提到你、追蹤你，手機會跳通知，主畫面的片刻圖示也會顯示數字。推和噓不會吵你，只會列在「社群」裡。</p>
+            {this.pushSt === "needs-install" ? <p class="nb-warn">iPhone 要先把片刻「加入主畫面」，從主畫面打開才能開通知。</p> : null}
+          </div>
+          <div class="nt-form">
+            {this.pushSt === "needs-install"
+              ? <Button label="看怎麼加入主畫面" onTap={() => { this.back(); this.go(() => this.notifyView(), "讀取中…"); }} />
+              : this.notifyButton("開啟通知", "btn primary", () => this.back())}
+            <Button label="稍後再說" kind="secondary" onTap={() => this.back()} />
+          </div>
+        </Section>
+        <p class="hint">之後可以在 設定 → 通知 隨時開關，也可以只關掉其中幾種。</p>
+      </Page>
+    ));
+  }
+  /** 社群頁籤最上面的提醒：這台還沒開通知（可以按掉，按掉後只在「通知」那一格裡留著） */
+  pushNudge(): string {
+    const st = this.pushSt;
+    if (!this.push() || !st || st === "on" || st === "unsupported") return "";
+    if (this.settings.notifyNudgeOff && this.socialTab !== "act") return "";
+    const text = st === "denied" ? "通知被關掉了。到 iPhone 的「設定 → 通知 → 片刻」打開，才收得到回覆和追蹤的通知。"
+      : st === "needs-install" ? "把片刻加入主畫面，才能在有人回覆、追蹤你時收到通知。"
+      : "還沒開通知：有人回覆、提到或追蹤你時，你不會馬上知道。";
+    return (
+      <div class="nb">
+        <span class="nb-i" aria-hidden="true">🔔</span>
+        <span class="nb-t">{text}</span>
+        {st === "off" ? this.notifyButton("開啟", "nb-go") : st === "needs-install" ? <button class="nb-go" onTap={() => this.go(() => this.notifyView(), "讀取中…")}>怎麼做</button> : null}
+        {this.socialTab !== "act" ? <button class="nb-x" aria-label="不再提醒" onTap={() => { this.settings.notifyNudgeOff = true; saveSettings(this.settings); }}>✕</button> : null}
+      </div>
+    );
   }
   /** first = 第一次設定（有歡迎說明和「稍後再說」）；pushed = 是另外開的一頁（存好、跳過都要退回原本那一頁） */
   profileEditView(user: Profile | null, first = false, pushed = false): string {
@@ -1392,11 +1451,14 @@ class App {
   socialTabs(): string {
     const seg = this.socialTab;
     return (
+      <>
       <Chips tabs>
         <Chip label="動態" muted={seg !== "feed"} onTap={() => { this.socialTab = "feed"; }} />
         <Chip label={this.unread > 0 ? `通知 ${this.unread > 99 ? "99+" : this.unread}` : "通知"} muted={seg !== "act"} onTap={() => { this.socialTab = "act"; }} />
         <Chip label="搜尋片友" muted={seg !== "people"} onTap={() => { this.socialTab = "people"; }} />
       </Chips>
+      {this.pushNudge()}
+      </>
     );
   }
   /** 動態裡的一則：頭像＋「誰 給《片名》幾分／看了《片名》」＋時間，下面是他的短評（點了到討論區） */
@@ -1438,6 +1500,7 @@ class App {
         </Page>
       );
     if (!this.socialTab) this.socialTab = this.unread > 0 ? "act" : "feed";
+    { const p = this.push(); this.pushSt = p ? await p.refresh().catch(() => "") : ""; }
     if (this.socialTab === "feed") {
       const r = await social<{ list: DiaryEntry[]; following: number }>("feed").catch(() => null);
       return (

@@ -439,6 +439,16 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .lb-opts{display:flex;flex-wrap:wrap;gap:6px;margin-top:7px}
 .lb-opts .cm-tag{padding:4px 10px;font-size:12.5px}
 .lb-bar{display:flex;flex-wrap:wrap;gap:6px;padding:12px 16px 2px}
+.nb{display:flex;align-items:center;gap:10px;margin:0 16px 14px;padding:11px 12px;border-radius:14px;background:rgba(10,132,255,.14)}
+.nb-i{flex:none;font-size:18px;line-height:1}
+.nb-t{flex:1;min-width:0;font-size:13.5px;line-height:1.4;color:var(--fg)}
+.nb-go{flex:none;padding:6px 13px;border-radius:999px;background:var(--accent);color:#fff;font-size:13.5px;font-weight:600;white-space:nowrap}
+.nb-x{flex:none;padding:4px 2px 4px 4px;font-size:13px;color:var(--fg2)}
+.nb-ask{padding:22px 20px 6px;text-align:center}
+.nb-ico{font-size:44px;line-height:1}
+.nb-ask b{display:block;margin-top:12px;font-size:19px}
+.nb-ask p{margin:10px 0 0;font-size:14.5px;line-height:1.55;color:var(--fg2)}
+.nb-ask .nb-warn{color:#ff9f0a}
 .fd-list{padding:4px 16px 6px}
 .fd{display:flex;align-items:flex-start;gap:12px;padding:12px 0}
 .fd+.fd{border-top:1px solid var(--line)}
