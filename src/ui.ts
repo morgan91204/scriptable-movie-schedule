@@ -107,12 +107,12 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .chips.scroll::-webkit-scrollbar{display:none}
 .chips.scroll .chip{flex:0 0 auto;min-width:72px}
 .chips.scroll .chip .l{white-space:nowrap}
-.sortbar{display:flex;align-items:center;gap:6px;padding:0 14px 0 16px;margin-top:6px}
+.sortbar{display:flex;align-items:center;gap:6px;padding:0;margin-top:6px}
 .sortbar .lbl{flex:none;font-size:13px;font-weight:600;color:var(--fg2)}
 .sortbar .chips{flex:1;min-width:0;padding:6px 0}
 .sortbar .chips.scroll .chip{min-width:0;padding:7px 12px}
-.sortbar .dir{flex:none;display:flex;align-items:center;gap:5px;padding:7px 9px 7px 11px;border-radius:12px;background:var(--card);color:var(--accent);font-size:14px;font-weight:600;white-space:nowrap;box-shadow:0 0 0 1px rgba(128,128,128,.25)}
-.sortbar .dir .arrows{display:flex;flex-direction:column;line-height:1;font-size:9px;gap:1px}
+.sortbar .dir{flex:none;display:flex;align-items:center;gap:4px;padding:5px 7px 5px 9px;border-radius:10px;background:var(--card);color:var(--accent);font-size:12.5px;font-weight:600;white-space:nowrap;box-shadow:0 0 0 1px rgba(128,128,128,.25)}
+.sortbar .dir .arrows{display:flex;flex-direction:column;line-height:1;font-size:7.5px;gap:1px}
 .sortbar .dir .arrows i{font-style:normal;color:var(--fg2);opacity:.35}
 .sortbar .dir.asc .up,.sortbar .dir.desc .down{color:var(--accent);opacity:1}
 .sortbar .dir:active{opacity:.6}
