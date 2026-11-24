@@ -14,8 +14,10 @@ import {
   Cinema, Movie, Settings, Version, TwMovie, TwMovieCinema, CITY_ORDER, TW,
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
   loadSettings, saveSettings, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, cinemaAddress,
-  FORMATS, formatsOf, filterVersions, filterVersionsAny, movieRows, movieDays, nearest, kmLabel, WINDOWS, findShowtimes, findShowtimesMulti, multiLabel, multiDetail, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText, hallOf, tmdbTest, movieExtras, moviePoster, posterReady, posterTint, POSTER_TINTS, normImageUrl, movieRuntime, posterSrc, isLocalSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxCountries, boxByCountry, boxInfo, boxInfoRows, boxCountryText, BOX_COUNTRY_NOTE, boxCountryTag, boxCountriesPicked, movieBoard, loadBoxFor, loadCommunitySummary, loadYearRatings, loadUpcoming, soonBoard, isFavMovie, toggleFavMovie, favMovieRows, favMovieBox, boxStatus, STATUS_LABEL, boxInfoBy, soonGroups, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityVote, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, SCRIPTING_IMPORT_URL, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, festivalDefaultDate, festivalStateLabel, festivalState, festivalFooter, linkMovies, nowGroupLine, nowFilter, festivalPick, movieAbout, festivalSearch, festivalSearchLines, festivalTrailer, festivalYears, festivalGroups, festivalChipNote, festivalStatusLine, movieRatings, ratingTier, tomatoTier, popcornTier, dropStaleCaches, rerunDataReady, boxRunRows, loadIntro,
+  FORMATS, formatsOf, filterVersions, filterVersionsAny, movieRows, movieDays, nearest, kmLabel, WINDOWS, findShowtimes, findShowtimesMulti, multiLabel, multiDetail, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText, hallOf, tmdbTest, movieExtras, moviePoster, posterReady, posterTint, POSTER_TINTS, normImageUrl, movieRuntime, posterSrc, isLocalSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxCountries, boxByCountry, boxInfo, boxInfoRows, boxCountryText, BOX_COUNTRY_NOTE, boxCountryTag, boxCountriesPicked, movieBoard, loadBoxFor, loadCommunitySummary, loadYearRatings, loadUpcoming, soonBoard, isFavMovie, toggleFavMovie, favMovieRows, favMovieBox, boxStatus, STATUS_LABEL, boxInfoBy, soonGroups, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityVote, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, SCRIPTING_IMPORT_URL, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, festivalDefaultDate, festivalStateLabel, festivalState, festivalFooter, linkMovies, nowGroupLine, nowFilter, festivalPick, movieAbout, festivalSearch, festivalSearchLines, festivalTrailer, festivalYears, festivalGroups, festivalChipNote, festivalStatusLine, movieRatings, ratingTier, tomatoTier, popcornTier, dropStaleCaches, rerunDataReady, boxRunRows, loadIntro, globalSearch, boxIsRerun, boxHasLaterRun, settingsStored, SITE_URL,
 } from "./core"
+import { CHANGELOG, CHANGELOG_LATEST } from "./changelog"
+import type { GlobalHits } from "./core"
 import type { Ratings, FavMovie, FavRow, EntryHi, Format, LatLng, Hit, Community, BoxOfficeItem, BoxSort, BoxOffice, MovieEntry, SoonEntry, UpcomingFilm, Festival, FestivalFilm, FestivalSession } from "./core"
 
 declare const Safari: any
@@ -196,8 +198,29 @@ function SettingsPage() {
       <Button title={"前往場次通"} systemImage={"heart"} action={() => Safari.openURL("https://twshowtimes.com/")} />
     </Section>
     <Section>
+      {/* 更新內容：有還沒看過的才標「新」，不會主動跳出來 */}
+      <NavigationLink destination={<ChangelogPage />}>
+        <Row title={"更新內容"} subtitle={"最近改了什麼、多了什麼"} trailing={CHANGELOG_LATEST && settings.seenLog !== CHANGELOG_LATEST ? "● 新" : ""} />
+      </NavigationLink>
       <VersionRow />
     </Section>
+  </List>
+}
+
+/** 更新內容：依日期分段、新的在上。進來就算看過 */
+function ChangelogPage() {
+  const [settings, update] = useSettings()
+  useEffect(() => {
+    if (CHANGELOG_LATEST && settings.seenLog !== CHANGELOG_LATEST) update({ seenLog: CHANGELOG_LATEST })
+  }, [])
+  return <List navigationTitle={"更新內容"} navigationBarTitleDisplayMode={"inline"}>
+    {CHANGELOG.map((e, i) => <Section key={e.id} header={<Text>{e.date}</Text>} footer={i === CHANGELOG.length - 1 ? <Text>只列出比較有感的變動；修小錯、調整文字這類不會寫在這裡。部分功能（通知、用 Google 帳號同步）只有網頁版有。</Text> : undefined}>
+      {e.items.map((it) => <HStack key={it.text} alignment={"top"} spacing={8}>
+        <Text font={"caption2"} fontWeight={"bold"} foregroundStyle={it.kind === "new" ? "systemGreen" : "systemOrange"} padding={{ horizontal: 6, vertical: 2 }}
+          background={it.kind === "new" ? "rgba(48, 209, 88, 0.18)" : "rgba(255, 159, 10, 0.2)"} clipShape={{ type: "rect", cornerRadius: 6 }} lineLimit={1} fixedSize>{it.kind === "new" ? "新功能" : "改進"}</Text>
+        <Text>{it.text}</Text>
+      </HStack>)}
+    </Section>)}
   </List>
 }
 
@@ -213,15 +236,22 @@ function Home({ cinemas }: { cinemas: CinemasLoad }) {
   const [favMovOpen, setFavMovOpen] = useState(false) // 收藏電影清單有沒有展開（預設收合；展開才查每部片現在的狀態）
   const favMovies = settings.favMovies || []
   const favRows = useLoad(() => (favMovOpen && favMovies.length ? favMovieRows(settings) : Promise.resolve([] as FavRow[])), [favMovOpen, favMovies.map((f) => f.key).join("|")])
+  const favIssuers = settings.favIssuers || []
+  const [favIssOpen, setFavIssOpen] = useState(false) // 收藏發行商清單有沒有展開
+  // 全域搜尋：有打字就把下面的入口和收藏換成分組的結果（影城、現正上映、即將上映、歷年電影、影展），清空就恢復
+  const [query, setQuery] = useState("")
+  const q = query.trim()
+  const hits = useLoad(() => (q ? globalSearch(q, list) : Promise.resolve(null as GlobalHits | null)), [q, list.length])
 
   return <NavigationStack>
     <List
       navigationTitle={"片刻"}
+      searchable={{ value: query, onChanged: setQuery, prompt: "搜尋電影、影城" } as any}
       toolbar={{ cancellationAction: <Button title={"關閉"} action={dismiss} /> }}
     >
       {cinemas.error ? <ErrorRow error={cinemas.error} retry={cinemas.reload} /> : null}
 
-      {<>
+      {q ? <GlobalResults q={q} hits={hits.data} error={hits.error} /> : <>
         <Section>
           <NavigationLink destination={<NowPage />}>
             <Text>{"🕘  現在有什麼可以看"}</Text>
@@ -264,9 +294,62 @@ function Home({ cinemas }: { cinemas: CinemasLoad }) {
           {favMovOpen && !favRows.data ? <Loading text={"讀取收藏電影…"} /> : null}
           {(favMovOpen ? favRows.data || [] : []).map((r) => <FavMovieLink key={r.fav.key} row={r} />)}
         </Section> : null}
+        <Section footer={favIssOpen ? <Text>{favIssuers.length ? "點發行商看它歷年發行的片（新的在前）。要增減收藏：到「電影 → 歷年電影」的「收藏發行商」那一列勾選。" : "還沒有收藏發行商。到「電影 → 歷年電影」，展開「收藏發行商」那一列勾選，這裡就能直接看那一家歷年發行的片。"}</Text> : undefined}>
+          <Button action={() => setFavIssOpen(!favIssOpen)}>
+            <HStack spacing={8}>
+              <Image systemName={"star.fill"} foregroundStyle={"systemYellow"} />
+              <Text font={"headline"} foregroundStyle={"label"}>{favIssuers.length ? `收藏發行商（${favIssuers.length} 家）` : "收藏發行商（還沒有）"}</Text>
+              <Spacer />
+              <Image systemName={favIssOpen ? "chevron.down.circle" : "chevron.right.circle"} font={"title3"} foregroundStyle={"secondaryLabel"} />
+            </HStack>
+          </Button>
+          {(favIssOpen ? favIssuers : []).map((id) => <NavigationLink key={id} destination={<IssuerPage issuer={id} />}>
+            <Text>{id}</Text>
+          </NavigationLink>)}
+        </Section>
       </>}
     </List>
   </NavigationStack>
+}
+
+/** 首頁全域搜尋的結果：五組，每組最多列 5 筆，超過的用「看全部」進一頁列出整組 */
+function GlobalResults({ q, hits, error }: { q: string; hits: GlobalHits | null; error: string | null }) {
+  if (error) return <Section><Text foregroundStyle={"secondaryLabel"}>{`搜尋時讀不到資料：${error}`}</Text></Section>
+  if (!hits) return <Section><Loading text={`正在找「${q}」…`} /></Section>
+  const MAX = 5
+  const yearRow = (x: BoxOfficeItem) => <NavigationLink key={x.name + "|" + x.release} destination={<BoxOfficeMoviePage item={x} />}>
+    <Row title={x.name} subtitle={[boxIsRerun(x) ? "重映" : boxHasLaterRun(x) ? "首映" : "", String(x.release || "").slice(0, 10).replace(/-/g, "/") + " 上映", `票房 ${money(x.total)}`].filter(Boolean).join("｜")} />
+  </NavigationLink>
+  const nowRow = (m: TwMovie) => <NavigationLink key={m.slug} destination={<MoviePage movie={m} />}>
+    <Row title={m.title} subtitle={movieLines(m).filter(Boolean).join("｜")} />
+  </NavigationLink>
+  const soonRow = (e: SoonEntry) => e.m
+    ? <NavigationLink key={e.key} destination={<MoviePage movie={e.m} />}><Row title={e.title} subtitle={e.lines.filter(Boolean).join("｜")} /></NavigationLink>
+    : e.u ? <NavigationLink key={e.key} destination={<SoonMoviePage film={e.u} />}><Row title={e.title} subtitle={e.lines.filter(Boolean).join("｜")} /></NavigationLink>
+    : <Row key={e.key} title={e.title} subtitle={e.lines.filter(Boolean).join("｜")} />
+  const festRow = (h: { f: Festival; film: FestivalFilm }) => <NavigationLink key={h.f.id + "|" + h.film.id} destination={<FestivalFilmPage festival={h.f} film={h.film} />}>
+    <Row title={h.film.title} subtitle={`${h.f.start.slice(0, 4)} ${h.f.name}`} />
+  </NavigationLink>
+  const cinemaRow = (c: Cinema) => <CinemaLink key={c.id} cinema={c} showCity />
+  // 一組：最多 5 筆；超過的最後一列是「看全部」，點了進一頁把整組列出來
+  function group<T>(title: string, unit: string, all: T[], row: (x: T) => any) {
+    if (!all.length) return null
+    return <Section key={title} header={<Text>{`${title}（${all.length}）`}</Text>}>
+      {all.slice(0, MAX).map(row)}
+      {all.length > MAX ? <NavigationLink destination={<List navigationTitle={`${title}：${q}`} navigationBarTitleDisplayMode={"inline"}><Section>{all.map(row)}</Section></List>}>
+        <Text foregroundStyle={"systemBlue"}>{`看全部 ${all.length} ${unit}`}</Text>
+      </NavigationLink> : null}
+    </Section>
+  }
+  const total = hits.cinemas.length + hits.now.length + hits.soon.length + hits.year.length + hits.fest.length
+  return <>
+    {group("影城", "間", hits.cinemas, cinemaRow)}
+    {group("現正上映", "部", hits.now, nowRow)}
+    {group("即將上映", "部", hits.soon, soonRow)}
+    {group("歷年電影", "部", hits.year, yearRow)}
+    {group("影展", "部", hits.fest, festRow)}
+    {total ? null : <Section><Text foregroundStyle={"secondaryLabel"}>找不到相符的電影或影城，換個關鍵字試試。</Text></Section>}
+  </>
 }
 
 /** 以 App 訂票：先試已知的 App 網址（有裝就直接開），都不行才開 App Store 頁 */
@@ -320,7 +403,7 @@ const TIER = {
 type Tier = keyof typeof TIER
 function RatingBadge({ kind, value, tier, note, url }: { kind: "imdb" | "tomato" | "popcorn"; value: string; tier: Tier; note?: string; url?: string }) {
   const c = TIER[tier]
-  const icon = kind === "tomato" ? (tier === "bad" ? "🤢" : "🍅") : kind === "popcorn" ? (tier === "bad" ? "🫗" : "🍿") : ""
+  const icon = kind === "tomato" ? (tier === "bad" ? "🤢" : "🍅") : kind === "popcorn" ? "🍿" : ""
   // 徽章內的字都用 fixedSize + lineLimit 1：SwiftUI 不會把「IMDb」壓成兩行或把分數截斷；
   // 字體用 caption2、留白縮到最小，三個徽章在 iPhone mini／SE 的寬度也放得下一排
   return <Button action={() => (url ? Safari.openURL(url) : undefined)} buttonStyle={"plain"} disabled={!url}>
@@ -337,7 +420,7 @@ function RatingBadge({ kind, value, tier, note, url }: { kind: "imdb" | "tomato"
 function HiCell({ hi }: { hi: EntryHi }) {
   const c = TIER[hi.tier as Tier] || TIER.none
   const rated = hi.kind === "imdb" || hi.kind === "tomato" || hi.kind === "popcorn" || hi.kind === "community"
-  const icon = hi.kind === "tomato" ? (hi.tier === "bad" ? "🤢" : "🍅") : hi.kind === "popcorn" ? (hi.tier === "bad" ? "🫗" : "🍿") : hi.kind === "community" ? "★" : ""
+  const icon = hi.kind === "tomato" ? (hi.tier === "bad" ? "🤢" : "🍅") : hi.kind === "popcorn" ? "🍿" : hi.kind === "community" ? "★" : ""
   return <VStack alignment={"trailing"} spacing={1}>
     <HStack spacing={3}>
       {hi.kind === "imdb"
@@ -349,7 +432,7 @@ function HiCell({ hi }: { hi: EntryHi }) {
   </VStack>
 }
 
-/** 片刻評分（大家一起統計）：平均、人數，以及「你的評分」五顆星；點已選的那顆可以取消 */
+/** 片刻評分（大家一起統計）：平均、人數，以及「你的評分」一排 1～10 的格子；點已選的那一格可以取消 */
 function CommunitySection({ title }: { title: string }) {
   const load = useLoad(() => communityStats(title), [title])
   const [voted, setVoted] = useState<Community | null>(null)
@@ -371,34 +454,43 @@ function CommunitySection({ title }: { title: string }) {
     }
     setBusy(false)
   }
-  // 平均是 10 分制，五顆星各代表 2 分
-  const starIcon = (i: number) => (avg / 2 >= i - 0.25 ? "star.fill" : avg / 2 >= i - 0.75 ? "star.leadinghalf.filled" : "star")
   const status = c ? (n ? `${n} 人評分` : "還沒有人評分，來當第一個") : load.error ? "片刻評分暫時讀不到" : "讀取中…"
-  return <Section header={<Text>片刻評分</Text>} footer={<Text>滿分 10 分。匿名評分，一台手機一票，可以隨時更改；再點一次已選的分數可以取消。各版本的評分會一起統計。</Text>}>
-    <HStack spacing={14}>
-      <HStack alignment={"lastTextBaseline"} spacing={2}>
-        <Text font={"largeTitle"} fontWeight={"bold"} monospacedDigit>{n ? avg.toFixed(1) : "-"}</Text>
-        <Text font={"footnote"} foregroundStyle={"secondaryLabel"}>／10</Text>
+  // 平均分數的色塊跟 IMDb 同一套（綠／黃／紅）；自己的評分是一排 1～10，選幾分就亮到幾分
+  const tc = n ? TIER[ratingTier("imdb", avg) as Tier] : TIER.none
+  return <Section header={<Text>片刻評分</Text>} footer={<Text>匿名評分，一台裝置一票，可以隨時更改；再點一次已選的分數可以取消。各版本的評分會一起統計。</Text>}>
+    {n ? <HStack spacing={12}>
+      <HStack alignment={"lastTextBaseline"} spacing={2} padding={{ horizontal: 10, vertical: 5 }} background={tc.bg} clipShape={{ type: "rect", cornerRadius: 10 }} fixedSize>
+        <Text font={"title"} fontWeight={"heavy"} monospacedDigit foregroundStyle={tc.fg} lineLimit={1} fixedSize>{avg.toFixed(1)}</Text>
+        <Text font={"caption"} fontWeight={"semibold"} foregroundStyle={tc.fg} lineLimit={1} fixedSize>／10</Text>
       </HStack>
-      <VStack alignment={"leading"} spacing={4}>
-        <HStack spacing={2}>
-          {[1, 2, 3, 4, 5].map((i) => <Image key={i} systemName={starIcon(i)} foregroundStyle={n ? "systemOrange" : "tertiaryLabel"} font={"subheadline"} />)}
-        </HStack>
-        <Text font={"caption"} foregroundStyle={"secondaryLabel"}>{status}</Text>
+      <VStack alignment={"leading"} spacing={2}>
+        <Text fontWeight={"semibold"}>{status}</Text>
+        <Text font={"caption"} foregroundStyle={"secondaryLabel"}>片刻使用者的評分</Text>
       </VStack>
       <Spacer />
+    </HStack> : <HStack>
+      <Text fontWeight={"semibold"}>{status}</Text>
+      <Spacer />
       {load.error && !c ? <Button title={"重試"} action={load.reload} buttonStyle={"plain"} foregroundStyle={"systemBlue"} /> : null}
-    </HStack>
+    </HStack>}
     <VStack alignment={"leading"} spacing={8}>
-      <Text>{mine ? `你給 ${mine} 分` : "點一個分數評分（滿分 10）"}</Text>
+      <HStack spacing={8}>
+        <Text fontWeight={"semibold"}>你的評分</Text>
+        {mine ? <Text fontWeight={"bold"} foregroundStyle={"systemBlue"}>{`${mine} 分`}</Text> : <Text font={"footnote"} foregroundStyle={"secondaryLabel"}>點一個分數</Text>}
+      </HStack>
       <HStack spacing={4}>
-        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((s) =>
-          <Button key={s} action={() => vote(s)} buttonStyle={"plain"} disabled={busy || !c}>
-            <Text font={"subheadline"} fontWeight={"bold"} monospacedDigit frame={{ maxWidth: "infinity", minHeight: 34 }}
-              foregroundStyle={s === mine ? "white" : s < mine ? "systemOrange" : "secondaryLabel"}
-              background={s === mine ? "systemOrange" : "tertiarySystemFill"} clipShape={{ type: "rect", cornerRadius: 8 }}>{`${s}`}</Text>
+        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((v) =>
+          <Button key={v} action={() => vote(v)} buttonStyle={"plain"} disabled={busy || !c}>
+            <Text font={"subheadline"} fontWeight={"bold"} monospacedDigit frame={{ maxWidth: "infinity", minHeight: 36 }}
+              foregroundStyle={v <= mine ? "white" : "secondaryLabel"}
+              background={v <= mine ? "systemBlue" : "tertiarySystemFill"} clipShape={{ type: "rect", cornerRadius: 8 }}>{`${v}`}</Text>
           </Button>
         )}
+      </HStack>
+      <HStack>
+        <Text font={"caption2"} foregroundStyle={"secondaryLabel"}>不推薦</Text>
+        <Spacer />
+        <Text font={"caption2"} foregroundStyle={"secondaryLabel"}>必看</Text>
       </HStack>
     </VStack>
     {msg ? <Text font={"caption"} foregroundStyle={"systemRed"}>{msg}</Text> : null}
@@ -587,6 +679,11 @@ function MovieHero({ title, slug, lines, en, poster, fest }: { title: string; sl
             <Label title={trailerLabel} systemImage={"play.fill"} font={"subheadline"} fontWeight={"semibold"} lineLimit={1} />
           </Button>
           <FavHeart title={title} en={en} poster={posterUrl || poster} fest={fest} />
+          {/* 分享這部電影：一段文字加連結，朋友點了會直接開到網頁版的這部片 */}
+          <Button action={() => ShareSheet.present([`《${title}》${fest && fest.name ? `｜${fest.name}` : ""}\n場次、評分、預告都在「片刻」：\n${SITE_URL}/?m=${encodeURIComponent(title)}${fest ? `&f=${encodeURIComponent(fest.id)}&ff=${encodeURIComponent(fest.film)}` : ""}`])}
+            buttonStyle={"bordered"} buttonBorderShape={"circle"} tint={"secondaryLabel"} padding={{ top: 6 }}>
+            <Image systemName={"square.and.arrow.up"} font={"subheadline"} />
+          </Button>
         </HStack>
         {x.data?.err ? <Text font={"caption2"} foregroundStyle={"tertiaryLabel"}>{`預告：${x.data.err}`}</Text> : null}
         {x.error ? <Text font={"caption2"} foregroundStyle={"tertiaryLabel"}>{`預告讀不到：${x.error}`}</Text> : null}
@@ -1037,36 +1134,44 @@ function SoonMoviePage({ film: u }: { film: UpcomingFilm }) {
 }
 
 /** 「電影」清單：上映中與票房排行合成一份（範圍、排序、出品國別都在這裡選）。每一部都可以點：有場次的進電影頁，沒有的進精簡頁 */
-function BoxOfficeSections({ movies, query, scope: pickedScope }: { movies: TwMovie[]; query: string; scope: "now" | "year" }) {
+/** 2016 年到今年的每一年（歷年電影「全部年份」用） */
+const allBoxYears = (): string[] => { const out: string[] = []; for (let y = Number(todayTPE().slice(0, 4)); y >= 2016; y--) out.push(String(y)); return out }
+function BoxOfficeSections({ movies, query, scope: pickedScope, init }: { movies: TwMovie[]; query: string; scope: "now" | "year"; init?: { issuers?: string[]; allYears?: boolean; sort?: string } }) {
   // 看哪些片由上面的頁籤決定：now = 現正上映，year = 歷年電影（某幾年上映的片，含已下檔）
-  const [pickedSort, setSort] = useState<string>("") // 排法（空 = 第一種）
+  // init：從別的頁面帶進來的初始條件（收藏發行商點進來：只看那一家、全部年份、依上映日期）
+  const [settings, updateSettings] = useSettings()
+  const favIssuers = settings.favIssuers || []
+  const [favIssuerOpen, setFavIssuerOpen] = useState(false)
+  const [pickedStatus, setPickedStatus] = useState<string>("") // 歷年電影只看上映中（now）／已下檔（off）；空 = 全部
+  const [pickedSort, setSort] = useState<string>(init?.sort || "") // 排法（空 = 第一種）
   const [asc, setAsc] = useState(false) // 反過來排（低到高、舊到新、少到多）；換一種排法就回到預設方向
   const [pickedRate, setRate] = useState<string>("") // 依評分排時用哪一種評分（空 = IMDb）
-  const [pickedIssuer, setPickedIssuer] = useState<string[]>([]) // 只看哪幾家發行商（可以複選；空 = 全部）
+  const [pickedIssuer, setPickedIssuer] = useState<string[]>(init?.issuers || []) // 只看哪幾家發行商（可以複選；空 = 全部）
   const [issuerOpen, setIssuerOpen] = useState(false)
   const [fewLast, setFewLast] = useState(true) // 依 IMDb 排時，評分人數少的片排在後面（關掉就照分數一起排）
   // 依片刻評分排時才讀評分總表
   const needCommunity = pickedSort === "rating" && pickedRate === "community"
   const community = useLoad(() => (needCommunity ? loadCommunitySummary() : Promise.resolve(null)), [needCommunity])
   // 年度依三大評分排時才讀伺服器的年度評分總表
-  const needYearRatings = pickedScope === "year" && pickedSort === "rating" && pickedRate !== "community"
+  // 歷年電影一律讀：裡面除了評分，還有每部片的首映年（清單要靠它標「重映」）
+  const needYearRatings = pickedScope === "year"
   const yearRatings = useLoad(() => (needYearRatings ? loadYearRatings() : Promise.resolve(null)), [needYearRatings])
   const [pickedWeek, setPickedWeek] = useState<string>("") // 週票房看哪一週（空 = 最新）
   // 年度排行的其他年份、過去的週票房各是另一個檔，用到才下載；票房讀不到時清單照樣出來，只是少了依票房排的選項
   const needWeeks = pickedScope !== "year" && (pickedSort || "week") === "week" && !!pickedWeek
   const box = useLoad(() => loadBoxFor(pickedScope, pickedSort || "week", pickedWeek).then((b) => ({ b: b as BoxOffice | null }), () => ({ b: null as BoxOffice | null })), [pickedScope === "year" ? 1 : needWeeks ? 2 : 0])
-  const [pickedYears, setPickedYears] = useState<string[]>([]) // 年度可以複選（空 = 最新的一年）
-  const [yearOpen, setYearOpen] = useState(true) // 歷年電影：年份清單預設展開，一進來就看得到有哪些年份
+  const [pickedYears, setPickedYears] = useState<string[]>(init?.allYears ? allBoxYears() : []) // 年度可以複選（空 = 最新的一年）
+  const [yearOpen, setYearOpen] = useState(!init) // 歷年電影：年份清單預設展開，一進來就看得到有哪些年份（從收藏發行商進來時先收著）
   const [pickedCountry, setPickedCountry] = useState<string[]>([]) // 只看哪幾個出品國別（可以複選；空 = 全部）
   const [countryOpen, setCountryOpen] = useState(false)
   const b = box.data ? box.data.b : null
   const board = useMemo(
-    () => movieBoard(b, movies, { scope: pickedScope, sort: pickedSort, years: pickedYears, week: pickedWeek, countries: pickedCountry, query, asc, rate: pickedRate, fewLast, issuers: pickedIssuer, community: community.data, yearRatings: yearRatings.data }),
-    [b, movies.length, asc, fewLast, pickedIssuer.join(","), yearRatings.data, pickedRate, community.data, pickedScope, pickedSort, pickedYears.join(","), pickedWeek, pickedCountry.join(","), query])
+    () => movieBoard(b, movies, { scope: pickedScope, sort: pickedSort, years: pickedYears, week: pickedWeek, countries: pickedCountry, query, asc, rate: pickedRate, fewLast, issuers: pickedIssuer, status: pickedStatus, community: community.data, yearRatings: yearRatings.data }),
+    [b, movies.length, asc, fewLast, pickedStatus, pickedIssuer.join(","), yearRatings.data, pickedRate, community.data, pickedScope, pickedSort, pickedYears.join(","), pickedWeek, pickedCountry.join(","), query])
   const { years: yearOptions, selYears: years, countries, selCountries: country } = board
   // 年度排行一年有六百部左右、全選是好幾千部：先顯示 100 列，滑到底自動接著載入（不用按）。換了排法、年份或搜尋字就從頭開始
   const paged = board.paged
-  const pageKey = `${board.selIssuers.join(",")}|${board.asc}|${board.rate}|${board.scope}|${board.sort}|${years.join(",")}|${board.selWeek}|${query}|${country.join(",")}`
+  const pageKey = `${board.statusSel || ""}|${board.selIssuers.join(",")}|${board.asc}|${board.rate}|${board.scope}|${board.sort}|${years.join(",")}|${board.selWeek}|${query}|${country.join(",")}`
   const [page, setPage] = useState<{ key: string; n: number }>({ key: "", n: BOX_PAGE })
   const limit = page.key === pageKey ? page.n : BOX_PAGE
   const shown = paged ? board.entries.slice(0, limit) : board.entries
@@ -1113,6 +1218,9 @@ function BoxOfficeSections({ movies, query, scope: pickedScope }: { movies: TwMo
       {board.rates.map((x) => <Text key={x.id} tag={x.id}>{x.label}</Text>)}
     </Picker> : null}
     {board.fewOption ? <Toggle title={"評分人數少的片排在後面"} value={board.fewLast} onChanged={setFewLast} /> : null}
+    {board.statusPicks ? <Picker title={"狀態"} value={board.statusSel || ""} onChanged={(v: string) => setPickedStatus(v)}>
+      {board.statusPicks.map((x) => <Text key={x.id} tag={x.id}>{`${x.label}（${x.count} 部）`}</Text>)}
+    </Picker> : null}
     {board.weeks.length > 1 ? <Picker title={"週次"} value={board.selWeek} onChanged={(v: string) => setPickedWeek(b && v === b.end ? "" : v)}>
       {board.weeks.map((o) => <Text key={o.id} tag={o.id}>{`${o.label}（${o.note}）`}</Text>)}
     </Picker> : null}
@@ -1129,10 +1237,23 @@ function BoxOfficeSections({ movies, query, scope: pickedScope }: { movies: TwMo
   {board.issuers.length > 1 ? multiPick({
     title: "發行商", open: issuerOpen, onOpen: () => setIssuerOpen(!issuerOpen),
     summary: board.selIssuers.length ? board.selIssuers.join("、") : `全部（${board.everyone} 部）`,
-    options: [{ id: "", label: `全部（${board.everyone} 部）` }, ...board.issuers.map((c) => ({ id: c.id, label: `${c.id}（${c.count} 部）` }))],
+    // 第一個是「全部」；有收藏發行商時第二個是「只看收藏發行商」；收藏的排在前面、前面加 ★
+    options: [
+      { id: "", label: `全部（${board.everyone} 部）` },
+      ...(board.issuers.some((c) => favIssuers.indexOf(c.id) >= 0) ? [{ id: "__fav__", label: "只看收藏發行商" }] : []),
+      ...board.issuers.slice().sort((x, y) => Number(favIssuers.indexOf(y.id) >= 0) - Number(favIssuers.indexOf(x.id) >= 0)).map((c) => ({ id: c.id, label: `${favIssuers.indexOf(c.id) >= 0 ? "★ " : ""}${c.id}（${c.count} 部）` })),
+    ],
     selected: board.selIssuers.length ? board.selIssuers : [""],
-    onToggle: (id) => setPickedIssuer(!id ? [] : board.selIssuers.indexOf(id) < 0 ? [...board.selIssuers, id] : board.selIssuers.filter((z) => z !== id)),
-    footer: "發行商來自官方票房資料，可複選；聯合發行的片算第一家。",
+    onToggle: (id) => setPickedIssuer(!id ? [] : id === "__fav__" ? board.issuers.filter((c) => favIssuers.indexOf(c.id) >= 0).map((c) => c.id) : board.selIssuers.indexOf(id) < 0 ? [...board.selIssuers, id] : board.selIssuers.filter((z) => z !== id)),
+    footer: "發行商來自官方票房資料，可複選；聯合發行的片算第一家。要收藏發行商，用下面那一列。",
+  }) : null}
+  {/* 收藏發行商：展開後勾選就是收藏、再點一次取消；收藏的會出現在首頁，上面的清單也會排在前面 */}
+  {board.issuers.length > 1 ? multiPick({
+    title: "收藏發行商", open: favIssuerOpen, onOpen: () => setFavIssuerOpen(!favIssuerOpen),
+    summary: favIssuers.length ? `${favIssuers.length} 家` : "還沒有",
+    options: board.issuers.map((c) => ({ id: c.id, label: `${c.id}（${c.count} 部）` })), selected: favIssuers,
+    onToggle: (id) => updateSettings({ favIssuers: favIssuers.indexOf(id) < 0 ? [...favIssuers, id] : favIssuers.filter((z) => z !== id) }),
+    footer: "打勾就是收藏。收藏後在首頁的「收藏發行商」可以直接看那一家歷年發行的片。",
   }) : null}
   {board.scope === "year" && yearOptions.length > 1 ? multiPick({
     title: "年份", open: yearOpen, onOpen: () => setYearOpen(!yearOpen),
@@ -1159,6 +1280,15 @@ function BoxOfficeSections({ movies, query, scope: pickedScope }: { movies: TwMo
 }
 
 /** 直接給圖片網址的小圖（影展官網給的劇照）：統一下載、好了整批重畫一次；沒有網址或讀不到就回傳 null */
+/** 收藏發行商點進來：歷年電影、全部年份、只看這一家、依上映日期新到舊（條件之後都還可以再改） */
+function IssuerPage({ issuer }: { issuer: string }) {
+  const movies = useLoad(() => loadMovies(), [])
+  return <List navigationTitle={issuer} navigationBarTitleDisplayMode={"inline"}>
+    {movies.error ? <ErrorRow error={movies.error} retry={movies.reload} /> : null}
+    <BoxOfficeSections key={"issuer:" + issuer} movies={movies.data || []} query={""} scope={"year"} init={{ issuers: [issuer], allYears: true, sort: "date" }} />
+  </List>
+}
+
 function useDirectImages(urls: string[], key: string): (url: string) => any {
   const [, setTick] = useState(0)
   const imgs = useMemo(() => ({} as Record<string, any>), [])
@@ -1588,7 +1718,7 @@ function NowPage() {
       footer: "都不選就是整天。「接下來 3 小時」只找今天。",
     })}
     {multiPick({
-      title: "找哪些影城", open: open === "scope", onOpen: flip("scope"),
+      title: "影城", open: open === "scope", onOpen: flip("scope"),
       summary: scopes.map((x) => (x === "all" ? "不限" : x === "fav" ? "收藏影城" : x === "near" ? "附近 10 間" : x)).join("、"),
       options: scopeOptions, selected: scopes,
       onToggle: (id) => setScopes(id === "all" ? ["all"] : toggle(scopes.filter((x) => x !== "all"), id, true)),
@@ -1601,7 +1731,8 @@ function NowPage() {
       onToggle: (id) => setFormats(toggle(formats, id)),
       footer: "都不選就是不限；選了幾種，就找其中任一種。",
     })}
-    <Section footer={<Text>每一項都可以複選：點標題展開，再點選項打勾。</Text>}>
+    {/* 四個條件各收成一列（右邊是目前選的），點了才展開；「找場次」緊接在後 */}
+    <Section footer={<Text>每一項都可以複選：點那一列展開，再點選項打勾。</Text>}>
       <NavigationLink destination={<NowResultsPage dates={selDates} winIds={winIds} scopes={scopes} formats={formats as Format[]} />}>
         <Label title={"找場次"} systemImage={"magnifyingglass"} />
       </NavigationLink>
@@ -1690,6 +1821,8 @@ function NowResultsPage({ dates, winIds, scopes, formats }: { dates: string[]; w
 async function run() {
   // 先讀設定再顯示畫面，避免還沒讀到就被預設值蓋掉
   store.settings = { ...store.settings, ...(await loadSettings()) }
+  // 更新內容：第一次使用的人沒有「舊版」可以比，直接當成看過，不標「新」
+  if (!settingsStored && store.settings.seenLog === undefined) store.settings = { ...store.settings, seenLog: CHANGELOG_LATEST }
   await Navigation.present({ element: <RootTabs /> })
   Script.exit()
 }
