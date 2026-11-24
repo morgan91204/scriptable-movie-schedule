@@ -1828,7 +1828,7 @@ export function boxFirstRun(x: BoxOfficeItem, b: BoxOffice | null = boxFullLates
   const first = boxRuns(x, b)[0];
   return first && first.release < x.release && !(first.name === x.name && first.release === x.release) ? first : null;
 }
-/** 這一筆之後有沒有再上映（首映那一筆在清單上標「有重映」用） */
+/** 這一筆之後有沒有再上映（首映那一筆在清單上標「首映」用，跟重映那一筆分得開） */
 export const boxHasLaterRun = (x: BoxOfficeItem, b: BoxOffice | null = boxFullLatest): boolean => boxRuns(x, b).some((r) => r.release > x.release);
 /** 「歷次上映」的各列：每次上映的日期、是首映還是重映、戲院數、票房；最後一列是合計。只有一次上映就回傳空陣列 */
 export function boxRunRows(x: BoxOfficeItem): { run: BoxOfficeItem | null; title: string; note: string; value: string; current: boolean }[] {
@@ -2049,7 +2049,7 @@ export function movieBoard(b: BoxOffice | null, movies: TwMovie[], opt: { scope?
     if (sort === "rating" || sort === "cinemas" || sort === "tickets" || sort === "price") keyed.slice().sort((a, c) => c.k.tier - a.k.tier || c.k.v - a.k.v).forEach((e, i) => { if (e.k.tier > 0) e.rank = i + 1; });
     keyed.sort((a, c) => c.k.tier - a.k.tier || (asc ? a.k.v - c.k.v : c.k.v - a.k.v));
     const entries = keyed.map(({ x, m, k: kk, rank }): MovieEntry => {
-      const info = [boxIsRerun(x, b) ? "重映" : boxHasLaterRun(x, b) ? "有重映" : "", boxMainCountry(x.country), sort === "date" ? "" : releaseLabel(dateOf(x, m)), theatersOf(x, m) && sort !== "cinemas" ? `${theatersOf(x, m)} 間戲院` : ""].filter(Boolean).join("｜");
+      const info = [boxIsRerun(x, b) ? "重映" : boxHasLaterRun(x, b) ? "首映" : "", boxMainCountry(x.country), sort === "date" ? "" : releaseLabel(dateOf(x, m)), theatersOf(x, m) && sort !== "cinemas" ? `${theatersOf(x, m)} 間戲院` : ""].filter(Boolean).join("｜");
       return { key: `${x.name}|${x.release}`, rank, name: x.name, x, m, lines: sort === "total" ? [info, ""] : [`票房 ${money(x.total)}`, info], light: !m, hi: kk.hi, status: boxStatus(x) };
     });
     const rateName = rates.find((r) => r.id === rate)!.label;
