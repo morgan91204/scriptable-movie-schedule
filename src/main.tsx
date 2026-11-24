@@ -372,6 +372,53 @@ class App {
       </Page>
     );
   }
+  cinemaFavQuery = ""; // 收藏影城頁的搜尋字
+  cinemaFavOpen: string[] = []; // 收藏影城頁裡展開的縣市（預設全部收合，點了才展開）
+  /** 收藏影城頁：管理收藏影城的地方。上面是已經收藏的；下面是全台的影城，依縣市分組（點縣市展開），可以搜尋。
+   *  點名稱進那間影城；點右邊的星號收藏或取消 */
+  async cinemaManageView(): Promise<string> {
+    if (!this.cinemas.length) this.cinemas = await loadCinemas();
+    const ids = this.settings.favorites;
+    const isFav = (c: Cinema) => ids.indexOf(c.id) >= 0;
+    const row = (c: Cinema) => <Item icon="🎦" title={c.name} subtitle={`${c.city} ${c.district}`} onTap={() => this.go(() => this.cinemaView(c), `讀取 ${c.name} 的場次…`)} action={{ label: isFav(c) ? "★" : "☆", hint: isFav(c) ? "取消收藏這間影城" : "收藏這間影城", onTap: () => this.toggleFav(c) }} />;
+    const favs = ids.map((id) => this.cinemas.find((c) => c.id === id)).filter(Boolean) as Cinema[];
+    // 收藏裡有、但影城清單上已經沒有的（歇業、改名後代碼換了）：列出來讓人自己決定要不要拿掉，不會默默留著
+    const gone = ids.filter((id) => !this.cinemas.some((c) => c.id === id));
+    const k = this.cinemaFavQuery.trim().toLowerCase().replace(/臺/g, "台");
+    const hits = k ? this.cinemas.filter((c) => `${c.name} ${c.city} ${c.district} ${c.id} ${c.aliases || ""}`.toLowerCase().replace(/臺/g, "台").includes(k)) : [];
+    const cities = Array.from(new Set(this.cinemas.map((c) => c.city))).sort((a, b) => (CITY_ORDER.indexOf(a) + 1 || 99) - (CITY_ORDER.indexOf(b) + 1 || 99));
+    const open = (city: string) => this.cinemaFavOpen.indexOf(city) >= 0;
+    return (
+      <Page title="收藏影城" subtitle={ids.length ? `已收藏 ${ids.length} 間` : `全台 ${this.cinemas.length} 間影城`} onBack={() => this.back()}>
+        <Search value={this.cinemaFavQuery} placeholder="搜尋影城，例如：松仁、西門、in89、台南" onInput={(t) => { this.cinemaFavQuery = t; }} />
+        {k ? (
+          <Section title={`符合「${this.cinemaFavQuery.trim()}」的 ${hits.length} 間`}>
+            {hits.map(row)}
+            {hits.length ? null : <Note text="找不到相符的影城，換個關鍵字試試。" />}
+          </Section>
+        ) : (
+          <>
+            <Section title={`已收藏（${ids.length}）`} hint={ids.length ? "點名稱進那間影城；點 ★ 取消收藏。" : "還沒有收藏。用上面的搜尋找影城，或展開下面的縣市點 ☆。"}>
+              {favs.map(row)}
+              {gone.map((id) => <Item icon="⚠️" title={id} subtitle="這間影城已經不在清單上（可能歇業或改名）" chevron={false} action={{ label: "移除", hint: "從收藏拿掉", onTap: () => { this.settings.favorites = ids.filter((z) => z !== id); saveSettings(this.settings); this.pushSync(); } }} />)}
+            </Section>
+            <Section title="全台影城" hint="點縣市展開，再點 ☆ 收藏。">
+              {cities.map((city) => {
+                const list = this.cinemas.filter((c) => c.city === city);
+                const n = list.filter(isFav).length;
+                return (
+                  <>
+                    <Item kv title={city} right={`${n ? `已收藏 ${n}｜` : ""}${list.length} 間 ${open(city) ? "▾" : "▸"}`} chevron={false} onTap={() => { this.cinemaFavOpen = open(city) ? this.cinemaFavOpen.filter((x) => x !== city) : [...this.cinemaFavOpen, city]; }} />
+                    {open(city) ? list.map(row) : null}
+                  </>
+                );
+              })}
+            </Section>
+          </>
+        )}
+      </Page>
+    );
+  }
   issuerQuery = ""; // 發行商頁的搜尋字
   /** 開某一家發行商歷年發行的片：歷年電影、全部年份、只看這一家、新的在前 */
   openIssuer(id: string) {
@@ -505,7 +552,7 @@ class App {
             {(this.favOpen ? favs : []).map((c) => (
               <Item icon="★" title={c.name} subtitle={`${c.city} ${c.district}`} onTap={() => this.go(() => this.cinemaView(c), `讀取 ${c.name} 的場次…`)} />
             ))}
-            {this.favOpen && !favs.length ? <Item icon="👉" title="去找影城來收藏" subtitle="在影城頁點「收藏這間影城」。收藏後可以從這裡直接進那間影城。" accent onTap={() => this.switchTab("cinemas")} /> : null}
+            {this.favOpen ? <Item icon={favs.length ? "⚙️" : "👉"} title={favs.length ? "管理收藏影城" : "去找影城來收藏"} subtitle={favs.length ? "增加、取消收藏，或搜尋其他影城" : "搜尋或從各縣市的清單裡點星號（☆ 變 ★）。收藏後可以從這裡直接進那間影城。"} accent onTap={() => { this.cinemaFavQuery = ""; this.go(() => this.cinemaManageView()); }} /> : null}
           </Section>
         )}
         {(
@@ -829,6 +876,7 @@ class App {
           }} />
         </Section>
         <Section title="收藏">
+          <Item icon="★" title="收藏影城" subtitle="搜尋影城、增加或取消收藏" right={this.settings.favorites.length ? `${this.settings.favorites.length} 間` : "還沒有"} onTap={() => { this.cinemaFavQuery = ""; this.go(() => this.cinemaManageView()); }} />
           <Item icon="♥" title="收藏電影" subtitle="搜尋全部的電影、增加或取消收藏" right={(this.settings.favMovies || []).length ? `${(this.settings.favMovies || []).length} 部` : "還沒有"} onTap={() => { this.favQuery = ""; this.go(() => this.favManageView(), "讀取電影…"); }} />
           <Item icon="🏢" title="收藏發行商" subtitle="搜尋發行商、增加或取消收藏" right={(this.settings.favIssuers || []).length ? `${(this.settings.favIssuers || []).length} 家` : "還沒有"} onTap={() => { this.issuerQuery = ""; this.go(() => this.issuerManageView(), "讀取發行商…"); }} />
         </Section>
