@@ -785,7 +785,7 @@ class App {
         {me ? (
           <div class="pf-btns">
             <button class="pf-btn" onTap={() => { this.profileDraft = null; this.go(() => this.profileEditView(u || null)); }}>{u ? "編輯個人檔案" : "設定暱稱"}</button>
-            {u && u.pub && !u.hidden ? <button class="pf-btn" onTap={async () => { Pasteboard.copy(`${SITE_URL}/?u=${encodeURIComponent(u.name)}`); await this.ui.toast("已複製個人頁連結"); }}>分享個人檔案</button> : null}
+            {u && u.pub && !u.hidden ? <button class="pf-btn" onTap={() => this.shareProfile(u.name, true)}>分享個人檔案</button> : null}
             <button class="pf-btn icon" aria-label="搜尋片友" onTap={() => { this.switchTab("activity"); this.socialTab = "people"; }}>{PERSON_ADD}</button>
           </div>
         ) : null}
@@ -835,6 +835,12 @@ class App {
     const fav: FavMovie = { key: communityKey(title), title, at: 0 };
     const row = (await favMovieRows({ ...this.settings, favMovies: [fav] }).catch(() => [] as FavRow[]))[0];
     if (row) this.openFavRow(row); else this.go(() => this.favMovieView(fav), `讀取《${title}》…`);
+  }
+  /** 分享個人頁：跳出系統的分享選單（不支援的瀏覽器改成複製連結） */
+  async shareProfile(name: string, mine: boolean): Promise<void> {
+    const url = `${SITE_URL}/?u=${encodeURIComponent(name)}`;
+    if (IS_WEB) await ShareSheet.present([mine ? `我在片刻記錄看過的電影，來追蹤我：${name}` : `${name} 在片刻的片單`, url]);
+    else { Pasteboard.copy(url); await this.ui.toast("已複製個人頁連結"); }
   }
   /** 頭像：底色＋表情符號；沒選表情符號就用暱稱的第一個字 */
   avatar(u: { name: string; color: string; emoji?: string }, big = false): string {
@@ -1515,7 +1521,7 @@ class App {
                 const sy = this.sync(); if (sy) sy.login();
               }}>登入後追蹤</button>
             )}
-            <button class="pf-btn" onTap={async () => { Pasteboard.copy(`${SITE_URL}/?u=${encodeURIComponent(u.name)}`); await this.ui.toast("已複製個人頁連結"); }}>分享</button>
+            <button class="pf-btn" onTap={() => this.shareProfile(u.name, !!p!.self)}>分享</button>
             {p.self ? null : <button class="pf-btn icon" aria-label="檢舉這個帳號" onTap={() => this.go(() => this.reportUserView(u.name))}>⚑</button>}
           </div>
         </Section>

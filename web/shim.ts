@@ -135,9 +135,14 @@ g.ShareSheet = {
     const text = items.join("\n");
     if (navigator.share) {
       try {
-        await navigator.share({ text });
+        // 最後一項是網址的話另外交給系統（分享到訊息、社群時會變成可以點的連結，有預覽圖）
+        const last = items[items.length - 1] || "";
+        if (items.length > 1 && /^https?:\/\/\S+$/.test(last)) await navigator.share({ text: items.slice(0, -1).join("\n"), url: last });
+        else await navigator.share({ text });
         return;
-      } catch (_) {}
+      } catch (e) {
+        if ((e as any)?.name === "AbortError") return; // 使用者自己關掉分享選單：不用再複製
+      }
     }
     await navigator.clipboard?.writeText(text).catch(() => {});
     (window as any).__toast?.("已複製，可以貼給朋友");
