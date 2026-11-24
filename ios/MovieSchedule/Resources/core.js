@@ -214,6 +214,7 @@
     rerunByName: () => rerunByName,
     rerunDataReady: () => rerunDataReady,
     reviewTagLabel: () => reviewTagLabel,
+    reviewTagsToggle: () => reviewTagsToggle,
     saveSettings: () => saveSettings,
     searchTitles: () => searchTitles,
     setMetaEnabled: () => setMetaEnabled,
@@ -3648,7 +3649,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   var PRIVACY_URL = SITE_URL + "/privacy/";
   var COMMUNITY_API = "https://movie-ratings.twmovietime.workers.dev";
   var REVIEW_TAGS = [
-    { group: "推薦程度", tags: [{ id: "cinema", label: "值得進戲院" }, { id: "stream", label: "等串流就好" }, { id: "again", label: "想二刷" }] },
+    { group: "推薦程度", single: true, tags: [{ id: "cinema", label: "值得進戲院" }, { id: "stream", label: "等串流就好" }, { id: "again", label: "想二刷" }] },
     { group: "亮點", tags: [{ id: "story", label: "劇情" }, { id: "cast", label: "演員" }, { id: "visual", label: "畫面" }, { id: "music", label: "配樂" }, { id: "pace", label: "節奏" }, { id: "ending", label: "結局有力" }] },
     { group: "氛圍", tags: [{ id: "funny", label: "好笑" }, { id: "tears", label: "催淚" }, { id: "brainy", label: "燒腦" }, { id: "tense", label: "緊張" }, { id: "healing", label: "療癒" }, { id: "heavy", label: "沉重" }] },
     { group: "觀影提醒", tags: [{ id: "credits", label: "有片尾彩蛋" }, { id: "prequel", label: "建議先看前作" }, { id: "bigscreen", label: "適合大銀幕" }, { id: "nokids", label: "不適合小孩" }, { id: "long", label: "片長有感" }] }
@@ -3657,6 +3658,12 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   var TAG_LABEL = {};
   for (const g of REVIEW_TAGS) for (const t of g.tags) TAG_LABEL[t.id] = t.label;
   var reviewTagLabel = (id) => TAG_LABEL[id] || "";
+  function reviewTagsToggle(mine, id) {
+    if (mine.indexOf(id) >= 0) return mine.filter((x) => x !== id);
+    const g = REVIEW_TAGS.find((x) => x.tags.some((t) => t.id === id));
+    const rest = g && g.single ? mine.filter((x) => !g.tags.some((t) => t.id === x)) : mine;
+    return rest.length >= REVIEW_TAGS_MAX ? null : [...rest, id];
+  }
   function topReviewTags(c, max = 4) {
     if (!c || c.n < COMMUNITY_MIN || !c.tags) return [];
     return Object.keys(c.tags).map((id) => ({ id, label: reviewTagLabel(id), n: Number(c.tags[id]) || 0, pct: Math.round((Number(c.tags[id]) || 0) / c.n * 100) })).filter((t) => t.label && t.n >= 2).sort((a, b) => b.n - a.n || a.id.localeCompare(b.id)).slice(0, max);
@@ -4084,7 +4091,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   var extra = { boxOffice, filmList, soonList, nowShowing, nowShowingMulti, movieBoard: movieBoard2, festivalBoard, festivalFilm, nearby, patchSettings, fillMovie, formatList };
   var BRIDGE_LEVEL = 2;
   globalThis.MS = {
-    version: "2026.11.24-1646",
+    version: "2026.11.24-1653",
     level: BRIDGE_LEVEL,
     init(saved) {
       cache = saved || {};
