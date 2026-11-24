@@ -41,7 +41,7 @@ const NOTE_MAX_ACCOUNT = 140; // 有帳號的人短評可以寫長一點
 const NOTES_PER_FILM = 5; // 同一部片一個人最多發幾則短評
 const REPLIES_PER_FILM = 30; // 同一部片一個人最多回覆幾則
 // 心得標籤：只收代號（小寫英文），有哪些標籤、叫什麼名字由 App 決定；不收任何自由輸入的文字
-const TAGS_MAX = 5;
+const TAGS_MAX = 12; // 推薦程度 1＋亮點 3＋氛圍 3＋觀影提醒 5（各組的上限在 App 裡擋）
 // 短評
 const NOTE_MAX = 60; // 最多幾個字
 const REPORT_WHY = ["spoiler", "abuse", "spam"];

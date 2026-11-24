@@ -228,6 +228,7 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .cm-tag.on{background:var(--accent);color:#fff;font-weight:600}
 .cm-tag:active{transform:scale(.94)}
 .cm-tagnote{margin-top:9px;font-size:11.5px;color:var(--fg2)}
+.cm-tagask{display:block;margin-top:8px;padding:0;font-size:13px;color:var(--accent)}
 .nt-form{padding:4px 16px 14px}
 .nt-form .field{background:var(--chip)}
 .nt-form .btn{margin-top:10px}

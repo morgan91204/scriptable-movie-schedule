@@ -3553,24 +3553,34 @@ export interface Community {
   myTags?: string[]; // 這支手機選的心得標籤
   notes?: number; // 看得到的短評有幾則
 }
-/** 心得標籤：評完分可以點選的看片心得（最多 5 個）。只有固定的選項、不能打字，所以不會暴雷。
+/** 心得標籤：評完分可以點選的看片心得（推薦程度選一個；亮點、氛圍各最多 3 個；觀影提醒不限）。只有固定的選項、不能打字，所以不會暴雷。
  *  代號送到伺服器統計，名稱只在 App 裡；要改名稱直接改這裡，代號不要動（動了舊的統計就對不上） */
-export const REVIEW_TAGS: { group: string; single?: boolean; tags: { id: string; label: string }[] }[] = [
+export const REVIEW_TAGS: { group: string; single?: boolean; max?: number; tags: { id: string; label: string }[] }[] = [
   { group: "推薦程度", single: true, tags: [{ id: "stream", label: "等串流就好" }, { id: "cinema", label: "值得進戲院" }, { id: "again", label: "想二刷" }] },
-  { group: "亮點", tags: [{ id: "story", label: "劇情" }, { id: "cast", label: "演員" }, { id: "visual", label: "畫面" }, { id: "music", label: "配樂" }, { id: "pace", label: "節奏" }, { id: "ending", label: "結局有力" }] },
-  { group: "氛圍", tags: [{ id: "funny", label: "好笑" }, { id: "tears", label: "催淚" }, { id: "brainy", label: "燒腦" }, { id: "tense", label: "緊張" }, { id: "healing", label: "療癒" }, { id: "heavy", label: "沉重" }] },
+  { group: "亮點", max: 3, tags: [{ id: "story", label: "劇情" }, { id: "cast", label: "演員" }, { id: "visual", label: "畫面" }, { id: "music", label: "配樂" }, { id: "pace", label: "節奏" }, { id: "ending", label: "結局有力" }] },
+  { group: "氛圍", max: 3, tags: [{ id: "funny", label: "好笑" }, { id: "tears", label: "催淚" }, { id: "brainy", label: "燒腦" }, { id: "tense", label: "緊張" }, { id: "healing", label: "療癒" }, { id: "heavy", label: "沉重" },
+    { id: "hype", label: "熱血" }, { id: "romance", label: "浪漫" }, { id: "scary", label: "恐怖" }, { id: "warm", label: "溫馨" }, { id: "bleak", label: "壓抑" }, { id: "rush", label: "爽快" }, { id: "puzzled", label: "困惑" }] },
   { group: "觀影提醒", tags: [{ id: "credits", label: "有片尾彩蛋" }, { id: "prequel", label: "建議先看前作" }, { id: "bigscreen", label: "適合大銀幕" }, { id: "nokids", label: "不適合小孩" }, { id: "long", label: "片長有感" }] },
 ];
-export const REVIEW_TAGS_MAX = 5;
+/** 各組上限加起來（1＋3＋3＋5）；伺服器也用這個數字擋 */
+export const REVIEW_TAGS_MAX = 12;
+/** 那一組選滿時要顯示的話 */
+export const reviewTagsFull = (id: string): string => {
+  const g = REVIEW_TAGS.find((x) => x.tags.some((t) => t.id === id));
+  return g && g.max ? `「${g.group}」最多選 ${g.max} 個，先取消一個再選` : "選太多了，先取消一個再選";
+};
+/** 標籤區最下面那行說明 */
+export const REVIEW_TAGS_NOTE = "推薦程度選一個，亮點、氛圍各最多 3 個。只有這些選項，不會有劇透。";
 const TAG_LABEL: Record<string, string> = {};
 for (const g of REVIEW_TAGS) for (const t of g.tags) TAG_LABEL[t.id] = t.label;
 export const reviewTagLabel = (id: string): string => TAG_LABEL[id] || "";
 /** 點一個標籤之後的新選擇：已選的再點一次是取消；單選的那一組（推薦程度）選了一個，同組其他的自動取消。
- *  回傳 null = 已經選滿了，不能再加 */
+ *  回傳 null = 那一組已經選滿了，不能再加 */
 export function reviewTagsToggle(mine: string[], id: string): string[] | null {
   if (mine.indexOf(id) >= 0) return mine.filter((x) => x !== id);
   const g = REVIEW_TAGS.find((x) => x.tags.some((t) => t.id === id));
   const rest = g && g.single ? mine.filter((x) => !g.tags.some((t) => t.id === x)) : mine;
+  if (g && g.max && rest.filter((x) => g.tags.some((t) => t.id === x)).length >= g.max) return null;
   return rest.length >= REVIEW_TAGS_MAX ? null : [...rest, id];
 }
 /** 最多人選的幾個心得標籤（評分滿 5 人才顯示；至少 2 人選的才列；pct = 佔評分人數的百分比） */

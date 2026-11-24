@@ -14,7 +14,7 @@ import {
   Cinema, Movie, Settings, Version, TwMovie, TwMovieCinema, CITY_ORDER, TW,
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
   loadSettings, saveSettings, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, cinemaAddress,
-  FORMATS, formatsOf, filterVersions, filterVersionsAny, movieRows, movieDays, nearest, kmLabel, WINDOWS, findShowtimes, findShowtimesMulti, multiLabel, multiDetail, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText, hallOf, tmdbTest, movieExtras, moviePoster, posterReady, posterTint, POSTER_TINTS, normImageUrl, movieRuntime, posterSrc, isLocalSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxCountries, boxByCountry, boxInfo, boxInfoRows, boxCountryText, BOX_COUNTRY_NOTE, boxCountryTag, boxCountriesPicked, movieBoard, loadBoxFor, loadCommunitySummary, loadYearRatings, loadUpcoming, soonBoard, isFavMovie, toggleFavMovie, favMovieRows, favMovieBox, boxStatus, STATUS_LABEL, boxInfoBy, soonGroups, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityVote, communityTags, sendFeedback, loadMyFeedback, feedbackSent, feedbackMarkSeen, feedbackCat, FEEDBACK_CATS, FEEDBACK_STATUS, FEEDBACK_MAX, loadNotes, saveNote, reportNote, noteLooksSpoiler, noteDate, NOTE_MAX, NOTE_PLACEHOLDER, NOTE_RULES, REPORT_REASONS, reviewTagsToggle, REVIEW_TAGS, REVIEW_TAGS_MAX, reviewTagLabel, topReviewTags, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, SCRIPTING_IMPORT_URL, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, festivalDefaultDate, festivalStateLabel, festivalState, festivalFooter, linkMovies, nowGroupLine, nowFilter, festivalPick, movieAbout, festivalSearch, festivalSearchLines, festivalTrailer, festivalYears, festivalGroups, festivalChipNote, festivalStatusLine, movieRatings, ratingTier, tomatoTier, popcornTier, dropStaleCaches, rerunDataReady, boxRunRows, boxRunsName, loadIntro, globalSearch, boxIsRerun, boxHasLaterRun, settingsStored, SITE_URL,
+  FORMATS, formatsOf, filterVersions, filterVersionsAny, movieRows, movieDays, nearest, kmLabel, WINDOWS, findShowtimes, findShowtimesMulti, multiLabel, multiDetail, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText, hallOf, tmdbTest, movieExtras, moviePoster, posterReady, posterTint, POSTER_TINTS, normImageUrl, movieRuntime, posterSrc, isLocalSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxCountries, boxByCountry, boxInfo, boxInfoRows, boxCountryText, BOX_COUNTRY_NOTE, boxCountryTag, boxCountriesPicked, movieBoard, loadBoxFor, loadCommunitySummary, loadYearRatings, loadUpcoming, soonBoard, isFavMovie, toggleFavMovie, favMovieRows, favMovieBox, boxStatus, STATUS_LABEL, boxInfoBy, soonGroups, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityVote, communityTags, sendFeedback, loadMyFeedback, feedbackSent, feedbackMarkSeen, feedbackCat, FEEDBACK_CATS, FEEDBACK_STATUS, FEEDBACK_MAX, loadNotes, saveNote, reportNote, noteLooksSpoiler, noteDate, NOTE_MAX, NOTE_PLACEHOLDER, NOTE_RULES, REPORT_REASONS, reviewTagsToggle, REVIEW_TAGS, reviewTagsFull, REVIEW_TAGS_NOTE, reviewTagLabel, topReviewTags, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, SCRIPTING_IMPORT_URL, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, festivalDefaultDate, festivalStateLabel, festivalState, festivalFooter, linkMovies, nowGroupLine, nowFilter, festivalPick, movieAbout, festivalSearch, festivalSearchLines, festivalTrailer, festivalYears, festivalGroups, festivalChipNote, festivalStatusLine, movieRatings, ratingTier, tomatoTier, popcornTier, dropStaleCaches, rerunDataReady, boxRunRows, boxRunsName, loadIntro, globalSearch, boxIsRerun, boxHasLaterRun, settingsStored, SITE_URL,
 } from "./core"
 import { CHANGELOG, CHANGELOG_LATEST } from "./changelog"
 import type { GlobalHits, ReviewNote, ReviewNotes, Feedback } from "./core"
@@ -519,7 +519,7 @@ function CommunitySection({ title }: { title: string }) {
   const pickTag = async (id: string) => {
     if (busy) return
     const next = reviewTagsToggle(myTags, id)
-    if (!next) { setMsg(`最多選 ${REVIEW_TAGS_MAX} 個，先取消一個再選`); return }
+    if (!next) { setMsg(reviewTagsFull(id)); return }
     setBusy(true)
     setMsg("")
     try {
@@ -580,7 +580,7 @@ function CommunitySection({ title }: { title: string }) {
     </Button> : null}
     {mine && tagsOpen ? REVIEW_TAGS.map((g) =>
       <VStack key={g.group} alignment={"leading"} spacing={5}>
-        <Text font={"caption2"} foregroundStyle={"secondaryLabel"}>{g.single ? `${g.group}（選一個）` : g.group}</Text>
+        <Text font={"caption2"} foregroundStyle={"secondaryLabel"}>{g.single ? `${g.group}（選一個）` : g.max ? `${g.group}（最多 ${g.max} 個）` : g.group}</Text>
         <ScrollView axes={"horizontal"}>
           <HStack spacing={6}>
             {g.tags.map((t) => {
@@ -594,7 +594,7 @@ function CommunitySection({ title }: { title: string }) {
         </ScrollView>
       </VStack>
     ) : null}
-    {mine && tagsOpen ? <Text font={"caption2"} foregroundStyle={"secondaryLabel"}>{`已選 ${myTags.length}／${REVIEW_TAGS_MAX}。只有這些選項，不會有劇透。`}</Text> : null}
+    {mine && tagsOpen ? <Text font={"caption2"} foregroundStyle={"secondaryLabel"}>{REVIEW_TAGS_NOTE}</Text> : null}
     {c && (mine || c.notes) ? <NavigationLink destination={<NotesPage title={title} voted={!!mine} />}>
       <HStack spacing={8}>
         <Text fontWeight={"semibold"}>短評</Text>
