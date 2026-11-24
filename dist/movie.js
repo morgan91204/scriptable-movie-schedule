@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.24-1837
+// @movie-schedule-app 電影行程 v2026.11.24-1901
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/parsers.gen.ts
@@ -4343,6 +4343,39 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .en-title{flex:1;min-width:0;font-size:16px;font-weight:600;color:var(--fg);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .cm-hist.wide{width:100%}
 .cm-hist.wide .bars{height:56px}
+.cmt-new{display:flex;align-items:center;gap:10px;width:100%;padding:12px 16px;text-align:left}
+.cmt-new-box{flex:1;min-width:0;padding:10px 14px;border-radius:18px;background:var(--chip);color:var(--fg2);font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cmt-new i{flex:none;font-style:normal;font-size:14px;font-weight:600;color:var(--accent)}
+.cmt-acts{display:flex;justify-content:space-between;margin-top:10px}
+.cmt-acts button{padding:6px 2px;font-size:14px;color:var(--fg2)}
+.cmt-acts button.danger{color:#ff3b30}
+.cmt-bar{display:flex;align-items:center;gap:8px;padding:12px 16px 4px}
+.cmt-filters{display:flex;flex-wrap:wrap;gap:6px;flex:1;min-width:0}
+.cmt-filters .cm-tag{font-size:13px;padding:5px 11px}
+.cmt-bar .sel{flex:none;max-width:9.5em;font-size:13px}
+.cmt-quiet{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;padding:10px 16px 2px;font-size:12.5px;color:var(--fg2)}
+.cmt-quiet button{display:inline-flex;align-items:center;gap:5px;color:var(--fg);font-size:13px}
+.cmt-quiet .av{width:18px;height:18px;font-size:10px}
+.cmt-quiet b{font-weight:600;color:var(--fg2)}
+.cmt-list{padding:10px 16px 14px}
+.cmt{display:flex;align-items:flex-start;gap:9px;margin-top:12px}
+.cmt:first-child{margin-top:0}
+.cmt-av{flex:none;padding:0;line-height:0}
+.cmt-av .av{width:34px;height:34px;font-size:16px}
+.cmt-av .av.emo{font-size:20px}
+.av.anon{background:var(--chip);color:var(--fg2);font-weight:600}
+.cmt-main{flex:1;min-width:0}
+.cmt-bub{display:inline-block;max-width:100%;padding:9px 13px;border-radius:16px;background:var(--chip)}
+.cmt.mine .cmt-bub{box-shadow:0 0 0 1.5px var(--accent) inset}
+.cmt-head{display:flex;flex-wrap:wrap;align-items:center;gap:4px 7px;font-size:12px}
+.cmt-name{font-size:14px;font-weight:700;color:var(--fg);padding:0;max-width:11em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cmt-name.dim{color:var(--fg2);font-weight:600}
+.cmt-text{margin-top:3px;font-size:15.5px;line-height:1.45;overflow-wrap:anywhere}
+.cmt-bub .nt-cover{background:var(--card);margin-top:5px}
+.cmt-foot{display:flex;flex-wrap:wrap;gap:4px 12px;margin:4px 0 0 13px;font-size:12px;color:var(--fg2)}
+.cmt-foot button{padding:0;font-size:12px;font-weight:600;color:var(--fg2)}
+.cmt-foot .f{color:var(--accent)}
+.cmt-foot .warn{color:var(--orange)}
 .nt-cover{display:block;width:100%;margin-top:6px;padding:9px 12px;border-radius:10px;background:var(--chip);color:var(--fg2);font-size:14px;text-align:left}
 .cm-star{font-size:28px;line-height:1;padding:2px 3px;color:var(--line)}
 @media(prefers-color-scheme:dark){.cm-star{color:#48484a}}
@@ -4799,6 +4832,12 @@ var App = class {
     this.noteAsk = "";
     // 偵測到可能有雷、正在問要不要標記的那句話
     this.noteShown = [];
+    // 已經點開的「可能有雷」短評
+    this.noteEdit = false;
+    // 短評頁上面寫短評的那一塊有沒有展開（預設收起來）
+    this.noteFilter = "all";
+    // 短評清單的篩選：all 全部／follow 追蹤中／clean 不看有雷的
+    this.noteSort = "new";
     this.rateOpenFor = "";
     // 哪一部片的「你的評分」是展開的（預設收起來，省空間）
     this.watchOpenFor = "";
@@ -4909,7 +4948,7 @@ var App = class {
   }
   /** 最新版本是多少。網頁版問的是自己網站現在上線的版本（重新整理就會拿到的那一版），不是 GitHub 上的 */
   checkVersion() {
-    if (true) return checkLatest("2026.11.24-1837");
+    if (true) return checkLatest("2026.11.24-1901");
     return (async () => {
       try {
         let r = await globalThis.fetch("/version.json?t=" + Date.now(), { cache: "no-store" });
@@ -4917,7 +4956,7 @@ var App = class {
         const latest = String((await r.json()).version || "");
         if (!latest) return null;
         const num = (v) => Number(v.replace(/\D/g, "")) || 0;
-        return { latest, isLatest: num("2026.11.24-1837") >= num(latest) };
+        return { latest, isLatest: num("2026.11.24-1901") >= num(latest) };
       } catch (_) {
         return null;
       }
@@ -5636,7 +5675,7 @@ var App = class {
         return;
       }
       try {
-        await sendFeedback(cat.id, text, false ? this.isStandalone() ? "web-app" : "web" : "scriptable", "2026.11.24-1837");
+        await sendFeedback(cat.id, text, false ? this.isStandalone() ? "web-app" : "web" : "scriptable", "2026.11.24-1901");
         this.fbDraft = "";
         this.fbCat = "";
         await this.ui.toast("已送出，謝謝你的回饋");
@@ -5958,7 +5997,7 @@ var App = class {
       this.settings.seenLog = CHANGELOG_LATEST;
       saveSettings(this.settings);
     }
-    return /* @__PURE__ */ h(Page, { title: "更新內容", subtitle: `目前版本 ${"2026.11.24-1837"}`, onBack: () => this.back() }, CHANGELOG.map((e) => /* @__PURE__ */ h(Section, { title: e.date }, e.items.map((it) => /* @__PURE__ */ h(Item, { title: it.text, tag: { text: it.kind === "new" ? "新功能" : "改進", tone: it.kind === "new" ? "now" : "soon" }, chevron: false })))), /* @__PURE__ */ h(Note, { text: "只列出比較有感的變動；修小錯、調整文字這類不會寫在這裡。" }));
+    return /* @__PURE__ */ h(Page, { title: "更新內容", subtitle: `目前版本 ${"2026.11.24-1901"}`, onBack: () => this.back() }, CHANGELOG.map((e) => /* @__PURE__ */ h(Section, { title: e.date }, e.items.map((it) => /* @__PURE__ */ h(Item, { title: it.text, tag: { text: it.kind === "new" ? "新功能" : "改進", tone: it.kind === "new" ? "now" : "soon" }, chevron: false })))), /* @__PURE__ */ h(Note, { text: "只列出比較有感的變動；修小錯、調整文字這類不會寫在這裡。" }));
   }
   async aboutView() {
     return /* @__PURE__ */ h(Page, { title: "關於", onBack: () => this.back() }, /* @__PURE__ */ h(Section, { hint: "連鎖影城的場次來自場次通（twshowtimes.com），感謝場次通的整理；其他來自開眼電影網，以及誠品、光點、樂聲、內惟戲院官網。實際場次以影城公告為準。" }, /* @__PURE__ */ h(Item, { icon: "ℹ️", title: "關於與資料來源", accent: true, chevron: false, onTap: () => Safari.open(ABOUT_URL) }), /* @__PURE__ */ h(Item, { icon: "🔒", title: "隱私權政策", accent: true, chevron: false, onTap: () => Safari.open(PRIVACY_URL) }), /* @__PURE__ */ h(Item, { icon: "🙏", title: "前往場次通", subtitle: "比較各影城場次、看上映場數排行", accent: true, chevron: false, onTap: () => Safari.open("https://twshowtimes.com/") })));
@@ -5989,11 +6028,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.24-1837"}`);
+          Pasteboard.copy(`版本 ${"2026.11.24-1901"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.24-1837"}`,
+      `版本 ${"2026.11.24-1901"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -6129,12 +6168,13 @@ var App = class {
     if (late.length) this.late = late;
     return { x: x ?? null, r: r ?? null, p: p || "", px, loading, c: c === void 0 ? communityCached(title) || void 0 : c };
   }
-  // 已經點開的「可能有雷」短評
+  // 排序：new 最新／high 分數高到低／low 分數低到高
   noteReset() {
     this.noteDraft = null;
     this.noteSpoil = null;
     this.noteAsk = "";
     this.noteShown = [];
+    this.noteEdit = false;
   }
   /** 短評頁：上面寫（或改）自己的一句話，下面是大家的。另開一頁，不擠在電影頁。
    *  防雷：輸入框提醒不提劇情、可以自己標「可能有雷」、偵測到劇透字眼送出前問一次；有雷的預設摺疊，點了才顯示。
@@ -6183,23 +6223,40 @@ var App = class {
       }
       await send(text, spoil);
     };
-    const others = notes.filter((n) => !n.mine);
     const friends = signedIn() ? (await social("friends", { m: communityKey(title) }).catch(() => null) || { list: [] }).list : [];
+    const quiet = friends.filter((e) => e.by && e.s && !e.x);
+    const hasFollow = notes.some((n) => n.by && n.by.f);
+    const hasSpoiler = notes.some((n) => n.sp);
+    if (this.noteFilter === "follow" && !hasFollow) this.noteFilter = "all";
+    if (this.noteFilter === "clean" && !hasSpoiler) this.noteFilter = "all";
+    const shown = notes.filter((n) => this.noteFilter === "follow" ? !!(n.by && n.by.f) || !!n.mine : this.noteFilter === "clean" ? !n.sp : true).sort((x, y) => this.noteSort === "high" ? y.s - x.s || y.at - x.at : this.noteSort === "low" ? x.s - y.s || y.at - x.at : y.at - x.at);
+    const SORTS = [{ id: "new", label: "最新" }, { id: "high", label: "分數高到低" }, { id: "low", label: "分數低到高" }];
+    const editing = this.noteEdit || !!this.noteAsk;
     const row = (n) => {
       const open = !n.sp || this.noteShown.indexOf(n.id) >= 0;
       const reported = !!list && list.reported.indexOf(n.id) >= 0;
-      return /* @__PURE__ */ h("div", { class: "nt" }, /* @__PURE__ */ h("div", { class: "nt-head" }, n.s ? /* @__PURE__ */ h("span", { class: "nt-score " + ratingTier("imdb", n.s) }, n.s, " 分") : null, n.sp ? /* @__PURE__ */ h("span", { class: "nt-sp" }, "可能有雷") : null, n.by ? /* @__PURE__ */ h("button", { class: "nt-by inline", onTap: (v) => {
+      const who = n.by ? n.by.name : n.mine ? "我" : "匿名";
+      const toProfile = n.by ? (v) => {
         keep(v);
         this.go(() => this.profileView(n.by.name), "讀取個人頁…");
-      } }, this.avatar(n.by), /* @__PURE__ */ h("span", null, esc(n.by.name)), n.by.f ? /* @__PURE__ */ h("em", null, "追蹤中") : null) : null, /* @__PURE__ */ h("span", { class: "nt-date" }, esc(noteDate(n.at))), n.mine ? null : reported ? /* @__PURE__ */ h("span", { class: "nt-rep done" }, "已檢舉") : /* @__PURE__ */ h("button", { class: "nt-rep", "aria-label": "檢舉這則短評", onTap: (v) => {
-        keep(v);
-        this.go(() => this.reportView(title, n));
-      } }, "檢舉")), open ? /* @__PURE__ */ h("div", { class: "nt-text" }, esc(n.x)) : /* @__PURE__ */ h("button", { class: "nt-cover", onTap: (v) => {
+      } : void 0;
+      return /* @__PURE__ */ h("div", { class: "cmt" + (n.mine ? " mine" : "") }, n.by ? /* @__PURE__ */ h("button", { class: "cmt-av", "aria-label": `${n.by.name} 的個人頁`, onTap: toProfile }, this.avatar(n.by)) : /* @__PURE__ */ h("span", { class: "cmt-av" }, /* @__PURE__ */ h("span", { class: "av anon", "aria-hidden": "true" }, n.mine ? "我" : "匿")), /* @__PURE__ */ h("div", { class: "cmt-main" }, /* @__PURE__ */ h("div", { class: "cmt-bub" }, /* @__PURE__ */ h("div", { class: "cmt-head" }, toProfile ? /* @__PURE__ */ h("button", { class: "cmt-name", onTap: toProfile }, esc(who)) : /* @__PURE__ */ h("span", { class: "cmt-name dim" }, esc(who)), n.s ? /* @__PURE__ */ h("span", { class: "nt-score " + ratingTier("imdb", n.s) }, n.s, " 分") : null, n.sp ? /* @__PURE__ */ h("span", { class: "nt-sp" }, "可能有雷") : null), open ? /* @__PURE__ */ h("div", { class: "cmt-text" }, esc(n.x)) : /* @__PURE__ */ h("button", { class: "nt-cover", onTap: (v) => {
         keep(v);
         this.noteShown = [...this.noteShown, n.id];
-      } }, "這則可能有雷，點一下顯示"));
+      } }, "這則可能有雷，點一下顯示")), /* @__PURE__ */ h("div", { class: "cmt-foot" }, /* @__PURE__ */ h("span", null, esc(noteDate(n.at))), n.by && n.by.f ? /* @__PURE__ */ h("span", { class: "f" }, "追蹤中") : null, n.mine && n.by ? /* @__PURE__ */ h("span", null, "我") : null, n.mine && n.hidden ? /* @__PURE__ */ h("span", { class: "warn" }, "已被隱藏") : null, n.mine ? /* @__PURE__ */ h("button", { onTap: (v) => {
+        keep(v);
+        this.noteEdit = true;
+      } }, "修改") : reported ? /* @__PURE__ */ h("span", null, "已檢舉") : /* @__PURE__ */ h("button", { "aria-label": "檢舉這則短評", onTap: (v) => {
+        keep(v);
+        this.go(() => this.reportView(title, n));
+      } }, "檢舉"))));
     };
-    return /* @__PURE__ */ h(Page, { title: "短評", subtitle: `《${title}》`, onBack: () => this.back() }, /* @__PURE__ */ h(Section, { title: "我的短評", hint: NOTE_RULES }, !voted ? /* @__PURE__ */ h(Note, { text: "先替這部片評分，就可以寫一句短評。" }) : /* @__PURE__ */ h("div", { class: "nt-form" }, my && my.hidden ? /* @__PURE__ */ h(Note, { kind: "warn", text: "你的短評被多人檢舉，目前別人看不到。可以修改後重新送出。" }) : null, /* @__PURE__ */ h("textarea", { class: "fb-area note", name: "x", maxlength: String(noteMax()), placeholder: `${NOTE_PLACEHOLDER}（最多 ${noteMax()} 字）` }, esc(draft)), /* @__PURE__ */ h("button", { class: "nt-check" + (spoil ? " on" : ""), "aria-pressed": spoil ? "true" : "false", onTap: (v) => {
+    return /* @__PURE__ */ h(Page, { title: "短評", subtitle: `《${title}》`, onBack: () => this.back() }, /* @__PURE__ */ h(Section, null, !voted ? /* @__PURE__ */ h(Note, { text: "先替這部片評分，就可以寫一句短評。" }) : !editing ? (
+      // 收起來的樣子：像留言區最上面那一格「寫點什麼…」，點了才展開
+      /* @__PURE__ */ h("button", { class: "cmt-new", onTap: () => {
+        this.noteEdit = true;
+      } }, /* @__PURE__ */ h("span", { class: "cmt-new-box" }, my ? esc(my.x) : `${NOTE_PLACEHOLDER}…`), /* @__PURE__ */ h("i", null, my ? "修改" : "寫短評"))
+    ) : /* @__PURE__ */ h("div", { class: "nt-form" }, my && my.hidden ? /* @__PURE__ */ h(Note, { kind: "warn", text: "你的短評被多人檢舉，目前別人看不到。可以修改後重新送出。" }) : null, /* @__PURE__ */ h("textarea", { class: "fb-area note", name: "x", maxlength: String(noteMax()), placeholder: `${NOTE_PLACEHOLDER}（最多 ${noteMax()} 字）` }, esc(draft)), /* @__PURE__ */ h("button", { class: "nt-check" + (spoil ? " on" : ""), "aria-pressed": spoil ? "true" : "false", onTap: (v) => {
       keep(v);
       this.noteSpoil = !spoil;
       this.noteAsk = "";
@@ -6209,7 +6266,27 @@ var App = class {
     } }), /* @__PURE__ */ h(Button, { label: "沒有雷，直接送出", kind: "secondary", onTap: async (v) => {
       keep(v);
       await send(this.noteAsk, false);
-    } })) : /* @__PURE__ */ h(Button, { label: my ? "更新短評" : "送出短評", onTap: submit }), my ? /* @__PURE__ */ h(Button, { label: "刪除我的短評", kind: "danger", onTap: () => send("", false) }) : null)), friends.length ? /* @__PURE__ */ h(Section, { title: `你追蹤的人（${friends.length}）` }, /* @__PURE__ */ h("div", { class: "nt-list" }, friends.map((e) => this.entryRow({ ...e, title: e.by ? e.by.name : e.title, by: void 0 }, () => this.go(() => this.profileView(e.by.name), "讀取個人頁…"))))) : null, /* @__PURE__ */ h(Section, { title: `大家的短評（${others.length}）`, hint: others.length ? "看到劇透、不當內容或廣告可以點「檢舉」。" : "" }, failed ? /* @__PURE__ */ h(Note, { kind: "warn", text: failed }) : null, others.length ? /* @__PURE__ */ h("div", { class: "nt-list" }, others.map(row)) : failed ? null : /* @__PURE__ */ h(Note, { text: my ? "目前只有你寫了短評。" : "還沒有人寫短評。" })));
+    } })) : /* @__PURE__ */ h(Button, { label: my ? "更新短評" : "送出短評", onTap: submit }), /* @__PURE__ */ h("div", { class: "cmt-acts" }, /* @__PURE__ */ h("button", { onTap: () => {
+      this.noteEdit = false;
+      this.noteDraft = null;
+      this.noteSpoil = null;
+      this.noteAsk = "";
+    } }, "取消"), my ? /* @__PURE__ */ h("button", { class: "danger", onTap: () => send("", false) }, "刪除我的短評") : null), /* @__PURE__ */ h("div", { class: "cm-tagnote" }, NOTE_RULES))), /* @__PURE__ */ h(Section, { title: `短評（${notes.length}）`, hint: notes.length ? "看到劇透、不當內容或廣告可以點「檢舉」。" : "" }, notes.length > 1 || hasFollow ? /* @__PURE__ */ h("div", { class: "cmt-bar" }, /* @__PURE__ */ h("div", { class: "cmt-filters" }, /* @__PURE__ */ h("button", { class: "cm-tag" + (this.noteFilter === "all" ? " on" : ""), onTap: (v) => {
+      keep(v);
+      this.noteFilter = "all";
+    } }, "全部"), hasFollow ? /* @__PURE__ */ h("button", { class: "cm-tag" + (this.noteFilter === "follow" ? " on" : ""), onTap: (v) => {
+      keep(v);
+      this.noteFilter = "follow";
+    } }, "追蹤中") : null, hasSpoiler ? /* @__PURE__ */ h("button", { class: "cm-tag" + (this.noteFilter === "clean" ? " on" : ""), onTap: (v) => {
+      keep(v);
+      this.noteFilter = "clean";
+    } }, "不看有雷的") : null), /* @__PURE__ */ h("select", { class: "sel", name: "ns", "aria-label": "排序", onInput: (v) => {
+      keep(v);
+      this.noteSort = v.ns || "new";
+    } }, SORTS.map((o) => /* @__PURE__ */ h("option", { value: o.id, selected: o.id === this.noteSort }, esc(o.label))))) : null, quiet.length ? /* @__PURE__ */ h("div", { class: "cmt-quiet" }, "你追蹤的人也評了分：", quiet.map((e) => /* @__PURE__ */ h("button", { onTap: (v) => {
+      keep(v);
+      this.go(() => this.profileView(e.by.name), "讀取個人頁…");
+    } }, this.avatar(e.by), /* @__PURE__ */ h("span", null, esc(e.by.name)), /* @__PURE__ */ h("b", null, e.s, " 分")))) : null, failed ? /* @__PURE__ */ h(Note, { kind: "warn", text: failed }) : null, shown.length ? /* @__PURE__ */ h("div", { class: "cmt-list" }, shown.map(row)) : failed ? null : /* @__PURE__ */ h(Note, { text: notes.length ? "這個篩選下沒有短評。" : "還沒有人寫短評。" })));
   }
   /** 檢舉一則短評：選原因就送出 */
   reportView(title, n) {
@@ -6497,7 +6574,7 @@ var App = class {
     if (false) {
       if (!r) return /* @__PURE__ */ h(Note, { text: "（無法確認是否為最新版：連不到網站）" });
       if (r.isLatest) return /* @__PURE__ */ h(Note, { text: "✅ 已是最新版" });
-      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.24-1837"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
+      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.24-1901"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
         globalThis.location.reload();
       } }));
     }

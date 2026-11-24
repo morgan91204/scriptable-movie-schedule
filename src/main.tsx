@@ -1740,7 +1740,10 @@ class App {
   noteSpoil: boolean | null = null; // 「可能有雷」有沒有勾（null = 跟已經送出的那一則一樣）
   noteAsk = ""; // 偵測到可能有雷、正在問要不要標記的那句話
   noteShown: number[] = []; // 已經點開的「可能有雷」短評
-  noteReset() { this.noteDraft = null; this.noteSpoil = null; this.noteAsk = ""; this.noteShown = []; }
+  noteEdit = false; // 短評頁上面寫短評的那一塊有沒有展開（預設收起來）
+  noteFilter = "all"; // 短評清單的篩選：all 全部／follow 追蹤中／clean 不看有雷的
+  noteSort = "new"; // 排序：new 最新／high 分數高到低／low 分數低到高
+  noteReset() { this.noteDraft = null; this.noteSpoil = null; this.noteAsk = ""; this.noteShown = []; this.noteEdit = false; }
   /** 短評頁：上面寫（或改）自己的一句話，下面是大家的。另開一頁，不擠在電影頁。
    *  防雷：輸入框提醒不提劇情、可以自己標「可能有雷」、偵測到劇透字眼送出前問一次；有雷的預設摺疊，點了才顯示。
    *  每則可以檢舉（劇透／不當內容／廣告），被多人檢舉的由伺服器自動摺疊或隱藏 */
@@ -1774,29 +1777,58 @@ class App {
       if (!spoil && noteLooksSpoiler(text) && this.noteAsk !== text) { this.noteAsk = text; return; } // 先問一次要不要標記
       await send(text, spoil);
     };
-    const others = notes.filter((n) => !n.mine);
-    // 登入的人：這部片我追蹤的人怎麼評（沒追蹤任何人就是空的）
+    // 登入的人：這部片我追蹤的人怎麼評（沒追蹤任何人就是空的）。有寫短評的在下面的清單裡；只評分沒寫的另外列一行
     const friends = signedIn() ? ((await social<{ list: DiaryEntry[] }>("friends", { m: communityKey(title) }).catch(() => null)) || { list: [] }).list : [];
+    const quiet = friends.filter((e) => e.by && e.s && !e.x);
+    // 一份清單（像留言區）：自己的那一則也在裡面。上面一排篩選、右邊選排序
+    const hasFollow = notes.some((n) => n.by && n.by.f);
+    const hasSpoiler = notes.some((n) => n.sp);
+    if (this.noteFilter === "follow" && !hasFollow) this.noteFilter = "all";
+    if (this.noteFilter === "clean" && !hasSpoiler) this.noteFilter = "all";
+    const shown = notes
+      .filter((n) => (this.noteFilter === "follow" ? !!(n.by && n.by.f) || !!n.mine : this.noteFilter === "clean" ? !n.sp : true))
+      .sort((x, y) => (this.noteSort === "high" ? y.s - x.s || y.at - x.at : this.noteSort === "low" ? x.s - y.s || y.at - x.at : y.at - x.at));
+    const SORTS = [{ id: "new", label: "最新" }, { id: "high", label: "分數高到低" }, { id: "low", label: "分數低到高" }];
+    const editing = this.noteEdit || !!this.noteAsk;
+    /** 一則留言：左邊頭像，右邊一個泡泡（名字＋分數＋內容），泡泡下面一行小字（時間、檢舉） */
     const row = (n: ReviewNote) => {
       const open = !n.sp || this.noteShown.indexOf(n.id) >= 0;
       const reported = !!list && list.reported.indexOf(n.id) >= 0;
+      const who = n.by ? n.by.name : n.mine ? "我" : "匿名";
+      const toProfile = n.by ? (v: Record<string, string>) => { keep(v); this.go(() => this.profileView(n.by!.name), "讀取個人頁…"); } : undefined;
       return (
-        <div class="nt">
-          <div class="nt-head">
-            {n.s ? <span class={"nt-score " + ratingTier("imdb", n.s)}>{n.s} 分</span> : null}
-            {n.sp ? <span class="nt-sp">可能有雷</span> : null}
-            {n.by ? <button class="nt-by inline" onTap={(v: Record<string, string>) => { keep(v); this.go(() => this.profileView(n.by!.name), "讀取個人頁…"); }}>{this.avatar(n.by)}<span>{esc(n.by.name)}</span>{n.by.f ? <em>追蹤中</em> : null}</button> : null}
-            <span class="nt-date">{esc(noteDate(n.at))}</span>
-            {n.mine ? null : reported ? <span class="nt-rep done">已檢舉</span> : <button class="nt-rep" aria-label="檢舉這則短評" onTap={(v: Record<string, string>) => { keep(v); this.go(() => this.reportView(title, n)); }}>檢舉</button>}
+        <div class={"cmt" + (n.mine ? " mine" : "")}>
+          {n.by ? <button class="cmt-av" aria-label={`${n.by.name} 的個人頁`} onTap={toProfile}>{this.avatar(n.by)}</button> : <span class="cmt-av"><span class="av anon" aria-hidden="true">{n.mine ? "我" : "匿"}</span></span>}
+          <div class="cmt-main">
+            <div class="cmt-bub">
+              <div class="cmt-head">
+                {toProfile ? <button class="cmt-name" onTap={toProfile}>{esc(who)}</button> : <span class="cmt-name dim">{esc(who)}</span>}
+                {n.s ? <span class={"nt-score " + ratingTier("imdb", n.s)}>{n.s} 分</span> : null}
+                {n.sp ? <span class="nt-sp">可能有雷</span> : null}
+              </div>
+              {open ? <div class="cmt-text">{esc(n.x)}</div> : <button class="nt-cover" onTap={(v: Record<string, string>) => { keep(v); this.noteShown = [...this.noteShown, n.id]; }}>這則可能有雷，點一下顯示</button>}
+            </div>
+            <div class="cmt-foot">
+              <span>{esc(noteDate(n.at))}</span>
+              {n.by && n.by.f ? <span class="f">追蹤中</span> : null}
+              {n.mine && n.by ? <span>我</span> : null}
+              {n.mine && n.hidden ? <span class="warn">已被隱藏</span> : null}
+              {n.mine ? <button onTap={(v: Record<string, string>) => { keep(v); this.noteEdit = true; }}>修改</button> : reported ? <span>已檢舉</span> : <button aria-label="檢舉這則短評" onTap={(v: Record<string, string>) => { keep(v); this.go(() => this.reportView(title, n)); }}>檢舉</button>}
+            </div>
           </div>
-          {open ? <div class="nt-text">{esc(n.x)}</div> : <button class="nt-cover" onTap={(v: Record<string, string>) => { keep(v); this.noteShown = [...this.noteShown, n.id]; }}>這則可能有雷，點一下顯示</button>}
         </div>
       );
     };
     return (
       <Page title="短評" subtitle={`《${title}》`} onBack={() => this.back()}>
-        <Section title="我的短評" hint={NOTE_RULES}>
-          {!voted ? <Note text="先替這部片評分，就可以寫一句短評。" /> : (
+        <Section>
+          {!voted ? <Note text="先替這部片評分，就可以寫一句短評。" /> : !editing ? (
+            // 收起來的樣子：像留言區最上面那一格「寫點什麼…」，點了才展開
+            <button class="cmt-new" onTap={() => { this.noteEdit = true; }}>
+              <span class="cmt-new-box">{my ? esc(my.x) : `${NOTE_PLACEHOLDER}…`}</span>
+              <i>{my ? "修改" : "寫短評"}</i>
+            </button>
+          ) : (
             <div class="nt-form">
               {my && my.hidden ? <Note kind="warn" text="你的短評被多人檢舉，目前別人看不到。可以修改後重新送出。" /> : null}
               <textarea class="fb-area note" name="x" maxlength={String(noteMax())} placeholder={`${NOTE_PLACEHOLDER}（最多 ${noteMax()} 字）`}>{esc(draft)}</textarea>
@@ -1812,18 +1844,30 @@ class App {
               ) : (
                 <Button label={my ? "更新短評" : "送出短評"} onTap={submit} />
               )}
-              {my ? <Button label="刪除我的短評" kind="danger" onTap={() => send("", false)} /> : null}
+              <div class="cmt-acts">
+                <button onTap={() => { this.noteEdit = false; this.noteDraft = null; this.noteSpoil = null; this.noteAsk = ""; }}>取消</button>
+                {my ? <button class="danger" onTap={() => send("", false)}>刪除我的短評</button> : null}
+              </div>
+              <div class="cm-tagnote">{NOTE_RULES}</div>
             </div>
           )}
         </Section>
-        {friends.length ? (
-          <Section title={`你追蹤的人（${friends.length}）`}>
-            <div class="nt-list">{friends.map((e) => this.entryRow({ ...e, title: e.by ? e.by.name : e.title, by: undefined }, () => this.go(() => this.profileView(e.by!.name), "讀取個人頁…")))}</div>
-          </Section>
-        ) : null}
-        <Section title={`大家的短評（${others.length}）`} hint={others.length ? "看到劇透、不當內容或廣告可以點「檢舉」。" : ""}>
+        <Section title={`短評（${notes.length}）`} hint={notes.length ? "看到劇透、不當內容或廣告可以點「檢舉」。" : ""}>
+          {notes.length > 1 || hasFollow ? (
+            <div class="cmt-bar">
+              <div class="cmt-filters">
+                <button class={"cm-tag" + (this.noteFilter === "all" ? " on" : "")} onTap={(v: Record<string, string>) => { keep(v); this.noteFilter = "all"; }}>全部</button>
+                {hasFollow ? <button class={"cm-tag" + (this.noteFilter === "follow" ? " on" : "")} onTap={(v: Record<string, string>) => { keep(v); this.noteFilter = "follow"; }}>追蹤中</button> : null}
+                {hasSpoiler ? <button class={"cm-tag" + (this.noteFilter === "clean" ? " on" : "")} onTap={(v: Record<string, string>) => { keep(v); this.noteFilter = "clean"; }}>不看有雷的</button> : null}
+              </div>
+              <select class="sel" name="ns" aria-label="排序" onInput={(v: Record<string, string>) => { keep(v); this.noteSort = v.ns || "new"; }}>
+                {SORTS.map((o) => <option value={o.id} selected={o.id === this.noteSort}>{esc(o.label)}</option>)}
+              </select>
+            </div>
+          ) : null}
+          {quiet.length ? <div class="cmt-quiet">你追蹤的人也評了分：{quiet.map((e) => <button onTap={(v: Record<string, string>) => { keep(v); this.go(() => this.profileView(e.by!.name), "讀取個人頁…"); }}>{this.avatar(e.by!)}<span>{esc(e.by!.name)}</span><b>{e.s} 分</b></button>)}</div> : null}
           {failed ? <Note kind="warn" text={failed} /> : null}
-          {others.length ? <div class="nt-list">{others.map(row)}</div> : failed ? null : <Note text={my ? "目前只有你寫了短評。" : "還沒有人寫短評。"} />}
+          {shown.length ? <div class="cmt-list">{shown.map(row)}</div> : failed ? null : <Note text={notes.length ? "這個篩選下沒有短評。" : "還沒有人寫短評。"} />}
         </Section>
       </Page>
     );
