@@ -188,7 +188,7 @@ export async function verifyGoogle(idToken, nonce, fetchKeys, wantClaims = false
 // 管理員名單不放在程式庫裡（程式庫是公開的）：
 //   站長本人（根管理員）寫在這個 Worker 的加密設定 ADMIN_EMAILS（Cloudflare 的 secret：只能寫入、任何人都讀不出來，連後台也看不到內容）；
 //   其他管理員由管理員在 App 的「管理員名單」新增、移除，存在這個 Durable Object 裡，只有管理員登入後讀得到。
-// 一般的「用 Google 登入來同步」不會跟 Google 要 email；只有按「管理員登入」才要，而且只在登入那一刻拿來比對名單——
+// 登入只有一種：每個人登入時 Google 都會帶 email，伺服器只在登入那一刻拿來比對管理員名單——
 // 不在名單裡的 email 不會被存下來。
 const okEmail = (e) => typeof e === "string" && e.length <= 120 && /^[^\s@,]+@[^\s@,]+\.[^\s@,]+$/.test(e);
 const normEmail = (e) => String(e || "").trim().toLowerCase();
@@ -283,7 +283,7 @@ export class PushHub {
       let claims;
       try { claims = await verifyGoogle(b.id_token, String(b.nonce || ""), this.env.GOOGLE_KEYS_TEST ? () => JSON.parse(this.env.GOOGLE_KEYS_TEST) : null, true); } catch (e) { return json({ error: "登入沒有通過驗證" }, 401); }
       const uid = await sha256hex("片刻|" + claims.sub);
-      // 管理員登入才會帶 email（Google 驗證過的）：在名單裡才記在這張登入憑證上，不在名單裡的不存
+      // 登入時帶的 email（Google 驗證過的）：在管理員名單裡才記在這張登入憑證上，不在名單裡的不存
       const email = claims.email && (claims.email_verified === true || claims.email_verified === "true") ? normEmail(claims.email) : "";
       const adm = email && (await this.isAdmin(email)) ? email : "";
       const raw = new Uint8Array(32); crypto.getRandomValues(raw);
@@ -305,7 +305,7 @@ export class PushHub {
       await this.state.storage.put(ukey, { data: JSON.parse(text), at });
       return json({ ok: true, at });
     }
-    // 是不是管理員：這張登入憑證是用「管理員登入」拿到的，而且那個 email 現在還在名單裡（被移除就立刻失效）
+    // 是不是管理員：這張登入憑證登入時的 email 在管理員名單裡，而且現在還在名單裡（被移除就立刻失效）
     const admin = !!sess.adm && (await this.isAdmin(sess.adm));
     if (path === "/sync/who") return json({ ok: true, admin });
     if (path === "/sync/admins" || path === "/sync/fb" || path === "/sync/users") {
