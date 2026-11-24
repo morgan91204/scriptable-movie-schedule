@@ -12,7 +12,7 @@ import {
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
   loadSettings, saveSettings, settingsStored, setSettingsSavedHook, syncPick, syncApply, syncMerge, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, communityKey, globalSearch, issuerRecent, favSnapGet, favSnapSet, boxIsRerun, boxHasLaterRun, boxRunRows, boxRunsName, loadIntro, rerunDataReady, SITE_URL, TW,
   FORMATS, formatsOf, filterVersions, filterVersionsAny, movieRows, movieDays, nearest, kmLabel, WINDOWS, findShowtimes, findShowtimesMulti, multiLabel, multiDetail, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText,
-  hallOf, tmdbTest, movieExtras, moviePoster, movieRuntime, posterSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxCountries, boxByCountry, boxInfo, boxInfoRows, boxCountryText, BOX_COUNTRY_NOTE, boxCountryTag, boxCountriesPicked, loadMovieBoard, loadSoonBoard, notifyPrefs, notifyPayload, notifyEndScope, notifyEndPick, notifyQuiet, NOTIFY_PRE_STEPS, NOTIFY_KINDS, boxStatus, STATUS_LABEL, boxInfoBy, isFavMovie, toggleFavMovie, favMovieRows, favMovieBox, soonGroups, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityCached, communityVote, communityTags, social, signedIn, setAccount, setSiteBase, setNotesViaSite, adoptRatings, forgetMyVotes, noteMax, profileColor, seenLabel, PROFILE_COLORS, sendFeedback, loadMyFeedback, feedbackSent, feedbackUnread, feedbackMarkSeen, feedbackCat, FEEDBACK_CATS, FEEDBACK_STATUS, FEEDBACK_MAX, loadNotes, notesCached, saveNote, reportNote, noteLooksSpoiler, noteDate, NOTE_MAX, NOTE_PLACEHOLDER, NOTE_RULES, REPORT_REASONS, reviewTagsToggle, REVIEW_TAGS, REVIEW_TAGS_MAX, reviewTagLabel, topReviewTags, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalsReady, festivalNote, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, festivalDefaultDate, festivalStateLabel, festivalState, festivalFooter, linkMovies, nowGroupLine, nowFilter, festivalPick, movieAbout, festivalSearch, festivalSearchLines, festivalTrailer, festivalYears, festivalsAny, festivalGroups, festivalChipNote, festivalStatusLine, movieRatings, ratingTier, tomatoTier, popcornTier, popcornCount,
+  hallOf, tmdbTest, movieExtras, moviePoster, movieRuntime, posterSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxCountries, boxByCountry, boxInfo, boxInfoRows, boxCountryText, BOX_COUNTRY_NOTE, boxCountryTag, boxCountriesPicked, loadMovieBoard, loadSoonBoard, notifyPrefs, notifyPayload, notifyEndScope, notifyEndPick, notifyQuiet, NOTIFY_PRE_STEPS, NOTIFY_KINDS, boxStatus, STATUS_LABEL, boxInfoBy, isFavMovie, toggleFavMovie, favMovieRows, favMovieBox, soonGroups, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityCached, communityVote, communityTags, social, signedIn, profileSkipped, setProfileSkipped, setAccount, setSiteBase, setNotesViaSite, adoptRatings, forgetMyVotes, noteMax, profileColor, seenLabel, PROFILE_COLORS, sendFeedback, loadMyFeedback, feedbackSent, feedbackUnread, feedbackMarkSeen, feedbackCat, FEEDBACK_CATS, FEEDBACK_STATUS, FEEDBACK_MAX, loadNotes, notesCached, saveNote, reportNote, noteLooksSpoiler, noteDate, NOTE_MAX, NOTE_PLACEHOLDER, NOTE_RULES, REPORT_REASONS, reviewTagsToggle, REVIEW_TAGS, REVIEW_TAGS_MAX, reviewTagLabel, topReviewTags, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalsReady, festivalNote, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, festivalDefaultDate, festivalStateLabel, festivalState, festivalFooter, linkMovies, nowGroupLine, nowFilter, festivalPick, movieAbout, festivalSearch, festivalSearchLines, festivalTrailer, festivalYears, festivalsAny, festivalGroups, festivalChipNote, festivalStatusLine, movieRatings, ratingTier, tomatoTier, popcornTier, popcornCount,
 } from "./core";
 import type { Profile, DiaryEntry, SocialCounts, Feedback, ReviewNote, MovieExtras, Ratings, Community, BoxOfficeItem, BoxSort, MovieEntry, SoonEntry, UpcomingFilm, FavMovie, FavRow, NotifyPrefs, NotifyKind, SyncData, GlobalHits, Festival, FestivalFilm, FestivalSession } from "./core";
 import { setTabBar, setBackGuard, esc } from "./jsx";
@@ -724,7 +724,8 @@ class App {
     if (!me) return <Page title="我的片單" onBack={() => this.back()}><Note kind="warn" text={failed} /></Page>;
     const user = me.user;
     // 還沒取暱稱：先帶去設定（可以按「稍後再說」跳過，只用不公開的片單）
-    if (!user && !this.skipProfile) return this.profileEditView(null, true);
+    this.hasProfile = !!user;
+    if (!user && !profileSkipped()) return this.profileEditView(null, true);
     let body = "";
     if (this.diaryTab === "feed") {
       const r = await social<{ list: DiaryEntry[]; following: number }>("feed").catch(() => null);
@@ -783,14 +784,25 @@ class App {
     );
   }
   /** 編輯個人檔案：暱稱（唯一）、顏色、要不要公開；最下面可以把片單和個人檔案整個刪掉 */
-  skipProfile = false; // 這次開啟按了「稍後再說」：先不設定暱稱
-  profileEditView(user: Profile | null, first = false): string {
+  hasProfile: boolean | null = null; // 登入的帳號取過暱稱了嗎（null = 還沒問過伺服器）
+  /** 登入的人評分、寫短評之後：還沒取暱稱就帶去設定一次。設過、或按過「稍後再說」就不再問（之後到 設定 → 我的片單 改） */
+  async askNickname(): Promise<void> {
+    if (!signedIn() || profileSkipped() || this.hasProfile) return;
+    if (this.hasProfile === null) {
+      const me = await social<{ user: Profile | null }>("me").catch(() => null);
+      if (!me) return;
+      this.hasProfile = !!me.user;
+    }
+    if (!this.hasProfile) { this.profileDraft = null; this.go(() => this.profileEditView(null, true, true)); }
+  }
+  /** first = 第一次設定（有歡迎說明和「稍後再說」）；pushed = 是另外開的一頁（存好、跳過都要退回原本那一頁） */
+  profileEditView(user: Profile | null, first = false, pushed = false): string {
     // 第一次設定：預設勾公開（要交朋友得公開；不想公開可以自己取消）
     const d = this.profileDraft || { name: user ? user.name : "", color: user ? user.color : "blue", pub: user ? !!user.pub : first };
     const keep = (v?: Record<string, string>) => { this.profileDraft = { ...d, name: v && typeof v.n === "string" ? v.n : d.name }; };
     return (
       <Page title={user ? "編輯個人檔案" : first ? "先取一個暱稱" : "設定暱稱"} onBack={() => this.back()}>
-        {first ? <Note text={"歡迎使用「我的片單」。取一個暱稱、公開個人頁，別人才找得到你、能追蹤你，你寫的短評旁邊也會顯示暱稱。\n不想公開也沒關係：取消下面的「公開我的個人頁」，或按最下面的「稍後再說」，片單就只有你自己看得到（還是可以追蹤別人）。"} /> : null}
+        {first ? <Note text={(pushed ? "你的評分已經送出了。" : "歡迎使用「我的片單」。") + "取一個暱稱、公開個人頁，別人才找得到你、能追蹤你，你寫的短評旁邊也會顯示暱稱。只會問這一次，之後在「設定 → 我的片單」可以改。\n不想公開也沒關係：取消下面的「公開我的個人頁」，或按最下面的「稍後再說」，片單就只有你自己看得到（還是可以追蹤別人）。"} /> : null}
         <Section title="暱稱" hint="2～16 個字，只能用中英文、數字和底線；不能跟別人重複。14 天內只能改一次。請不要用真實姓名或冒用他人名義。">
           <div class="nt-form">
             <input class="field" name="n" maxlength="16" autocomplete="off" autocapitalize="off" value={d.name} placeholder="例如：愛看片的小明" />
@@ -809,9 +821,9 @@ class App {
             <Button label="儲存" onTap={async (v) => {
               keep(v);
               const p = this.profileDraft!;
-              try { await social("profile-set", { name: p.name.trim(), color: p.color, pub: p.pub }); this.profileDraft = null; await this.ui.toast(first ? "設定好了，開始記錄吧" : "已儲存"); if (!first) this.back(); } catch (e) { await this.ui.toast(String((e as Error)?.message || e)); }
+              try { await social("profile-set", { name: p.name.trim(), color: p.color, pub: p.pub }); this.profileDraft = null; this.hasProfile = true; setProfileSkipped(false); await this.ui.toast(first ? "暱稱設定好了" : "已儲存"); if (!first || pushed) this.back(); } catch (e) { await this.ui.toast(String((e as Error)?.message || e)); }
             }} />
-            {first ? <Button label="稍後再說" kind="secondary" onTap={() => { this.skipProfile = true; this.profileDraft = null; }} /> : null}
+            {first ? <Button label="稍後再說" kind="secondary" onTap={() => { setProfileSkipped(true); this.profileDraft = null; if (pushed) this.back(); }} /> : null}
           </div>
         </Section>
         {user ? (
@@ -839,6 +851,7 @@ class App {
     for (let i = 0; i < 200; i++) { const r = await social<{ left: number }>("wipe"); if (!r.left) break; }
     forgetMyVotes();
     this.diaryMem = null;
+    this.hasProfile = false;
   }
   /** 某個人的公開個人頁 */
   async profileView(name: string): Promise<string> {
@@ -1206,7 +1219,7 @@ class App {
           if (r && r.data && r.at > sy.at()) { this.syncMute = true; this.settings = syncApply(this.settings, r.data as Partial<SyncData>); saveSettings(this.settings); this.syncMute = false; sy.setAt(r.at); this.pushSync(); await this.ui.toast("已帶入帳號裡比較新的設定"); }
           else await this.ui.toast((await sy.push(syncPick(this.settings))) ? "已同步" : "同步失敗，請稍後再試");
         }} />
-        <Item icon="🚪" title="登出" subtitle="這台的收藏會留著，只是不再同步" chevron={false} onTap={async () => { await sy.logout(); forgetMyVotes(); this.syncWho = null; this.diaryMem = null; this.syncNote = ""; await this.ui.toast("已登出"); }} />
+        <Item icon="🚪" title="登出" subtitle="這台的收藏會留著，只是不再同步" chevron={false} onTap={async () => { await sy.logout(); forgetMyVotes(); this.syncWho = null; this.diaryMem = null; this.hasProfile = null; this.syncNote = ""; await this.ui.toast("已登出"); }} />
         <Item icon="🗑" title="刪除帳號裡的資料並登出" subtitle="伺服器上的設定、片單、暱稱和你用帳號評的分都會刪掉，所有裝置都會登出；這台的收藏會留著" chevron={false} onTap={async () => { await this.wipeSocial().catch(() => undefined); await sy.wipe(); this.syncWho = null; this.syncNote = ""; await this.ui.toast("已刪除並登出"); }} />
       </Section>
     );
@@ -1698,6 +1711,7 @@ class App {
         await saveNote(title, text, sp);
         this.noteReset();
         await this.ui.toast(text ? "短評已送出" : "已刪除你的短評");
+        if (text) await this.askNickname();
       } catch (e) {
         await this.ui.toast(String((e as Error)?.message || e));
       }
@@ -1735,7 +1749,7 @@ class App {
           {!voted ? <Note text="先替這部片評分，就可以寫一句短評。" /> : (
             <div class="nt-form">
               {my && my.hidden ? <Note kind="warn" text="你的短評被多人檢舉，目前別人看不到。可以修改後重新送出。" /> : null}
-              <input class="field" name="x" maxlength={String(noteMax())} enterkeyhint="done" autocomplete="off" value={draft} placeholder={`${NOTE_PLACEHOLDER}（最多 ${noteMax()} 字）`} />
+              <textarea class="fb-area note" name="x" maxlength={String(noteMax())} placeholder={`${NOTE_PLACEHOLDER}（最多 ${noteMax()} 字）`}>{esc(draft)}</textarea>
               <button class={"nt-check" + (spoil ? " on" : "")} aria-pressed={spoil ? "true" : "false"} onTap={(v: Record<string, string>) => { keep(v); this.noteSpoil = !spoil; this.noteAsk = ""; }}>
                 <i>{spoil ? "✓" : ""}</i><span>可能有雷</span><em>勾了以後預設摺疊，點了才會顯示</em>
               </button>
@@ -1807,6 +1821,7 @@ class App {
       try {
         await communityVote(title, s === mine ? 0 : s);
         await this.ui.toast(s === mine ? "已取消你的評分" : `已送出 ${s} 分`);
+        if (s !== mine) await this.askNickname();
       } catch (e) {
         await this.ui.toast(String((e as Error)?.message || e));
       }

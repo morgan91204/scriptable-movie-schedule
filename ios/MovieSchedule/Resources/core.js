@@ -229,6 +229,7 @@
     posterTint: () => posterTint,
     prefetchPosters: () => prefetchPosters,
     profileColor: () => profileColor,
+    profileSkipped: () => profileSkipped,
     ratingTier: () => ratingTier,
     ratingsOfIdent: () => ratingsOfIdent,
     releaseLabel: () => releaseLabel,
@@ -246,6 +247,7 @@
     setAccount: () => setAccount,
     setMetaEnabled: () => setMetaEnabled,
     setNotesViaSite: () => setNotesViaSite,
+    setProfileSkipped: () => setProfileSkipped,
     setSettingsSavedHook: () => setSettingsSavedHook,
     setSiteBase: () => setSiteBase,
     settingsStored: () => settingsStored,
@@ -3857,6 +3859,8 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     if (r.status !== 200 || !r.data) throw new Error(SOCIAL_ERR[r.data && r.data.error || ""] || "暫時連不上，請稍後再試");
     return r.data;
   }
+  var profileSkipped = () => cacheGet("profile-skip.txt") === "1";
+  var setProfileSkipped = (on) => cacheSet("profile-skip.txt", on ? "1" : "");
   var PROFILE_COLORS = [
     { id: "blue", hex: "#0a84ff" },
     { id: "green", hex: "#30b158" },
@@ -4390,7 +4394,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   var extra = { boxOffice, filmList, soonList, nowShowing, nowShowingMulti, movieBoard: movieBoard2, festivalBoard, festivalFilm, nearby, patchSettings, fillMovie, formatList };
   var BRIDGE_LEVEL = 2;
   globalThis.MS = {
-    version: "2026.11.24-1812",
+    version: "2026.11.24-1818",
     level: BRIDGE_LEVEL,
     init(saved) {
       cache = saved || {};

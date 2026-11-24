@@ -248,6 +248,7 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .nt-acts button{padding:7px 14px;border-radius:9px;background:var(--chip);color:var(--accent);font-size:14px;font-weight:600}
 .nt-acts button.danger{color:#ff3b30;margin-left:auto}
 .fb-area{display:block;width:100%;min-height:120px;padding:12px 14px;border:0;border-radius:12px;background:var(--chip);color:var(--fg);font:inherit;font-size:16px;line-height:1.5;margin-top:10px;outline:none;resize:vertical;-webkit-appearance:none;appearance:none}
+.fb-area.note{min-height:96px;margin-top:8px}
 .fb-cats{display:flex;flex-wrap:wrap;gap:6px}
 .fb-tag{font-size:12px;font-weight:600;padding:1px 7px;border-radius:6px;background:var(--chip);color:var(--fg)}
 .fb-tag.new{background:rgba(10,132,255,.16);color:var(--accent)}

@@ -3620,6 +3620,9 @@ export async function social<T = any>(op: string, body: Record<string, unknown> 
   if (r.status !== 200 || !r.data) throw new Error(SOCIAL_ERR[(r.data && r.data.error) || ""] || "暫時連不上，請稍後再試");
   return r.data as T;
 }
+/** 問過要不要取暱稱、使用者按了「稍後再說」：記在這台，之後評分、寫短評不再跳出來問（設定 → 我的片單 隨時可以設） */
+export const profileSkipped = (): boolean => cacheGet("profile-skip.txt") === "1";
+export const setProfileSkipped = (on: boolean): void => cacheSet("profile-skip.txt", on ? "1" : "");
 export interface Profile { name: string; color: string; pub?: boolean; hidden?: boolean; canRename?: boolean }
 export interface DiaryEntry { k: string; title: string; s: number; x: string; sp: number; seen: string; at: number; priv?: number; by?: { name: string; color: string } }
 export interface SocialCounts { films: number; notes: number; following: number; followers: number }
