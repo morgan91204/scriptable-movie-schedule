@@ -36,6 +36,17 @@ function storeSet(key: string, value: string) {
   }
 }
 
+// 換了新版（程式更新過）：手機上存的資料快取整批丟掉，重新跟伺服器拿。
+// 新版常常會多欄位、換格式，舊的快取留著會變成「新畫面配舊資料」。使用者自己的東西（設定、評分用的裝置代號、投過的票）不動。
+declare const APP_VERSION: string;
+try {
+  const verKey = LS + "cache-version";
+  if (localStorage.getItem(verKey) !== APP_VERSION) {
+    for (const k of Object.keys(localStorage)) if (k.startsWith(LS + "cache:") && !/cache:(device-id\.txt|my-votes)/.test(k)) localStorage.removeItem(k);
+    localStorage.setItem(verKey, APP_VERSION);
+  }
+} catch (_) {}
+
 /** 這些網址本身允許跨網域，直接抓；其他經過自己的 Worker 轉發 */
 const DIRECT = /^https:\/\/(raw\.githubusercontent\.com|movie-ratings\.[\w-]+\.workers\.dev)\//; // 評分伺服器（子網域換過，不寫死）
 
@@ -188,7 +199,6 @@ g.CalendarEvent = CalendarEvent;
 
 // ── 自動更新：網站上線了新版，就自動重新載入換成新版（不用使用者自己重新整理）。
 // 只在「剛開啟」和「從背景切回來」時檢查，不會在操作到一半時突然重載；同一個新版只重載一次，避免出錯時一直重來
-declare const APP_VERSION: string;
 let lastVersionCheck = 0;
 async function autoUpdate() {
   if (Date.now() - lastVersionCheck < 60e3) return;

@@ -1780,25 +1780,56 @@ const rerunIndex = new WeakMap<object, Record<string, BoxOfficeItem[]>>();
 /** 片名本身就寫明是重映的（首輪在 2016 年以前、資料裡找不到首輪時靠這個）。「莎翁經典劇集」這種是另一部作品，不算 */
 export const rerunByName = (name: string): boolean => /重映|修復|週年|周年|[紀記]念版|數位經典|經典劇場|特別版/.test(name || "");
 const plainName = (s: string) => String(s || "").toLowerCase().replace(/[\s:：．.。・·,，、!！?？'"「」《》\-—_]/g, "");
-/** 這一筆的首輪：同一部片、上映日早了三百天以上的最早那一筆；沒有就是 null。
- *  「同一部片」要嚴一點，免得把同名的不同作品湊在一起：出品國別要一樣，而且
- *  片名（不看標點）完全相同，或這一筆的片名寫了重映字樣、去掉之後跟那一筆（片名沒有括號註記的）相同 */
-export function boxFirstRun(x: BoxOfficeItem, b: BoxOffice | null = boxFullLatest): BoxOfficeItem | null {
-  if (!b || !b.years || !x || !x.release) return null;
+/** 兩筆是不是同一部片的不同次上映。要嚴一點，免得把同名的不同作品湊在一起：
+ *  出品國別要一樣、上映日差三百天以上，而且片名（不看標點）完全相同，
+ *  或其中一筆的片名寫了重映字樣、去掉之後跟另一筆（片名沒有括號註記的）相同 */
+function sameFilmRuns(a: BoxOfficeItem, c: BoxOfficeItem): boolean {
+  if (!a.release || !c.release || Math.abs(Date.parse(a.release) - Date.parse(c.release)) <= 300 * 86400e3) return false;
+  if (a.country && c.country && boxMainCountry(a.country) !== boxMainCountry(c.country)) return false;
+  if (plainName(a.name) === plainName(c.name)) return true;
+  const plainOf = (x: BoxOfficeItem) => !/[（(［\[]/.test(x.name) && !rerunByName(x.name);
+  return (rerunByName(a.name) && plainOf(c)) || (rerunByName(c.name) && plainOf(a));
+}
+/** 這部片在資料裡的每一次上映（含這一筆），依上映日排；只有一次就回傳只有自己的陣列。不管從首映還是重映那一筆找，結果都一樣 */
+export function boxRuns(x: BoxOfficeItem, b: BoxOffice | null = boxFullLatest): BoxOfficeItem[] {
+  if (!b || !b.years || !x || !x.release) return [x];
   let idx = rerunIndex.get(b);
   if (!idx) {
     idx = {};
     for (const y of Object.keys(b.years)) for (const i of b.years[y]) { const k = communityKey(i.name); if (k && i.release) (idx[k] ||= []).push(i); }
-    for (const k of Object.keys(idx)) idx[k].sort((a, c) => a.release.localeCompare(c.release));
+    for (const k of Object.keys(idx)) idx[k].sort((p, q) => p.release.localeCompare(q.release));
     rerunIndex.set(b, idx);
   }
-  const marked = rerunByName(x.name);
-  for (const f of idx[communityKey(x.name)] || []) {
-    if (!(Date.parse(x.release) - Date.parse(f.release) > 300 * 86400e3)) break; // 依上映日排好的：後面的都不夠早
-    if (x.country && f.country && boxMainCountry(x.country) !== boxMainCountry(f.country)) continue;
-    if (plainName(f.name) === plainName(x.name) || (marked && !/[（(［\[]/.test(f.name))) return f;
+  const same = (p: BoxOfficeItem, q: BoxOfficeItem) => p.name === q.name && p.release === q.release;
+  const group = idx[communityKey(x.name)] || [];
+  // 從這一筆出發，把「同一部片」的一筆一筆接進來（首映 ↔ 特別版 ↔ 重映 不一定兩兩都對得上，所以用接龍的）
+  const runs: BoxOfficeItem[] = [group.find((i) => same(i, x)) || x];
+  for (let grew = true; grew; ) {
+    grew = false;
+    for (const i of group) if (!runs.some((r) => same(r, i)) && runs.some((r) => sameFilmRuns(r, i))) { runs.push(i); grew = true; }
   }
-  return null;
+  return runs.sort((p, q) => p.release.localeCompare(q.release));
+}
+/** 這一筆的首輪：同一部片更早的那一次上映裡最早的一筆；沒有就是 null */
+export function boxFirstRun(x: BoxOfficeItem, b: BoxOffice | null = boxFullLatest): BoxOfficeItem | null {
+  const first = boxRuns(x, b)[0];
+  return first && first.release < x.release && !(first.name === x.name && first.release === x.release) ? first : null;
+}
+/** 這一筆之後有沒有再上映（首映那一筆在清單上標「有重映」用） */
+export const boxHasLaterRun = (x: BoxOfficeItem, b: BoxOffice | null = boxFullLatest): boolean => boxRuns(x, b).some((r) => r.release > x.release);
+/** 「歷次上映」的各列：每次上映的日期、是首映還是重映、戲院數、票房；最後一列是合計。只有一次上映就回傳空陣列 */
+export function boxRunRows(x: BoxOfficeItem): { run: BoxOfficeItem | null; title: string; note: string; value: string; current: boolean }[] {
+  const runs = boxRuns(x);
+  if (runs.length < 2) return [];
+  const rows: { run: BoxOfficeItem | null; title: string; note: string; value: string; current: boolean }[] = runs.map((r, i) => ({
+    run: r,
+    title: `${r.release.replace(/-/g, "/")}　${i > 0 || boxIsRerun(r) ? "重映" : "首映"}`,
+    note: [r.name !== x.name ? r.name : "", r.theaters ? `${r.theaters} 間戲院` : ""].filter(Boolean).join("｜"),
+    value: money(r.total),
+    current: r.name === x.name && r.release === x.release,
+  }));
+  rows.push({ run: null, title: "合計", note: `${runs.length} 次上映`, value: money(runs.reduce((n, r) => n + (r.total || 0), 0)), current: false });
+  return rows;
 }
 /** 這部片原本是哪一年的（伺服器用 TMDB 查的首映年）。比這次上映早五年以上才回傳：
  *  首輪在 2016 年以前、片名又沒寫「重映」的老片（《魔戒三部曲：王者再臨》2003 年的片、2021 年重映）靠這個認出來。
@@ -1836,7 +1867,7 @@ export function boxInfoRows(x: BoxOfficeItem, info: BoxInfo | null): [string, st
   // 重映的片：官方的累計只算這一次重映，寫清楚，並把首輪的票房列在下面（資料從 2016 年開始，更早的首輪沒有數字）
   const first = boxFirstRun(x), orig = boxOrigYear(x), rerun = !!first || rerunByName(x.name) || !!orig;
   rows.push([rerun ? "這次重映累計" : "累計票房", `${money(x.total)}（${num(x.total)} 元）`]);
-  if (first) rows.push(["先前上映票房", `${money(first.total)}（${first.release.slice(0, 4)} 年上映）`]);
+  if (first) { /* 先前每一次上映的票房列在下面的「歷次上映」 */ }
   else if (rerun) rows.push(["先前上映票房", `${orig ? `${orig} 年的片；` : ""}官方資料從 2016 年開始，沒有更早的紀錄`]);
   const tickets = (info && info.tickets) || x.tickets || 0;
   if (tickets) {
@@ -2005,7 +2036,7 @@ export function movieBoard(b: BoxOffice | null, movies: TwMovie[], opt: { scope?
     if (sort === "rating" || sort === "cinemas" || sort === "tickets" || sort === "price") keyed.slice().sort((a, c) => c.k.tier - a.k.tier || c.k.v - a.k.v).forEach((e, i) => { if (e.k.tier > 0) e.rank = i + 1; });
     keyed.sort((a, c) => c.k.tier - a.k.tier || (asc ? a.k.v - c.k.v : c.k.v - a.k.v));
     const entries = keyed.map(({ x, m, k: kk, rank }): MovieEntry => {
-      const info = [boxIsRerun(x, b) ? "重映" : "", boxMainCountry(x.country), sort === "date" ? "" : releaseLabel(dateOf(x, m)), theatersOf(x, m) && sort !== "cinemas" ? `${theatersOf(x, m)} 間戲院` : ""].filter(Boolean).join("｜");
+      const info = [boxIsRerun(x, b) ? "重映" : boxHasLaterRun(x, b) ? "有重映" : "", boxMainCountry(x.country), sort === "date" ? "" : releaseLabel(dateOf(x, m)), theatersOf(x, m) && sort !== "cinemas" ? `${theatersOf(x, m)} 間戲院` : ""].filter(Boolean).join("｜");
       return { key: `${x.name}|${x.release}`, rank, name: x.name, x, m, lines: sort === "total" ? [info, ""] : [`票房 ${money(x.total)}`, info], light: !m, hi: kk.hi, status: boxStatus(x) };
     });
     const rateName = rates.find((r) => r.id === rate)!.label;

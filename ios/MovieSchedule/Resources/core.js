@@ -59,6 +59,7 @@
     boxCountryTag: () => boxCountryTag,
     boxCountryText: () => boxCountryText,
     boxFirstRun: () => boxFirstRun,
+    boxHasLaterRun: () => boxHasLaterRun,
     boxInfo: () => boxInfo,
     boxInfoBy: () => boxInfoBy,
     boxInfoRows: () => boxInfoRows,
@@ -74,6 +75,8 @@
     boxOfficeNote: () => boxOfficeNote,
     boxOfficeTitle: () => boxOfficeTitle,
     boxOrigYear: () => boxOrigYear,
+    boxRunRows: () => boxRunRows,
+    boxRuns: () => boxRuns,
     boxSorts: () => boxSorts,
     boxStatus: () => boxStatus,
     boxWeekOptions: () => boxWeekOptions,
@@ -2277,8 +2280,15 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   var rerunIndex = /* @__PURE__ */ new WeakMap();
   var rerunByName = (name) => /重映|修復|週年|周年|[紀記]念版|數位經典|經典劇場|特別版/.test(name || "");
   var plainName = (s) => String(s || "").toLowerCase().replace(/[\s:：．.。・·,，、!！?？'"「」《》\-—_]/g, "");
-  function boxFirstRun(x, b = boxFullLatest) {
-    if (!b || !b.years || !x || !x.release) return null;
+  function sameFilmRuns(a, c) {
+    if (!a.release || !c.release || Math.abs(Date.parse(a.release) - Date.parse(c.release)) <= 300 * 864e5) return false;
+    if (a.country && c.country && boxMainCountry(a.country) !== boxMainCountry(c.country)) return false;
+    if (plainName(a.name) === plainName(c.name)) return true;
+    const plainOf = (x) => !/[（(［\[]/.test(x.name) && !rerunByName(x.name);
+    return rerunByName(a.name) && plainOf(c) || rerunByName(c.name) && plainOf(a);
+  }
+  function boxRuns(x, b = boxFullLatest) {
+    if (!b || !b.years || !x || !x.release) return [x];
     let idx = rerunIndex.get(b);
     if (!idx) {
       idx = {};
@@ -2286,16 +2296,38 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
         const k = communityKey(i.name);
         if (k && i.release) (idx[k] ||= []).push(i);
       }
-      for (const k of Object.keys(idx)) idx[k].sort((a, c) => a.release.localeCompare(c.release));
+      for (const k of Object.keys(idx)) idx[k].sort((p, q) => p.release.localeCompare(q.release));
       rerunIndex.set(b, idx);
     }
-    const marked = rerunByName(x.name);
-    for (const f of idx[communityKey(x.name)] || []) {
-      if (!(Date.parse(x.release) - Date.parse(f.release) > 300 * 864e5)) break;
-      if (x.country && f.country && boxMainCountry(x.country) !== boxMainCountry(f.country)) continue;
-      if (plainName(f.name) === plainName(x.name) || marked && !/[（(［\[]/.test(f.name)) return f;
+    const same = (p, q) => p.name === q.name && p.release === q.release;
+    const group = idx[communityKey(x.name)] || [];
+    const runs = [group.find((i) => same(i, x)) || x];
+    for (let grew = true; grew; ) {
+      grew = false;
+      for (const i of group) if (!runs.some((r) => same(r, i)) && runs.some((r) => sameFilmRuns(r, i))) {
+        runs.push(i);
+        grew = true;
+      }
     }
-    return null;
+    return runs.sort((p, q) => p.release.localeCompare(q.release));
+  }
+  function boxFirstRun(x, b = boxFullLatest) {
+    const first = boxRuns(x, b)[0];
+    return first && first.release < x.release && !(first.name === x.name && first.release === x.release) ? first : null;
+  }
+  var boxHasLaterRun = (x, b = boxFullLatest) => boxRuns(x, b).some((r) => r.release > x.release);
+  function boxRunRows(x) {
+    const runs = boxRuns(x);
+    if (runs.length < 2) return [];
+    const rows = runs.map((r, i) => ({
+      run: r,
+      title: `${r.release.replace(/-/g, "/")}　${i > 0 || boxIsRerun(r) ? "重映" : "首映"}`,
+      note: [r.name !== x.name ? r.name : "", r.theaters ? `${r.theaters} 間戲院` : ""].filter(Boolean).join("｜"),
+      value: money(r.total),
+      current: r.name === x.name && r.release === x.release
+    }));
+    rows.push({ run: null, title: "合計", note: `${runs.length} 次上映`, value: money(runs.reduce((n, r) => n + (r.total || 0), 0)), current: false });
+    return rows;
   }
   function boxOrigYear(x) {
     const r = yearRatingsLatest && x && x.release ? yearRatingsLatest.ratings[yearRatingKey(x.name, x.release)] : null;
@@ -2325,8 +2357,8 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     if (x.week !== null && !x.since) rows.push(["本週票房", money(x.week)]);
     const first = boxFirstRun(x), orig = boxOrigYear(x), rerun = !!first || rerunByName(x.name) || !!orig;
     rows.push([rerun ? "這次重映累計" : "累計票房", `${money(x.total)}（${num(x.total)} 元）`]);
-    if (first) rows.push(["先前上映票房", `${money(first.total)}（${first.release.slice(0, 4)} 年上映）`]);
-    else if (rerun) rows.push(["先前上映票房", `${orig ? `${orig} 年的片；` : ""}官方資料從 2016 年開始，沒有更早的紀錄`]);
+    if (first) {
+    } else if (rerun) rows.push(["先前上映票房", `${orig ? `${orig} 年的片；` : ""}官方資料從 2016 年開始，沒有更早的紀錄`]);
     const tickets = info && info.tickets || x.tickets || 0;
     if (tickets) {
       rows.push(["累計票數", `${num(tickets)} 張`]);
@@ -2453,7 +2485,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
       });
       keyed2.sort((a, c) => c.k.tier - a.k.tier || (asc ? a.k.v - c.k.v : c.k.v - a.k.v));
       const entries2 = keyed2.map(({ x, m, k: kk, rank }) => {
-        const info = [boxIsRerun(x, b) ? "重映" : "", boxMainCountry(x.country), sort === "date" ? "" : releaseLabel(dateOf(x, m)), theatersOf(x, m) && sort !== "cinemas" ? `${theatersOf(x, m)} 間戲院` : ""].filter(Boolean).join("｜");
+        const info = [boxIsRerun(x, b) ? "重映" : boxHasLaterRun(x, b) ? "有重映" : "", boxMainCountry(x.country), sort === "date" ? "" : releaseLabel(dateOf(x, m)), theatersOf(x, m) && sort !== "cinemas" ? `${theatersOf(x, m)} 間戲院` : ""].filter(Boolean).join("｜");
         return { key: `${x.name}|${x.release}`, rank, name: x.name, x, m, lines: sort === "total" ? [info, ""] : [`票房 ${money(x.total)}`, info], light: !m, hi: kk.hi, status: boxStatus(x) };
       });
       const rateName2 = rates.find((r) => r.id === rate).label;
@@ -3853,7 +3885,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   var extra = { boxOffice, filmList, soonList, nowShowing, nowShowingMulti, movieBoard: movieBoard2, festivalBoard, festivalFilm, nearby, patchSettings, fillMovie, formatList };
   var BRIDGE_LEVEL = 2;
   globalThis.MS = {
-    version: "2026.11.24-1015",
+    version: "2026.11.24-1034",
     level: BRIDGE_LEVEL,
     init(saved) {
       cache = saved || {};

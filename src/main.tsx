@@ -10,7 +10,7 @@ import { scriptablePlatform } from "./platform-scriptable";
 import {
   Cinema, Settings, Movie, Version, EXTRA, CITY_ORDER, AD_STEPS,
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
-  loadSettings, saveSettings, settingsStored, setSettingsSavedHook, syncPick, syncApply, syncMerge, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, communityKey, globalSearch, boxIsRerun, loadIntro, rerunDataReady, SITE_URL, TW,
+  loadSettings, saveSettings, settingsStored, setSettingsSavedHook, syncPick, syncApply, syncMerge, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, communityKey, globalSearch, boxIsRerun, boxHasLaterRun, boxRunRows, loadIntro, rerunDataReady, SITE_URL, TW,
   FORMATS, formatsOf, filterVersions, filterVersionsAny, movieRows, movieDays, nearest, kmLabel, WINDOWS, findShowtimes, findShowtimesMulti, multiLabel, multiDetail, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText,
   hallOf, tmdbTest, movieExtras, moviePoster, movieRuntime, posterSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxCountries, boxByCountry, boxInfo, boxInfoRows, boxCountryText, BOX_COUNTRY_NOTE, boxCountryTag, boxCountriesPicked, loadMovieBoard, loadSoonBoard, notifyPrefs, notifyPayload, notifyEndScope, notifyEndPick, notifyQuiet, NOTIFY_PRE_STEPS, NOTIFY_KINDS, boxStatus, STATUS_LABEL, boxInfoBy, isFavMovie, toggleFavMovie, favMovieRows, favMovieBox, soonGroups, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityCached, communityVote, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalsReady, festivalNote, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, festivalDefaultDate, festivalStateLabel, festivalState, festivalFooter, linkMovies, nowGroupLine, nowFilter, festivalPick, movieAbout, festivalSearch, festivalSearchLines, festivalTrailer, festivalYears, festivalsAny, festivalGroups, festivalChipNote, festivalStatusLine, movieRatings, ratingTier, tomatoTier, popcornTier, popcornCount,
 } from "./core";
@@ -265,7 +265,7 @@ class App {
           ) : null}
           {hits.year.length ? (
             <Section title={`歷年電影（${hits.year.length}）`}>
-              {hits.year.slice(0, MAX).map((x) => <Item title={x.name} subtitle={[boxIsRerun(x) ? "重映" : "", String(x.release || "").slice(0, 10).replace(/-/g, "/") + " 上映", `票房 ${money(x.total)}`].filter(Boolean).join("｜")} tag={{ text: "已下檔", tone: "off" }} onTap={() => this.go(() => this.boxMovieView(x), `讀取《${x.name}》…`)} />)}
+              {hits.year.slice(0, MAX).map((x) => <Item title={x.name} subtitle={[boxIsRerun(x) ? "重映" : boxHasLaterRun(x) ? "有重映" : "", String(x.release || "").slice(0, 10).replace(/-/g, "/") + " 上映", `票房 ${money(x.total)}`].filter(Boolean).join("｜")} tag={{ text: "已下檔", tone: "off" }} onTap={() => this.go(() => this.boxMovieView(x), `讀取《${x.name}》…`)} />)}
               {more(hits.year.length, "部", () => toMovies("year"))}
             </Section>
           ) : null}
@@ -1616,6 +1616,25 @@ class App {
   }
 
   /** 票房排行上、場次通已經沒有場次的片：海報、評分、預告、片刻評分與票房 */
+  /** 歷次上映：這部片在票房資料裡的每一次上映（首映、重映各一列）和合計；只有一次上映就不顯示。點其他那幾列可以過去看那一次的資料 */
+  runsSection(x: BoxOfficeItem): string {
+    const rows = boxRunRows(x);
+    if (!rows.length) return "";
+    return (
+      <Section title="歷次上映" hint="官方把每一次上映分開算，這裡把同一部片的放在一起。資料從 2016 年開始，更早的上映沒有紀錄。">
+        {rows.map((r) => (
+          <Item
+            title={r.title + (r.current ? "（這一筆）" : "")}
+            subtitle={r.note}
+            right={r.value}
+            head={!r.run}
+            chevron={!!r.run && !r.current}
+            onTap={r.run && !r.current ? () => this.go(() => this.boxMovieView(r.run!), `讀取《${r.run!.name}》…`) : undefined}
+          />
+        ))}
+      </Section>
+    );
+  }
   async boxMovieView(x: BoxOfficeItem): Promise<string> {
     const [e, info] = await Promise.all([this.extras(x.name), boxInfo(x).catch(() => null)]);
     // 劇情簡介（伺服器向 TMDB 查的）：讀太久就先畫其他的，讀好再補上
@@ -1643,6 +1662,7 @@ class App {
           <Item kv title="狀態" tag={{ text: STATUS_LABEL[boxStatus(x)], tone: boxStatus(x) }} />
           {boxInfoRows(x, info).map(([label, value]) => <Item kv title={label} right={value} />)}
         </Section>
+        {this.runsSection(x)}
         <Note text={boxStatus(x) === "now" ? "官方票房資料顯示這部片最近一週還有賣出票，但場次通目前查不到場次：可能只在少數戲院放映，或這幾天剛下檔。" : "這部片已經下檔，場次通目前沒有它的場次。"} />
       </Page>
     );
@@ -1804,6 +1824,7 @@ class App {
           {box ? <Item kv title="票房資訊" right={`${money(box.x.total)}｜${this.infoOpen ? "收合 ▾" : "展開 ▸"}`} chevron={false} onTap={() => { this.infoOpen = !this.infoOpen; }} /> : <Item kv title="票房資訊" right="官方資料還沒列入" />}
           {box && this.infoOpen ? boxInfoRows(box.x, box.info).map(([label, value]) => <Item kv title={label} right={value} />) : null}
         </Section>
+        {box && this.infoOpen ? this.runsSection(box.x) : null}
         <Section title="日期" hint="日期、縣市、特殊廳都可以複選。">
           <Chips>
             {allDates.map((dt) => (
