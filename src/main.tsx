@@ -743,7 +743,7 @@ class App {
           <div class="pf-btns">
             <button class="pf-btn" onTap={() => { this.profileDraft = null; this.go(() => this.profileEditView(u || null)); }}>{u ? "編輯個人檔案" : "設定暱稱"}</button>
             {u && u.pub && !u.hidden ? <button class="pf-btn" onTap={async () => { Pasteboard.copy(`${SITE_URL}/?u=${encodeURIComponent(u.name)}`); await this.ui.toast("已複製個人頁連結"); }}>分享個人檔案</button> : null}
-            <button class="pf-btn icon" aria-label="找人追蹤" onTap={() => { this.switchTab("activity"); this.socialTab = "people"; }}>{PERSON_ADD}</button>
+            <button class="pf-btn icon" aria-label="搜尋片友" onTap={() => { this.switchTab("activity"); this.socialTab = "people"; }}>{PERSON_ADD}</button>
           </div>
         ) : null}
         <Item icon="🎞" title="我的片單" subtitle={u ? "看過的片、評分和短評" : "取暱稱、記錄看過的片、追蹤別人"} onTap={open} />
@@ -1177,7 +1177,7 @@ class App {
       <Chips tabs>
         <Chip label="動態" muted={seg !== "feed"} onTap={() => { this.socialTab = "feed"; }} />
         <Chip label={this.unread > 0 ? `通知 ${this.unread > 99 ? "99+" : this.unread}` : "通知"} muted={seg !== "act"} onTap={() => { this.socialTab = "act"; }} />
-        <Chip label="找人" muted={seg !== "people"} onTap={() => { this.socialTab = "people"; }} />
+        <Chip label="搜尋片友" muted={seg !== "people"} onTap={() => { this.socialTab = "people"; }} />
       </Chips>
     );
   }
@@ -1230,7 +1230,7 @@ class App {
           ) : (
             <Section>
               <Note text={r.following ? "你追蹤的人最近還沒有新的紀錄。" : "還沒有追蹤任何人。追蹤之後，他們評分、寫短評、記錄看過的片會出現在這裡。"} />
-              <Item icon="🔍" title="找人追蹤" subtitle="看看誰公開了片單" onTap={() => { this.socialTab = "people"; }} />
+              <Item icon="🔍" title="搜尋片友" subtitle="看看誰公開了片單" onTap={() => { this.socialTab = "people"; }} />
             </Section>
           )}
           {r && r.list.length ? <p class="hint">只會出現對方公開的紀錄。</p> : null}
@@ -1242,7 +1242,7 @@ class App {
       return (
         <Page title="社群">
           {this.socialTabs()}
-          <Search value={this.peopleQ} placeholder="用暱稱找人" onInput={(t) => { this.peopleQ = t; }} />
+          <Search value={this.peopleQ} placeholder="用暱稱搜尋片友" onInput={(t) => { this.peopleQ = t; }} />
           <Section title={this.peopleQ.trim() ? "符合的帳號" : "最近有新紀錄的人"} hint="只會列出公開個人頁的帳號。">
             {!r ? <Note kind="warn" text="暫時讀不到" /> : r.list.length ? r.list.map((u) => this.userItem(u)) : <Note text={this.peopleQ.trim() ? "找不到這個暱稱（對方可能沒有公開個人頁）。" : "目前還沒有人公開片單。"} />}
           </Section>

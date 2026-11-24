@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.24-2342
+// @movie-schedule-app 電影行程 v2026.11.24-2344
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/brand.ts
@@ -4880,7 +4880,7 @@ var CHANGELOG = [
     id: "2026-11-24d",
     date: "2026/11/24",
     items: [
-      { kind: "new", text: "底部的「通知」變成「社群」：追蹤對象的動態、通知、找人都在這裡（動態和找人從我的片單搬過來）" },
+      { kind: "new", text: "底部的「通知」變成「社群」：追蹤對象的動態、通知、搜尋片友都在這裡（從我的片單搬過來）" },
       { kind: "new", text: "有新通知時，主畫面的「片刻」圖示上會顯示數字（要先把片刻加到主畫面並開啟通知）；從背景切回來也會更新紅點" },
       { kind: "better", text: "設定的帳號卡下面可以直接編輯、分享個人檔案" },
       { kind: "new", text: "短評和回覆裡可以 @暱稱 提到別人，對方會收到通知；內文裡的 @暱稱 點了會開那個人的個人頁" },
@@ -5189,7 +5189,7 @@ var App = class {
   }
   /** 最新版本是多少。網頁版問的是自己網站現在上線的版本（重新整理就會拿到的那一版），不是 GitHub 上的 */
   checkVersion() {
-    if (true) return checkLatest("2026.11.24-2342");
+    if (true) return checkLatest("2026.11.24-2344");
     return (async () => {
       try {
         let r = await globalThis.fetch("/version.json?t=" + Date.now(), { cache: "no-store" });
@@ -5197,7 +5197,7 @@ var App = class {
         const latest = String((await r.json()).version || "");
         if (!latest) return null;
         const num = (v) => Number(v.replace(/\D/g, "")) || 0;
-        return { latest, isLatest: num("2026.11.24-2342") >= num(latest) };
+        return { latest, isLatest: num("2026.11.24-2344") >= num(latest) };
       } catch (_) {
         return null;
       }
@@ -5695,7 +5695,7 @@ var App = class {
     } }, u ? "編輯個人檔案" : "設定暱稱"), u && u.pub && !u.hidden ? /* @__PURE__ */ h("button", { class: "pf-btn", onTap: async () => {
       Pasteboard.copy(`${SITE_URL}/?u=${encodeURIComponent(u.name)}`);
       await this.ui.toast("已複製個人頁連結");
-    } }, "分享個人檔案") : null, /* @__PURE__ */ h("button", { class: "pf-btn icon", "aria-label": "找人追蹤", onTap: () => {
+    } }, "分享個人檔案") : null, /* @__PURE__ */ h("button", { class: "pf-btn icon", "aria-label": "搜尋片友", onTap: () => {
       this.switchTab("activity");
       this.socialTab = "people";
     } }, PERSON_ADD)) : null, /* @__PURE__ */ h(Item, { icon: "🎞", title: "我的片單", subtitle: u ? "看過的片、評分和短評" : "取暱稱、記錄看過的片、追蹤別人", onTap: open }), u && !u.hidden ? /* @__PURE__ */ h(Item, { icon: u.pub ? "✅" : "⬜️", title: "公開個人頁", subtitle: u.pub ? "別人可以看你的片單、追蹤你；短評旁邊顯示暱稱" : "目前只有你看得到片單，短評匿名", chevron: false, onTap: async () => {
@@ -6021,7 +6021,7 @@ var App = class {
       this.socialTab = "feed";
     } }), /* @__PURE__ */ h(Chip, { label: this.unread > 0 ? `通知 ${this.unread > 99 ? "99+" : this.unread}` : "通知", muted: seg !== "act", onTap: () => {
       this.socialTab = "act";
-    } }), /* @__PURE__ */ h(Chip, { label: "找人", muted: seg !== "people", onTap: () => {
+    } }), /* @__PURE__ */ h(Chip, { label: "搜尋片友", muted: seg !== "people", onTap: () => {
       this.socialTab = "people";
     } }));
   }
@@ -6047,13 +6047,13 @@ var App = class {
     if (!this.socialTab) this.socialTab = this.unread > 0 ? "act" : "feed";
     if (this.socialTab === "feed") {
       const r = await social("feed").catch(() => null);
-      return /* @__PURE__ */ h(Page, { title: "社群" }, this.socialTabs(), !r ? /* @__PURE__ */ h(Section, null, /* @__PURE__ */ h(Note, { kind: "warn", text: "動態暫時讀不到" })) : r.list.length ? /* @__PURE__ */ h(Section, null, /* @__PURE__ */ h("div", { class: "fd-list" }, r.list.filter((e) => e.by).map((e) => this.feedRow(e)))) : /* @__PURE__ */ h(Section, null, /* @__PURE__ */ h(Note, { text: r.following ? "你追蹤的人最近還沒有新的紀錄。" : "還沒有追蹤任何人。追蹤之後，他們評分、寫短評、記錄看過的片會出現在這裡。" }), /* @__PURE__ */ h(Item, { icon: "🔍", title: "找人追蹤", subtitle: "看看誰公開了片單", onTap: () => {
+      return /* @__PURE__ */ h(Page, { title: "社群" }, this.socialTabs(), !r ? /* @__PURE__ */ h(Section, null, /* @__PURE__ */ h(Note, { kind: "warn", text: "動態暫時讀不到" })) : r.list.length ? /* @__PURE__ */ h(Section, null, /* @__PURE__ */ h("div", { class: "fd-list" }, r.list.filter((e) => e.by).map((e) => this.feedRow(e)))) : /* @__PURE__ */ h(Section, null, /* @__PURE__ */ h(Note, { text: r.following ? "你追蹤的人最近還沒有新的紀錄。" : "還沒有追蹤任何人。追蹤之後，他們評分、寫短評、記錄看過的片會出現在這裡。" }), /* @__PURE__ */ h(Item, { icon: "🔍", title: "搜尋片友", subtitle: "看看誰公開了片單", onTap: () => {
         this.socialTab = "people";
       } })), r && r.list.length ? /* @__PURE__ */ h("p", { class: "hint" }, "只會出現對方公開的紀錄。") : null);
     }
     if (this.socialTab === "people") {
       const r = await social("people", { q: this.peopleQ.trim() }).catch(() => null);
-      return /* @__PURE__ */ h(Page, { title: "社群" }, this.socialTabs(), /* @__PURE__ */ h(Search, { value: this.peopleQ, placeholder: "用暱稱找人", onInput: (t) => {
+      return /* @__PURE__ */ h(Page, { title: "社群" }, this.socialTabs(), /* @__PURE__ */ h(Search, { value: this.peopleQ, placeholder: "用暱稱搜尋片友", onInput: (t) => {
         this.peopleQ = t;
       } }), /* @__PURE__ */ h(Section, { title: this.peopleQ.trim() ? "符合的帳號" : "最近有新紀錄的人", hint: "只會列出公開個人頁的帳號。" }, !r ? /* @__PURE__ */ h(Note, { kind: "warn", text: "暫時讀不到" }) : r.list.length ? r.list.map((u) => this.userItem(u)) : /* @__PURE__ */ h(Note, { text: this.peopleQ.trim() ? "找不到這個暱稱（對方可能沒有公開個人頁）。" : "目前還沒有人公開片單。" })));
     }
@@ -6119,7 +6119,7 @@ var App = class {
         return;
       }
       try {
-        await sendFeedback(cat.id, text, false ? this.isStandalone() ? "web-app" : "web" : "scriptable", "2026.11.24-2342");
+        await sendFeedback(cat.id, text, false ? this.isStandalone() ? "web-app" : "web" : "scriptable", "2026.11.24-2344");
         this.fbDraft = "";
         this.fbCat = "";
         await this.ui.toast("已送出，謝謝你的回饋");
@@ -6457,7 +6457,7 @@ var App = class {
       this.settings.seenLog = CHANGELOG_LATEST;
       saveSettings(this.settings);
     }
-    return /* @__PURE__ */ h(Page, { title: "更新內容", subtitle: `目前版本 ${"2026.11.24-2342"}`, onBack: () => this.back() }, CHANGELOG.map((e) => /* @__PURE__ */ h(Section, { title: e.date }, e.items.map((it) => /* @__PURE__ */ h(Item, { title: it.text, tag: { text: it.kind === "new" ? "新功能" : "改進", tone: it.kind === "new" ? "now" : "soon" }, chevron: false })))), /* @__PURE__ */ h(Note, { text: "只列出比較有感的變動；修小錯、調整文字這類不會寫在這裡。" }));
+    return /* @__PURE__ */ h(Page, { title: "更新內容", subtitle: `目前版本 ${"2026.11.24-2344"}`, onBack: () => this.back() }, CHANGELOG.map((e) => /* @__PURE__ */ h(Section, { title: e.date }, e.items.map((it) => /* @__PURE__ */ h(Item, { title: it.text, tag: { text: it.kind === "new" ? "新功能" : "改進", tone: it.kind === "new" ? "now" : "soon" }, chevron: false })))), /* @__PURE__ */ h(Note, { text: "只列出比較有感的變動；修小錯、調整文字這類不會寫在這裡。" }));
   }
   async aboutView() {
     return /* @__PURE__ */ h(Page, { title: "關於", onBack: () => this.back() }, /* @__PURE__ */ h(Section, { hint: "連鎖影城的場次來自場次通（twshowtimes.com），感謝場次通的整理；其他來自開眼電影網，以及誠品、光點、樂聲、內惟戲院官網。實際場次以影城公告為準。" }, /* @__PURE__ */ h(Item, { icon: "ℹ️", title: "關於與資料來源", accent: true, chevron: false, onTap: () => Safari.open(ABOUT_URL) }), /* @__PURE__ */ h(Item, { icon: "🔒", title: "隱私權政策", accent: true, chevron: false, onTap: () => Safari.open(PRIVACY_URL) }), /* @__PURE__ */ h(Item, { icon: "🙏", title: "前往場次通", subtitle: "比較各影城場次、看上映場數排行", accent: true, chevron: false, onTap: () => Safari.open("https://twshowtimes.com/") })));
@@ -6488,11 +6488,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.24-2342"}`);
+          Pasteboard.copy(`版本 ${"2026.11.24-2344"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.24-2342"}`,
+      `版本 ${"2026.11.24-2344"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -7128,7 +7128,7 @@ var App = class {
     if (false) {
       if (!r) return /* @__PURE__ */ h(Note, { text: "（無法確認是否為最新版：連不到網站）" });
       if (r.isLatest) return /* @__PURE__ */ h(Note, { text: "✅ 已是最新版" });
-      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.24-2342"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
+      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.24-2344"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
         globalThis.location.reload();
       } }));
     }
