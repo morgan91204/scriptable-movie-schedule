@@ -933,6 +933,10 @@ class App {
       this.profileDraft = { ...d, name: v && typeof v.n === "string" ? v.n : d.name, emoji: v && typeof v.e === "string" ? v.e.trim() : d.emoji, bio: v && typeof v.b === "string" ? v.b : d.bio, th: v && typeof v.th === "string" ? v.th : d.th, ig: v && typeof v.ig === "string" ? v.ig : d.ig, tw: v && typeof v.tw === "string" ? v.tw : d.tw, color: picked };
     };
     const custom = /^#/.test(d.color);
+    // 自己加的表情符號（存在這台裝置的設定裡）；目前用的那個如果不在清單上也列出來
+    const saved = (this.settings.myEmoji || []).filter((e) => PROFILE_EMOJI.indexOf(e) < 0);
+    const mine = [...saved];
+    for (const e of [user && user.emoji, d.emoji]) if (e && PROFILE_EMOJI.indexOf(e) < 0 && mine.indexOf(e) < 0) mine.push(e); // 原本用的、現在選的也留在格子裡
     const save = async (v: Record<string, string>) => {
               keep(v);
               const p = this.profileDraft!;
@@ -953,23 +957,31 @@ class App {
             {SOCIALS.map((x) => <label class="pf-handle" aria-label={x.name}>{socialIcon(x.id)}<span>@</span><input name={x.id} maxlength="60" autocomplete="off" autocapitalize="off" spellcheck="false" value={d[x.id]} placeholder={`${x.name} 帳號名稱`} /></label>)}
           </div>
         </Section>
-        <Section title="頭像" hint="頭像是底色加上一個表情符號；沒選表情符號就用暱稱的第一個字（不能上傳照片）。">
+        <Section title="頭像" hint="底色加上一個表情符號；選「字」就用暱稱的第一個字。按 ＋ 可以加自己喜歡的表情符號（不能上傳照片）。">
           <div class="nt-form">
-            <div class="pf-prev">{this.avatar({ name: d.name || "?", color: d.color, emoji: d.emoji }, true)}<button class="cm-tag" onTap={(v: Record<string, string>) => { keep(v); }}>更新預覽</button></div>
-            <span class="cm-taghead">表情符號</span>
-            <div class="fb-cats">
-              <button class={"em" + (!d.emoji ? " on" : "")} aria-label="不用表情符號" onTap={(v: Record<string, string>) => { keep(v); this.profileDraft = { ...this.profileDraft!, emoji: "" }; }}>字</button>
-              {PROFILE_EMOJI.map((e) => <button class={"em" + (e === d.emoji ? " on" : "")} aria-pressed={e === d.emoji ? "true" : "false"} onTap={(v: Record<string, string>) => { keep(v); this.profileDraft = { ...this.profileDraft!, emoji: e }; }}>{e}</button>)}
+            <div class="pf-prev">{this.avatar({ name: d.name || "?", color: d.color, emoji: d.emoji }, true)}</div>
+            <div class="em-grid">
+              <button class={"em" + (!d.emoji ? " on" : "")} aria-label="不用表情符號，用暱稱的第一個字" onTap={(v: Record<string, string>) => { keep(v); this.profileDraft = { ...this.profileDraft!, emoji: "" }; }}>字</button>
+              {[...PROFILE_EMOJI, ...mine].map((e) => <button class={"em" + (e === d.emoji ? " on" : "")} aria-pressed={e === d.emoji ? "true" : "false"} onTap={(v: Record<string, string>) => { keep(v); this.profileDraft = { ...this.profileDraft!, emoji: e }; }}>{e}</button>)}
+              <button class="em add" aria-label="加一個自己的表情符號" onTap={async (v: Record<string, string>) => {
+                keep(v);
+                const ask = (globalThis as any).prompt;
+                const raw = typeof ask === "function" ? ask("輸入一個表情符號（用鍵盤的表情符號鍵）", "") : null;
+                const e = String(raw || "").trim();
+                if (!e) return;
+                if (e.length > 32 || !/^(?:[\u{1F1E6}-\u{1F1FF}]{2}|\p{Extended_Pictographic}[\p{Extended_Pictographic}\u200D\uFE0F\u{1F3FB}-\u{1F3FF}]*)$/u.test(e)) { await this.ui.toast("只能放一個表情符號"); return; }
+                if (PROFILE_EMOJI.indexOf(e) < 0 && saved.indexOf(e) < 0) { this.settings.myEmoji = [...saved, e].slice(-14); saveSettings(this.settings); }
+                this.profileDraft = { ...this.profileDraft!, emoji: e };
+              }}>＋</button>
             </div>
-            <input class="field" name="e" maxlength="16" autocomplete="off" value={d.emoji} placeholder="或自己輸入一個表情符號" />
-            <span class="cm-taghead" style="margin-top:14px">底色</span>
-            <div class="fb-cats">
+            {d.emoji && saved.indexOf(d.emoji) >= 0 ? <button class="em-del" onTap={(v: Record<string, string>) => { keep(v); this.settings.myEmoji = saved.filter((x) => x !== d.emoji); saveSettings(this.settings); this.profileDraft = { ...this.profileDraft!, emoji: "" }; }}>從清單移除 {d.emoji}</button> : null}
+            <div class="sw-row">
               {PROFILE_COLORS.map((c) => <button class={"sw" + (c.id === d.color ? " on" : "")} style={`background:${c.hex}`} aria-label={c.id} aria-pressed={c.id === d.color ? "true" : "false"} onTap={(v: Record<string, string>) => { keep(v); this.profileDraft = { ...this.profileDraft!, color: c.id }; }} />)}
+              <label class={"sw pick" + (custom ? " on" : "")} style={custom ? `background:${d.color}` : ""} aria-label="自訂顏色">
+                <input type="color" name="c" value={profileColor(d.color)} onInput={(v: Record<string, string>) => { keep(v); }} />
+              </label>
             </div>
-            <label class={"sw-custom" + (custom ? " on" : "")}>
-              <input type="color" name="c" value={profileColor(d.color)} />
-              <span>{custom ? `自訂色號 ${d.color.toUpperCase()}` : "自訂顏色（點色塊選任何色號）"}</span>
-            </label>
+            {custom ? <div class="sw-note">自訂色號 {d.color.toUpperCase()}</div> : null}
           </div>
         </Section>
         {first ? (
@@ -982,11 +994,7 @@ class App {
               <Button label="稍後再說" kind="secondary" onTap={() => { setProfileSkipped(true); this.profileDraft = null; if (pushed) this.back(); }} />
             </div>
           </Section>
-        ) : (
-          <Section hint={user ? "要不要公開個人頁，在設定的帳號那一區切換。" : ""}>
-            <div class="nt-form"><Button label="儲存" onTap={save} /></div>
-          </Section>
-        )}
+        ) : <p class="hint">改好按右上角的「儲存」。{user ? "要不要公開個人頁，在設定的帳號那一區切換。" : ""}</p>}
         {user ? (
           <Section title="刪除" hint="會刪掉你的片單、暱稱、追蹤關係，以及你用這個帳號評的分和寫的短評。刪了救不回來。收藏和設定的同步不受影響（那個在「用 Google 帳號同步」裡刪）。">
             <Item icon="🗑" title="刪除我的片單和個人檔案" chevron={false} onTap={() => this.go(() => this.wipeConfirmView())} />

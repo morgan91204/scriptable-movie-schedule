@@ -276,7 +276,17 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .av{flex:none;display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;color:#fff;font-size:13px;font-weight:700;line-height:1}
 .av.emo{font-size:14px;font-weight:400}
 .nt-by.inline .av.emo{font-size:11px}
-.pf-prev{display:flex;align-items:center;gap:14px;margin:8px 0 12px}
+.pf-prev{display:flex;justify-content:center;margin:6px 0 16px}
+.pf-prev .av.big{width:92px;height:92px;font-size:40px}
+.pf-prev .av.big.emo{font-size:50px}
+.em-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:8px}
+.em-grid .em{width:100%;height:auto;aspect-ratio:1}
+.em.add{font-size:22px;color:var(--accent);background:none;box-shadow:0 0 0 1.5px var(--line) inset}
+.em-del{display:block;margin-top:10px;padding:0;font-size:13px;color:var(--fg2);text-decoration:underline}
+.sw-row{display:flex;justify-content:space-between;align-items:center;gap:4px;margin-top:18px}
+.sw.pick{position:relative;flex:none;overflow:hidden;background:conic-gradient(#ff3b30,#ff9500,#ffcc00,#34c759,#00c7be,#007aff,#af52de,#ff2d55,#ff3b30)}
+.sw.pick input{position:absolute;inset:-6px;width:200%;height:200%;opacity:0;padding:0;border:0}
+.sw-note{margin-top:8px;font-size:12.5px;color:var(--fg2);text-align:right}
 .em{display:inline-flex;align-items:center;justify-content:center;padding:0;width:40px;height:40px;border-radius:10px;background:var(--chip);font-size:21px;line-height:1;color:var(--fg2)}
 .em.on{box-shadow:0 0 0 2px var(--accent) inset}
 .sw-custom{display:flex;align-items:center;gap:10px;margin-top:10px;font-size:14px;color:var(--fg2)}
@@ -318,7 +328,7 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .us-sub{flex:none;font-size:13px;color:var(--fg2)}
 .us-follow{flex:none;margin-left:10px;padding:6px 14px;border-radius:999px;background:var(--accent);color:#fff;font-size:14px;font-weight:600}
 .us-follow.on{background:var(--chip);color:var(--fg2)}
-.sw{width:34px;height:34px;border-radius:50%;border:3px solid transparent}
+.sw{flex:none;width:32px;height:32px;padding:0;border-radius:50%;border:3px solid transparent}
 .sw.on{border-color:var(--fg);box-shadow:0 0 0 2px var(--card) inset}
 .nt-by{display:flex;align-items:center;gap:7px;margin-bottom:6px;font-size:14px;font-weight:600;color:var(--fg)}
 .nt-by.inline{display:inline-flex;margin:0;font-size:12px;gap:5px;min-width:0}
