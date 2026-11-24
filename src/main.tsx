@@ -149,8 +149,9 @@ class App {
     setBackGuard(() => this.stack.length > 1);
     this.go(() => this.homeView(), "讀取影城清單…");
     // 從通知點進來（?tab=soon／?tab=fest）：直接開電影分頁的那一類
-    const startTab = IS_WEB ? (/[?&]tab=(soon|fest|activity)\b/.exec(String((globalThis as any).location?.search || "")) || [])[1] : "";
+    const startTab = IS_WEB ? (/[?&]tab=(soon|fest|activity|admin)\b/.exec(String((globalThis as any).location?.search || "")) || [])[1] : "";
     if (startTab === "activity") { if (this.sync()) { this.switchTab("activity"); this.socialTab = "act"; } }
+    else if (startTab === "admin") { this.switchTab("settings"); if (this.sync()) this.go(() => this.adminHomeView(), "讀取中…"); } // 從「有新的檢舉／回饋」的通知點進來
     else if (startTab) { this.movieMode = startTab as "soon" | "fest"; this.switchTab("movies"); }
     // 連點頁籤重新整理之後：回到剛才那個頁籤
     if (IS_WEB) { try { const G = globalThis as any; const t = G.sessionStorage.getItem("ms:reload-tab"); if (t) { G.sessionStorage.removeItem("ms:reload-tab"); if (/^(movies|cinemas|settings|activity)$/.test(t)) this.switchTab(t); } } catch (_) {} }
@@ -1921,7 +1922,7 @@ class App {
     if (!p) return "";
     const state: string = await p.refresh().catch(() => "unsupported");
     const prefs = notifyPrefs(this.settings);
-    const on = NOTIFY_KINDS.filter((k) => prefs[k.id]).map((k) => k.label.replace(/時$/, ""));
+    const on = NOTIFY_KINDS.filter((k) => prefs[k.id] && (k.group !== "admin" || !!(this.meMem && this.meMem.data.admin))).map((k) => k.label.replace(/時$/, ""));
     const note = state === "on" ? (on.length ? (on.length > 3 ? `${on.slice(0, 3).join("、")}等 ${on.length} 種` : on.join("、")) : "每一種通知都關著") : state === "needs-install" ? "要先把「片刻」加到主畫面" : state === "unsupported" ? "這個瀏覽器不支援" : state === "denied" ? "系統設定裡沒有允許通知" : "開放場次、上映、快下檔、影展開始時通知你";
     return (
       <Section title="通知">
@@ -2046,6 +2047,11 @@ class App {
         <Section title="社群" hint={signedIn() ? "事情發生的當下就通知；有開勿擾時段的話，那段時間的會留到之後再發。" : "要先用 Google 帳號登入，這兩種才會發。"}>
           {NOTIFY_KINDS.filter((k) => k.group === "social").map(row)}
         </Section>
+        {this.meMem && this.meMem.data.admin ? (
+          <Section title="管理員">
+            {NOTIFY_KINDS.filter((k) => k.group === "admin").map(row)}
+          </Section>
+        ) : null}
         <Section title="收藏電影有動態時" hint="點一下開或關。">
           {NOTIFY_KINDS.filter((k) => k.group === "fav").map(row)}
         </Section>

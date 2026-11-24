@@ -50,7 +50,7 @@ export interface Settings {
 /** 收藏電影通知種類：open 開放場次了、rel 上映了、end 快下檔了、fest 影展開始了 */
 export interface NotifyPrefs {
   open: boolean; rel: boolean; end: boolean; fest: boolean;
-  favc?: boolean; fmt?: boolean; pre?: boolean; rate?: boolean; week?: boolean; flist?: boolean; cweek?: boolean; reply?: boolean; follow?: boolean;
+  favc?: boolean; fmt?: boolean; pre?: boolean; rate?: boolean; week?: boolean; flist?: boolean; cweek?: boolean; reply?: boolean; follow?: boolean; admin?: boolean;
   fmts?: string[]; // 特殊廳有場次時：要哪幾種廳（IMAX、杜比…）
   preDays?: number; // 上映前幾天提醒（預設 3）
   quietOn?: boolean; quietFrom?: number; quietTo?: number; // 勿擾時段（預設開，22 點到 9 點）
@@ -84,9 +84,9 @@ export function notifyPayload(s: Settings): { prefs: Record<string, boolean>; op
     favs: notifyFavs(s),
   };
 }
-export type NotifyKind = "open" | "rel" | "end" | "fest" | "favc" | "fmt" | "pre" | "rate" | "week" | "flist" | "cweek" | "reply" | "follow";
+export type NotifyKind = "open" | "rel" | "end" | "fest" | "favc" | "fmt" | "pre" | "rate" | "week" | "flist" | "cweek" | "reply" | "follow" | "admin";
 /** 通知種類。group：fav = 跟著收藏的電影走；all = 不用收藏也會發（預設關） */
-export const NOTIFY_KINDS: { id: NotifyKind; label: string; note: string; group: "fav" | "all" | "social" }[] = [
+export const NOTIFY_KINDS: { id: NotifyKind; label: string; note: string; group: "fav" | "all" | "social" | "admin" }[] = [
   { id: "open", label: "開放場次時", note: "還沒排片的片，戲院開始排場次、可以訂票了", group: "fav" },
   { id: "pre", label: "上映前提醒", note: "上映前幾天提醒一次", group: "fav" },
   { id: "rel", label: "上映時", note: "收藏的片正式上映的那一天", group: "fav" },
@@ -99,11 +99,12 @@ export const NOTIFY_KINDS: { id: NotifyKind; label: string; note: string; group:
   { id: "week", label: "每週新片", note: "每週四早上一則：這一週上映哪些片", group: "all" },
   { id: "flist", label: "影展片單公布時", note: "有影展公布了片單", group: "all" },
   { id: "reply", label: "有人回覆或提到我時", note: "回覆你的短評，或在短評裡 @你；推和噓不會跳通知，只列在「通知」頁籤裡", group: "social" },
+  { id: "admin", label: "有新的檢舉或意見回饋時", note: "只有管理員會收到：短評被檢舉、帳號被檢舉、有人送出意見回饋", group: "admin" },
   { id: "follow", label: "有人追蹤我時", note: "包含對方回追你、有人送出追蹤要求、對方接受了你的追蹤要求", group: "social" },
 ];
 /** 「上映前提醒」可以選幾天前 */
 export const NOTIFY_PRE_STEPS = [1, 3, 7];
-export const notifyPrefs = (s: Settings): NotifyPrefs => ({ open: true, rel: true, end: true, fest: true, favc: true, fmt: false, pre: true, rate: false, week: false, flist: false, cweek: false, reply: true, follow: true, ...(s.notify || {}) });
+export const notifyPrefs = (s: Settings): NotifyPrefs => ({ open: true, rel: true, end: true, fest: true, favc: true, fmt: false, pre: true, rate: false, week: false, flist: false, cweek: false, reply: true, follow: true, admin: true, ...(s.notify || {}) });
 /** 勿擾時段（幾點到幾點不發）。預設關閉；打開的話預設是晚上十點到早上九點 */
 export const notifyQuiet = (p: NotifyPrefs): { on: boolean; from: number; to: number } => ({ on: p.quietOn === true, from: p.quietFrom ?? 22, to: p.quietTo ?? 9 });
 /** 交給通知伺服器的收藏清單：只有片名鍵、片名、影展代碼（海報、收藏時間這些不傳） */

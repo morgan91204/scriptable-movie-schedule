@@ -209,6 +209,7 @@ export async function social(hub, path, b) {
     if (!sess) return json({ error: "not signed in" }, 401);
     uid = sess.uid;
     isAdmin = !!sess.adm && (await hub.isAdmin(sess.adm)); // 設定頁要不要多出「管理員專區」那一列
+    if (isAdmin && op === "me") await hub.adminSeen(uid, sess.adm); // 之後有新的檢舉、回饋才通知得到他
   }
   const me = uid ? one(sql, "SELECT * FROM users WHERE uid = ?", uid) : null;
   const need = () => (uid ? null : json({ error: "not signed in" }, 401));
@@ -228,6 +229,7 @@ export async function social(hub, path, b) {
     if (!okKey(m) || !by || !rate) return json({ error: "bad request" }, 400);
     if (uid && !quotaOk(sql, uid)) return json({ error: "too many" }, 429);
     const r = await rate.report(m, by, Number(b.id), String(b.why || ""));
+    if (!(r && r.error)) await hub.adminPush({ title: `有短評被檢舉：《${cleanTitle(b.title) || m}》`, body: "到 管理員專區 → 短評管理 複查。", tag: "admin:note:" + m.slice(0, 40) }).catch(() => 0);
     return fail(r) || json(withAuthors(sql, r, uid, m));
   }
   if (op === "note-vote") {
@@ -314,7 +316,10 @@ export async function social(hub, path, b) {
     const by = uid || (okDev(b.d) ? "d:" + b.d : "");
     const u = one(sql, "SELECT uid FROM users WHERE name = ?", String(b.name || ""));
     if (!by || !u || ["name", "fake", "abuse"].indexOf(b.why) < 0) return json({ error: "bad request" }, 400);
-    if (u.uid !== uid) sql.exec("INSERT OR IGNORE INTO user_reports (uid, by, why, at) VALUES (?, ?, ?, ?)", u.uid, by, b.why, Date.now());
+    if (u.uid !== uid) {
+      sql.exec("INSERT OR IGNORE INTO user_reports (uid, by, why, at) VALUES (?, ?, ?, ?)", u.uid, by, b.why, Date.now());
+      await hub.adminPush({ title: `有帳號被檢舉：${String(b.name).slice(0, 16)}`, body: ({ name: "暱稱不當", fake: "冒名", abuse: "不當行為" }[b.why] || "") + "。到 管理員專區 → 帳號管理 處理。", tag: "admin:user" }).catch(() => 0);
+    }
     return json({ ok: true });
   }
 

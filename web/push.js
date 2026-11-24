@@ -14,7 +14,7 @@ const SUBJECT = "https://app.twmovietime.workers.dev/about/"; // 推送服務出
 const NOTIFY_URL = "https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/data/notify.json";
 // 只接受各家瀏覽器的推送服務，其他網址一律不送（不讓這個端點被拿去打別的網站）
 const PUSH_HOSTS = [/\.push\.apple\.com$/, /^fcm\.googleapis\.com$/, /^updates\.push\.services\.mozilla\.com$/, /\.notify\.windows\.com$/, /^android\.googleapis\.com$/];
-const KINDS = ["open", "rel", "end", "fest", "favc", "fmt", "pre", "rate", "week", "flist", "cweek", "reply", "follow"]; // reply、follow = 有人回覆我的短評、有人追蹤我（事情發生當下就推，見 socialPush）
+const KINDS = ["open", "rel", "end", "fest", "favc", "fmt", "pre", "rate", "week", "flist", "cweek", "reply", "follow", "admin"]; // reply、follow = 有人回覆我的短評、有人追蹤我（事情發生當下就推，見 socialPush）
 // 跟著收藏的片走的通知（依序判斷）；week、flist 是不用收藏也會發的
 const FAV_KINDS = ["open", "rel", "favc", "fmt", "pre", "rate", "end", "fest"];
 const FORMATS = ["IMAX", "杜比", "4DX", "MX4D", "ScreenX", "巨幕", "LED", "頂級廳", "3D"];
@@ -407,6 +407,21 @@ export class PushHub {
   }
   /** 根管理員（加密設定裡的，App 裡不能移除） */
   rootAdmins() { return String(this.env.ADMIN_EMAILS || "").split(/[\s,]+/).map(normEmail).filter(okEmail); }
+  /** 記下「這個帳號是管理員」（管理員打開片刻時記一次）：有新的檢舉、意見回饋時才知道要通知誰 */
+  async adminSeen(uid, email) {
+    const m = (await this.state.storage.get("au")) || {}, k = String(uid).slice(0, 40);
+    if (m[k] !== email) { m[k] = email; await this.state.storage.put("au", m); }
+  }
+  /** 通知所有管理員（有開通知、而且「管理員通知」沒關的裝置）。已經不是管理員的順手從名單拿掉 */
+  async adminPush(note) {
+    const m = (await this.state.storage.get("au")) || {};
+    let changed = false;
+    for (const [k, email] of Object.entries(m)) {
+      if (!(await this.isAdmin(email))) { delete m[k]; changed = true; continue; }
+      await this.socialPush(k, "admin", { url: "/?tab=admin", ...note });
+    }
+    if (changed) await this.state.storage.put("au", m);
+  }
   async isAdmin(email) {
     if (this.rootAdmins().indexOf(email) >= 0) return true;
     return ((await this.state.storage.get("admins")) || []).indexOf(email) >= 0;
@@ -453,6 +468,7 @@ export class PushHub {
         for (const [k, v] of old) if (v && (v.status === "done" || v.status === "wont")) { await this.state.storage.delete(k); cut++; }
         await this.state.storage.put("fn", n - cut);
       }
+      await this.adminPush({ title: "新的意見回饋：" + ({ bug: "問題回報", data: "資料有誤", idea: "功能建議" }[b.cat] || "其他"), body: Array.from(text).slice(0, 100).join(""), tag: "admin:fb" }).catch(() => 0);
     } else if (path !== "/feedback/mine") return json({ error: "not found" }, 404);
     const now = (await this.state.storage.get("fd:" + d)) || [];
     const got = now.length ? await this.state.storage.get(now.map((id) => "f:" + id)) : new Map();
