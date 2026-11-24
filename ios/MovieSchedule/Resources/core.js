@@ -1557,7 +1557,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
       const read = readExtras;
       const hit = read()[ck];
       const stale = hit && hit.v !== EXTRAS_V && true;
-      const ttl = stale ? 0 : !hit?.trailerName ? 36e5 : hit?.poster ? 7 * 864e5 : 864e5;
+      const ttl = stale ? 0 : hit?.poster && hit?.trailerName ? 7 * 864e5 : 864e5;
       const me = await metaOf(title);
       if (me && me.tn && me.t) return { poster: normImageUrl(me.p || (hit && !(me.xa && me.xa > hit.at) ? hit.poster : "") || ""), trailer: me.t, trailerName: me.tn };
       if (hit && Date.now() - hit.at < ttl) return { poster: hit.poster, trailer: hit.trailer, trailerName: hit.trailerName };
@@ -1565,7 +1565,8 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
       const all = read();
       for (const [key, v] of Object.entries(all)) if (Date.now() - v.at > 7 * 864e5) delete all[key];
       const { err: _e, ...keep } = out;
-      all[ck] = { ...keep, at: Date.now(), v: EXTRAS_V };
+      const flaky = !out.trailerName && /讀不到|連線|回應 \d|逾時|失敗/.test(out.err || "");
+      all[ck] = { ...keep, at: Date.now() - (flaky ? 23 * 36e5 : 0), v: EXTRAS_V };
       cacheSet("extras.json", JSON.stringify(all));
       return out;
     })()).then((r) => {
@@ -3502,6 +3503,28 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     return out;
   }
   var ratingsMem = {};
+  function yearRatingByTitle(yr, normed) {
+    let best = null, bestN = -1, bestYear = "";
+    for (const key of Object.keys(yr.ratings)) {
+      if (!key.startsWith(normed + "|") || key.length !== normed.length + 5) continue;
+      const r = yr.ratings[key], y = key.slice(-4);
+      const n = (r.i ? 1 : 0) + (r.t !== void 0 ? 1 : 0) + (r.p !== void 0 ? 1 : 0);
+      if (n > bestN || n === bestN && y > bestYear) {
+        best = r;
+        bestN = n;
+        bestYear = y;
+      }
+    }
+    return best;
+  }
+  function ratingsFromYear(r) {
+    const out = {};
+    const rt = r.u ? `https://www.rottentomatoes.com/m/${r.u}` : "";
+    if (r.i && r.id) out.imdb = { score: r.i, votes: r.v || 0, url: `https://www.imdb.com/title/${r.id}/` };
+    if (r.t !== void 0 && rt) out.tomato = { score: r.t, certified: !!r.c, url: rt };
+    if (r.p !== void 0 && rt) out.popcorn = { score: r.p, url: rt, ...r.h ? { certified: true } : {} };
+    return out;
+  }
   function movieRatings(title, en, slug) {
     const k = normTitle(title);
     return ratingsMem[k] ||= (async () => {
@@ -3517,6 +3540,11 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
       const me = await metaOf(title);
       if (hit && hit.v === RATINGS_V && Date.now() - hit.at < (has(hit) ? 7 : 1) * 864e5 && !(me && me.r && me.ra && me.ra > hit.at)) return hit;
       if (me && me.r && me.ra) return me.r;
+      if (!me) {
+        const yr = yearRatingsLatest || await Promise.race([loadYearRatings().catch(() => null), delay(1500).then(() => null)]);
+        const rec = yr ? yearRatingByTitle(yr, k) : null;
+        if (rec) return ratingsFromYear(rec);
+      }
       const r = await findRatings(title, en, slug);
       if (!r.err || has(r)) {
         const all = read();
@@ -3947,7 +3975,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   var extra = { boxOffice, filmList, soonList, nowShowing, nowShowingMulti, movieBoard: movieBoard2, festivalBoard, festivalFilm, nearby, patchSettings, fillMovie, formatList };
   var BRIDGE_LEVEL = 2;
   globalThis.MS = {
-    version: "2026.11.24-1310",
+    version: "2026.11.24-1316",
     level: BRIDGE_LEVEL,
     init(saved) {
       cache = saved || {};

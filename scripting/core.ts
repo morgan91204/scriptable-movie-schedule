@@ -951,7 +951,8 @@ export async function movieExtras(title: string, slug?: string): Promise<MovieEx
     // 舊版記下的「沒海報」也重查（海報比對規則改了）
     // 預告挑選規則也改過（要對得上片名、台灣版優先）：舊版從 YouTube 搜尋挑的也重查
     const stale = hit && hit.v !== EXTRAS_V && true; // 預告的挑選與檢查規則改過：舊版記下的一律重查一次
-    const ttl = stale ? 0 : !hit?.trailerName ? 3600e3 : hit?.poster ? 7 * 86400e3 : 86400e3;
+    // 沒找到預告的也記一天（原本只記 1 小時，等於每次打開都重新搜尋一輪：開眼＋YouTube 五六個請求，下檔的片尤其慢）
+    const ttl = stale ? 0 : hit?.poster && hit?.trailerName ? 7 * 86400e3 : 86400e3;
     // 伺服器查好的預告優先，手機自己以前搜到的排後面：這樣每個版本、每支手機看到的都是同一支，
     // 不會因為各自搜尋的結果不同而不一樣
     const me = await metaOf(title);
@@ -966,7 +967,9 @@ export async function movieExtras(title: string, slug?: string): Promise<MovieEx
     const all = read();
     for (const [key, v] of Object.entries(all)) if (Date.now() - v.at > 7 * 86400e3) delete all[key]; // 清掉過期的
     const { err: _e, ...keep } = out;
-    all[ck] = { ...keep, at: Date.now(), v: EXTRAS_V } as MovieExtras & { at: number };
+    // 沒找到預告、而且看起來是連線出錯（不是真的沒有）：只記一小時就再試；其餘照上面的期限
+    const flaky = !out.trailerName && /讀不到|連線|回應 \d|逾時|失敗/.test(out.err || "");
+    all[ck] = { ...keep, at: Date.now() - (flaky ? 23 * 3600e3 : 0), v: EXTRAS_V } as MovieExtras & { at: number };
     cacheSet("extras.json", JSON.stringify(all));
     return out;
   })()).then((r) => {
@@ -3272,6 +3275,27 @@ async function findRatings(title: string, en?: string, slug?: string, known?: Id
 
 const ratingsMem: Record<string, Promise<Ratings>> = {};
 /** 評分（記在手機 3 天；查不到的下次打開再試） */
+/** 年度評分總表裡這個片名的那一筆（鍵是「片名|上映年」）。同名好幾年都有的（首映、重映各一筆），
+ *  用分數最齊全的那一筆（IMDb、番茄、爆米花有幾項）；一樣齊全就用比較新的那一年 */
+function yearRatingByTitle(yr: YearRatings, normed: string): YearRating | null {
+  let best: YearRating | null = null, bestN = -1, bestYear = "";
+  for (const key of Object.keys(yr.ratings)) {
+    if (!key.startsWith(normed + "|") || key.length !== normed.length + 5) continue;
+    const r = yr.ratings[key], y = key.slice(-4);
+    const n = (r.i ? 1 : 0) + (r.t !== undefined ? 1 : 0) + (r.p !== undefined ? 1 : 0);
+    if (n > bestN || (n === bestN && y > bestYear)) { best = r; bestN = n; bestYear = y; }
+  }
+  return best;
+}
+/** 把年度評分總表的一筆換成電影頁用的格式 */
+function ratingsFromYear(r: YearRating): Ratings {
+  const out: Ratings = {};
+  const rt = r.u ? `https://www.rottentomatoes.com/m/${r.u}` : "";
+  if (r.i && r.id) out.imdb = { score: r.i, votes: r.v || 0, url: `https://www.imdb.com/title/${r.id}/` };
+  if (r.t !== undefined && rt) out.tomato = { score: r.t, certified: !!r.c, url: rt };
+  if (r.p !== undefined && rt) out.popcorn = { score: r.p, url: rt, ...(r.h ? { certified: true } : {}) };
+  return out;
+}
 export function movieRatings(title: string, en?: string, slug?: string): Promise<Ratings> {
   const k = normTitle(title);
   return (ratingsMem[k] ||= (async () => {
@@ -3290,6 +3314,12 @@ export function movieRatings(title: string, en?: string, slug?: string): Promise
     // 伺服器查的時間比手機記的新：一律用伺服器的（伺服器修正過配錯的片時，手機上記著的舊分數才會跟著換掉）
     if (hit && hit.v === RATINGS_V && Date.now() - hit.at < (has(hit) ? 7 : 1) * 86400e3 && !(me && me.r && me.ra && me.ra > hit.at)) return hit;
     if (me && me.r && me.ra) return me.r; // 伺服器已經查好評分（空物件 = 查過、沒有評分）
+    // 已經下檔的片（伺服器的片單上沒有）：年度評分總表裡有就直接用，不用手機再去 IMDb、爛番茄各查一次
+    if (!me) {
+      const yr = yearRatingsLatest || (await Promise.race([loadYearRatings().catch(() => null), delay(1500).then(() => null)]));
+      const rec = yr ? yearRatingByTitle(yr, k) : null;
+      if (rec) return ratingsFromYear(rec);
+    }
     const r = await findRatings(title, en, slug);
     // 有錯（連線失敗）：不寫進手機快取（下次啟動再試），但這次執行內記住結果，重畫時不用再查
     if (!r.err || has(r)) {
