@@ -4,9 +4,11 @@ export interface ChangeItem { kind: "new" | "better"; text: string }
 export interface ChangeEntry { id: string; date: string; items: ChangeItem[] }
 export const CHANGELOG: ChangeEntry[] = [
   {
-    id: "2026-11-24b",
+    id: "2026-11-24c",
     date: "2026/11/24",
     items: [
+      { kind: "new", text: "短評和回覆裡可以 @暱稱 提到別人，對方會收到通知；內文裡的 @暱稱 點了會開那個人的個人頁" },
+      { kind: "new", text: "個人檔案可以填 Threads、Instagram 帳號，公開個人頁上會多兩顆按鈕" },
       { kind: "new", text: "多了「通知」頁籤（登入後出現）：有人推、回覆你的短評，或追蹤你、回追你，都會列在這裡；可以直接回追" },
       { kind: "new", text: "有開通知的話，有人回覆你的短評或追蹤你時會即時通知（可以在通知設定的「社群」各別關掉；推和噓不會跳通知）" },
       { kind: "new", text: "短評變成討論區：同一部片可以發好幾則，可以回覆別人、推或噓，預設依熱門排序" },

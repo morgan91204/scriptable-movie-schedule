@@ -899,7 +899,7 @@ function parseTwMovieDay(doc) {
     { id: "cweek", label: "收藏影城每週新片", note: "每週四早上一則：你收藏的影城這一週新上哪些片", group: "all" },
     { id: "week", label: "每週新片", note: "每週四早上一則：這一週上映哪些片", group: "all" },
     { id: "flist", label: "影展片單公布時", note: "有影展公布了片單", group: "all" },
-    { id: "reply", label: "有人回覆我的短評時", note: "推和噓不會跳通知，只列在「通知」頁籤裡", group: "social" },
+    { id: "reply", label: "有人回覆或提到我時", note: "回覆你的短評，或在短評裡 @你；推和噓不會跳通知，只列在「通知」頁籤裡", group: "social" },
     { id: "follow", label: "有人追蹤我時", note: "包含對方回追你", group: "social" }
   ];
   var NOTIFY_PRE_STEPS = [1, 3, 7];
@@ -3858,6 +3858,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   var SOCIAL_ERR = {
     "not signed in": "登入已經失效，請重新登入",
     "too many": "操作太頻繁，請稍後再試",
+    "bad handle": "社群帳號只要填帳號名稱（英文、數字、底線、句點）",
     "bad name": "暱稱要 2～16 個字，只能用中英文、數字和底線",
     "name taken": "這個暱稱有人用了，換一個",
     "rename later": "暱稱 14 天內只能改一次",
@@ -4435,7 +4436,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   var extra = { boxOffice, filmList, soonList, nowShowing, nowShowingMulti, movieBoard: movieBoard2, festivalBoard, festivalFilm, nearby, patchSettings, fillMovie, formatList };
   var BRIDGE_LEVEL = 2;
   globalThis.MS = {
-    version: "2026.11.24-2248",
+    version: "2026.11.24-2252",
     level: BRIDGE_LEVEL,
     init(saved) {
       cache = saved || {};

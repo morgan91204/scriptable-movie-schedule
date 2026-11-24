@@ -95,7 +95,7 @@ export const NOTIFY_KINDS: { id: NotifyKind; label: string; note: string; group:
   { id: "cweek", label: "收藏影城每週新片", note: "每週四早上一則：你收藏的影城這一週新上哪些片", group: "all" },
   { id: "week", label: "每週新片", note: "每週四早上一則：這一週上映哪些片", group: "all" },
   { id: "flist", label: "影展片單公布時", note: "有影展公布了片單", group: "all" },
-  { id: "reply", label: "有人回覆我的短評時", note: "推和噓不會跳通知，只列在「通知」頁籤裡", group: "social" },
+  { id: "reply", label: "有人回覆或提到我時", note: "回覆你的短評，或在短評裡 @你；推和噓不會跳通知，只列在「通知」頁籤裡", group: "social" },
   { id: "follow", label: "有人追蹤我時", note: "包含對方回追你", group: "social" },
 ];
 /** 「上映前提醒」可以選幾天前 */
@@ -3613,7 +3613,7 @@ async function socialCall(op: string, body: Record<string, unknown> = {}): Promi
   return { status: r.status, data };
 }
 const SOCIAL_ERR: Record<string, string> = {
-  "not signed in": "登入已經失效，請重新登入", "too many": "操作太頻繁，請稍後再試", "bad name": "暱稱要 2～16 個字，只能用中英文、數字和底線", "name taken": "這個暱稱有人用了，換一個",
+  "not signed in": "登入已經失效，請重新登入", "too many": "操作太頻繁，請稍後再試", "bad handle": "社群帳號只要填帳號名稱（英文、數字、底線、句點）", "bad name": "暱稱要 2～16 個字，只能用中英文、數字和底線", "name taken": "這個暱稱有人用了，換一個",
   "rename later": "暱稱 14 天內只能改一次", "private": "對方沒有公開個人頁", "not found": "找不到這個帳號", "too many follows": "追蹤的人數到上限了", "bad date": "日期不對（不能是未來的日期）", "bad emoji": "頭像只能放一個表情符號", "bad bio": "自我介紹最多 80 個字，不能放連結或聯絡方式",
 };
 /** 帳號功能：做不成就丟出看得懂的錯誤 */
@@ -3625,13 +3625,13 @@ export async function social<T = any>(op: string, body: Record<string, unknown> 
 /** 問過要不要取暱稱、使用者按了「稍後再說」：記在這台，之後評分、寫短評不再跳出來問（設定 → 我的片單 隨時可以設） */
 export const profileSkipped = (): boolean => cacheGet("profile-skip.txt") === "1";
 export const setProfileSkipped = (on: boolean): void => cacheSet("profile-skip.txt", on ? "1" : "");
-export interface Profile { name: string; color: string; emoji?: string; bio?: string; pub?: boolean; hidden?: boolean; canRename?: boolean }
+export interface Profile { name: string; color: string; emoji?: string; bio?: string; th?: string; ig?: string; pub?: boolean; hidden?: boolean; canRename?: boolean }
 /** 觀影方式（可以複選） */
 export const WATCH_HOW: { id: string; label: string }[] = [{ id: "cinema", label: "電影院" }, { id: "second", label: "二輪電影院" }, { id: "stream", label: "串流" }];
 export const howLabel = (how?: string[]): string => WATCH_HOW.filter((h) => (how || []).indexOf(h.id) >= 0).map((h) => h.label).join("、");
 export interface DiaryEntry { k: string; title: string; s: number; x: string; sp: number; seen: string; at: number; priv?: number; how?: string[]; by?: { name: string; color: string; emoji?: string } }
 /** 通知頁的一列：up 有人推我的短評／down 有人噓／reply 有人回覆我／follow 有人追蹤我。who = 是誰（最多列兩個有公開個人頁的人），n = 總共幾個人 */
-export interface Activity { kind: "up" | "down" | "reply" | "follow"; at: number; n: number; who: { name: string; color: string; emoji?: string }[]; k?: string; title?: string; x?: string; px?: string; back?: number; returned?: number; fresh?: number }
+export interface Activity { kind: "up" | "down" | "reply" | "mention" | "follow"; at: number; n: number; who: { name: string; color: string; emoji?: string }[]; k?: string; title?: string; x?: string; px?: string; back?: number; returned?: number; fresh?: number }
 /** 通知上的時間：剛剛、幾分鐘、幾小時、幾天，再久就寫日期 */
 export function agoLabel(at: number): string {
   const m = Math.floor((Date.now() - at) / 60000);

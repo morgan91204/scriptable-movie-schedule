@@ -302,6 +302,12 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .pf-btn{text-align:center;flex:1 1 0;min-width:0;height:36px;padding:0 10px;border-radius:10px;background:var(--chip);color:var(--fg);font-size:14.5px;font-weight:600;white-space:nowrap}
 .pf-btn.go{background:var(--accent);color:#fff}
 .pf-btn.icon{flex:none;width:40px;font-size:16px;font-weight:400}
+.pf-btn.link{flex:none;padding:0 11px;font-size:13.5px}
+.pf-handle{display:flex;align-items:center;gap:8px;margin-top:8px;padding:0 12px;height:44px;border-radius:10px;background:var(--chip)}
+.pf-handle span{flex:none;font-size:14px;color:var(--fg2);white-space:nowrap}
+.pf-handle input{flex:1;min-width:0;height:100%;border:0;background:none;color:var(--fg);font-size:16px;outline:none}
+.at{display:inline;padding:0;font:inherit;color:var(--accent);font-weight:600}
+.ac-mark.mention{background:#8e5cf7}
 .pf-btn:active{opacity:.7}
 .us-main{display:flex;align-items:center;gap:10px;flex:1;min-width:0;text-align:left;color:var(--fg);padding:4px 0}
 .us-name{font-size:16px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

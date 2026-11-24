@@ -749,7 +749,7 @@ class App {
   diaryTab = "mine"; // 片單頁看哪一塊：mine 我的片單／feed 動態／people 找人
   peopleQ = ""; // 找人的搜尋字
   diaryMem: { at: number; list: DiaryEntry[] } | null = null; // 自己的片單（一分鐘內不重讀）
-  profileDraft: { name: string; color: string; emoji: string; bio: string; pub: boolean } | null = null; // 編輯個人檔案時還沒存的內容
+  profileDraft: { name: string; color: string; emoji: string; bio: string; th: string; ig: string; pub: boolean } | null = null; // 編輯個人檔案時還沒存的內容
   async myDiary(force = false): Promise<DiaryEntry[]> {
     if (!force && this.diaryMem && Date.now() - this.diaryMem.at < 60e3) return this.diaryMem.list;
     const r = await social<{ list: DiaryEntry[] }>("mine");
@@ -928,11 +928,11 @@ class App {
     // 第一次取暱稱：先填上 Google 帳號的名稱（去掉空白和符號、最多 16 個字），使用者可以改
     const sy0 = this.sync();
     const suggest = !user && sy0 && sy0.gname ? Array.from(String(sy0.gname() || "").normalize("NFC").replace(/[^\p{L}\p{N}_]/gu, "")).slice(0, 16).join("") : "";
-    const d = this.profileDraft || { name: user ? user.name : suggest.length >= 2 ? suggest : "", color: user ? user.color : "blue", emoji: (user && user.emoji) || "", bio: (user && user.bio) || "", pub: user ? !!user.pub : first };
+    const d = this.profileDraft || { name: user ? user.name : suggest.length >= 2 ? suggest : "", color: user ? user.color : "blue", emoji: (user && user.emoji) || "", bio: (user && user.bio) || "", th: (user && user.th) || "", ig: (user && user.ig) || "", pub: user ? !!user.pub : first };
     /** 每個按鈕都帶著輸入框目前的內容：暱稱、自己打的表情符號、色盤選的顏色（跟目前的不一樣才算有改） */
     const keep = (v?: Record<string, string>) => {
       const picked = v && /^#[0-9a-f]{6}$/i.test(v.c || "") && v.c.toLowerCase() !== profileColor(d.color).toLowerCase() ? v.c.toLowerCase() : d.color;
-      this.profileDraft = { ...d, name: v && typeof v.n === "string" ? v.n : d.name, emoji: v && typeof v.e === "string" ? v.e.trim() : d.emoji, bio: v && typeof v.b === "string" ? v.b : d.bio, color: picked };
+      this.profileDraft = { ...d, name: v && typeof v.n === "string" ? v.n : d.name, emoji: v && typeof v.e === "string" ? v.e.trim() : d.emoji, bio: v && typeof v.b === "string" ? v.b : d.bio, th: v && typeof v.th === "string" ? v.th : d.th, ig: v && typeof v.ig === "string" ? v.ig : d.ig, color: picked };
     };
     const custom = /^#/.test(d.color);
     return (
@@ -946,6 +946,9 @@ class App {
         <Section title="自我介紹" hint="選填，最多 80 個字，會顯示在個人頁的暱稱下面。不能放連結或聯絡方式。">
           <div class="nt-form">
             <input class="field" name="b" maxlength="80" autocomplete="off" value={d.bio} placeholder="例如：恐怖片愛好者｜每週進戲院" />
+            <span class="cm-taghead" style="margin-top:14px">社群帳號（可不填；公開個人頁時別人點得到）</span>
+            <label class="pf-handle"><span>Threads　@</span><input name="th" maxlength="60" autocomplete="off" autocapitalize="off" spellcheck="false" value={d.th} placeholder="帳號名稱" /></label>
+            <label class="pf-handle"><span>Instagram　@</span><input name="ig" maxlength="60" autocomplete="off" autocapitalize="off" spellcheck="false" value={d.ig} placeholder="帳號名稱" /></label>
           </div>
         </Section>
         <Section title="頭像" hint="頭像是底色加上一個表情符號；沒選表情符號就用暱稱的第一個字（不能上傳照片）。">
@@ -975,7 +978,7 @@ class App {
             <Button label="儲存" onTap={async (v) => {
               keep(v);
               const p = this.profileDraft!;
-              try { await social("profile-set", { name: p.name.trim(), color: p.color, emoji: p.emoji, bio: p.bio, pub: p.pub }); this.profileDraft = null; this.hasProfile = true; this.meMem = null; setProfileSkipped(false); await this.ui.toast(first ? "暱稱設定好了" : "已儲存"); if (!first || pushed) this.back(); } catch (e) { await this.ui.toast(String((e as Error)?.message || e)); }
+              try { await social("profile-set", { name: p.name.trim(), color: p.color, emoji: p.emoji, bio: p.bio, th: p.th.trim(), ig: p.ig.trim(), pub: p.pub }); this.profileDraft = null; this.hasProfile = true; this.meMem = null; setProfileSkipped(false); await this.ui.toast(first ? "暱稱設定好了" : "已儲存"); if (!first || pushed) this.back(); } catch (e) { await this.ui.toast(String((e as Error)?.message || e)); }
             }} />
             {first ? <Button label="稍後再說" kind="secondary" onTap={() => { setProfileSkipped(true); this.profileDraft = null; if (pushed) this.back(); }} /> : null}
           </div>
@@ -1044,6 +1047,8 @@ class App {
               }}>登入後追蹤</button>
             )}
             <button class="pf-btn" onTap={async () => { Pasteboard.copy(`${SITE_URL}/?u=${encodeURIComponent(u.name)}`); await this.ui.toast("已複製個人頁連結"); }}>分享</button>
+            {u.th ? <button class="pf-btn link" aria-label={`Threads：@${u.th}`} onTap={() => Safari.open(`https://www.threads.net/@${encodeURIComponent(u.th!)}`)}>Threads ↗</button> : null}
+            {u.ig ? <button class="pf-btn link" aria-label={`Instagram：@${u.ig}`} onTap={() => Safari.open(`https://www.instagram.com/${encodeURIComponent(u.ig!)}/`)}>IG ↗</button> : null}
             {p.self ? null : <button class="pf-btn icon" aria-label="檢舉這個帳號" onTap={() => this.go(() => this.reportUserView(u.name))}>⚑</button>}
           </div>
         </Section>
@@ -1169,12 +1174,13 @@ class App {
       const what = a.kind === "up" ? `推了你在《${a.title}》的短評${quote(a.px)}`
         : a.kind === "down" ? `噓了你在《${a.title}》的短評${quote(a.px)}`
         : a.kind === "reply" ? `在《${a.title}》回覆你：${a.x || ""}`
+        : a.kind === "mention" ? `在《${a.title}》提到你：${a.x || ""}`
         : a.returned ? "也回追你了" : "開始追蹤你";
       const open = a.kind === "follow"
         ? (names.length ? () => this.go(() => this.profileView(names[0]), "讀取個人頁…") : undefined)
         : () => { this.noteReset(); if (a.px) this.noteFocus = { x: a.px, at: Date.now(), head: true }; this.go(() => this.notesView(a.title || ""), "讀取短評…"); };
       const first = a.who[0];
-      const mark = a.kind === "up" ? "▲" : a.kind === "down" ? "▼" : a.kind === "reply" ? "↩" : "＋";
+      const mark = a.kind === "up" ? "▲" : a.kind === "down" ? "▼" : a.kind === "reply" ? "↩" : a.kind === "mention" ? "@" : "＋";
       return (
         <div class={"ac" + (a.fresh ? " fresh" : "")}>
           <button class="ac-main" onTap={open}>
@@ -1900,6 +1906,10 @@ class App {
   noteEdit = false; // 短評頁上面寫短評的那一塊有沒有展開（預設收起來）
   noteFilter = "all"; // 短評清單的篩選：all 全部／follow 追蹤中／clean 不看有雷的
   noteSort = "hot"; // 排序：hot 熱門／new 最新／top 最多推／high 評分高到低／low 評分低到高
+  /** 短評內文：@暱稱 變成可以點的連結（點了開那個人的個人頁） */
+  noteBody(x: string): string {
+    return String(x || "").split(/(@[\p{L}\p{N}_]{2,16})/u).map((part, i) => (i % 2 ? <button class="at" onTap={() => this.go(() => this.profileView(part.slice(1)), "讀取個人頁…")}>{esc(part)}</button> : esc(part))).join("");
+  }
   noteReset() { this.noteDraft = null; this.noteSpoil = null; this.noteAsk = ""; this.noteShown = []; this.noteEdit = false; this.noteReplyTo = 0; this.noteReplyDraft = ""; this.noteMenu = 0; this.noteFocus = null; }
   /** 短評頁：上面寫（或改）自己的一句話，下面是大家的。另開一頁，不擠在電影頁。
    *  防雷：輸入框提醒不提劇情、可以自己標「可能有雷」、偵測到劇透字眼送出前問一次；有雷的預設摺疊，點了才顯示。
@@ -2000,7 +2010,7 @@ class App {
             {n.s && !n.r ? <span class={"nt-score " + ratingTier("imdb", n.s)}>{n.s} 分</span> : null}
             {n.sp ? <span class="nt-sp">有雷</span> : null}
           </div>
-          {open ? <div class="th-text">{esc(n.x)}</div> : <button class="nt-cover" onTap={(v: Record<string, string>) => { keep(v); this.noteShown = [...this.noteShown, n.id]; }}>{sunk && !n.sp ? "被噓到摺疊了，點一下顯示" : "可能有雷，點一下顯示"}</button>}
+          {open ? <div class="th-text">{this.noteBody(n.x)}</div> : <button class="nt-cover" onTap={(v: Record<string, string>) => { keep(v); this.noteShown = [...this.noteShown, n.id]; }}>{sunk && !n.sp ? "被噓到摺疊了，點一下顯示" : "可能有雷，點一下顯示"}</button>}
           {n.mine && n.hidden ? <div class="th-warn">這則被多人檢舉，目前別人看不到。</div> : null}
           <div class="th-acts">
             <button class={"ib" + (menu ? " on" : "")} aria-label="更多" aria-expanded={menu ? "true" : "false"} onTap={(v: Record<string, string>) => { keep(v); this.noteMenu = menu ? 0 : n.id; }}>{ICO.more}</button>

@@ -39,6 +39,8 @@ export function socialInit(sql) {
   if (!sql.exec("SELECT 1 FROM pragma_table_info('entries') WHERE name = 'how'").toArray().length) sql.exec("ALTER TABLE entries ADD COLUMN how TEXT NOT NULL DEFAULT ''");
   // users.emoji = 頭像用的表情符號（後來才加的欄位）；沒有就用暱稱的第一個字
   if (!sql.exec("SELECT 1 FROM pragma_table_info('users') WHERE name = 'emoji'").toArray().length) sql.exec("ALTER TABLE users ADD COLUMN emoji TEXT NOT NULL DEFAULT ''");
+  // users.th、users.ig = 個人頁上的 Threads、Instagram 帳號（只存帳號名稱，不存網址）
+  for (const c of ["th", "ig"]) if (!sql.exec("SELECT 1 FROM pragma_table_info('users') WHERE name = ?", c).toArray().length) sql.exec(`ALTER TABLE users ADD COLUMN ${c} TEXT NOT NULL DEFAULT ''`);
   // users.bio = 個人頁上的一行自我介紹（後來才加的欄位）
   if (!sql.exec("SELECT 1 FROM pragma_table_info('users') WHERE name = 'bio'").toArray().length) sql.exec("ALTER TABLE users ADD COLUMN bio TEXT NOT NULL DEFAULT ''");
   sql.exec("CREATE INDEX IF NOT EXISTS entries_at ON entries (at)");
@@ -88,6 +90,32 @@ const BIO_MAX = 80;
 /** 自我介紹：去掉控制字元、換行併成空白；不收連結和聯絡方式（跟短評同一套規則） */
 const cleanBio = (x) => String(x == null ? "" : x).normalize("NFC").replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u202a-\u202e\u2060-\u206f\ufeff]/g, " ").replace(/\s+/g, " ").trim();
 const bioHasContact = (x) => /https?:|www\.|[a-z0-9-]+\.(com|net|org|tw|cc|io|me|ly|gg|xyz|shop|top)\b|\d{8,}|(?:line|telegram|tg|賴)\s*(?:id)?\s*[:：@]/i.test(x);
+/** 社群帳號：只收帳號名稱（貼整個網址或前面有 @ 會自動去掉）；格式不對回 null */
+const cleanHandle = (x) => {
+  const v = String(x == null ? "" : x).trim().replace(/^https?:\/\/(www\.)?(threads\.(net|com)|instagram\.com)\//i, "").replace(/[/?#].*$/, "").replace(/^@/, "");
+  return v === "" ? "" : /^[A-Za-z0-9._]{1,30}$/.test(v) ? v : null;
+};
+const linksOut = (u) => ({ ...(u.th ? { th: u.th } : {}), ...(u.ig ? { ig: u.ig } : {}) });
+/** 短評或回覆裡的 @暱稱：通知被提到的人（最多 3 個；只有公開個人頁的人收得到，自己和 skip 裡的人不算）。回傳被通知的帳號 */
+function mentioned(sql, text, uid, skip = []) {
+  const out = [];
+  for (const m of String(text || "").matchAll(/@([\p{L}\p{N}_]{2,16})/gu)) {
+    if (out.length >= 3) break;
+    const u = sql.exec("SELECT uid FROM users WHERE name = ? AND pub = 1 AND hidden = 0", m[1].normalize("NFC")).toArray()[0];
+    const to = u ? u.uid.slice(0, 40) : "";
+    if (!to || u.uid === uid || skip.indexOf(to) >= 0 || out.indexOf(to) >= 0) continue;
+    out.push(to);
+  }
+  return out;
+}
+async function notifyMentions(hub, sql, text, uid, more, skip) {
+  if (!uid) return; // 沒登入的人不能 @（免得被拿來洗別人的通知）
+  const x = cleanTitle(text);
+  for (const to of mentioned(sql, x, uid, skip)) {
+    notify(sql, to, "mention", uid, { ...more, x: x.slice(0, 140), px: Array.from(x).slice(0, 40).join("") });
+    await pushTo(hub, sql, to, "reply", uid, (who) => ({ title: `${who}在《${cleanTitle(more.title) || more.k}》的短評提到你`, body: more.sp ? "（有雷，點進去看）" : x.slice(0, 100), tag: "mention:" + more.k }));
+  }
+}
 const okEmoji = (e) => e === "" || (typeof e === "string" && e.length <= 32 && EMOJI_RE.test(e));
 
 /** 這個帳號的數字：片單幾部、短評幾則、追蹤幾人、被幾人追蹤 */
@@ -179,6 +207,7 @@ export async function social(hub, path, b) {
         const film = cleanTitle(b.title);
         await pushTo(hub, sql, r.t.a, "reply", uid, (who) => ({ title: `${who}回覆了你${film ? `在《${film}》` : ""}的短評`, body: b.sp ? "（有雷，點進去看）" : cleanTitle(b.x).slice(0, 100), tag: "reply:" + m }));
       }
+      await notifyMentions(hub, sql, b.x, uid, { k: m, title: b.title, sp: b.sp }, r.t.a ? [r.t.a] : []);
       delete r.t;
     }
     return json(withAuthors(sql, r, uid, m));
@@ -199,7 +228,7 @@ export async function social(hub, path, b) {
       const rows = all(sql, "SELECT x.name, x.color, x.emoji FROM follows mine JOIN follows theirs ON theirs.a = mine.b AND theirs.b = ? JOIN users x ON x.uid = mine.b AND x.pub = 1 AND x.hidden = 0 WHERE mine.a = ? ORDER BY theirs.at DESC LIMIT 50", u.uid, uid);
       if (rows.length) mutual = { list: rows.slice(0, 3).map(userOut), more: Math.max(0, rows.length - 3) };
     }
-    return json({ ok: true, user: { ...userOut(u), bio: u.bio || "" }, self, since: u.at, counts: counts(sql, u.uid, !self), dist, list, following: !!(uid && one(sql, "SELECT 1 AS x FROM follows WHERE a = ? AND b = ?", uid, u.uid)), ...(mutual ? { mutual } : {}) });
+    return json({ ok: true, user: { ...userOut(u), bio: u.bio || "", ...linksOut(u) }, self, since: u.at, counts: counts(sql, u.uid, !self), dist, list, following: !!(uid && one(sql, "SELECT 1 AS x FROM follows WHERE a = ? AND b = ?", uid, u.uid)), ...(mutual ? { mutual } : {}) });
   }
   if (op === "list") {
     // 個人卡片上四個數字點進去的清單：films 片單／notes 有寫短評的／followers 粉絲／following 追蹤中。
@@ -242,7 +271,7 @@ export async function social(hub, path, b) {
   // ── 以下都要登入 ──
   const no = need();
   if (no) return no;
-  if (op === "me") return json({ ok: true, unread: one(sql, 'SELECT COUNT(*) AS c FROM activity WHERE "to" = ? AND at > ?', uid.slice(0, 40), (one(sql, 'SELECT at FROM activity_seen WHERE "to" = ?', uid.slice(0, 40)) || { at: 0 }).at).c, ...(isAdmin ? { admin: true } : {}), user: me ? { ...userOut(me), bio: me.bio || "", pub: !!me.pub, hidden: !!me.hidden, canRename: Date.now() - me.named > RENAME_EVERY } : null, counts: counts(sql, uid, false) });
+  if (op === "me") return json({ ok: true, unread: one(sql, 'SELECT COUNT(*) AS c FROM activity WHERE "to" = ? AND at > ?', uid.slice(0, 40), (one(sql, 'SELECT at FROM activity_seen WHERE "to" = ?', uid.slice(0, 40)) || { at: 0 }).at).c, ...(isAdmin ? { admin: true } : {}), user: me ? { ...userOut(me), bio: me.bio || "", ...linksOut(me), pub: !!me.pub, hidden: !!me.hidden, canRename: Date.now() - me.named > RENAME_EVERY } : null, counts: counts(sql, uid, false) });
   if (op === "activity") {
     // 通知頁：最近的 150 筆，整理成一列一列（同一則的推合成一列、噓只算人數）。打開就算看過
     const to = uid.slice(0, 40);
@@ -266,6 +295,8 @@ export async function social(hub, path, b) {
         if (r.kind === "up") { const a = actorOf(r.actor); if (a && it.who.length < 2 && !it.who.some((x) => x.name === a.name)) it.who.push(a); }
       } else if (r.kind === "reply") {
         items.push({ kind: "reply", k: r.k, title: r.title, x: r.x, px: r.px, at: r.at, who: [actorOf(r.actor)].filter(Boolean), n: 1, ...(r.at > seen ? { fresh: 1 } : {}) });
+      } else if (r.kind === "mention") {
+        items.push({ kind: "mention", k: r.k, title: r.title, x: r.x, px: r.px, at: r.at, who: [actorOf(r.actor)].filter(Boolean), n: 1, ...(r.at > seen ? { fresh: 1 } : {}) });
       } else if (r.kind === "follow") {
         const a = actorOf(r.actor);
         // back = 我也有追蹤他；先追蹤他、他才追蹤我的話就是「回追」
@@ -304,13 +335,15 @@ export async function social(hub, path, b) {
     if (!okEmoji(emoji)) return json({ error: "bad emoji" }, 400);
     const bio = b.bio === undefined ? (me ? me.bio || "" : "") : cleanBio(b.bio);
     if (Array.from(bio).length > BIO_MAX || bioHasContact(bio)) return json({ error: "bad bio" }, 400);
+    const th = b.th === undefined ? (me ? me.th || "" : "") : cleanHandle(b.th), ig = b.ig === undefined ? (me ? me.ig || "" : "") : cleanHandle(b.ig);
+    if (th === null || ig === null) return json({ error: "bad handle" }, 400);
     const pub = b.pub ? 1 : 0;
     if (!NAME_RE.test(name) || RESERVED.test(name)) return json({ error: "bad name" }, 400);
     const taken = one(sql, "SELECT uid FROM users WHERE name = ?", name);
     if (taken && taken.uid !== uid) return json({ error: "name taken" }, 409);
     if (me && me.name !== name && Date.now() - me.named <= RENAME_EVERY) return json({ error: "rename later" }, 429);
-    if (me) sql.exec("UPDATE users SET name = ?, color = ?, emoji = ?, bio = ?, pub = ?, named = ? WHERE uid = ?", name, color, emoji, bio, pub, me.name !== name ? Date.now() : me.named, uid);
-    else sql.exec("INSERT INTO users (uid, name, color, emoji, bio, pub, at, named) VALUES (?, ?, ?, ?, ?, ?, ?, 0)", uid, name, color, emoji, bio, pub, Date.now());
+    if (me) sql.exec("UPDATE users SET name = ?, color = ?, emoji = ?, bio = ?, th = ?, ig = ?, pub = ?, named = ? WHERE uid = ?", name, color, emoji, bio, th, ig, pub, me.name !== name ? Date.now() : me.named, uid);
+    else sql.exec("INSERT INTO users (uid, name, color, emoji, bio, th, ig, pub, at, named) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)", uid, name, color, emoji, bio, th, ig, pub, Date.now());
     return json({ ok: true, user: { name, color, pub: !!pub, ...(emoji ? { emoji } : {}) } });
   }
   if (op === "follow") {
@@ -398,6 +431,7 @@ export async function social(hub, path, b) {
     if (bad) return bad;
     // 片單上記的是自己最新的一則「短評」（回覆別人的不算）
     if (r.t) delete r.t; // 發通知用的資料不傳給 App
+    if (op === "note-add") await notifyMentions(hub, sql, b.x, uid, { k: m, title: b.title, sp: b.sp }, []);
     const mine = (r.notes || []).filter((n) => n.mine && !n.r).sort((x, y) => y.at - x.at)[0];
     upsertEntry(sql, uid, m, b.title, { x: mine ? mine.x : "", sp: mine ? mine.sp : 0, ...(mine ? { s: mine.s } : {}), touch: op === "note-add" && !b.r });
     return json(withAuthors(sql, r, uid, m));
