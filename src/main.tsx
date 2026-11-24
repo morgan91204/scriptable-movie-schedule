@@ -891,8 +891,8 @@ class App {
         <Section>
           {user ? this.profileCard(user, me.counts, user.hidden ? "個人頁目前被站長停用，別人看不到。" : "", (kind) => this.go(() => this.profileListView("", kind), "讀取中…"), "", user.hidden ? { text: "已被停用", tone: "bad" } : user.pub ? { text: "公開", tone: "good" } : { text: "不公開", tone: "" }) : <Note kind="warn" text="還沒有設定暱稱：別人找不到你、不能追蹤你，短評也是匿名。你還是可以追蹤別人。" />}
         </Section>
-        {body}
         {IS_WEB ? <Section><Item icon="📥" title="從 Letterboxd 匯入" subtitle="把 Letterboxd 上的評分、觀影日期和影評搬過來" onTap={() => { this.lbx = null; this.go(() => this.lbxView()); }} /></Section> : null}
+        {body}
       </Page>
     );
   }
