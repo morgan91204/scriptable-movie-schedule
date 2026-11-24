@@ -26,21 +26,24 @@ import ICON_512 from "./public/icon-512.png";
 import SW_JS from "./public/sw.js.txt";
 import { handlePush, runPush, PushHub, handleSync } from "./push.js";
 export { PushHub };
+// 目前上線的版本號（從打包進來的 App 本體裡取）：網頁版用它判斷「重新整理後會不會拿到更新的版本」
+const DEPLOYED = (APP_JS.match(/"(\d{4}\.\d{2}\.\d{2}-\d{4})"/) || [])[1] || "";
+const VERSIONED_APP = `/app.${DEPLOYED || "0"}.js`;
+// 首頁裡載入程式的那一行，換成帶版本號的網址
+const INDEX_LIVE = INDEX_HTML.replace('src="app.js"', `src="${VERSIONED_APP}"`);
 const FILES = {
-  "/": [INDEX_HTML, "text/html; charset=utf-8", "no-cache"],
-  "/index.html": [INDEX_HTML, "text/html; charset=utf-8", "no-cache"],
+  "/": [INDEX_LIVE, "text/html; charset=utf-8", "no-cache"],
+  "/index.html": [INDEX_LIVE, "text/html; charset=utf-8", "no-cache"],
   "/manifest.webmanifest": [MANIFEST, "application/manifest+json; charset=utf-8", "public, max-age=3600"],
   "/icon-180.png": [ICON_180, "image/png", "public, max-age=86400"],
   "/icon-192.png": [ICON_192, "image/png", "public, max-age=86400"],
   "/icon-512.png": [ICON_512, "image/png", "public, max-age=86400"],
 };
 
-// 目前上線的版本號（從打包進來的 App 本體裡取）：網頁版用它判斷「重新整理後會不會拿到更新的版本」
-const DEPLOYED = (APP_JS.match(/"(\d{4}\.\d{2}\.\d{2}-\d{4})"/) || [])[1] || "";
-
 export default {
   async fetch(req, env, ctx) {
     const url = new URL(req.url);
+    if (url.pathname === "/version.json") return new Response(JSON.stringify({ version: DEPLOYED }), { headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } });
     if (url.pathname === "/api/version") return new Response(JSON.stringify({ version: DEPLOYED }), { headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } });
     if (url.pathname === "/api/fetch" && req.method === "POST") return proxy(req, ctx);
     if (url.pathname.startsWith("/api/push/")) return handlePush(req, env, url.pathname);
@@ -48,8 +51,11 @@ export default {
     // Google 登入完會回到這裡，身分憑證放在網址的 # 後面（不會送到伺服器）：原封不動帶回首頁，由網頁自己處理
     if (url.pathname === "/api/auth/google") return new Response('<!doctype html><meta charset="utf-8"><title>片刻</title><script>location.replace("/"+location.hash)</script>', { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } });
     if (url.pathname === "/sw.js") return new Response(SW_JS, { headers: { "content-type": "text/javascript; charset=utf-8", "cache-control": "no-cache", "service-worker-allowed": "/" } });
-    if (url.pathname === "/app.js") {
-      return new Response(APP_JS, { headers: { "content-type": "text/javascript; charset=utf-8", "cache-control": "no-cache" } });
+    // 程式本體：首頁指到帶版本號的網址（/app.<版本>.js），瀏覽器可以長期快取，同一版只下載一次，之後開啟不用再跟伺服器要。
+    // 換了新版，首頁會指到新的網址，自然就拿到新的。不帶版本號的 /app.js 留給還開著的舊頁面，每次都重新確認
+    if (url.pathname === "/app.js" || /^\/app\.[\w.-]+\.js$/.test(url.pathname)) {
+      const current = url.pathname === VERSIONED_APP;
+      return new Response(APP_JS, { headers: { "content-type": "text/javascript; charset=utf-8", "cache-control": current ? "public, max-age=31536000, immutable" : "no-cache" } });
     }
     const page = PAGES[url.pathname.replace(/\/+$/, "")];
     if (page && req.method === "GET") return new Response(page, { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "public, max-age=600" } });

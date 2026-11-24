@@ -215,7 +215,7 @@ async function autoUpdate() {
     location.reload();
   } catch (_) {}
 }
-autoUpdate();
+// 剛載入時不用查：首頁每次都是跟伺服器重新拿的，載入的一定是最新版（少一次請求）
 document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") autoUpdate(); });
 window.addEventListener("pageshow", (e) => { if ((e as PageTransitionEvent).persisted) autoUpdate(); });
 

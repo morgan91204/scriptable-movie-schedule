@@ -6,8 +6,10 @@ workers_dev = true
 
 # 靜態檔（首頁、程式本體、圖示、關於頁…）放在 site/（build.sh 產生），由 Cloudflare 直接送出：
 # 不經過 Worker、不算每天的請求額度。只有 /api/* 這些要運算的才會進 Worker。
-[assets]
-directory = "./site"
+# 目前先關著：靜態資源的上傳在這個開發環境裡會被擋（401），要改由 GitHub Actions 部署才能開。
+# 開的方法：拿掉下面兩行的 #，用有 Cloudflare 金鑰的環境執行 wrangler deploy（site/ 由 build.sh 產生）
+# [assets]
+# directory = "./site"
 
 # 同樣的檔案也打包進 Worker 當備援（見 worker.js）：靜態資源那邊找不到時才會用到
 [[rules]]
