@@ -3642,7 +3642,7 @@ export async function social<T = any>(op: string, body: Record<string, unknown> 
 /** 問過要不要取暱稱、使用者按了「稍後再說」：記在這台，之後評分、寫短評不再跳出來問（設定 → 我的片單 隨時可以設） */
 export const profileSkipped = (): boolean => cacheGet("profile-skip.txt") === "1";
 export const setProfileSkipped = (on: boolean): void => cacheSet("profile-skip.txt", on ? "1" : "");
-export interface Profile { name: string; color: string; emoji?: string; bio?: string; th?: string; ig?: string; tw?: string; pub?: boolean; hidden?: boolean; canRename?: boolean }
+export interface Profile { name: string; color: string; emoji?: string; bio?: string; code?: string; th?: string; ig?: string; tw?: string; pub?: boolean; hidden?: boolean; canRename?: boolean }
 /** 觀影方式（可以複選） */
 export const WATCH_HOW: { id: string; label: string }[] = [{ id: "cinema", label: "電影院" }, { id: "second", label: "二輪電影院" }, { id: "stream", label: "串流" }];
 export const howLabel = (how?: string[]): string => WATCH_HOW.filter((h) => (how || []).indexOf(h.id) >= 0).map((h) => h.label).join("、");

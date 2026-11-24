@@ -170,7 +170,7 @@ class App {
       await this.askNickname().catch(() => undefined);
     } else if (this.syncNote) { this.switchTab("settings"); this.go(() => this.syncView()); } // 剛從 Google 登入回來：直接到同步那一頁看結果
     // 網頁版的新手引導（從分享連結、通知點進來的不打擾，只在停在首頁時才出現）
-    if (IS_WEB && this.tab === "home" && this.stack.length === 1 && !/[?&](u|tab|fav|c|m)=/.test(String((globalThis as any).location?.search || ""))) {
+    if (IS_WEB && this.tab === "home" && this.stack.length === 1 && !/[?&](u|p|tab|fav|c|m)=/.test(String((globalThis as any).location?.search || ""))) {
       if (this.isStandalone()) {
         // 第一次從主畫面的圖示開啟：問要不要開通知（只問這一次；之後寫短評、追蹤別人時還會再問）
         // 問完通知（不管開不開）接著問要不要用 Google 登入；這台已經開了通知或不支援通知的，直接問登入
@@ -785,7 +785,7 @@ class App {
         {me ? (
           <div class="pf-btns">
             <button class="pf-btn" onTap={() => { this.profileDraft = null; this.go(() => this.profileEditView(u || null)); }}>{u ? "編輯個人檔案" : "設定暱稱"}</button>
-            {u && u.pub && !u.hidden ? <button class="pf-btn" onTap={() => this.shareProfile(u.name, true)}>分享個人檔案</button> : null}
+            {u && u.pub && !u.hidden ? <button class="pf-btn" onTap={() => this.shareProfile(u.name, true, u.code)}>分享個人檔案</button> : null}
             <button class="pf-btn icon" aria-label="搜尋片友" onTap={() => { this.switchTab("activity"); this.socialTab = "people"; }}>{PERSON_ADD}</button>
           </div>
         ) : null}
@@ -837,8 +837,9 @@ class App {
     if (row) this.openFavRow(row); else this.go(() => this.favMovieView(fav), `讀取《${title}》…`);
   }
   /** 分享個人頁：跳出系統的分享選單（不支援的瀏覽器改成複製連結） */
-  async shareProfile(name: string, mine: boolean): Promise<void> {
-    const url = `${SITE_URL}/?u=${encodeURIComponent(name)}`;
+  async shareProfile(name: string, mine: boolean, code = ""): Promise<void> {
+    // 有短代號就用短代號（網址乾淨）；沒有才退回用暱稱（中文會變成一長串 %E5…）
+    const url = code ? `${SITE_URL}/?p=${code}` : `${SITE_URL}/?u=${encodeURIComponent(name)}`;
     if (IS_WEB) await ShareSheet.present([mine ? `我在片刻記錄看過的電影，來追蹤我：${name}` : `${name} 在片刻的片單`, url]);
     else { Pasteboard.copy(url); await this.ui.toast("已複製個人頁連結"); }
   }
@@ -1521,7 +1522,7 @@ class App {
                 const sy = this.sync(); if (sy) sy.login();
               }}>登入後追蹤</button>
             )}
-            <button class="pf-btn" onTap={() => this.shareProfile(u.name, !!p!.self)}>分享</button>
+            <button class="pf-btn" onTap={() => this.shareProfile(u.name, !!p!.self, u.code)}>分享</button>
             {p.self ? null : <button class="pf-btn icon" aria-label="檢舉這個帳號" onTap={() => this.go(() => this.reportUserView(u.name))}>⚑</button>}
           </div>
         </Section>
@@ -2327,6 +2328,7 @@ class App {
         </Section>
         {await this.notifyLink()}
         <Section title="關於">
+          {IS_WEB ? <Item icon="📣" title="分享片刻給朋友" subtitle="把片刻的網址傳給朋友" chevron={false} onTap={async () => { await ShareSheet.present(["片刻：全台電影場次一次查，還能記片單、寫短評、追蹤朋友。免費、沒有廣告、不用安裝。", SITE_URL]); }} /> : null}
           {IS_WEB && !this.isStandalone() ? <Item icon="📲" title="加到主畫面" subtitle="像 App 一樣從主畫面開啟，看圖示教學" onTap={() => this.go(() => this.installView())} /> : null}
           <Item icon="ℹ️" title="關於" subtitle="資料來源、隱私權政策、場次通" onTap={() => this.go(() => this.aboutView())} />
           <Item icon="💬" title="意見回饋" subtitle={fbNew ? "站長回覆你了，點進來看" : "回報問題、資料有誤，或建議新功能"} right={fbNew ? "● 新回覆" : ""} onTap={() => { this.fbCat = ""; this.fbDraft = ""; this.fbForce = true; this.go(() => this.feedbackView(), "讀取中…"); }} />
@@ -3968,6 +3970,15 @@ class App {
     const param = (name: string) => { const m = new RegExp(`[?&]${name}=([^&]*)`).exec(search); try { return m ? decodeURIComponent(m[1].replace(/\+/g, " ")) : ""; } catch (_) { return ""; } };
     const who = param("u").trim().slice(0, 16);
     if (who) { this.switchTab("settings"); this.go(() => this.profileView(who), "讀取個人頁…"); return; }
+    // 短代號的個人頁連結（?p=…）：先問伺服器這是誰，再開他的個人頁
+    const code = param("p").trim().toLowerCase();
+    if (/^[a-z0-9]{7}$/.test(code)) {
+      const r = await social<{ user: Profile }>("profile", { code }).catch(() => null);
+      this.switchTab("settings");
+      if (r && r.user) this.go(() => this.profileView(r.user.name), "讀取個人頁…");
+      else this.go(() => <Page title="個人頁" onBack={() => this.back()}><Note kind="warn" text="找不到這個帳號（可能已經刪除）。" /></Page>);
+      return;
+    }
     const title = param("m").trim().slice(0, 120);
     if (!title) return;
     const fid = param("f"), film = param("ff");

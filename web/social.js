@@ -43,6 +43,9 @@ export function socialInit(sql) {
   sql.exec("CREATE TABLE IF NOT EXISTS lbx_map (k TEXT PRIMARY KEY, zh TEXT NOT NULL DEFAULT '', imdb TEXT NOT NULL DEFAULT '', y INTEGER NOT NULL DEFAULT 0, at INTEGER NOT NULL DEFAULT 0)");
   // users.th、users.ig = 個人頁上的 Threads、Instagram 帳號（只存帳號名稱，不存網址）
   for (const c of ["th", "ig", "tw"]) if (!sql.exec("SELECT 1 FROM pragma_table_info('users') WHERE name = ?", c).toArray().length) sql.exec(`ALTER TABLE users ADD COLUMN ${c} TEXT NOT NULL DEFAULT ''`);
+  // users.code = 分享個人頁用的短代號（網址裡放中文暱稱會變成一長串 %E5…，改放這個）
+  if (!sql.exec("SELECT 1 FROM pragma_table_info('users') WHERE name = 'code'").toArray().length) sql.exec("ALTER TABLE users ADD COLUMN code TEXT NOT NULL DEFAULT ''");
+  sql.exec("CREATE UNIQUE INDEX IF NOT EXISTS users_code ON users (code) WHERE code != ''");
   // users.bio = 個人頁上的一行自我介紹（後來才加的欄位）
   if (!sql.exec("SELECT 1 FROM pragma_table_info('users') WHERE name = 'bio'").toArray().length) sql.exec("ALTER TABLE users ADD COLUMN bio TEXT NOT NULL DEFAULT ''");
   sql.exec("CREATE INDEX IF NOT EXISTS entries_at ON entries (at)");
@@ -165,6 +168,17 @@ async function notifyMentions(hub, sql, text, uid, more, skip) {
 const okEmoji = (e) => e === "" || (typeof e === "string" && e.length <= 32 && EMOJI_RE.test(e));
 
 /** 這個帳號的數字：片單幾部、短評幾則、追蹤幾人、被幾人追蹤 */
+/** 這個帳號分享用的短代號：第一次要用的時候才產生（7 個小寫英數，去掉容易看錯的字），之後不變（改暱稱也不變） */
+function codeOf(sql, u) {
+  if (u.code) return u.code;
+  const A = "abcdefghjkmnpqrstuvwxyz23456789";
+  for (let i = 0; i < 6; i++) {
+    const code = Array.from(crypto.getRandomValues(new Uint8Array(7)), (b) => A[b % A.length]).join("");
+    try { sql.exec("UPDATE users SET code = ? WHERE uid = ? AND code = ''", code, u.uid); } catch (_) { continue; } // 撞到別人的：再抽一次
+    return (u.code = (sql.exec("SELECT code FROM users WHERE uid = ?", u.uid).toArray()[0] || {}).code || "");
+  }
+  return "";
+}
 /** viewer 看得到 u 的片單、短評、粉絲和追蹤名單嗎：公開帳號誰都可以；不公開的只有本人和他同意追蹤的人 */
 const canSee = (sql, viewer, u) => !!u.pub || u.uid === viewer || !!(viewer && one(sql, "SELECT 1 AS x FROM follows WHERE a = ? AND b = ?", viewer, u.uid));
 function counts(sql, uid, onlyPublic) {
@@ -266,11 +280,11 @@ export async function social(hub, path, b) {
     return json(withAuthors(sql, r, uid, m));
   }
   if (op === "profile") {
-    const u = one(sql, "SELECT * FROM users WHERE name = ?", String(b.name || ""));
+    const u = /^[a-z0-9]{7}$/.test(String(b.code || "")) ? one(sql, "SELECT * FROM users WHERE code = ?", String(b.code)) : one(sql, "SELECT * FROM users WHERE name = ?", String(b.name || ""));
     if (!u || (u.hidden && u.uid !== uid)) return json({ error: "not found" }, 404);
     const self = u.uid === uid;
     // 不公開帳號：個人頁看得到（暱稱、頭像、自我介紹、四個數字），但片單、短評、粉絲和追蹤名單要他同意追蹤後才看得到
-    if (!canSee(sql, uid, u)) return json({ ok: true, user: { ...userOut(u), bio: u.bio || "" }, private: true, locked: true, since: u.at, counts: counts(sql, u.uid, true), following: false, requested: !!(uid && one(sql, "SELECT 1 AS x FROM follow_reqs WHERE a = ? AND b = ?", uid, u.uid)) });
+    if (!canSee(sql, uid, u)) return json({ ok: true, user: { ...userOut(u), bio: u.bio || "", code: codeOf(sql, u) }, private: true, locked: true, since: u.at, counts: counts(sql, u.uid, true), following: false, requested: !!(uid && one(sql, "SELECT 1 AS x FROM follow_reqs WHERE a = ? AND b = ?", uid, u.uid)) });
     const where = self ? "" : " AND priv = 0";
     const offset = Math.max(0, Number(b.offset) || 0);
     const list = all(sql, "SELECT * FROM entries WHERE uid = ?" + where + " ORDER BY at DESC LIMIT 50 OFFSET ?", u.uid, offset).map(entryOut);
@@ -282,7 +296,7 @@ export async function social(hub, path, b) {
       const rows = all(sql, "SELECT x.name, x.color, x.emoji FROM follows mine JOIN follows theirs ON theirs.a = mine.b AND theirs.b = ? JOIN users x ON x.uid = mine.b AND x.pub = 1 AND x.hidden = 0 WHERE mine.a = ? ORDER BY theirs.at DESC LIMIT 50", u.uid, uid);
       if (rows.length) mutual = { list: rows.slice(0, 3).map(userOut), more: Math.max(0, rows.length - 3) };
     }
-    return json({ ok: true, user: { ...userOut(u), bio: u.bio || "", ...linksOut(u) }, self, since: u.at, counts: counts(sql, u.uid, !self), dist, list, following: !!(uid && one(sql, "SELECT 1 AS x FROM follows WHERE a = ? AND b = ?", uid, u.uid)), ...(u.pub ? {} : { private: true }), ...(mutual ? { mutual } : {}) });
+    return json({ ok: true, user: { ...userOut(u), bio: u.bio || "", code: codeOf(sql, u), ...linksOut(u) }, self, since: u.at, counts: counts(sql, u.uid, !self), dist, list, following: !!(uid && one(sql, "SELECT 1 AS x FROM follows WHERE a = ? AND b = ?", uid, u.uid)), ...(u.pub ? {} : { private: true }), ...(mutual ? { mutual } : {}) });
   }
   if (op === "list") {
     // 個人卡片上四個數字點進去的清單：films 片單／notes 有寫短評的／followers 粉絲／following 追蹤中。
@@ -329,7 +343,7 @@ export async function social(hub, path, b) {
   // ── 以下都要登入 ──
   const no = need();
   if (no) return no;
-  if (op === "me") return json({ ok: true, unread: one(sql, 'SELECT COUNT(*) AS c FROM activity WHERE "to" = ? AND at > ?', uid.slice(0, 40), (one(sql, 'SELECT at FROM activity_seen WHERE "to" = ?', uid.slice(0, 40)) || { at: 0 }).at).c, ...(isAdmin ? { admin: true } : {}), user: me ? { ...userOut(me), bio: me.bio || "", ...linksOut(me), pub: !!me.pub, hidden: !!me.hidden, canRename: Date.now() - me.named > RENAME_EVERY } : null, counts: counts(sql, uid, false) });
+  if (op === "me") return json({ ok: true, unread: one(sql, 'SELECT COUNT(*) AS c FROM activity WHERE "to" = ? AND at > ?', uid.slice(0, 40), (one(sql, 'SELECT at FROM activity_seen WHERE "to" = ?', uid.slice(0, 40)) || { at: 0 }).at).c, ...(isAdmin ? { admin: true } : {}), user: me ? { ...userOut(me), bio: me.bio || "", code: codeOf(sql, me), ...linksOut(me), pub: !!me.pub, hidden: !!me.hidden, canRename: Date.now() - me.named > RENAME_EVERY } : null, counts: counts(sql, uid, false) });
   if (op === "activity") {
     // 通知頁：最近的 150 筆，整理成一列一列（同一則的推合成一列、噓只算人數）。打開就算看過
     const to = uid.slice(0, 40);
