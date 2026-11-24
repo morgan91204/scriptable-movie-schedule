@@ -119,8 +119,11 @@ export interface FavMovie { key: string; title: string; en?: string; poster?: st
 
 export type MapsApp = "apple" | "google";
 export const MAPS_LABEL: Record<MapsApp, string> = { apple: "Apple 地圖", google: "Google 地圖" };
-/** 導航連結：Apple 地圖或 Google 地圖（分享、行程備註、點地址都用這個） */
-export function mapsUrl(name: string, address?: string, app: MapsApp = "apple"): string {
+/** 導航連結：Apple 地圖或 Google 地圖（分享、行程備註、點地址都用這個）。
+ *  short = 會被人看到的地方（行事曆備註、分享的文字）：只用影城名稱搜尋、網址用短的寫法，
+ *  免得中文地址變成七八行的 %E5…（地址在備註裡另外有一行，點了一樣能導航） */
+export function mapsUrl(name: string, address?: string, app: MapsApp = "apple", short = false): string {
+  if (short) return `https://${app === "google" ? "maps.google.com" : "maps.apple.com"}/?q=${encodeURIComponent(name)}`;
   if (app === "google")
     return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([name, address].filter(Boolean).join(" "))}`;
   return `https://maps.apple.com/?q=${encodeURIComponent(name)}${address ? "&address=" + encodeURIComponent(address) : ""}`;
@@ -4154,7 +4157,7 @@ export async function bookingUrl(p: { cinema: Cinema; booking?: string }): Promi
 // ───────────────────────── 分享 ─────────────────────────
 
 export function shareText(p: { movie: { title: string }; version: { label: string }; cinema: Cinema; address?: string }, start: Date, end?: Date, seat?: string, app: MapsApp = "apple"): string {
-  const maps = mapsUrl(p.cinema.name, p.address, app);
+  const maps = mapsUrl(p.cinema.name, p.address, app, true);
   return [
     `🎬 ${p.movie.title}`,
     `🕒 ${fmt(start)}${end ? ` – ${fmt(end).slice(-5)}` : ""}`,

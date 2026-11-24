@@ -1165,7 +1165,7 @@ function ConfirmPage({ pick }: { pick: Pick }) {
         .find((e: any) => e.title === pick.movie.title)
       if (dup && !(await Dialog.confirm({ title: "行事曆裡已經有這場", message: `${pick.movie.title}\n${fmt(start)}`, cancelLabel: "取消", confirmLabel: "還是加入" }))) return
 
-      const maps = mapsUrl(pick.cinema.name, address, settings.maps)
+      const maps = mapsUrl(pick.cinema.name, address, settings.maps, true)
       const ev = new CalendarEvent()
       ev.title = pick.movie.title
       ev.calendar = cal

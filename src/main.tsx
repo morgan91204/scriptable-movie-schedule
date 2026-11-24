@@ -3315,7 +3315,7 @@ class App {
   }
 
   write(p: Pick, cal: Calendar, start: Date, end: Date) {
-    const maps = mapsUrl(p.cinema.name, p.address, this.settings.maps);
+    const maps = mapsUrl(p.cinema.name, p.address, this.settings.maps, true);
     const ev = new CalendarEvent();
     ev.title = p.movie.title;
     ev.startDate = start;

@@ -911,7 +911,8 @@ function parseTwMovieDay(doc) {
   var notifyQuiet = (p) => ({ on: p.quietOn === true, from: p.quietFrom ?? 22, to: p.quietTo ?? 9 });
   var notifyFavs = (s) => (s.favMovies || []).map((f) => ({ key: f.key, title: f.title, ...f.fest ? { fest: { id: f.fest.id, name: f.fest.name } } : {} }));
   var MAPS_LABEL = { apple: "Apple 地圖", google: "Google 地圖" };
-  function mapsUrl(name, address, app = "apple") {
+  function mapsUrl(name, address, app = "apple", short = false) {
+    if (short) return `https://${app === "google" ? "maps.google.com" : "maps.apple.com"}/?q=${encodeURIComponent(name)}`;
     if (app === "google")
       return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([name, address].filter(Boolean).join(" "))}`;
     return `https://maps.apple.com/?q=${encodeURIComponent(name)}${address ? "&address=" + encodeURIComponent(address) : ""}`;
@@ -4306,7 +4307,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     }
   }
   function shareText(p, start, end, seat, app = "apple") {
-    const maps = mapsUrl(p.cinema.name, p.address, app);
+    const maps = mapsUrl(p.cinema.name, p.address, app, true);
     return [
       `🎬 ${p.movie.title}`,
       `🕒 ${fmt(start)}${end ? ` – ${fmt(end).slice(-5)}` : ""}`,
@@ -4461,7 +4462,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   var extra = { boxOffice, filmList, soonList, nowShowing, nowShowingMulti, movieBoard: movieBoard2, festivalBoard, festivalFilm, nearby, patchSettings, fillMovie, formatList };
   var BRIDGE_LEVEL = 2;
   globalThis.MS = {
-    version: "2026.11.25-0246",
+    version: "2026.11.25-0259",
     level: BRIDGE_LEVEL,
     init(saved) {
       cache = saved || {};
