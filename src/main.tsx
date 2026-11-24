@@ -203,6 +203,17 @@ class App {
     );
   }
 
+  showAll: string[] = []; // 搜尋結果裡，哪幾組已經展開成「全部列出」
+  showAllFor = ""; // 上面那份是哪一頁、哪個搜尋字的（換了就重來）
+  /** 搜尋結果每一組先列前幾筆；超過的給一列「顯示全部 N 部」，點了在原地全部列出，再點收回去 */
+  showAllOf(scope: string, max: number): { lim: (id: string) => number; more: (id: string, n: number, unit: string) => string | null } {
+    if (this.showAllFor !== scope) { this.showAllFor = scope; this.showAll = []; }
+    const open = (id: string) => this.showAll.indexOf(id) >= 0;
+    return {
+      lim: (id) => (open(id) ? Infinity : max),
+      more: (id, n, unit) => (n > max ? <Item title={open(id) ? `只顯示前 ${max} ${unit}` : `顯示全部 ${n} ${unit}`} right={open(id) ? "▴" : "▾"} accent chevron={false} onTap={() => { this.showAll = open(id) ? this.showAll.filter((x) => x !== id) : [...this.showAll, id]; }} /> : null),
+    };
+  }
   favQuery = ""; // 收藏電影頁的搜尋字
   favJob: { q: string; job: Promise<GlobalHits> } | null = null;
   /** 收藏電影頁：管理收藏電影的地方。上面是已經收藏的（含現在的狀態）；
@@ -215,8 +226,8 @@ class App {
       const on = isFavMovie(this.settings, title);
       return { label: on ? "♥" : "♡", hint: on ? "取消收藏" : "收藏這部電影", onTap: () => { toggleFavMovie(this.settings, { title, ...(extra || {}) }); saveSettings(this.settings); this.pushSync(); } };
     };
-    const MAX = 20;
-    const more = (n: number) => (n > MAX ? <Note text={`還有 ${n - MAX} 部沒列出來，把關鍵字打得更完整一點。`} /> : null);
+    const MAX = 20; // 每一組先列 20 部，其餘點「顯示全部」展開
+    const { lim, more } = this.showAllOf("fav|" + q, MAX);
     let body: string;
     if (q) {
       // 歷年電影和影展片單第一次要下載：先畫已經有的，讀好再補上（不能讓整頁換成「讀取中」，搜尋欄會不見）
@@ -229,26 +240,26 @@ class App {
         <>
           {hits.now.length ? (
             <Section title={`現正上映（${hits.now.length}）`}>
-              {hits.now.slice(0, MAX).map((m) => <Item title={m.title} subtitle={movieLines(m).filter(Boolean).join("\n")} tag={{ text: "上映中", tone: "now" }} onTap={() => this.go(() => this.movieView(m, ""), `讀取《${m.title}》的放映影城…`)} action={heart(m.title, { en: m.en })} />)}
-              {more(hits.now.length)}
+              {hits.now.slice(0, lim("now")).map((m) => <Item title={m.title} subtitle={movieLines(m).filter(Boolean).join("\n")} tag={{ text: "上映中", tone: "now" }} onTap={() => this.go(() => this.movieView(m, ""), `讀取《${m.title}》的放映影城…`)} action={heart(m.title, { en: m.en })} />)}
+              {more("now", hits.now.length, "部")}
             </Section>
           ) : null}
           {hits.soon.length ? (
             <Section title={`即將上映（${hits.soon.length}）`}>
-              {hits.soon.slice(0, MAX).map((e) => <Item title={e.title} subtitle={e.lines.filter(Boolean).join("\n")} onTap={e.m ? () => this.go(() => this.movieView(e.m!, ""), `讀取《${e.title}》的放映影城…`) : e.u ? () => this.go(() => this.soonMovieView(e.u!), `讀取《${e.title}》…`) : undefined} action={heart(e.title, { en: e.m ? e.m.en : e.u ? e.u.en : "", poster: e.u ? e.u.poster : undefined })} />)}
-              {more(hits.soon.length)}
+              {hits.soon.slice(0, lim("soon")).map((e) => <Item title={e.title} subtitle={e.lines.filter(Boolean).join("\n")} onTap={e.m ? () => this.go(() => this.movieView(e.m!, ""), `讀取《${e.title}》的放映影城…`) : e.u ? () => this.go(() => this.soonMovieView(e.u!), `讀取《${e.title}》…`) : undefined} action={heart(e.title, { en: e.m ? e.m.en : e.u ? e.u.en : "", poster: e.u ? e.u.poster : undefined })} />)}
+              {more("soon", hits.soon.length, "部")}
             </Section>
           ) : null}
           {hits.year.length ? (
             <Section title={`已下檔（${hits.year.length}）`}>
-              {hits.year.slice(0, MAX).map((x) => <Item title={x.name} subtitle={[boxIsRerun(x) ? "重映" : boxHasLaterRun(x) ? "首映" : "", String(x.release || "").slice(0, 10).replace(/-/g, "/") + " 上映", `票房 ${money(x.total)}`].filter(Boolean).join("｜")} tag={{ text: STATUS_LABEL[boxStatus(x)], tone: boxStatus(x) }} onTap={() => this.go(() => this.boxMovieView(x), `讀取《${x.name}》…`)} action={heart(x.name)} />)}
-              {more(hits.year.length)}
+              {hits.year.slice(0, lim("year")).map((x) => <Item title={x.name} subtitle={[boxIsRerun(x) ? "重映" : boxHasLaterRun(x) ? "首映" : "", String(x.release || "").slice(0, 10).replace(/-/g, "/") + " 上映", `票房 ${money(x.total)}`].filter(Boolean).join("｜")} tag={{ text: STATUS_LABEL[boxStatus(x)], tone: boxStatus(x) }} onTap={() => this.go(() => this.boxMovieView(x), `讀取《${x.name}》…`)} action={heart(x.name)} />)}
+              {more("year", hits.year.length, "部")}
             </Section>
           ) : null}
           {hits.fest.length ? (
             <Section title={`影展（${hits.fest.length}）`}>
-              {hits.fest.slice(0, MAX).map(({ f, film }) => <Item title={film.title} subtitle={`${f.start.slice(0, 4)} ${f.name}`} onTap={() => this.go(() => this.festivalFilmView(f, film))} action={heart(film.title, { poster: film.poster, fest: { id: f.id, film: film.id, name: f.name } })} />)}
-              {more(hits.fest.length)}
+              {hits.fest.slice(0, lim("fest")).map(({ f, film }) => <Item title={film.title} subtitle={`${f.start.slice(0, 4)} ${f.name}`} onTap={() => this.go(() => this.festivalFilmView(f, film))} action={heart(film.title, { poster: film.poster, fest: { id: f.id, film: film.id, name: f.name } })} />)}
+              {more("fest", hits.fest.length, "部")}
             </Section>
           ) : null}
           {total ? null : <Empty icon="🔎" text="找不到相符的電影，換個關鍵字試試。" />}
@@ -346,44 +357,38 @@ class App {
       const hits: GlobalHits = got || { cinemas: this.cinemas.filter((c) => `${c.name} ${c.city} ${c.district} ${c.id} ${c.aliases || ""}`.toLowerCase().replace(/臺/g, "台").includes(k0)), now: [], soon: [], year: [], fest: [] };
       const total = hits.cinemas.length + hits.now.length + hits.soon.length + hits.year.length + hits.fest.length;
       const MAX = 5;
-      const toMovies = (mode: "box" | "soon" | "year" | "fest") => {
-        this.movieMode = mode;
-        if (mode === "fest") { this.festQuery = q; this.festYear = hits.fest.length ? Number(hits.fest[0].f.start.slice(0, 4)) : 0; } else this.movieQuery = q;
-        if (mode === "year") { this.boxYears = Array.from({ length: new Date().getFullYear() - 2014 }, (_, i) => String(2016 + i)); this.boxIssuer = []; this.boxCountry = []; this.boxStatus = ""; this.sortBy.year = "date"; this.ascBy.year = false; }
-        this.switchTab("movies");
-      };
-      const more = (n: number, unit: string, onTap: () => void) => (n > MAX ? <Item title={`看全部 ${n} ${unit}`} accent onTap={onTap} /> : null);
+      const { lim, more } = this.showAllOf("home|" + q, MAX); // 每一組先列 5 筆，點「顯示全部」在原地展開
       return (
         <Page title="🎬 片刻" subtitle={pendingGs ? `正在找「${q}」…` : `「${q}」找到 ${total} 筆`}>
           <Search value={this.homeQuery} placeholder="搜尋電影、影城" onInput={(t) => { this.homeQuery = t; }} />
           {hits.cinemas.length ? (
             <Section title={`影城（${hits.cinemas.length}）`}>
-              {hits.cinemas.slice(0, MAX).map((c) => this.cinemaItem(c))}
-              {more(hits.cinemas.length, "間", () => { this.query = q; this.switchTab("cinemas"); })}
+              {hits.cinemas.slice(0, lim("cinemas")).map((c) => this.cinemaItem(c))}
+              {more("cinemas", hits.cinemas.length, "間")}
             </Section>
           ) : null}
           {hits.now.length ? (
             <Section title={`現正上映（${hits.now.length}）`}>
-              {hits.now.slice(0, MAX).map((m) => <Item title={m.title} subtitle={movieLines(m).filter(Boolean).join("\n")} tag={{ text: "上映中", tone: "now" }} onTap={() => this.go(() => this.movieView(m, ""), `讀取《${m.title}》的放映影城…`)} />)}
-              {more(hits.now.length, "部", () => toMovies("box"))}
+              {hits.now.slice(0, lim("now")).map((m) => <Item title={m.title} subtitle={movieLines(m).filter(Boolean).join("\n")} tag={{ text: "上映中", tone: "now" }} onTap={() => this.go(() => this.movieView(m, ""), `讀取《${m.title}》的放映影城…`)} />)}
+              {more("now", hits.now.length, "部")}
             </Section>
           ) : null}
           {hits.soon.length ? (
             <Section title={`即將上映（${hits.soon.length}）`}>
-              {hits.soon.slice(0, MAX).map((e) => <Item title={e.title} subtitle={e.lines.filter(Boolean).join("\n")} onTap={e.m ? () => this.go(() => this.movieView(e.m!, ""), `讀取《${e.title}》的放映影城…`) : e.u ? () => this.go(() => this.soonMovieView(e.u!), `讀取《${e.title}》…`) : undefined} />)}
-              {more(hits.soon.length, "部", () => toMovies("soon"))}
+              {hits.soon.slice(0, lim("soon")).map((e) => <Item title={e.title} subtitle={e.lines.filter(Boolean).join("\n")} onTap={e.m ? () => this.go(() => this.movieView(e.m!, ""), `讀取《${e.title}》的放映影城…`) : e.u ? () => this.go(() => this.soonMovieView(e.u!), `讀取《${e.title}》…`) : undefined} />)}
+              {more("soon", hits.soon.length, "部")}
             </Section>
           ) : null}
           {hits.year.length ? (
             <Section title={`歷年電影（${hits.year.length}）`}>
-              {hits.year.slice(0, MAX).map((x) => <Item title={x.name} subtitle={[boxIsRerun(x) ? "重映" : boxHasLaterRun(x) ? "首映" : "", String(x.release || "").slice(0, 10).replace(/-/g, "/") + " 上映", `票房 ${money(x.total)}`].filter(Boolean).join("｜")} tag={{ text: STATUS_LABEL[boxStatus(x)], tone: boxStatus(x) }} onTap={() => this.go(() => this.boxMovieView(x), `讀取《${x.name}》…`)} />)}
-              {more(hits.year.length, "部", () => toMovies("year"))}
+              {hits.year.slice(0, lim("year")).map((x) => <Item title={x.name} subtitle={[boxIsRerun(x) ? "重映" : boxHasLaterRun(x) ? "首映" : "", String(x.release || "").slice(0, 10).replace(/-/g, "/") + " 上映", `票房 ${money(x.total)}`].filter(Boolean).join("｜")} tag={{ text: STATUS_LABEL[boxStatus(x)], tone: boxStatus(x) }} onTap={() => this.go(() => this.boxMovieView(x), `讀取《${x.name}》…`)} />)}
+              {more("year", hits.year.length, "部")}
             </Section>
           ) : null}
           {hits.fest.length ? (
             <Section title={`影展（${hits.fest.length}）`}>
-              {hits.fest.slice(0, MAX).map(({ f, film }) => <Item title={film.title} subtitle={`${f.start.slice(0, 4)} ${f.name}`} onTap={() => this.go(() => this.festivalFilmView(f, film))} />)}
-              {more(hits.fest.length, "部", () => toMovies("fest"))}
+              {hits.fest.slice(0, lim("fest")).map(({ f, film }) => <Item title={film.title} subtitle={`${f.start.slice(0, 4)} ${f.name}`} onTap={() => this.go(() => this.festivalFilmView(f, film))} />)}
+              {more("fest", hits.fest.length, "部")}
             </Section>
           ) : null}
           {pendingGs ? <Note text="正在找電影…" /> : total ? null : <Empty icon="🔎" text="找不到相符的電影或影城，換個關鍵字試試。" />}
