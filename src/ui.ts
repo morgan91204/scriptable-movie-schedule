@@ -18,6 +18,7 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .bar-title{flex:1;text-align:center;min-width:0}
 .bar-title .t{font-weight:600;font-size:17px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .bar-title .s{font-size:12px;color:var(--fg2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bar-save{padding:6px 2px 6px 12px;font-size:17px;font-weight:600;color:var(--accent)}
 .bar-right{min-width:64px;text-align:right;font-size:13px;color:var(--fg2);white-space:nowrap}
 .content{flex:1;padding:8px 16px calc(env(safe-area-inset-bottom) + 32px)}
 .page.with-tabs .content{padding-bottom:calc(max(env(safe-area-inset-bottom) - 12px,12px) + 104px)}

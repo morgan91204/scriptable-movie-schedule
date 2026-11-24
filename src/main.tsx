@@ -746,6 +746,9 @@ class App {
           </div>
         ) : null}
         <Item icon="🎞" title="我的片單" subtitle={u ? "看過的片、評分和短評" : "取暱稱、記錄看過的片、追蹤別人"} onTap={open} />
+        {u && !u.hidden ? <Item icon={u.pub ? "✅" : "⬜️"} title="公開個人頁" subtitle={u.pub ? "別人可以看你的片單、追蹤你；短評旁邊顯示暱稱" : "目前只有你看得到片單，短評匿名"} chevron={false} onTap={async () => {
+          try { await social("profile-set", { name: u.name, pub: !u.pub }); this.meMem = null; this.diaryMem = null; await this.ui.toast(u.pub ? "個人頁改成不公開了" : "個人頁公開了"); } catch (e) { await this.ui.toast(String((e as Error)?.message || e)); }
+        }} /> : null}
         <Item icon="🔄" title="同步與登出" subtitle="收藏和設定自動同步中" onTap={() => this.go(() => this.syncView())} />
         {me && me.admin ? <Item icon="🛡" title="管理員專區" subtitle="意見回饋、短評、帳號、管理員名單" onTap={() => this.go(() => this.adminHomeView())} /> : null}
       </Section>
@@ -930,8 +933,13 @@ class App {
       this.profileDraft = { ...d, name: v && typeof v.n === "string" ? v.n : d.name, emoji: v && typeof v.e === "string" ? v.e.trim() : d.emoji, bio: v && typeof v.b === "string" ? v.b : d.bio, th: v && typeof v.th === "string" ? v.th : d.th, ig: v && typeof v.ig === "string" ? v.ig : d.ig, color: picked };
     };
     const custom = /^#/.test(d.color);
+    const save = async (v: Record<string, string>) => {
+              keep(v);
+              const p = this.profileDraft!;
+              try { await social("profile-set", { name: p.name.trim(), color: p.color, emoji: p.emoji, bio: p.bio, th: p.th.trim(), ig: p.ig.trim(), pub: p.pub }); this.profileDraft = null; this.hasProfile = true; this.meMem = null; setProfileSkipped(false); await this.ui.toast(first ? "暱稱設定好了" : "已儲存"); if (!first || pushed) this.back(); } catch (e) { await this.ui.toast(String((e as Error)?.message || e)); }
+    };
     return (
-      <Page title={user ? "編輯個人檔案" : first ? "先取一個暱稱" : "設定暱稱"} onBack={() => this.back()}>
+      <Page title={user ? "編輯個人檔案" : first ? "先取一個暱稱" : "設定暱稱"} onBack={() => this.back()} right={<button class="bar-save" onTap={save}>儲存</button>}>
         {first ? <Note text={(pushed ? "剛才的動作已經完成了。接下來，" : "歡迎使用「我的片單」。") + "取一個暱稱、公開個人頁，別人才找得到你、能追蹤你，你寫的短評旁邊也會顯示暱稱。只會問這一次，之後在「設定 → 我的片單」可以改。\n不想公開也沒關係：取消下面的「公開我的個人頁」，或按最下面的「稍後再說」，片單就只有你自己看得到（還是可以追蹤別人）。"} /> : null}
         <Section title="暱稱" hint={(!user && suggest.length >= 2 ? "已經先幫你填上 Google 帳號的名稱，可以直接改成你想要的；如果那是本名，建議換一個。" : "") + "2～16 個字，只能用中英文、數字和底線；不能跟別人重複。14 天內只能改一次。請不要冒用他人名義。"}>
           <div class="nt-form">
@@ -965,19 +973,21 @@ class App {
             </label>
           </div>
         </Section>
-        <Section title="公開" hint="公開後：別人可以看到你的個人頁（片單、評分、短評）、可以追蹤你，你寫的短評旁邊會顯示暱稱。不公開：片單只有你看得到，短評照樣匿名。每一筆也可以單獨設成只有自己看得到。">
-          <div class="nt-form">
-            <button class={"nt-check" + (d.pub ? " on" : "")} aria-pressed={d.pub ? "true" : "false"} onTap={(v: Record<string, string>) => { keep(v); this.profileDraft = { ...this.profileDraft!, pub: !d.pub }; }}>
-              <i>{d.pub ? "✓" : ""}</i><span>公開我的個人頁</span>
-            </button>
-            <Button label="儲存" onTap={async (v) => {
-              keep(v);
-              const p = this.profileDraft!;
-              try { await social("profile-set", { name: p.name.trim(), color: p.color, emoji: p.emoji, bio: p.bio, th: p.th.trim(), ig: p.ig.trim(), pub: p.pub }); this.profileDraft = null; this.hasProfile = true; this.meMem = null; setProfileSkipped(false); await this.ui.toast(first ? "暱稱設定好了" : "已儲存"); if (!first || pushed) this.back(); } catch (e) { await this.ui.toast(String((e as Error)?.message || e)); }
-            }} />
-            {first ? <Button label="稍後再說" kind="secondary" onTap={() => { setProfileSkipped(true); this.profileDraft = null; if (pushed) this.back(); }} /> : null}
-          </div>
-        </Section>
+        {first ? (
+          <Section title="公開" hint="公開後：別人可以看到你的個人頁（片單、評分、短評）、可以追蹤你，你寫的短評旁邊會顯示暱稱。不公開：片單只有你看得到，短評照樣匿名。之後在設定的帳號那一區可以隨時切換。">
+            <div class="nt-form">
+              <button class={"nt-check" + (d.pub ? " on" : "")} aria-pressed={d.pub ? "true" : "false"} onTap={(v: Record<string, string>) => { keep(v); this.profileDraft = { ...this.profileDraft!, pub: !d.pub }; }}>
+                <i>{d.pub ? "✓" : ""}</i><span>公開我的個人頁</span>
+              </button>
+              <Button label="儲存" onTap={save} />
+              <Button label="稍後再說" kind="secondary" onTap={() => { setProfileSkipped(true); this.profileDraft = null; if (pushed) this.back(); }} />
+            </div>
+          </Section>
+        ) : (
+          <Section hint={user ? "要不要公開個人頁，在設定的帳號那一區切換。" : ""}>
+            <div class="nt-form"><Button label="儲存" onTap={save} /></div>
+          </Section>
+        )}
         {user ? (
           <Section title="刪除" hint="會刪掉你的片單、暱稱、追蹤關係，以及你用這個帳號評的分和寫的短評。刪了救不回來。收藏和設定的同步不受影響（那個在「用 Google 帳號同步」裡刪）。">
             <Item icon="🗑" title="刪除我的片單和個人檔案" chevron={false} onTap={() => this.go(() => this.wipeConfirmView())} />
