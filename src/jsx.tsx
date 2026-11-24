@@ -86,7 +86,7 @@ export function Fragment(props: { children?: Children }): string {
 /** 底部分頁列：由 App 註冊（目前哪一頁、點了怎麼切換）；沒註冊就不畫 */
 export interface TabBar {
   active: string;
-  items: { id: string; label: string; icon: string }[];
+  items: { id: string; label: string; icon: string; dot?: boolean }[]; // dot = 圖示右上角的小紅點（有還沒看過的更新內容）
   onTap: (id: string) => void;
 }
 let tabBarProvider: (() => TabBar | null) | null = null;
@@ -140,6 +140,7 @@ function TabBarView(): string {
       {t.items.map((it) => (
         <button class={"tab" + (it.id === t.active ? " on" : "")} onTap={() => t.onTap(it.id)} aria-label={it.label}>
           {TAB_ICONS[it.icon] || ""}
+          {it.dot ? <i class="tab-dot" aria-label="有新內容" /> : null}
           <span>{esc(it.label)}</span>
         </button>
       ))}

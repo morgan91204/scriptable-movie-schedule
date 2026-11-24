@@ -41,6 +41,7 @@ export interface Settings {
   maps?: MapsApp; // 導航用哪個地圖（預設 Apple 地圖）
   favMovies?: FavMovie[]; // 收藏電影（含影展片）
   favIssuers?: string[]; // 收藏發行商（官方票房資料裡的名稱）
+  seenLog?: string; // 看過的最新一段更新內容（每台裝置各自記，不同步）
   notify?: NotifyPrefs; // 收藏電影通知要哪幾種（網頁版；沒設過 = 全部都要）
 }
 /** 收藏電影通知種類：open 開放場次了、rel 上映了、end 快下檔了、fest 影展開始了 */
@@ -214,10 +215,13 @@ export function fmt(dt: Date): string {
 
 // ───────────────────────── 設定 ─────────────────────────
 
+/** 這台裝置之前有沒有存過設定（沒有 = 第一次使用） */
+export let settingsStored = false;
 export async function loadSettings(): Promise<Settings> {
   const def: Settings = { favorites: ["vscinemas-xinyi", "eslite", "spot-hs", "spot-taipei"], ads: 10 };
   try {
     const json = await platform().loadSettingsJSON();
+    settingsStored = !!json;
     const s: Settings = json ? { ...def, ...JSON.parse(json) } : def;
     // 收藏影城裡被併掉的重複戲院，換成留下來的那一筆
     let alias = cinemaAlias;

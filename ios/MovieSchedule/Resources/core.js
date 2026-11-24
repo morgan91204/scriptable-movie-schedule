@@ -73,6 +73,7 @@
     boxOfficeLines: () => boxOfficeLines,
     boxOfficeNote: () => boxOfficeNote,
     boxOfficeTitle: () => boxOfficeTitle,
+    boxOrigYear: () => boxOrigYear,
     boxSorts: () => boxSorts,
     boxStatus: () => boxStatus,
     boxWeekOptions: () => boxWeekOptions,
@@ -202,6 +203,7 @@
     searchTitles: () => searchTitles,
     setMetaEnabled: () => setMetaEnabled,
     setSettingsSavedHook: () => setSettingsSavedHook,
+    settingsStored: () => settingsStored,
     shareText: () => shareText,
     showDay: () => showDay,
     showMinute: () => showMinute,
@@ -950,10 +952,12 @@ function parseTwMovieDay(doc) {
     const d = s.slice(0, 10);
     return `${d.replace(/-/g, "/")}（${weekday(d)}）${s.slice(11, 16)}`;
   }
+  var settingsStored = false;
   async function loadSettings() {
     const def = { favorites: ["vscinemas-xinyi", "eslite", "spot-hs", "spot-taipei"], ads: 10 };
     try {
       const json = await platform().loadSettingsJSON();
+      settingsStored = !!json;
       const s = json ? { ...def, ...JSON.parse(json) } : def;
       let alias = cinemaAlias;
       if (!alias) {
@@ -2263,10 +2267,11 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     const k = communityKey(title);
     const x = b ? b.list.find((i) => communityKey(i.name) === k) : null;
     if (!x) return null;
-    if (!boxFullLatest) await Promise.race([loadBoxOfficeFull().catch(() => null), delay(1500)]);
+    if (!boxFullLatest || !yearRatingsLatest) await Promise.race([Promise.all([loadBoxOfficeFull().catch(() => null), loadYearRatings().catch(() => null)]), delay(1500)]);
     return { x, info: await boxInfo(x).catch(() => null) };
   }
   var boxFullLatest = null;
+  var yearRatingsLatest = null;
   var rerunIndex = /* @__PURE__ */ new WeakMap();
   var rerunByName = (name) => /重映|修復|週年|周年|[紀記]念版|數位經典|經典劇場|特別版/.test(name || "");
   var plainName = (s) => String(s || "").toLowerCase().replace(/[\s:：．.。・·,，、!！?？'"「」《》\-—_]/g, "");
@@ -2290,7 +2295,12 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     }
     return null;
   }
-  var boxIsRerun = (x, b = boxFullLatest) => !!boxFirstRun(x, b) || rerunByName(x.name);
+  function boxOrigYear(x) {
+    const r = yearRatingsLatest && x && x.release ? yearRatingsLatest.ratings[yearRatingKey(x.name, x.release)] : null;
+    const y = r && r.y ? r.y : 0, shown = Number(String(x.release || "").slice(0, 4)) || 0;
+    return y && shown && shown - y >= 5 ? y : 0;
+  }
+  var boxIsRerun = (x, b = boxFullLatest) => !!boxFirstRun(x, b) || rerunByName(x.name) || !!boxOrigYear(x);
   function boxInfoRows(x, info) {
     const num = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
     const rows = [];
@@ -2300,10 +2310,10 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     rows.push(["上映日期", x.release.replace(/-/g, "/")]);
     if (x.theaters) rows.push(["上映戲院", `${x.theaters} 間`]);
     if (x.week !== null && !x.since) rows.push(["本週票房", money(x.week)]);
-    const first = boxFirstRun(x), rerun = !!first || rerunByName(x.name);
+    const first = boxFirstRun(x), orig = boxOrigYear(x), rerun = !!first || rerunByName(x.name) || !!orig;
     rows.push([rerun ? "這次重映累計" : "累計票房", `${money(x.total)}（${num(x.total)} 元）`]);
     if (first) rows.push(["先前上映票房", `${money(first.total)}（${first.release.slice(0, 4)} 年上映）`]);
-    else if (rerun) rows.push(["先前上映票房", "官方資料從 2016 年開始，沒有更早的紀錄"]);
+    else if (rerun) rows.push(["先前上映票房", `${orig ? `${orig} 年的片；` : ""}官方資料從 2016 年開始，沒有更早的紀錄`]);
     const tickets = info && info.tickets || x.tickets || 0;
     if (tickets) {
       rows.push(["累計票數", `${num(tickets)} 張`]);
@@ -2562,7 +2572,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
       loadBoxFor(year ? "year" : "now", opt.sort || "week", opt.week || "").catch(() => null),
       loadMovies().catch(() => []),
       needCommunity ? loadCommunitySummary() : Promise.resolve(null),
-      needYearRatings ? loadYearRatings() : Promise.resolve(null)
+      needYearRatings || opt.scope === "year" ? loadYearRatings() : Promise.resolve(null)
     ]);
     if (!b && !all.length) throw new Error("讀不到電影清單，請稍後再試");
     return movieBoard(b, all, { ...opt, community, yearRatings });
@@ -2654,7 +2664,9 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
       loadMovies().catch(() => []),
       loadUpcoming().catch(() => []),
       loadBoxOfficeFull().catch(() => null),
-      loadFestivals().catch(() => [])
+      loadFestivals().catch(() => []),
+      loadYearRatings().catch(() => null)
+      // 裡面有每部片的首映年：結果要標「重映」
     ]);
     out.now = movies.filter((m) => !m.comingSoon && hit(m.title, m.en));
     out.soon = soonBoard(movies, upcoming, "").groups.flatMap((g) => g.items).filter((e) => hit(e.title, e.m ? e.m.en : e.u ? e.u.en : ""));
@@ -2692,7 +2704,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     const job = (async () => {
       let disk = null;
       try {
-        disk = JSON.parse(cacheGet("ratings-years2.json") || "null");
+        disk = JSON.parse(cacheGet("ratings-years3.json") || "null");
       } catch (_) {
       }
       if (disk && disk.data && Date.now() - disk.at < 6 * 36e5) return disk.data;
@@ -2702,7 +2714,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
         if (d && d.ratings && typeof d.ratings === "object") {
           const data = { total: Number(d.total) || 0, missed: Object.keys(d.miss || {}).length, ratings: d.ratings };
           try {
-            cacheSet("ratings-years2.json", JSON.stringify({ at: Date.now(), data }));
+            cacheSet("ratings-years3.json", JSON.stringify({ at: Date.now(), data }));
           } catch (_) {
           }
           return data;
@@ -2710,7 +2722,10 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
       } catch (_) {
       }
       return disk && disk.data ? disk.data : null;
-    })();
+    })().then((d) => {
+      if (d) yearRatingsLatest = d;
+      return d;
+    });
     yearRatingsMem = { at: Date.now(), job };
     return job;
   }
@@ -3797,7 +3812,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   var extra = { boxOffice, filmList, soonList, nowShowing, nowShowingMulti, movieBoard: movieBoard2, festivalBoard, festivalFilm, nearby, patchSettings, fillMovie, formatList };
   var BRIDGE_LEVEL = 2;
   globalThis.MS = {
-    version: "2026.11.24-0924",
+    version: "2026.11.24-0957",
     level: BRIDGE_LEVEL,
     init(saved) {
       cache = saved || {};

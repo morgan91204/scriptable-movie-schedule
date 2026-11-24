@@ -31,6 +31,9 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .tab.on{color:var(--accent);background:rgba(10,132,255,.14);box-shadow:inset 0 1px 0 rgba(255,255,255,.35)}
 @media(prefers-color-scheme:dark){.tab.on{background:rgba(10,132,255,.22)}}
 .tab:active{opacity:.6}
+.tab{position:relative}
+.tab-dot{position:absolute;top:5px;left:calc(50% + 7px);width:8px;height:8px;border-radius:4px;background:#ff3b30;box-shadow:0 0 0 1.5px var(--bg)}
+.newdot{display:inline-block;width:8px;height:8px;border-radius:4px;background:#ff3b30;margin-right:6px;vertical-align:1px}
 .sec{margin:14px 0 0}
 .sec-title{margin:0 0 6px 12px;font-size:13px;font-weight:600;color:var(--fg2);text-transform:uppercase;letter-spacing:.3px}
 .group{background:var(--card);border-radius:14px;overflow:hidden}

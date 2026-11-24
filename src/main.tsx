@@ -10,12 +10,13 @@ import { scriptablePlatform } from "./platform-scriptable";
 import {
   Cinema, Settings, Movie, Version, EXTRA, CITY_ORDER, AD_STEPS,
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
-  loadSettings, saveSettings, setSettingsSavedHook, syncPick, syncApply, syncMerge, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, communityKey, globalSearch, boxIsRerun, SITE_URL, TW,
+  loadSettings, saveSettings, settingsStored, setSettingsSavedHook, syncPick, syncApply, syncMerge, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, communityKey, globalSearch, boxIsRerun, SITE_URL, TW,
   FORMATS, formatsOf, filterVersions, filterVersionsAny, movieRows, movieDays, nearest, kmLabel, WINDOWS, findShowtimes, findShowtimesMulti, multiLabel, multiDetail, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText,
   hallOf, tmdbTest, movieExtras, moviePoster, movieRuntime, posterSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxCountries, boxByCountry, boxInfo, boxInfoRows, boxCountryText, BOX_COUNTRY_NOTE, boxCountryTag, boxCountriesPicked, loadMovieBoard, loadSoonBoard, notifyPrefs, notifyPayload, notifyEndScope, notifyEndPick, notifyQuiet, NOTIFY_PRE_STEPS, NOTIFY_KINDS, boxStatus, STATUS_LABEL, boxInfoBy, isFavMovie, toggleFavMovie, favMovieRows, favMovieBox, soonGroups, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityCached, communityVote, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalsReady, festivalNote, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, festivalDefaultDate, festivalStateLabel, festivalState, festivalFooter, linkMovies, nowGroupLine, nowFilter, festivalPick, movieAbout, festivalSearch, festivalSearchLines, festivalTrailer, festivalYears, festivalsAny, festivalGroups, festivalChipNote, festivalStatusLine, movieRatings, ratingTier, tomatoTier, popcornTier, popcornCount,
 } from "./core";
 import type { MovieExtras, Ratings, Community, BoxOfficeItem, BoxSort, MovieEntry, SoonEntry, UpcomingFilm, FavMovie, FavRow, NotifyPrefs, NotifyKind, SyncData, GlobalHits, Festival, FestivalFilm, FestivalSession } from "./core";
 import { setTabBar, setBackGuard, esc } from "./jsx";
+import { CHANGELOG, CHANGELOG_LATEST } from "./changelog";
 import type { TwMovie, TwMovieCinema, Format, LatLng, Hit } from "./core";
 
 interface Pick {
@@ -113,7 +114,9 @@ class App {
   async run() {
     this.settings = await loadSettings();
     await this.syncStart().catch(() => undefined);
-    setTabBar(() => ({ active: this.tab, items: this.TABS, onTap: (id) => this.switchTab(id) }));
+    // 更新內容：第一次使用的人沒有「舊版」可以比，直接當成看過，不亮紅點
+    if (!settingsStored && this.settings.seenLog === undefined) this.settings.seenLog = CHANGELOG_LATEST;
+    setTabBar(() => ({ active: this.tab, items: this.TABS.map((t) => (t.id === "settings" && this.logUnread() ? { ...t, dot: true } : t)), onTap: (id) => this.switchTab(id) }));
     setBackGuard(() => this.stack.length > 1);
     this.go(() => this.homeView(), "讀取影城清單…");
     // 從通知點進來（?tab=soon／?tab=fest）：直接開電影分頁的那一類
@@ -581,6 +584,22 @@ class App {
       </>
     );
   }
+  /** 有沒有還沒看過的更新內容（設定分頁和那一列的小紅點） */
+  logUnread(): boolean { return !!CHANGELOG_LATEST && this.settings.seenLog !== CHANGELOG_LATEST; }
+  /** 更新內容：依日期分段、新的在上。進來就算看過，紅點消失；不會主動跳出來打擾 */
+  changelogView(): string {
+    if (this.logUnread()) { this.settings.seenLog = CHANGELOG_LATEST; saveSettings(this.settings); }
+    return (
+      <Page title="更新內容" subtitle={`目前版本 ${APP_VERSION}`} onBack={() => this.back()}>
+        {CHANGELOG.map((e) => (
+          <Section title={e.date}>
+            {e.items.map((it) => <Item title={it.text} tag={{ text: it.kind === "new" ? "新功能" : "改進", tone: it.kind === "new" ? "now" : "soon" }} chevron={false} />)}
+          </Section>
+        ))}
+        <Note text="只列出比較有感的變動；修小錯、調整文字這類不會寫在這裡。" />
+      </Page>
+    );
+  }
   async aboutView(): Promise<string> {
     return (
       <Page title="關於" onBack={() => this.back()}>
@@ -609,6 +628,7 @@ class App {
         <Section title="關於">
           {IS_WEB && !this.isStandalone() ? <Item icon="📲" title="加到主畫面" subtitle="像 App 一樣從主畫面開啟，看圖示教學" onTap={() => this.go(() => this.installView())} /> : null}
           <Item icon="ℹ️" title="關於" subtitle="資料來源、隱私權政策、場次通" onTap={() => this.go(() => this.aboutView())} />
+          <Item icon="📝" title="更新內容" subtitle={this.logUnread() ? "有新的更新，點進來看看" : "最近改了什麼、多了什麼"} right={this.logUnread() ? "● 新" : ""} onTap={() => this.go(() => this.changelogView())} />
         </Section>
         <p
           class="note version"
