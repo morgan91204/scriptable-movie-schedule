@@ -325,7 +325,10 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .ac-mark.mention{background:#8e5cf7}
 .ac-mark.request{background:#ff9f0a}
 .ac-mark.accepted{background:#30b158}
-.ac-btn+.ac-btn{margin-left:-2px}
+.ac-nb{white-space:nowrap}
+.ac.req{flex-wrap:wrap;row-gap:10px}
+.ac-acts{flex:0 0 100%;display:flex;gap:8px;box-sizing:border-box;padding-left:56px}
+.ac-acts .ac-btn{flex:1 1 0;max-width:150px;text-align:center}
 .us-lock{margin-left:5px;font-style:normal;font-size:11px}
 .pf-lock{padding:26px 22px;text-align:center}
 .pf-lock div{font-size:34px;line-height:1}

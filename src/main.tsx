@@ -1634,19 +1634,19 @@ class App {
       const first = a.who[0];
       const mark = a.kind === "up" ? "▲" : a.kind === "down" ? "▼" : a.kind === "reply" ? "↩" : a.kind === "mention" ? "@" : a.kind === "accepted" ? "✓" : a.kind === "request" ? "?" : "＋";
       return (
-        <div class={"ac" + (a.fresh ? " fresh" : "")}>
+        <div class={"ac" + (a.fresh ? " fresh" : "") + (a.kind === "request" ? " req" : "")}>
           <button class="ac-main" onTap={open}>
             <span class="ac-av">
               {first ? this.avatar(first) : <span class="av anon" aria-hidden="true">{a.kind === "down" ? "？" : "匿"}</span>}
               {a.who[1] ? <span class="ac-av2">{this.avatar(a.who[1])}</span> : null}
               <i class={"ac-mark " + a.kind} aria-hidden="true">{mark}</i>
             </span>
-            <span class="ac-text">{a.kind === "down" ? <b>{a.n > 1 ? `${a.n} 個人` : "有人"}</b> : <b>{esc(whoText)}</b>} {esc(what)}<em>・{esc(agoLabel(a.at))}</em></span>
+            <span class="ac-text">{a.kind === "down" ? <b>{a.n > 1 ? `${a.n} 個人` : "有人"}</b> : <b>{esc(whoText)}</b>} {a.kind === "request" || a.kind === "accepted" || a.kind === "follow" ? <span class="ac-nb">{esc(what)}</span> : esc(what)}<em>・{esc(agoLabel(a.at))}</em></span>
           </button>
           {a.kind === "follow" && names.length === 1 && !a.back ? <button class="ac-btn go" onTap={async () => {
             try { const r = await social<{ requested: boolean }>("follow", { name: names[0], on: true }); this.meMem = null; await this.ui.toast(r.requested ? "對方是不公開帳號，已送出追蹤要求" : `已追蹤 ${names[0]}`); await this.askNickname(); } catch (e) { await this.ui.toast(String((e as Error)?.message || e)); }
           }}>回追</button> : a.kind === "follow" && a.back ? <span class="ac-btn">互相追蹤</span> : null}
-          {a.kind === "request" && names.length === 1 ? <><button class="ac-btn go" onTap={answer(true)}>接受</button><button class="ac-btn" aria-label={`拒絕 ${names[0]} 的追蹤要求`} onTap={answer(false)}>拒絕</button></> : null}
+          {a.kind === "request" && names.length === 1 ? <div class="ac-acts"><button class="ac-btn go" onTap={answer(true)}>接受</button><button class="ac-btn" aria-label={`拒絕 ${names[0]} 的追蹤要求`} onTap={answer(false)}>拒絕</button></div> : null}
         </div>
       );
     };
