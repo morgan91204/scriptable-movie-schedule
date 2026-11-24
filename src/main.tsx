@@ -214,6 +214,42 @@ class App {
       more: (id, n, unit) => (n > max ? <Item title={open(id) ? `只顯示前 ${max} ${unit}` : `顯示全部 ${n} ${unit}`} right={open(id) ? "▴" : "▾"} accent chevron={false} onTap={() => { this.showAll = open(id) ? this.showAll.filter((x) => x !== id) : [...this.showAll, id]; }} /> : null),
     };
   }
+  /** 清單的小海報：跟「依電影找場次」的清單同一套做法、同一份海報快取。
+   *  手機上記過的立刻有；沒記過的最多等一下（wait 毫秒），其餘讀好後每 8 張在原位補畫一次。
+   *  傳進來每一列的鍵和「怎麼找這張海報」，回傳一個用鍵取縮圖的函式 */
+  async listThumbs(items: { key: string; job: () => Promise<string> }[], wait = 600): Promise<(key: string) => { src: string; url?: string; pending?: boolean } | undefined> {
+    const jobs = items.map((x) => { try { return x.job().catch(() => ""); } catch (_) { return Promise.resolve(""); } });
+    const got = await Promise.all(jobs.map((j) => Promise.race([j, sleep(this.rerendering ? 0 : wait).then(() => undefined)])));
+    const pending = jobs.filter((_, i) => got[i] === undefined);
+    const batches: Promise<unknown>[] = [];
+    for (let i = 0; i < pending.length; i += 8) batches.push(Promise.all(pending.slice(i, i + 8)));
+    if (batches.length) this.late = [...(this.late || []), ...batches];
+    const map = new Map<string, string | undefined>();
+    items.forEach((x, i) => map.set(x.key, got[i]));
+    return (key: string) => {
+      if (!map.has(key)) return undefined;
+      const u = map.get(key);
+      if (u === undefined) return { src: "", pending: true };
+      const src = posterSrc(u);
+      if (src && src === u) cachePoster(u); // 這次用網址顯示，順便抓進快取
+      return { src, url: u };
+    };
+  }
+  /** 各種片怎麼找海報：有場次的片、即將上映、已下檔（票房資料）、影展片、收藏的片 */
+  posterJobOf = {
+    movie: (m: TwMovie) => () => moviePoster(m.title, m.slug, m.en),
+    soon: (e: SoonEntry) => () => (e.m ? moviePoster(e.m.title, e.m.slug, e.m.en) : e.u && e.u.poster ? Promise.resolve(e.u.poster) : moviePoster(e.title)),
+    box: (x: BoxOfficeItem) => () => posterLight(x.name, x.release),
+    fest: (film: FestivalFilm) => () => (film.poster ? Promise.resolve(film.poster) : moviePoster(film.title)),
+    fav: (r: FavRow) => () => {
+      const t = r.target;
+      if (t.kind === "movie") return moviePoster(t.m.title, t.m.slug, t.m.en);
+      if (t.kind === "soon") return t.u.poster ? Promise.resolve(t.u.poster) : moviePoster(t.u.title);
+      if (t.kind === "fest") return t.film.poster || r.fav.poster ? Promise.resolve(t.film.poster || r.fav.poster || "") : moviePoster(r.fav.title);
+      if (t.kind === "box") return posterLight(t.x.name, t.x.release).then((u) => u || r.fav.poster || "");
+      return r.fav.poster ? Promise.resolve(r.fav.poster) : moviePoster(r.fav.title);
+    },
+  };
   favQuery = ""; // 收藏電影頁的搜尋字
   favJob: { q: string; job: Promise<GlobalHits> } | null = null;
   /** 收藏電影頁：管理收藏電影的地方。上面是已經收藏的（含現在的狀態）；
@@ -236,29 +272,36 @@ class App {
       const hits = await Promise.race([job, sleep(this.rerendering ? 0 : 150).then(() => null)]);
       if (!hits) this.late = [job];
       const total = hits ? hits.now.length + hits.soon.length + hits.year.length + hits.fest.length : 0;
+      // 畫面上這幾組實際列出來的片，才去找海報
+      const thumb = hits ? await this.listThumbs([
+        ...hits.now.slice(0, lim("now")).map((m) => ({ key: "now|" + m.slug, job: this.posterJobOf.movie(m) })),
+        ...hits.soon.slice(0, lim("soon")).map((e) => ({ key: "soon|" + e.key, job: this.posterJobOf.soon(e) })),
+        ...hits.year.slice(0, lim("year")).map((x) => ({ key: "year|" + x.name + "|" + x.release, job: this.posterJobOf.box(x) })),
+        ...hits.fest.slice(0, lim("fest")).map(({ f, film }) => ({ key: "fest|" + f.id + "|" + film.id, job: this.posterJobOf.fest(film) })),
+      ], 300) : () => undefined;
       body = !hits ? <Note text="正在找電影…" /> : (
         <>
           {hits.now.length ? (
             <Section title={`現正上映（${hits.now.length}）`}>
-              {hits.now.slice(0, lim("now")).map((m) => <Item title={m.title} subtitle={movieLines(m).filter(Boolean).join("\n")} tag={{ text: "上映中", tone: "now" }} onTap={() => this.go(() => this.movieView(m, ""), `讀取《${m.title}》的放映影城…`)} action={heart(m.title, { en: m.en })} />)}
+              {hits.now.slice(0, lim("now")).map((m) => <Item thumb={thumb("now|" + m.slug)} title={m.title} subtitle={movieLines(m).filter(Boolean).join("\n")} tag={{ text: "上映中", tone: "now" }} onTap={() => this.go(() => this.movieView(m, ""), `讀取《${m.title}》的放映影城…`)} action={heart(m.title, { en: m.en })} />)}
               {more("now", hits.now.length, "部")}
             </Section>
           ) : null}
           {hits.soon.length ? (
             <Section title={`即將上映（${hits.soon.length}）`}>
-              {hits.soon.slice(0, lim("soon")).map((e) => <Item title={e.title} subtitle={e.lines.filter(Boolean).join("\n")} onTap={e.m ? () => this.go(() => this.movieView(e.m!, ""), `讀取《${e.title}》的放映影城…`) : e.u ? () => this.go(() => this.soonMovieView(e.u!), `讀取《${e.title}》…`) : undefined} action={heart(e.title, { en: e.m ? e.m.en : e.u ? e.u.en : "", poster: e.u ? e.u.poster : undefined })} />)}
+              {hits.soon.slice(0, lim("soon")).map((e) => <Item thumb={thumb("soon|" + e.key)} title={e.title} subtitle={e.lines.filter(Boolean).join("\n")} onTap={e.m ? () => this.go(() => this.movieView(e.m!, ""), `讀取《${e.title}》的放映影城…`) : e.u ? () => this.go(() => this.soonMovieView(e.u!), `讀取《${e.title}》…`) : undefined} action={heart(e.title, { en: e.m ? e.m.en : e.u ? e.u.en : "", poster: e.u ? e.u.poster : undefined })} />)}
               {more("soon", hits.soon.length, "部")}
             </Section>
           ) : null}
           {hits.year.length ? (
             <Section title={`已下檔（${hits.year.length}）`}>
-              {hits.year.slice(0, lim("year")).map((x) => <Item title={x.name} subtitle={[boxIsRerun(x) ? "重映" : boxHasLaterRun(x) ? "首映" : "", String(x.release || "").slice(0, 10).replace(/-/g, "/") + " 上映", `票房 ${money(x.total)}`].filter(Boolean).join("｜")} tag={{ text: STATUS_LABEL[boxStatus(x)], tone: boxStatus(x) }} onTap={() => this.go(() => this.boxMovieView(x), `讀取《${x.name}》…`)} action={heart(x.name)} />)}
+              {hits.year.slice(0, lim("year")).map((x) => <Item thumb={thumb("year|" + x.name + "|" + x.release)} title={x.name} subtitle={[boxIsRerun(x) ? "重映" : boxHasLaterRun(x) ? "首映" : "", String(x.release || "").slice(0, 10).replace(/-/g, "/") + " 上映", `票房 ${money(x.total)}`].filter(Boolean).join("｜")} tag={{ text: STATUS_LABEL[boxStatus(x)], tone: boxStatus(x) }} onTap={() => this.go(() => this.boxMovieView(x), `讀取《${x.name}》…`)} action={heart(x.name)} />)}
               {more("year", hits.year.length, "部")}
             </Section>
           ) : null}
           {hits.fest.length ? (
             <Section title={`影展（${hits.fest.length}）`}>
-              {hits.fest.slice(0, lim("fest")).map(({ f, film }) => <Item title={film.title} subtitle={`${f.start.slice(0, 4)} ${f.name}`} onTap={() => this.go(() => this.festivalFilmView(f, film))} action={heart(film.title, { poster: film.poster, fest: { id: f.id, film: film.id, name: f.name } })} />)}
+              {hits.fest.slice(0, lim("fest")).map(({ f, film }) => <Item thumb={thumb("fest|" + f.id + "|" + film.id)} title={film.title} subtitle={`${f.start.slice(0, 4)} ${f.name}`} onTap={() => this.go(() => this.festivalFilmView(f, film))} action={heart(film.title, { poster: film.poster, fest: { id: f.id, film: film.id, name: f.name } })} />)}
               {more("fest", hits.fest.length, "部")}
             </Section>
           ) : null}
@@ -269,13 +312,17 @@ class App {
       // 沒搜尋：已經收藏的（含現在的狀態），加上現正上映的片可以直接點愛心
       const rows = favs.length ? await favMovieRows(this.settings).catch(() => [] as FavRow[]) : [];
       const movies = (await loadMovies().catch(() => [] as TwMovie[])).filter((m) => !m.comingSoon);
+      const thumb = await this.listThumbs([
+        ...rows.map((r) => ({ key: "fav|" + r.fav.key, job: this.posterJobOf.fav(r) })),
+        ...movies.slice(0, 40).map((m) => ({ key: "now|" + m.slug, job: this.posterJobOf.movie(m) })),
+      ]);
       body = (
         <>
           <Section title={`已收藏（${favs.length}）`} hint={favs.length ? "點片名進那部片的頁面；點 ♥ 取消收藏。下檔的片也會留在這裡。" : "還沒有收藏。用上面的搜尋找電影，或在下面的清單點 ♡。"}>
-            {rows.map((r) => <Item thumb={{ src: r.fav.poster ? posterSrc(r.fav.poster) : "", url: r.fav.poster }} title={r.fav.title} subtitle={r.line} onTap={() => this.openFavRow(r)} action={heart(r.fav.title)} />)}
+            {rows.map((r) => <Item thumb={thumb("fav|" + r.fav.key)} title={r.fav.title} subtitle={r.line} onTap={() => this.openFavRow(r)} action={heart(r.fav.title)} />)}
           </Section>
           <Section title={`現正上映（${movies.length}）`} hint="已下檔的片、即將上映的片、影展片，用上面的搜尋找。">
-            {movies.slice(0, 40).map((m) => <Item title={m.title} subtitle={movieLines(m)[0]} onTap={() => this.go(() => this.movieView(m, ""), `讀取《${m.title}》的放映影城…`)} action={heart(m.title, { en: m.en })} />)}
+            {movies.slice(0, 40).map((m) => <Item thumb={thumb("now|" + m.slug)} title={m.title} subtitle={movieLines(m)[0]} onTap={() => this.go(() => this.movieView(m, ""), `讀取《${m.title}》的放映影城…`)} action={heart(m.title, { en: m.en })} />)}
           </Section>
         </>
       );
@@ -343,6 +390,7 @@ class App {
     const favIssuers = this.settings.favIssuers || [];
     const favRows = this.favMovOpen && favMovies.length ? await favMovieRows(this.settings).catch(() => [] as FavRow[]) : [];
     const openFav = (r: FavRow) => this.openFavRow(r);
+    const favThumb = await this.listThumbs(favRows.map((r) => ({ key: r.fav.key, job: this.posterJobOf.fav(r) })));
     // 全域搜尋：有打字就把下面的入口和收藏換成分組的結果（影城、現正上映、即將上映、歷年電影、影展），清空就恢復
     const q = this.homeQuery.trim();
     if (q) {
@@ -429,7 +477,7 @@ class App {
             {/* 預設收合，只留這一列；點一下展開清單 */}
             <Item head icon="♥" title={favMovies.length ? `收藏電影（${favMovies.length} 部）` : "收藏電影（還沒有）"} subtitle={this.favMovOpen ? "點一下收合" : "點一下展開"} chevron={false} onTap={() => { this.favMovOpen = !this.favMovOpen; }} action={{ label: this.favMovOpen ? "▾" : "▸", hint: this.favMovOpen ? "收合收藏電影" : "展開收藏電影", onTap: () => { this.favMovOpen = !this.favMovOpen; } }} />
             {favRows.map((r) => (
-              <Item thumb={{ src: r.fav.poster ? posterSrc(r.fav.poster) : "", url: r.fav.poster }} title={r.fav.title} subtitle={r.line} onTap={() => openFav(r)} />
+              <Item thumb={favThumb(r.fav.key)} title={r.fav.title} subtitle={r.line} onTap={() => openFav(r)} />
             ))}
             {this.favMovOpen ? <Item icon={favMovies.length ? "⚙️" : "👉"} title={favMovies.length ? "管理收藏電影" : "去找電影來收藏"} subtitle={favMovies.length ? "搜尋其他電影來收藏，或取消收藏" : "上映中、即將上映、已下檔、影展的片都找得到，點愛心（♡ 變 ♥）就收藏。"} accent onTap={() => { this.favQuery = ""; this.go(() => this.favManageView(), "讀取電影…"); }} /> : null}
           </Section>
