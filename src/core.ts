@@ -898,7 +898,7 @@ function loadMeta(): Promise<MetaFile | null> {
   const job = (async (): Promise<MetaFile | null> => {
     let disk: { at: number; data: MetaFile } | null = null;
     try {
-      disk = JSON.parse(cacheGet("meta.json") || "null");
+      disk = JSON.parse(cacheGet("meta2.json") || "null");
     } catch (_) {}
     if (disk && Date.now() - disk.at < 3600e3) return fresh(disk.data);
     const net = (async () => {
@@ -906,7 +906,7 @@ function loadMeta(): Promise<MetaFile | null> {
       if (r.status !== 200) return null;
       const data = JSON.parse(r.body) as MetaFile;
       if (!data || typeof data.movies !== "object") return null;
-      cacheSet("meta.json", JSON.stringify({ at: Date.now(), data }));
+      cacheSet("meta2.json", JSON.stringify({ at: Date.now(), data }));
       return data;
     })().catch(() => null);
     const got = await Promise.race([net, delay(4000).then(() => null)]);
@@ -2169,7 +2169,7 @@ export function loadYearRatings(): Promise<YearRatings | null> {
   const job = (async (): Promise<YearRatings | null> => {
     let disk: { at: number; data: YearRatings } | null = null;
     try {
-      disk = JSON.parse(cacheGet("ratings-years.json") || "null");
+      disk = JSON.parse(cacheGet("ratings-years2.json") || "null");
     } catch (_) {}
     if (disk && disk.data && Date.now() - disk.at < 6 * 3600e3) return disk.data;
     try {
@@ -2177,7 +2177,7 @@ export function loadYearRatings(): Promise<YearRatings | null> {
       const d = r.status === 200 ? JSON.parse(r.body) : null;
       if (d && d.ratings && typeof d.ratings === "object") {
         const data: YearRatings = { total: Number(d.total) || 0, missed: Object.keys(d.miss || {}).length, ratings: d.ratings };
-        try { cacheSet("ratings-years.json", JSON.stringify({ at: Date.now(), data })); } catch (_) {}
+        try { cacheSet("ratings-years2.json", JSON.stringify({ at: Date.now(), data })); } catch (_) {}
         return data;
       }
     } catch (_) {}
@@ -3061,7 +3061,7 @@ export function movieRatings(title: string, en?: string, slug?: string): Promise
   })());
 }
 /** ratings.json 紀錄的版本：比對規則改了就加 1，讓舊紀錄重查 */
-const RATINGS_V = 2;
+const RATINGS_V = 3;
 
 /** 評分顏色等級：good（綠）／mid（黃）／bad（紅） */
 /** 番茄指數照爛番茄自己的三級：認證新鮮（爛番茄給的標章，綠）／新鮮（60% 以上，黃）／腐爛（低於 60%，紅） */
