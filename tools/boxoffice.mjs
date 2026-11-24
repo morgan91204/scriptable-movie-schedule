@@ -126,7 +126,7 @@ for (let y = Number(year); y >= 2016; y--) {
 }
 const yearList = years[year] || [];
 
-// 歷史週票房：把這一週的排行存進去（同一週重跑就蓋掉），新的在前，最多留 52 週
+// 歷史週票房：把這一週的排行存進去（同一週重跑就蓋掉），新的在前；App 用的檔留最近 52 週，完整的另外依年份存檔
 const weekItem = (f, i) => ({ rank: i + 1, name: f.name, release: f.release, theaters: f.theaters, week: f.week, ...(f.since ? { since: true } : {}), total: f.total });
 let weeksHistory = [];
 try {
@@ -137,6 +137,19 @@ if (mode === "week") {
   weeksHistory.push({ start, end, list: list.slice(0, TOP).map(weekItem) });
 }
 weeksHistory.sort((a, b) => b.end.localeCompare(a.end));
+// 長期保存：每一週的排行另外依年份存檔（data/boxoffice-weeks-<年>.json，依那一週結束的年份分），永遠不刪。
+// 週票房是我們自己用「這週累計 − 上週累計」算的，官方沒有提供，過了就算不回來，所以要自己留。
+// App 用的那一份（dist/boxoffice-weeks.json）只放最近 52 週，檔案才不會越來越大、下載越來越慢。
+const weekYears = Array.from(new Set(weeksHistory.map((w) => w.end.slice(0, 4))));
+for (const y of weekYears) {
+  const file = `data/boxoffice-weeks-${y}.json`;
+  let kept = [];
+  try { kept = JSON.parse(fs.readFileSync(file, "utf8")).weeks || []; } catch (_) {}
+  const byEnd = new Map(kept.map((w) => [w.end, w]));
+  for (const w of weeksHistory) if (w.end.slice(0, 4) === y) byEnd.set(w.end, w); // 同一週重跑就以新的為準
+  const all = Array.from(byEnd.values()).sort((a, b) => b.end.localeCompare(a.end));
+  fs.writeFileSync(file, JSON.stringify({ updated: new Date().toISOString(), weeks: all }) + "\n");
+}
 weeksHistory = weeksHistory.slice(0, 52);
 
 const result = {
