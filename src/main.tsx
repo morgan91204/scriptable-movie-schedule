@@ -241,7 +241,7 @@ class App {
           ) : null}
           {hits.year.length ? (
             <Section title={`已下檔（${hits.year.length}）`}>
-              {hits.year.slice(0, MAX).map((x) => <Item title={x.name} subtitle={[boxIsRerun(x) ? "重映" : boxHasLaterRun(x) ? "首映" : "", String(x.release || "").slice(0, 10).replace(/-/g, "/") + " 上映", `票房 ${money(x.total)}`].filter(Boolean).join("｜")} tag={{ text: "已下檔", tone: "off" }} onTap={() => this.go(() => this.boxMovieView(x), `讀取《${x.name}》…`)} action={heart(x.name)} />)}
+              {hits.year.slice(0, MAX).map((x) => <Item title={x.name} subtitle={[boxIsRerun(x) ? "重映" : boxHasLaterRun(x) ? "首映" : "", String(x.release || "").slice(0, 10).replace(/-/g, "/") + " 上映", `票房 ${money(x.total)}`].filter(Boolean).join("｜")} tag={{ text: STATUS_LABEL[boxStatus(x)], tone: boxStatus(x) }} onTap={() => this.go(() => this.boxMovieView(x), `讀取《${x.name}》…`)} action={heart(x.name)} />)}
               {more(hits.year.length)}
             </Section>
           ) : null}
@@ -376,7 +376,7 @@ class App {
           ) : null}
           {hits.year.length ? (
             <Section title={`歷年電影（${hits.year.length}）`}>
-              {hits.year.slice(0, MAX).map((x) => <Item title={x.name} subtitle={[boxIsRerun(x) ? "重映" : boxHasLaterRun(x) ? "首映" : "", String(x.release || "").slice(0, 10).replace(/-/g, "/") + " 上映", `票房 ${money(x.total)}`].filter(Boolean).join("｜")} tag={{ text: "已下檔", tone: "off" }} onTap={() => this.go(() => this.boxMovieView(x), `讀取《${x.name}》…`)} />)}
+              {hits.year.slice(0, MAX).map((x) => <Item title={x.name} subtitle={[boxIsRerun(x) ? "重映" : boxHasLaterRun(x) ? "首映" : "", String(x.release || "").slice(0, 10).replace(/-/g, "/") + " 上映", `票房 ${money(x.total)}`].filter(Boolean).join("｜")} tag={{ text: STATUS_LABEL[boxStatus(x)], tone: boxStatus(x) }} onTap={() => this.go(() => this.boxMovieView(x), `讀取《${x.name}》…`)} />)}
               {more(hits.year.length, "部", () => toMovies("year"))}
             </Section>
           ) : null}
@@ -1599,7 +1599,7 @@ class App {
       </Page>
     );
   }
-  boxStatus = ""; // 歷年電影只看上映中（now）／已下檔（off）；空 = 全部
+  boxStatus = ""; // 歷年電影只看上映中（now）／少數戲院（few）／已下檔（off）；空 = 全部
   boxIssuer: string[] = []; // 只看哪幾家發行商（可以複選；空 = 全部）
   boxFewLast = true; // 依 IMDb 排時，評分人數少的片排在後面（關掉就照分數一起排）
   boxOpen = ""; // 目前展開哪一組篩選（週次／年份／出品國別；空 = 都收合）
@@ -1774,7 +1774,7 @@ class App {
           {boxInfoRows(x, info).map(([label, value]) => <Item kv title={label} right={value} />)}
         </Section>
         {this.runsSection(x)}
-        <Note text={boxStatus(x) === "now" ? "官方票房資料顯示這部片最近一週還有賣出票，但場次通目前查不到場次：可能只在少數戲院放映，或這幾天剛下檔。" : "這部片已經下檔，場次通目前沒有它的場次。"} />
+        <Note text={boxStatus(x) === "few" ? "官方票房資料顯示這部片最近一週還有賣出票，但場次通目前查不到場次：可能只剩少數戲院（二輪、獨立戲院）在放，或這幾天剛下檔。" : "這部片已經下檔，場次通目前沒有它的場次。"} />
       </Page>
     );
   }

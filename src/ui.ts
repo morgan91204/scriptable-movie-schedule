@@ -81,6 +81,8 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .pill{display:inline-block;margin-left:6px;padding:1px 7px;border-radius:999px;font-size:11px;font-weight:700;line-height:1.5;vertical-align:middle;white-space:nowrap}
 .pill.now{background:rgba(48,209,88,.2);color:#1f9d45}
 .pill.off{background:rgba(255,69,58,.18);color:#d63a31}
+.pill.few{background:rgba(255,204,0,.28);color:#8a6d00}
+@media(prefers-color-scheme:dark){.pill.few{color:#ffd60a}}
 .pill.soon{background:rgba(255,159,10,.2);color:#c77700}
 @media(prefers-color-scheme:dark){.pill.now{color:#30d158}.pill.off{color:#ff6961}.pill.soon{color:#ffb340}}
 .item .title .pill{position:relative;top:-2px}

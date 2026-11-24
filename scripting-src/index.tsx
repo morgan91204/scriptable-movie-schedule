@@ -1062,7 +1062,7 @@ function ConfirmPage({ pick }: { pick: Pick }) {
 /** 票房排行上、場次通已經沒有場次的片：海報、評分、預告、片刻評分與票房 */
 /** 狀態標籤：上映中（綠底）／已下檔（紅底）／即將上映（橘底） */
 function StatusPill({ status }: { status: string }) {
-  const c = status === "now" ? { bg: "rgba(48,209,88,0.2)", fg: "systemGreen" } : status === "off" ? { bg: "rgba(255,69,58,0.18)", fg: "systemRed" } : { bg: "rgba(255,159,10,0.2)", fg: "systemOrange" }
+  const c = status === "now" ? { bg: "rgba(48,209,88,0.2)", fg: "systemGreen" } : status === "off" ? { bg: "rgba(255,69,58,0.18)", fg: "systemRed" } : status === "few" ? { bg: "rgba(255,204,0,0.28)", fg: "systemYellow" } : { bg: "rgba(255,159,10,0.2)", fg: "systemOrange" }
   return <Text font={"caption2"} fontWeight={"bold"} foregroundStyle={c.fg as any} lineLimit={1} fixedSize padding={{ horizontal: 7, vertical: 2 }} background={c.bg as any} clipShape={{ type: "capsule" } as any}>{STATUS_LABEL[status] || ""}</Text>
 }
 /** 「狀態」那一列：左邊標題，右邊色塊標籤 */

@@ -2261,8 +2261,8 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     if (n >= 1e4) return `${(n / 1e4).toFixed(n >= 1e6 ? 0 : 1).replace(/\.0$/, "")} 萬`;
     return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
   }
-  var boxStatus = (x) => x.showing || x.week !== null ? "now" : "off";
-  var STATUS_LABEL = { now: "上映中", off: "已下檔", soon: "即將上映" };
+  var boxStatus = (x, m) => m && !m.comingSoon ? "now" : x.showing || x.week !== null ? "few" : "off";
+  var STATUS_LABEL = { now: "上映中", few: "少數戲院", off: "已下檔", soon: "即將上映" };
   var BOXOFFICE_INFO_URL = "https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/main/dist/boxoffice-info-";
   var boxInfoMem = {};
   async function boxInfo(x) {
@@ -2489,16 +2489,17 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
         const m = match(x.name) || null;
         return { x, m, k: keyOf2(x, m), rank: sort === "total" ? x.rank : null };
       }).filter((e) => hit(e.x.name, e.m?.en));
-      const st = opt.status === "now" || opt.status === "off" ? opt.status : "";
-      const stCount = { now: keyedAll.filter((e) => boxStatus(e.x) === "now").length, off: keyedAll.filter((e) => boxStatus(e.x) === "off").length };
-      const keyed2 = st ? keyedAll.filter((e) => boxStatus(e.x) === st) : keyedAll;
+      const st = opt.status === "now" || opt.status === "few" || opt.status === "off" ? opt.status : "";
+      const stOf = (s) => keyedAll.filter((e) => boxStatus(e.x, e.m) === s);
+      const stCount = { now: stOf("now").length, few: stOf("few").length, off: stOf("off").length };
+      const keyed2 = st ? stOf(st) : keyedAll;
       if (sort === "rating" || sort === "cinemas" || sort === "tickets" || sort === "price") keyed2.slice().sort((a, c) => c.k.tier - a.k.tier || c.k.v - a.k.v).forEach((e, i) => {
         if (e.k.tier > 0) e.rank = i + 1;
       });
       keyed2.sort((a, c) => c.k.tier - a.k.tier || (asc ? a.k.v - c.k.v : c.k.v - a.k.v));
       const entries2 = keyed2.map(({ x, m, k: kk, rank }) => {
         const info = [boxIsRerun(x, b) ? "重映" : boxHasLaterRun(x, b) ? "首映" : "", boxMainCountry(x.country), sort === "date" ? "" : releaseLabel(dateOf(x, m)), theatersOf(x, m) && sort !== "cinemas" ? `${theatersOf(x, m)} 間戲院` : ""].filter(Boolean).join("｜");
-        return { key: `${x.name}|${x.release}`, rank, name: x.name, x, m, lines: sort === "total" ? [info, ""] : [`票房 ${money(x.total)}`, info], light: !m, hi: kk.hi, status: boxStatus(x) };
+        return { key: `${x.name}|${x.release}`, rank, name: x.name, x, m, lines: sort === "total" ? [info, ""] : [`票房 ${money(x.total)}`, info], light: !m, hi: kk.hi, status: boxStatus(x, m) };
       });
       const rateName2 = rates.find((r) => r.id === rate).label;
       const md = (d) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`;
@@ -2520,8 +2521,8 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
         selIssuers: firm2,
         issuerSummary: landText(firm2, everyone.length),
         statusSel: st,
-        statusPicks: [{ id: "", label: "全部", count: keyedAll.length }, { id: "now", label: "上映中", count: stCount.now }, { id: "off", label: "已下檔", count: stCount.off }],
-        title: (st ? st === "now" ? "上映中｜" : "已下檔｜" : "") + (sort === "total" ? `${yt} 年票房排行（截至 ${md(b.end)}）${dirTag}` : `${yt} 年上映 ${entries2.length} 部｜${sort === "date" ? asc ? "最早上映在前" : "最新上映在前" : sort === "rating" ? `${rateName2}${asc ? "低到高" : "高到低"}` : sort === "tickets" ? `累計票數${asc ? "少到多" : "多到少"}` : sort === "price" ? `平均票價${asc ? "低到高" : "高到低"}` : `累計院數${asc ? "少到多" : "多到少"}`}`) + boxCountryTag(land2) + issuerTag(firm2),
+        statusPicks: [{ id: "", label: "全部", count: keyedAll.length }, { id: "now", label: "上映中", count: stCount.now }, { id: "few", label: "少數戲院", count: stCount.few }, { id: "off", label: "已下檔", count: stCount.off }],
+        title: (st ? STATUS_LABEL[st] + "｜" : "") + (sort === "total" ? `${yt} 年票房排行（截至 ${md(b.end)}）${dirTag}` : `${yt} 年上映 ${entries2.length} 部｜${sort === "date" ? asc ? "最早上映在前" : "最新上映在前" : sort === "rating" ? `${rateName2}${asc ? "低到高" : "高到低"}` : sort === "tickets" ? `累計票數${asc ? "少到多" : "多到少"}` : sort === "price" ? `平均票價${asc ? "低到高" : "高到低"}` : `累計院數${asc ? "少到多" : "多到少"}`}`) + boxCountryTag(land2) + issuerTag(firm2),
         footer: sort === "total" ? boxOfficeFooter(b, "year", selYears, wk.id) : `${yt} 年上映、有票房紀錄的電影（已經下檔的也在裡面）${sort === "date" ? "依上映日期排序" : sort === "tickets" ? "依累計票數排序（上映以來賣出的票數）" : sort === "price" ? "依平均票價排序（累計票房 ÷ 累計票數；特殊廳、演唱會轉播的票價較高）" : sort === "rating" ? `依${rateName2}排序。${rate === "community" ? `評分不到 ${COMMUNITY_MIN} 人的不列入。` : cov}` : `依累計院數排序：上映以來放映過的戲院數（官方票房資料，算到 ${md(b.end)}）。還在上映的片，今天有場次的影城如果比官方的數字多，就用今天的數字，所以上映中和已下檔的片算法相同`}。${src}`.replace("。。", "。"),
         restTitle: "",
         restFooter: "",
@@ -3897,7 +3898,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   var extra = { boxOffice, filmList, soonList, nowShowing, nowShowingMulti, movieBoard: movieBoard2, festivalBoard, festivalFilm, nearby, patchSettings, fillMovie, formatList };
   var BRIDGE_LEVEL = 2;
   globalThis.MS = {
-    version: "2026.11.24-1243",
+    version: "2026.11.24-1249",
     level: BRIDGE_LEVEL,
     init(saved) {
       cache = saved || {};
