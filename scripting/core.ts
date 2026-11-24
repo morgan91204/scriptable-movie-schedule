@@ -1605,7 +1605,7 @@ export async function loadMovies(): Promise<TwMovie[]> {
         m.score = e.r.imdb.score;
         m.scoreFew = (e.r.imdb.votes || 0) < 500;
       }
-      if (e?.r?.tomato && typeof e.r.tomato.score === "number") m.tomato = e.r.tomato.score;
+      if (e?.r?.tomato && typeof e.r.tomato.score === "number") { m.tomato = e.r.tomato.score; m.tomatoCert = !!e.r.tomato.certified; }
       if (e?.r?.popcorn && typeof e.r.popcorn.score === "number") m.popcorn = e.r.popcorn.score;
       if (m.comingSoon && m.release && m.release <= today) {
         m.comingSoon = false;
@@ -1929,7 +1929,7 @@ export function movieBoard(b: BoxOffice | null, movies: TwMovie[], opt: { scope?
         const i = r && r.i ? { s: r.i, few: (r.v || 0) < 500 } : m && m.score ? { s: m.score, few: !!m.scoreFew } : null;
         const t = r && r.t !== undefined ? r.t : m ? m.tomato : undefined;
         const p = r && r.p !== undefined ? r.p : m ? m.popcorn : undefined;
-        if (rate === "tomato") return t !== undefined ? { tier: 2, v: t, hi: { kind: "tomato", text: `${t}%`, tier: ratingTier("pct", t) } } : { tier: 0, v: 0, hi: noneHi("tomato") };
+        if (rate === "tomato") return t !== undefined ? { tier: 2, v: t, hi: { kind: "tomato", text: `${t}%`, tier: tomatoTier(t, r && r.t !== undefined ? !!r.c : !!(m && m.tomatoCert)), note: tomatoLabel(t, r && r.t !== undefined ? !!r.c : !!(m && m.tomatoCert)) } } : { tier: 0, v: 0, hi: noneHi("tomato") };
         if (rate === "popcorn") return p !== undefined ? { tier: 2, v: p, hi: { kind: "popcorn", text: `${p}%`, tier: ratingTier("pct", p) } } : { tier: 0, v: 0, hi: noneHi("popcorn") };
         return i ? { tier: i.few && fewLast ? 1 : 2, v: i.s, hi: { kind: "imdb", text: i.s.toFixed(1), tier: ratingTier("imdb", i.s), ...(i.few ? { note: "評分人數少" } : {}) } } : { tier: 0, v: 0, hi: noneHi("imdb") };
       }
@@ -2014,7 +2014,7 @@ export function movieBoard(b: BoxOffice | null, movies: TwMovie[], opt: { scope?
   // sort 是穩定的：數值一樣時維持原本（影城數多到少）的順序
   const none = (kind: EntryHi["kind"], note?: string): EntryHi => ({ kind, text: "–", tier: "none", ...(note ? { note } : {}) });
   const rated = (m: TwMovie): { tier: number; v: number; hi: EntryHi } => {
-    if (rate === "tomato") return m.tomato !== undefined ? { tier: 2, v: m.tomato, hi: { kind: "tomato", text: `${m.tomato}%`, tier: ratingTier("pct", m.tomato) } } : { tier: 0, v: 0, hi: none("tomato") };
+    if (rate === "tomato") return m.tomato !== undefined ? { tier: 2, v: m.tomato, hi: { kind: "tomato", text: `${m.tomato}%`, tier: tomatoTier(m.tomato, m.tomatoCert), note: tomatoLabel(m.tomato, m.tomatoCert) } } : { tier: 0, v: 0, hi: none("tomato") };
     if (rate === "popcorn") return m.popcorn !== undefined ? { tier: 2, v: m.popcorn, hi: { kind: "popcorn", text: `${m.popcorn}%`, tier: ratingTier("pct", m.popcorn) } } : { tier: 0, v: 0, hi: none("popcorn") };
     if (rate === "community") {
       const c = opt.community && opt.community[communityKey(m.title)] ? fromDist(opt.community[communityKey(m.title)], 0) : null;
@@ -3064,6 +3064,11 @@ export function movieRatings(title: string, en?: string, slug?: string): Promise
 const RATINGS_V = 2;
 
 /** 評分顏色等級：good（綠）／mid（黃）／bad（紅） */
+/** 番茄指數照爛番茄自己的三級：認證新鮮（爛番茄給的標章，綠）／新鮮（60% 以上，黃）／腐爛（低於 60%，紅） */
+export function tomatoTier(score: number, certified?: boolean): "good" | "mid" | "bad" {
+  return score < 60 ? "bad" : certified ? "good" : "mid";
+}
+export const tomatoLabel = (score: number, certified?: boolean): string => (score < 60 ? "腐爛" : certified ? "認證新鮮" : "新鮮");
 export function ratingTier(kind: "imdb" | "pct", v: number): "good" | "mid" | "bad" {
   const x = kind === "imdb" ? v * 10 : v;
   return x >= 75 ? "good" : x >= 60 ? "mid" : "bad";

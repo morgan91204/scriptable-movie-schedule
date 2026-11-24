@@ -208,6 +208,8 @@
     tmdbTest: () => tmdbTest,
     todayTPE: () => todayTPE,
     toggleFavMovie: () => toggleFavMovie,
+    tomatoLabel: () => tomatoLabel,
+    tomatoTier: () => tomatoTier,
     tpeDate: () => tpeDate,
     twDayLive: () => twDayLive,
     twReleaseDate: () => twReleaseDate,
@@ -2110,7 +2112,10 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
           m.score = e.r.imdb.score;
           m.scoreFew = (e.r.imdb.votes || 0) < 500;
         }
-        if (e?.r?.tomato && typeof e.r.tomato.score === "number") m.tomato = e.r.tomato.score;
+        if (e?.r?.tomato && typeof e.r.tomato.score === "number") {
+          m.tomato = e.r.tomato.score;
+          m.tomatoCert = !!e.r.tomato.certified;
+        }
         if (e?.r?.popcorn && typeof e.r.popcorn.score === "number") m.popcorn = e.r.popcorn.score;
         if (m.comingSoon && m.release && m.release <= today) {
           m.comingSoon = false;
@@ -2367,7 +2372,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
           const i = r && r.i ? { s: r.i, few: (r.v || 0) < 500 } : m && m.score ? { s: m.score, few: !!m.scoreFew } : null;
           const t = r && r.t !== void 0 ? r.t : m ? m.tomato : void 0;
           const p = r && r.p !== void 0 ? r.p : m ? m.popcorn : void 0;
-          if (rate === "tomato") return t !== void 0 ? { tier: 2, v: t, hi: { kind: "tomato", text: `${t}%`, tier: ratingTier("pct", t) } } : { tier: 0, v: 0, hi: noneHi("tomato") };
+          if (rate === "tomato") return t !== void 0 ? { tier: 2, v: t, hi: { kind: "tomato", text: `${t}%`, tier: tomatoTier(t, r && r.t !== void 0 ? !!r.c : !!(m && m.tomatoCert)), note: tomatoLabel(t, r && r.t !== void 0 ? !!r.c : !!(m && m.tomatoCert)) } } : { tier: 0, v: 0, hi: noneHi("tomato") };
           if (rate === "popcorn") return p !== void 0 ? { tier: 2, v: p, hi: { kind: "popcorn", text: `${p}%`, tier: ratingTier("pct", p) } } : { tier: 0, v: 0, hi: noneHi("popcorn") };
           return i ? { tier: i.few && fewLast ? 1 : 2, v: i.s, hi: { kind: "imdb", text: i.s.toFixed(1), tier: ratingTier("imdb", i.s), ...i.few ? { note: "評分人數少" } : {} } } : { tier: 0, v: 0, hi: noneHi("imdb") };
         }
@@ -2471,7 +2476,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     const list = pool.filter((p) => (!land.length || !!p.x && land.indexOf(boxMainCountry(p.x.country)) >= 0) && (!firm.length || !!p.x && firm.indexOf(boxMainIssuer(p.x.issue)) >= 0) && hit(p.m.title, p.m.en));
     const none = (kind, note) => ({ kind, text: "–", tier: "none", ...note ? { note } : {} });
     const rated = (m) => {
-      if (rate === "tomato") return m.tomato !== void 0 ? { tier: 2, v: m.tomato, hi: { kind: "tomato", text: `${m.tomato}%`, tier: ratingTier("pct", m.tomato) } } : { tier: 0, v: 0, hi: none("tomato") };
+      if (rate === "tomato") return m.tomato !== void 0 ? { tier: 2, v: m.tomato, hi: { kind: "tomato", text: `${m.tomato}%`, tier: tomatoTier(m.tomato, m.tomatoCert), note: tomatoLabel(m.tomato, m.tomatoCert) } } : { tier: 0, v: 0, hi: none("tomato") };
       if (rate === "popcorn") return m.popcorn !== void 0 ? { tier: 2, v: m.popcorn, hi: { kind: "popcorn", text: `${m.popcorn}%`, tier: ratingTier("pct", m.popcorn) } } : { tier: 0, v: 0, hi: none("popcorn") };
       if (rate === "community") {
         const c = opt.community && opt.community[communityKey(m.title)] ? fromDist(opt.community[communityKey(m.title)], 0) : null;
@@ -3298,6 +3303,10 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     })();
   }
   var RATINGS_V = 2;
+  function tomatoTier(score, certified) {
+    return score < 60 ? "bad" : certified ? "good" : "mid";
+  }
+  var tomatoLabel = (score, certified) => score < 60 ? "腐爛" : certified ? "認證新鮮" : "新鮮";
   function ratingTier(kind, v) {
     const x = kind === "imdb" ? v * 10 : v;
     return x >= 75 ? "good" : x >= 60 ? "mid" : "bad";
@@ -3709,7 +3718,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   var extra = { boxOffice, filmList, soonList, nowShowing, nowShowingMulti, movieBoard: movieBoard2, festivalBoard, festivalFilm, nearby, patchSettings, fillMovie, formatList };
   var BRIDGE_LEVEL = 2;
   globalThis.MS = {
-    version: "2026.11.24-0402",
+    version: "2026.11.24-0806",
     level: BRIDGE_LEVEL,
     init(saved) {
       cache = saved || {};

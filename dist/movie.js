@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.24-0402
+// @movie-schedule-app 電影行程 v2026.11.24-0806
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/parsers.gen.ts
@@ -1857,7 +1857,10 @@ async function loadMovies() {
         m.score = e.r.imdb.score;
         m.scoreFew = (e.r.imdb.votes || 0) < 500;
       }
-      if (e?.r?.tomato && typeof e.r.tomato.score === "number") m.tomato = e.r.tomato.score;
+      if (e?.r?.tomato && typeof e.r.tomato.score === "number") {
+        m.tomato = e.r.tomato.score;
+        m.tomatoCert = !!e.r.tomato.certified;
+      }
       if (e?.r?.popcorn && typeof e.r.popcorn.score === "number") m.popcorn = e.r.popcorn.score;
       if (m.comingSoon && m.release && m.release <= today) {
         m.comingSoon = false;
@@ -2103,7 +2106,7 @@ function movieBoard(b, movies, opt = {}) {
         const i = r && r.i ? { s: r.i, few: (r.v || 0) < 500 } : m && m.score ? { s: m.score, few: !!m.scoreFew } : null;
         const t = r && r.t !== void 0 ? r.t : m ? m.tomato : void 0;
         const p = r && r.p !== void 0 ? r.p : m ? m.popcorn : void 0;
-        if (rate === "tomato") return t !== void 0 ? { tier: 2, v: t, hi: { kind: "tomato", text: `${t}%`, tier: ratingTier("pct", t) } } : { tier: 0, v: 0, hi: noneHi("tomato") };
+        if (rate === "tomato") return t !== void 0 ? { tier: 2, v: t, hi: { kind: "tomato", text: `${t}%`, tier: tomatoTier(t, r && r.t !== void 0 ? !!r.c : !!(m && m.tomatoCert)), note: tomatoLabel(t, r && r.t !== void 0 ? !!r.c : !!(m && m.tomatoCert)) } } : { tier: 0, v: 0, hi: noneHi("tomato") };
         if (rate === "popcorn") return p !== void 0 ? { tier: 2, v: p, hi: { kind: "popcorn", text: `${p}%`, tier: ratingTier("pct", p) } } : { tier: 0, v: 0, hi: noneHi("popcorn") };
         return i ? { tier: i.few && fewLast ? 1 : 2, v: i.s, hi: { kind: "imdb", text: i.s.toFixed(1), tier: ratingTier("imdb", i.s), ...i.few ? { note: "評分人數少" } : {} } } : { tier: 0, v: 0, hi: noneHi("imdb") };
       }
@@ -2207,7 +2210,7 @@ function movieBoard(b, movies, opt = {}) {
   const list = pool.filter((p) => (!land.length || !!p.x && land.indexOf(boxMainCountry(p.x.country)) >= 0) && (!firm.length || !!p.x && firm.indexOf(boxMainIssuer(p.x.issue)) >= 0) && hit(p.m.title, p.m.en));
   const none = (kind, note) => ({ kind, text: "–", tier: "none", ...note ? { note } : {} });
   const rated = (m) => {
-    if (rate === "tomato") return m.tomato !== void 0 ? { tier: 2, v: m.tomato, hi: { kind: "tomato", text: `${m.tomato}%`, tier: ratingTier("pct", m.tomato) } } : { tier: 0, v: 0, hi: none("tomato") };
+    if (rate === "tomato") return m.tomato !== void 0 ? { tier: 2, v: m.tomato, hi: { kind: "tomato", text: `${m.tomato}%`, tier: tomatoTier(m.tomato, m.tomatoCert), note: tomatoLabel(m.tomato, m.tomatoCert) } } : { tier: 0, v: 0, hi: none("tomato") };
     if (rate === "popcorn") return m.popcorn !== void 0 ? { tier: 2, v: m.popcorn, hi: { kind: "popcorn", text: `${m.popcorn}%`, tier: ratingTier("pct", m.popcorn) } } : { tier: 0, v: 0, hi: none("popcorn") };
     if (rate === "community") {
       const c = opt.community && opt.community[communityKey(m.title)] ? fromDist(opt.community[communityKey(m.title)], 0) : null;
@@ -3011,6 +3014,10 @@ function movieRatings(title, en, slug) {
   })();
 }
 var RATINGS_V = 2;
+function tomatoTier(score, certified) {
+  return score < 60 ? "bad" : certified ? "good" : "mid";
+}
+var tomatoLabel = (score, certified) => score < 60 ? "腐爛" : certified ? "認證新鮮" : "新鮮";
 function ratingTier(kind, v) {
   const x = kind === "imdb" ? v * 10 : v;
   return x >= 75 ? "good" : x >= 60 ? "mid" : "bad";
@@ -4056,14 +4063,14 @@ var App = class {
   }
   /** 最新版本是多少。網頁版問的是自己網站現在上線的版本（重新整理就會拿到的那一版），不是 GitHub 上的 */
   checkVersion() {
-    if (true) return checkLatest("2026.11.24-0402");
+    if (true) return checkLatest("2026.11.24-0806");
     return (async () => {
       try {
         const r = await globalThis.fetch("/api/version?t=" + Date.now(), { cache: "no-store" });
         const latest = String((await r.json()).version || "");
         if (!latest) return null;
         const num = (v) => Number(v.replace(/\D/g, "")) || 0;
-        return { latest, isLatest: num("2026.11.24-0402") >= num(latest) };
+        return { latest, isLatest: num("2026.11.24-0806") >= num(latest) };
       } catch (_) {
         return null;
       }
@@ -4407,11 +4414,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.24-0402"}`);
+          Pasteboard.copy(`版本 ${"2026.11.24-0806"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.24-0402"}`,
+      `版本 ${"2026.11.24-0806"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -4586,7 +4593,7 @@ var App = class {
     const badges = [];
     if (r) {
       badges.push(r.imdb ? { kind: "imdb", value: r.imdb.score.toFixed(1), tier: ratingTier("imdb", r.imdb.score), onTap: () => Safari.open(r.imdb.url) } : { kind: "imdb", value: "-", tier: "none" });
-      badges.push(r.tomato ? { kind: "tomato", value: `${r.tomato.score}%`, tier: ratingTier("pct", r.tomato.score), note: r.tomato.certified ? "✓" : void 0, onTap: () => Safari.open(r.tomato.url) } : { kind: "tomato", value: "-", tier: "none" });
+      badges.push(r.tomato ? { kind: "tomato", value: `${r.tomato.score}%`, tier: tomatoTier(r.tomato.score, r.tomato.certified), note: r.tomato.certified ? "✓" : void 0, onTap: () => Safari.open(r.tomato.url) } : { kind: "tomato", value: "-", tier: "none" });
       badges.push(r.popcorn ? { kind: "popcorn", value: `${r.popcorn.score}%`, tier: ratingTier("pct", r.popcorn.score), onTap: () => Safari.open(r.popcorn.url) } : { kind: "popcorn", value: "-", tier: "none" });
     }
     return badges;
@@ -4753,7 +4760,7 @@ var App = class {
     if (false) {
       if (!r) return /* @__PURE__ */ h(Note, { text: "（無法確認是否為最新版：連不到網站）" });
       if (r.isLatest) return /* @__PURE__ */ h(Note, { text: "✅ 已是最新版" });
-      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.24-0402"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
+      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.24-0806"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
         globalThis.location.reload();
       } }));
     }
