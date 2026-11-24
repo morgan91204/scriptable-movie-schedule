@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.24-1427
+// @movie-schedule-app 電影行程 v2026.11.24-1632
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/parsers.gen.ts
@@ -928,6 +928,7 @@ async function atDay(c, date) {
 var TW_NEAR_URL = "https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/data/tw-near.json";
 var TW_FAR_URL = "https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/data/tw-far.json";
 var OFFICIAL_URL = "https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/data/official.json";
+var SHOWTIMES_URL = "https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/data/showtimes.json";
 var servedMem = {};
 function loadServed(name, url, maxHours, ok) {
   if (!metaOn) return Promise.resolve(null);
@@ -977,6 +978,33 @@ async function twDay(c, date) {
     if (hit && hit.date === day) return twDayCache[key] = { cinema: c.name, ...hit };
   }
   return twDayLive(c, date);
+}
+async function chainDays(c) {
+  if (!/^showtimes-/.test(c.id)) return null;
+  const data = await loadServed("showtimes", SHOWTIMES_URL, 12, (d) => typeof d.cinemas === "object").catch(() => null);
+  return data?.cinemas[c.id]?.schedules || null;
+}
+function mergeChain(movies, extra) {
+  const out = movies.map((m) => ({ ...m, versions: m.versions.map((v) => ({ ...v, times: v.times.slice() })) }));
+  for (const em of extra) {
+    let m = out.find((x) => normTitle(x.title) === normTitle(em.title));
+    if (!m) {
+      out.push({ ...em, versions: em.versions.map((v) => ({ ...v, times: v.times.slice() })) });
+      continue;
+    }
+    if (!m.runtime && em.runtime) m.runtime = em.runtime;
+    if (!m.rating && em.rating) m.rating = em.rating;
+    for (const ev of em.versions) {
+      const v = m.versions.find((x) => x.label === ev.label);
+      if (!v) {
+        m.versions.push({ ...ev, times: ev.times.slice() });
+        continue;
+      }
+      for (const t of ev.times) if (v.times.indexOf(t) < 0) v.times.push(t);
+      v.times.sort();
+    }
+  }
+  return out;
 }
 var multiCache = {};
 async function multiDayLive(c) {
@@ -1101,9 +1129,10 @@ async function datesOf(c) {
   if (c.source === "tw") {
     const sup = AT_SUPPLEMENT.find((x) => x[0].test(c.name));
     if (sup) atDay(atCinema(sup[1], sup[2], c.name, "")).catch(() => null);
-    const d = await twDay(c);
+    const [d, chain] = await Promise.all([twDay(c), chainDays(c)]);
     const future = d.dates.filter((x) => x >= today);
-    return { dates: future.length ? future : d.dates, address: d.address, notice: "", site: d.booking || "" };
+    const more = Object.keys(chain || {}).filter((x) => x >= today && future.indexOf(x) < 0);
+    return { dates: future.length || more.length ? future.concat(more).sort() : d.dates, address: d.address, notice: "", site: d.booking || "" };
   }
   const m = await multiDay(c);
   const dates = Object.keys(m.schedules).filter((x) => x >= today).sort();
@@ -1159,9 +1188,12 @@ async function moviesOf(c, date) {
   }
   if (c.source === "tw") {
     let d = await twDay(c);
+    const extra = (await chainDays(c) || {})[date];
+    if (extra && d.date !== date && d.dates.indexOf(date) < 0) return { movies: await fillRuntimes(extra), booking: d.booking, sourceUrl: d.booking || c.url, address: d.address };
     if (d.date !== date) d = await twDay(c, date);
     if (d.date && d.date !== date) throw new Error("網站回傳的日期和選擇的不同，請稍後再試");
-    return { movies: await fillRuntimes(await supplementHalls(c, date, d.movies)), booking: d.booking, sourceUrl: `${TW}/cinemas/${c.id}/${date}/`, address: d.address };
+    const movies = extra ? mergeChain(d.movies, extra) : d.movies;
+    return { movies: await fillRuntimes(await supplementHalls(c, date, movies)), booking: d.booking, sourceUrl: `${TW}/cinemas/${c.id}/${date}/`, address: d.address };
   }
   const m = await multiDay(c);
   return { movies: await fillRuntimes(m.schedules[date] || []), booking: c.url, sourceUrl: c.url, address: c.address || "" };
@@ -4203,6 +4235,7 @@ var CHANGELOG = [
     id: "2026-11-24",
     date: "2026/11/24",
     items: [
+      { kind: "new", text: "秀泰影城的預售日期和特別場也查得到了（直接讀秀泰官網的完整場次，補上場次通還沒列出的）" },
       { kind: "new", text: "首頁可以直接搜尋：影城、現正上映、即將上映、歷年電影、影展片一起找；可以用空白隔開好幾個字（例如「威秀 台中」），最符合的排最前面" },
       { kind: "new", text: "電影頁多了分享按鈕，朋友點連結會直接開到那部片" },
       { kind: "new", text: "可以用 Google 帳號同步收藏和設定（設定 → 同步）" },
@@ -4411,7 +4444,7 @@ var App = class {
   }
   /** 最新版本是多少。網頁版問的是自己網站現在上線的版本（重新整理就會拿到的那一版），不是 GitHub 上的 */
   checkVersion() {
-    if (true) return checkLatest("2026.11.24-1427");
+    if (true) return checkLatest("2026.11.24-1632");
     return (async () => {
       try {
         let r = await globalThis.fetch("/version.json?t=" + Date.now(), { cache: "no-store" });
@@ -4419,7 +4452,7 @@ var App = class {
         const latest = String((await r.json()).version || "");
         if (!latest) return null;
         const num = (v) => Number(v.replace(/\D/g, "")) || 0;
-        return { latest, isLatest: num("2026.11.24-1427") >= num(latest) };
+        return { latest, isLatest: num("2026.11.24-1632") >= num(latest) };
       } catch (_) {
         return null;
       }
@@ -4989,7 +5022,7 @@ var App = class {
       this.settings.seenLog = CHANGELOG_LATEST;
       saveSettings(this.settings);
     }
-    return /* @__PURE__ */ h(Page, { title: "更新內容", subtitle: `目前版本 ${"2026.11.24-1427"}`, onBack: () => this.back() }, CHANGELOG.map((e) => /* @__PURE__ */ h(Section, { title: e.date }, e.items.map((it) => /* @__PURE__ */ h(Item, { title: it.text, tag: { text: it.kind === "new" ? "新功能" : "改進", tone: it.kind === "new" ? "now" : "soon" }, chevron: false })))), /* @__PURE__ */ h(Note, { text: "只列出比較有感的變動；修小錯、調整文字這類不會寫在這裡。" }));
+    return /* @__PURE__ */ h(Page, { title: "更新內容", subtitle: `目前版本 ${"2026.11.24-1632"}`, onBack: () => this.back() }, CHANGELOG.map((e) => /* @__PURE__ */ h(Section, { title: e.date }, e.items.map((it) => /* @__PURE__ */ h(Item, { title: it.text, tag: { text: it.kind === "new" ? "新功能" : "改進", tone: it.kind === "new" ? "now" : "soon" }, chevron: false })))), /* @__PURE__ */ h(Note, { text: "只列出比較有感的變動；修小錯、調整文字這類不會寫在這裡。" }));
   }
   async aboutView() {
     return /* @__PURE__ */ h(Page, { title: "關於", onBack: () => this.back() }, /* @__PURE__ */ h(Section, { hint: "連鎖影城的場次來自場次通（twshowtimes.com），感謝場次通的整理；其他來自開眼電影網，以及誠品、光點、樂聲、內惟戲院官網。實際場次以影城公告為準。" }, /* @__PURE__ */ h(Item, { icon: "ℹ️", title: "關於與資料來源", accent: true, chevron: false, onTap: () => Safari.open(ABOUT_URL) }), /* @__PURE__ */ h(Item, { icon: "🔒", title: "隱私權政策", accent: true, chevron: false, onTap: () => Safari.open(PRIVACY_URL) }), /* @__PURE__ */ h(Item, { icon: "🙏", title: "前往場次通", subtitle: "比較各影城場次、看上映場數排行", accent: true, chevron: false, onTap: () => Safari.open("https://twshowtimes.com/") })));
@@ -5013,11 +5046,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.24-1427"}`);
+          Pasteboard.copy(`版本 ${"2026.11.24-1632"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.24-1427"}`,
+      `版本 ${"2026.11.24-1632"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -5361,7 +5394,7 @@ var App = class {
     if (false) {
       if (!r) return /* @__PURE__ */ h(Note, { text: "（無法確認是否為最新版：連不到網站）" });
       if (r.isLatest) return /* @__PURE__ */ h(Note, { text: "✅ 已是最新版" });
-      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.24-1427"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
+      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.24-1632"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
         globalThis.location.reload();
       } }));
     }

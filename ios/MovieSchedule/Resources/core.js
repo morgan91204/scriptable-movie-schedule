@@ -38,6 +38,7 @@
     PRIVACY_URL: () => PRIVACY_URL,
     RATE_SOURCES: () => RATE_SOURCES,
     SCRIPTING_IMPORT_URL: () => SCRIPTING_IMPORT_URL,
+    SHOWTIMES_URL: () => SHOWTIMES_URL,
     SITE_URL: () => SITE_URL,
     STATUS_LABEL: () => STATUS_LABEL,
     TMDB_LINKS: () => TMDB_LINKS,
@@ -1028,7 +1029,7 @@ function parseTwMovieDay(doc) {
     try {
       if (!version || cacheGet("cache-version.txt") === version) return;
       const thisYear = Number(todayTPE().slice(0, 4));
-      const names = ["meta2.json", "ratings-years3.json", "boxoffice-years3.json", "boxoffice5.json", "boxoffice-weeks.json", "upcoming.json", "festival.json", "official.json", "tw-near.json", "tw-far.json"];
+      const names = ["meta2.json", "ratings-years3.json", "boxoffice-years3.json", "boxoffice5.json", "boxoffice-weeks.json", "upcoming.json", "festival.json", "official.json", "showtimes.json", "tw-near.json", "tw-far.json"];
       for (let y = 2016; y <= thisYear; y++) names.push(`intro-${y}.json`, `festival-${y}.json`);
       for (const n of names) if (cacheGet(n)) cacheSet(n, "");
       cacheSet("cache-version.txt", version);
@@ -1172,6 +1173,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   var TW_NEAR_URL = "https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/data/tw-near.json";
   var TW_FAR_URL = "https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/data/tw-far.json";
   var OFFICIAL_URL = "https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/data/official.json";
+  var SHOWTIMES_URL = "https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/data/showtimes.json";
   var servedMem = {};
   function loadServed(name, url, maxHours, ok) {
     if (!metaOn) return Promise.resolve(null);
@@ -1221,6 +1223,33 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
       if (hit && hit.date === day) return twDayCache[key] = { cinema: c.name, ...hit };
     }
     return twDayLive(c, date);
+  }
+  async function chainDays(c) {
+    if (!/^showtimes-/.test(c.id)) return null;
+    const data = await loadServed("showtimes", SHOWTIMES_URL, 12, (d) => typeof d.cinemas === "object").catch(() => null);
+    return data?.cinemas[c.id]?.schedules || null;
+  }
+  function mergeChain(movies, extra2) {
+    const out = movies.map((m) => ({ ...m, versions: m.versions.map((v) => ({ ...v, times: v.times.slice() })) }));
+    for (const em of extra2) {
+      let m = out.find((x) => normTitle(x.title) === normTitle(em.title));
+      if (!m) {
+        out.push({ ...em, versions: em.versions.map((v) => ({ ...v, times: v.times.slice() })) });
+        continue;
+      }
+      if (!m.runtime && em.runtime) m.runtime = em.runtime;
+      if (!m.rating && em.rating) m.rating = em.rating;
+      for (const ev of em.versions) {
+        const v = m.versions.find((x) => x.label === ev.label);
+        if (!v) {
+          m.versions.push({ ...ev, times: ev.times.slice() });
+          continue;
+        }
+        for (const t of ev.times) if (v.times.indexOf(t) < 0) v.times.push(t);
+        v.times.sort();
+      }
+    }
+    return out;
   }
   var multiCache = {};
   async function multiDayLive(c) {
@@ -1345,9 +1374,10 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     if (c.source === "tw") {
       const sup = AT_SUPPLEMENT.find((x) => x[0].test(c.name));
       if (sup) atDay(atCinema(sup[1], sup[2], c.name, "")).catch(() => null);
-      const d = await twDay(c);
+      const [d, chain] = await Promise.all([twDay(c), chainDays(c)]);
       const future = d.dates.filter((x) => x >= today);
-      return { dates: future.length ? future : d.dates, address: d.address, notice: "", site: d.booking || "" };
+      const more = Object.keys(chain || {}).filter((x) => x >= today && future.indexOf(x) < 0);
+      return { dates: future.length || more.length ? future.concat(more).sort() : d.dates, address: d.address, notice: "", site: d.booking || "" };
     }
     const m = await multiDay(c);
     const dates = Object.keys(m.schedules).filter((x) => x >= today).sort();
@@ -1403,9 +1433,12 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     }
     if (c.source === "tw") {
       let d = await twDay(c);
+      const extra2 = (await chainDays(c) || {})[date];
+      if (extra2 && d.date !== date && d.dates.indexOf(date) < 0) return { movies: await fillRuntimes(extra2), booking: d.booking, sourceUrl: d.booking || c.url, address: d.address };
       if (d.date !== date) d = await twDay(c, date);
       if (d.date && d.date !== date) throw new Error("網站回傳的日期和選擇的不同，請稍後再試");
-      return { movies: await fillRuntimes(await supplementHalls(c, date, d.movies)), booking: d.booking, sourceUrl: `${TW}/cinemas/${c.id}/${date}/`, address: d.address };
+      const movies = extra2 ? mergeChain(d.movies, extra2) : d.movies;
+      return { movies: await fillRuntimes(await supplementHalls(c, date, movies)), booking: d.booking, sourceUrl: `${TW}/cinemas/${c.id}/${date}/`, address: d.address };
     }
     const m = await multiDay(c);
     return { movies: await fillRuntimes(m.schedules[date] || []), booking: c.url, sourceUrl: c.url, address: c.address || "" };
@@ -4012,7 +4045,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   var extra = { boxOffice, filmList, soonList, nowShowing, nowShowingMulti, movieBoard: movieBoard2, festivalBoard, festivalFilm, nearby, patchSettings, fillMovie, formatList };
   var BRIDGE_LEVEL = 2;
   globalThis.MS = {
-    version: "2026.11.24-1427",
+    version: "2026.11.24-1632",
     level: BRIDGE_LEVEL,
     init(saved) {
       cache = saved || {};

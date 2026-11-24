@@ -281,7 +281,7 @@ export function dropStaleCaches(version: string): void {
   try {
     if (!version || cacheGet("cache-version.txt") === version) return;
     const thisYear = Number(todayTPE().slice(0, 4));
-    const names = ["meta2.json", "ratings-years3.json", "boxoffice-years3.json", "boxoffice5.json", "boxoffice-weeks.json", "upcoming.json", "festival.json", "official.json", "tw-near.json", "tw-far.json"];
+    const names = ["meta2.json", "ratings-years3.json", "boxoffice-years3.json", "boxoffice5.json", "boxoffice-weeks.json", "upcoming.json", "festival.json", "official.json", "showtimes.json", "tw-near.json", "tw-far.json"];
     for (let y = 2016; y <= thisYear; y++) names.push(`intro-${y}.json`, `festival-${y}.json`);
     for (const n of names) if (cacheGet(n)) cacheSet(n, ""); // 空字串 = 沒有：讀的地方都會當成還沒抓過
     cacheSet("cache-version.txt", version);
@@ -463,6 +463,7 @@ interface TwServed { date: string; dates: string[]; address: string; booking: st
 interface TwData { updated: number; days: Record<string, Record<string, TwServed>> } // 影城代碼 → 日期 → 片單
 /** 官網來源的影城（誠品、光點、真善美）：伺服器抓好的整份時刻表。光點華山要一部片讀一頁，手機自己讀要幾十個請求 */
 export const OFFICIAL_URL = "https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/data/official.json";
+export const SHOWTIMES_URL = "https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/data/showtimes.json";
 interface OfficialData { updated: number; cinemas: Record<string, MultiDay> }
 // GitHub 的免費排程常常隔好幾個小時才跑一次（寫每小時也一樣），所以過期時間抓寬：
 // 今明兩天與官網來源 12 小時、後天起 24 小時。場次公布後很少更動；超過這個時間就改由手機自己讀
@@ -518,6 +519,31 @@ async function twDay(c: Cinema, date?: string): Promise<TwDay> {
     if (hit && hit.date === day) return (twDayCache[key] = { cinema: c.name, ...hit });
   }
   return twDayLive(c, date);
+}
+
+/** 秀泰影城：官網的完整場次（伺服器每小時整理一次）。場次通只列最近 6、7 天、有時漏掉特別場，
+ *  官網那份有全部已經開賣的日期（含預售、特別場），拿來補場次通沒有的日期和場次。不是秀泰、或讀不到就是 null（照舊只用場次通） */
+async function chainDays(c: Cinema): Promise<Record<string, Movie[]> | null> {
+  if (!/^showtimes-/.test(c.id)) return null;
+  const data = await loadServed<OfficialData>("showtimes", SHOWTIMES_URL, 12, (d) => typeof d.cinemas === "object").catch(() => null);
+  return data?.cinemas[c.id]?.schedules || null;
+}
+/** 把官網有、場次通沒有的場次補進片單（同一部片、同一種版本的時間合在一起；不改到快取裡的片單） */
+function mergeChain(movies: Movie[], extra: Movie[]): Movie[] {
+  const out = movies.map((m) => ({ ...m, versions: m.versions.map((v) => ({ ...v, times: v.times.slice() })) }));
+  for (const em of extra) {
+    let m = out.find((x) => normTitle(x.title) === normTitle(em.title));
+    if (!m) { out.push({ ...em, versions: em.versions.map((v) => ({ ...v, times: v.times.slice() })) }); continue; }
+    if (!m.runtime && em.runtime) m.runtime = em.runtime;
+    if (!m.rating && em.rating) m.rating = em.rating;
+    for (const ev of em.versions) {
+      const v = m.versions.find((x) => x.label === ev.label);
+      if (!v) { m.versions.push({ ...ev, times: ev.times.slice() }); continue; }
+      for (const t of ev.times) if (v.times.indexOf(t) < 0) v.times.push(t);
+      v.times.sort();
+    }
+  }
+  return out;
 }
 
 const multiCache: Record<string, MultiDay> = {};
@@ -661,9 +687,11 @@ export async function datesOf(c: Cinema): Promise<{ dates: string[]; address: st
   if (c.source === "tw") {
     const sup = AT_SUPPLEMENT.find((x) => x[0].test(c.name));
     if (sup) atDay(atCinema(sup[1], sup[2], c.name, "")).catch(() => null); // 先在背景讀開眼（補頂級影廳用）
-    const d = await twDay(c);
+    const [d, chain] = await Promise.all([twDay(c), chainDays(c)]);
     const future = d.dates.filter((x) => x >= today);
-    return { dates: future.length ? future : d.dates, address: d.address, notice: "", site: d.booking || "" };
+    // 秀泰：官網已經開賣、場次通還沒列出的日期（預售、特別場）也放進來
+    const more = Object.keys(chain || {}).filter((x) => x >= today && future.indexOf(x) < 0);
+    return { dates: future.length || more.length ? future.concat(more).sort() : d.dates, address: d.address, notice: "", site: d.booking || "" };
   }
   const m = await multiDay(c);
   const dates = Object.keys(m.schedules).filter((x) => x >= today).sort();
@@ -726,9 +754,13 @@ export async function moviesOf(c: Cinema, date: string): Promise<{ movies: Movie
   }
   if (c.source === "tw") {
     let d = await twDay(c);
+    const extra = ((await chainDays(c)) || {})[date];
+    // 秀泰官網有、場次通還沒列出的日期：整天用官網的
+    if (extra && d.date !== date && d.dates.indexOf(date) < 0) return { movies: await fillRuntimes(extra), booking: d.booking, sourceUrl: d.booking || c.url, address: d.address };
     if (d.date !== date) d = await twDay(c, date);
     if (d.date && d.date !== date) throw new Error("網站回傳的日期和選擇的不同，請稍後再試");
-    return { movies: await fillRuntimes(await supplementHalls(c, date, d.movies)), booking: d.booking, sourceUrl: `${TW}/cinemas/${c.id}/${date}/`, address: d.address };
+    const movies = extra ? mergeChain(d.movies, extra) : d.movies;
+    return { movies: await fillRuntimes(await supplementHalls(c, date, movies)), booking: d.booking, sourceUrl: `${TW}/cinemas/${c.id}/${date}/`, address: d.address };
   }
   const m = await multiDay(c);
   return { movies: await fillRuntimes(m.schedules[date] || []), booking: c.url, sourceUrl: c.url, address: c.address || "" };
