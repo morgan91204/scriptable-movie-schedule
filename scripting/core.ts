@@ -3674,6 +3674,7 @@ export function communityCached(title: string): Community | null {
 export const COMMUNITY_SUMMARY_URL = "https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/data/community10.json"; // 10 分制的總表（舊版 App 讀的 5 星制是 community.json）
 type Summary = Record<string, number[]>;
 let summaryMem: { at: number; job: Promise<Summary | null> } | null = null;
+let summaryAt = 0; // 那份檔是什麼時候匯出的（舊的檔沒有這一欄 = 0）
 let summaryNotes: Record<string, number> = {}; // 同一份檔裡每部片的短評則數
 let summaryTags: Record<string, Record<string, number>> = {}; // 同一份檔裡的心得標籤統計（片名鍵 → 代號 → 人數）
 /** 靜態總表（記 5 分鐘）；還沒有這個檔或讀不到回傳 null，改用伺服器 */
@@ -3685,6 +3686,7 @@ function loadSummary(): Promise<Summary | null> {
       if (r.status !== 200) return null;
       const data = JSON.parse(r.body);
       const m = data?.movies;
+      if (m && typeof m === "object") summaryAt = Number(data.at) || 0;
       if (m && typeof m === "object" && data.tags && typeof data.tags === "object") summaryTags = data.tags;
       if (m && typeof m === "object" && data.notes && typeof data.notes === "object") summaryNotes = data.notes;
       return m && typeof m === "object" ? (m as Summary) : null;
@@ -3731,8 +3733,11 @@ export async function communityStats(title: string): Promise<Community> {
     const summary = await loadSummary();
     if (summary) {
       // 剛投完票的 45 分鐘內用伺服器當時回的統計（靜態檔還沒更新）
-      const recent = !!(mine.dist && mine.dat && Date.now() - mine.dat < 45 * 60e3);
-      const c: Community = { ...fromDist(recent ? mine.dist! : summary[k] || [], mine.s), tags: (recent && mine.tags) || summaryTags[k] || {}, myTags: mine.t || [], notes: typeof mine.nn === "number" && mine.nat && Date.now() - mine.nat < 45 * 60e3 ? mine.nn : summaryNotes[k] || 0 };
+      // 用我投票當下伺服器回的統計，還是用靜態檔？靜態檔比我的票舊（還沒算到我那一票）就用前者；
+      // 檔案沒有匯出時間（舊格式）的話，照舊只信 45 分鐘
+      const newer = (t?: number) => !!t && (summaryAt ? t > summaryAt : Date.now() - t < 45 * 60e3);
+      const recent = !!(mine.dist && newer(mine.dat));
+      const c: Community = { ...fromDist(recent ? mine.dist! : summary[k] || [], mine.s), tags: (recent && mine.tags) || summaryTags[k] || {}, myTags: mine.t || [], notes: typeof mine.nn === "number" && newer(mine.nat) ? mine.nn : summaryNotes[k] || 0 };
       communityMem[k] = { ...c, at: Date.now() };
       return c;
     }

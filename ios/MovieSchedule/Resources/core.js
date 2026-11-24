@@ -3908,6 +3908,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   }
   var COMMUNITY_SUMMARY_URL = "https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/data/community10.json";
   var summaryMem = null;
+  var summaryAt = 0;
   var summaryNotes = {};
   var summaryTags = {};
   function loadSummary() {
@@ -3918,6 +3919,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
         if (r.status !== 200) return null;
         const data = JSON.parse(r.body);
         const m = data?.movies;
+        if (m && typeof m === "object") summaryAt = Number(data.at) || 0;
         if (m && typeof m === "object" && data.tags && typeof data.tags === "object") summaryTags = data.tags;
         if (m && typeof m === "object" && data.notes && typeof data.notes === "object") summaryNotes = data.notes;
         return m && typeof m === "object" ? m : null;
@@ -3959,8 +3961,9 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     if (mine && Date.now() - mine.at < 30 * 864e5) {
       const summary = await loadSummary();
       if (summary) {
-        const recent = !!(mine.dist && mine.dat && Date.now() - mine.dat < 45 * 6e4);
-        const c2 = { ...fromDist(recent ? mine.dist : summary[k] || [], mine.s), tags: recent && mine.tags || summaryTags[k] || {}, myTags: mine.t || [], notes: typeof mine.nn === "number" && mine.nat && Date.now() - mine.nat < 45 * 6e4 ? mine.nn : summaryNotes[k] || 0 };
+        const newer = (t) => !!t && (summaryAt ? t > summaryAt : Date.now() - t < 45 * 6e4);
+        const recent = !!(mine.dist && newer(mine.dat));
+        const c2 = { ...fromDist(recent ? mine.dist : summary[k] || [], mine.s), tags: recent && mine.tags || summaryTags[k] || {}, myTags: mine.t || [], notes: typeof mine.nn === "number" && newer(mine.nat) ? mine.nn : summaryNotes[k] || 0 };
         communityMem[k] = { ...c2, at: Date.now() };
         return c2;
       }
@@ -4407,7 +4410,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   var extra = { boxOffice, filmList, soonList, nowShowing, nowShowingMulti, movieBoard: movieBoard2, festivalBoard, festivalFilm, nearby, patchSettings, fillMovie, formatList };
   var BRIDGE_LEVEL = 2;
   globalThis.MS = {
-    version: "2026.11.24-2107",
+    version: "2026.11.24-2132",
     level: BRIDGE_LEVEL,
     init(saved) {
       cache = saved || {};

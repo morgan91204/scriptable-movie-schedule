@@ -19,7 +19,9 @@ const sorted = Object.fromEntries(Object.keys(movies).sort().map((k) => [k, movi
 // 心得標籤（只有 10 分制那份有）：片名鍵 → { 標籤代號: 人數 }
 const tags = VER === "v2" && data.tags && typeof data.tags === "object" ? Object.fromEntries(Object.keys(data.tags).sort().map((k) => [k, data.tags[k]])) : null;
 const notes = VER === "v2" && data.notes && typeof data.notes === "object" ? Object.fromEntries(Object.keys(data.notes).sort().map((k) => [k, data.notes[k]])) : null; // 每部片的短評則數
-fs.writeFileSync(out, JSON.stringify(tags ? { movies: sorted, tags, ...(notes ? { notes } : {}) } : { movies: sorted }) + "\n");
+// at = 這份是什麼時候匯出的（只有 10 分制那份有）。App 用它判斷：我投票的時間比這份新，就代表這份還沒算到我那一票，
+// 改用投票當下伺服器回的統計——排程晚了好幾個小時（GitHub 的免費排程常這樣）也不會出現「我投 8 分，分布圖上卻沒有 8 分」
+fs.writeFileSync(out, JSON.stringify(tags ? { at: Date.now(), movies: sorted, tags, ...(notes ? { notes } : {}) } : { movies: sorted }) + "\n");
 // 短評全文（第三個參數給了輸出檔才匯出）：App 不讀這個檔，是留底用的——data 分支每週、每月會打標籤備份，
 // 萬一評分伺服器的資料出事，可以用「短評管理」的 import 從這份匯回。只有看得到的短評，沒有裝置代號。
 if (VER === "v2" && data.pending > 0) console.log(`::warning::有 ${data.pending} 則短評被檢舉或被自動隱藏，還沒複查。到 Actions 執行「短評管理」（動作選 flagged）可以看內容並處理。`);
