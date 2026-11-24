@@ -811,7 +811,12 @@ class App {
           <span class="nt-rep">›</span>
         </div>
         <div class="nt-meta">{esc([seenLabel(e.seen), howLabel(e.how), `${noteDate(e.at)}記錄`].filter(Boolean).join("｜"))}</div>
-        {e.x ? (open ? <div class="nt-text">{esc(e.x)}</div> : <button class="nt-cover" onTap={() => { this.noteShown = [...this.noteShown, -e.at]; }}>這則可能有雷，點一下顯示</button>) : null}
+        {/* 點短評的內容：直接到那部片的討論區（可以回覆、推噓）；點上面的片名則是開那部片的頁面 */}
+        {e.x ? (open ? (
+          <button class="nt-text go" aria-label={`到《${e.title}》的討論區`} onTap={() => { this.noteReset(); this.go(() => this.notesView(e.title), "讀取短評…"); }}>
+            <span>{esc(e.x)}</span><i aria-hidden="true">💬 ›</i>
+          </button>
+        ) : <button class="nt-cover" onTap={() => { this.noteShown = [...this.noteShown, -e.at]; }}>這則可能有雷，點一下顯示</button>) : null}
       </div>
     );
   }

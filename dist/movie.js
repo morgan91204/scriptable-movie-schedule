@@ -4451,6 +4451,10 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .th-reply .fb-area.note{min-height:56px;margin-top:4px}
 .th-kids{margin:2px 0 0 13px;padding-left:13px;border-left:2px solid var(--line)}
 .th-kids .th{padding-top:12px}
+.nt-text.go{display:flex;align-items:flex-end;gap:8px;width:100%;padding:0;text-align:left;color:var(--fg)}
+.nt-text.go span{flex:1;min-width:0}
+.nt-text.go i{flex:none;font-style:normal;font-size:13px;color:var(--accent);white-space:nowrap}
+.nt-text.go:active{opacity:.6}
 .nt-cover{display:block;width:100%;margin-top:6px;padding:9px 12px;border-radius:10px;background:var(--chip);color:var(--fg2);font-size:14px;text-align:left}
 .cm-star{font-size:28px;line-height:1;padding:2px 3px;color:var(--line)}
 @media(prefers-color-scheme:dark){.cm-star{color:#48484a}}
@@ -5579,7 +5583,10 @@ var App = class {
   /** 片單上的一筆：片名、分數、看過的日期、短評（有雷的摺疊）。by = 動態裡是誰的紀錄 */
   entryRow(e, onTap, onUser) {
     const open = !e.sp || this.noteShown.indexOf(-e.at) >= 0;
-    return /* @__PURE__ */ h("div", { class: "nt" }, e.by ? /* @__PURE__ */ h("button", { class: "nt-by", onTap: () => onUser && onUser(e.by.name) }, this.avatar(e.by), /* @__PURE__ */ h("span", null, esc(e.by.name))) : null, /* @__PURE__ */ h("div", { class: "nt-head", role: "button", onTap }, /* @__PURE__ */ h("span", { class: "en-title" }, esc(e.title)), e.s ? /* @__PURE__ */ h("span", { class: "nt-score " + ratingTier("imdb", e.s) }, e.s, " 分") : null, e.priv ? /* @__PURE__ */ h("span", { class: "fb-tag" }, "只有自己看得到") : null, /* @__PURE__ */ h("span", { class: "nt-rep" }, "›")), /* @__PURE__ */ h("div", { class: "nt-meta" }, esc([seenLabel(e.seen), howLabel(e.how), `${noteDate(e.at)}記錄`].filter(Boolean).join("｜"))), e.x ? open ? /* @__PURE__ */ h("div", { class: "nt-text" }, esc(e.x)) : /* @__PURE__ */ h("button", { class: "nt-cover", onTap: () => {
+    return /* @__PURE__ */ h("div", { class: "nt" }, e.by ? /* @__PURE__ */ h("button", { class: "nt-by", onTap: () => onUser && onUser(e.by.name) }, this.avatar(e.by), /* @__PURE__ */ h("span", null, esc(e.by.name))) : null, /* @__PURE__ */ h("div", { class: "nt-head", role: "button", onTap }, /* @__PURE__ */ h("span", { class: "en-title" }, esc(e.title)), e.s ? /* @__PURE__ */ h("span", { class: "nt-score " + ratingTier("imdb", e.s) }, e.s, " 分") : null, e.priv ? /* @__PURE__ */ h("span", { class: "fb-tag" }, "只有自己看得到") : null, /* @__PURE__ */ h("span", { class: "nt-rep" }, "›")), /* @__PURE__ */ h("div", { class: "nt-meta" }, esc([seenLabel(e.seen), howLabel(e.how), `${noteDate(e.at)}記錄`].filter(Boolean).join("｜"))), e.x ? open ? /* @__PURE__ */ h("button", { class: "nt-text go", "aria-label": `到《${e.title}》的討論區`, onTap: () => {
+      this.noteReset();
+      this.go(() => this.notesView(e.title), "讀取短評…");
+    } }, /* @__PURE__ */ h("span", null, esc(e.x)), /* @__PURE__ */ h("i", { "aria-hidden": "true" }, "💬 ›")) : /* @__PURE__ */ h("button", { class: "nt-cover", onTap: () => {
       this.noteShown = [...this.noteShown, -e.at];
     } }, "這則可能有雷，點一下顯示") : null);
   }
