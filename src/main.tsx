@@ -750,9 +750,18 @@ class App {
           </div>
         ) : null}
         <Item icon="🎞" title="我的片單" subtitle={u ? "看過的片、評分和短評" : "取暱稱、記錄看過的片、追蹤別人"} onTap={open} />
-        {u && !u.hidden ? <Item icon={u.pub ? "✅" : "⬜️"} title="公開個人頁" subtitle={u.pub ? "別人可以看你的片單、追蹤你；短評旁邊顯示暱稱" : "目前只有你看得到片單，短評匿名"} chevron={false} onTap={async () => {
-          try { await social("profile-set", { name: u.name, pub: !u.pub }); this.meMem = null; this.diaryMem = null; await this.ui.toast(u.pub ? "個人頁改成不公開了" : "個人頁公開了"); } catch (e) { await this.ui.toast(String((e as Error)?.message || e)); }
-        }} /> : null}
+        {u && !u.hidden ? (Date.now() - this.pubAsk < 60e3 ? (
+          <div class="nt-form">
+            <Note kind="warn" text={u.pub
+              ? "確定要改成不公開嗎？改了之後：別人看不到你的個人頁和片單、不能追蹤你，你寫的短評會顯示成匿名，也不會出現在別人的動態裡。現有的粉絲不會被移除。"
+              : "確定要公開個人頁嗎？公開之後：別人看得到你的暱稱、頭像、片單（片名、分數、短評、看過的日期）、可以追蹤你，你寫的短評旁邊會顯示暱稱。設成只有自己看得到的那幾筆不會公開。"} />
+            <Button label={u.pub ? "確定改成不公開" : "確定公開"} kind={u.pub ? "danger" : "primary"} onTap={async () => {
+              this.pubAsk = 0;
+              try { await social("profile-set", { name: u.name, pub: !u.pub }); this.meMem = null; this.diaryMem = null; await this.ui.toast(u.pub ? "個人頁改成不公開了" : "個人頁公開了"); } catch (e) { await this.ui.toast(String((e as Error)?.message || e)); }
+            }} />
+            <Button label={u.pub ? "不要改，維持公開" : "不要改，維持不公開"} kind="secondary" onTap={() => { this.pubAsk = 0; }} />
+          </div>
+        ) : <Item icon={u.pub ? "✅" : "⬜️"} title="公開個人頁" subtitle={u.pub ? "別人可以看你的片單、追蹤你；短評旁邊顯示暱稱" : "目前只有你看得到片單，短評匿名"} chevron={false} onTap={() => { this.pubAsk = Date.now(); }} />) : null}
         <Item icon="🔄" title="同步與登出" subtitle="收藏和設定自動同步中" onTap={() => this.go(() => this.syncView())} />
         {me && me.admin ? <Item icon="🛡" title="管理員專區" subtitle="意見回饋、短評、帳號、管理員名單" onTap={() => this.go(() => this.adminHomeView())} /> : null}
       </Section>
@@ -1840,6 +1849,7 @@ class App {
       </Section>
     );
   }
+  pubAsk = 0; // 按了「公開個人頁」的時間：一分鐘內顯示確認（同 notifyOffAsk）
   notifyOffAsk = 0; // 按了「關閉通知」的時間：一分鐘內顯示「確定要關嗎」（過了就當沒按，免得下次進來還停在確認）
   notifyOpen = false; // 設定頁「算哪些影城」的選項有沒有展開
   /** 網頁版的通知介面（web/shim.ts 的 __push）；Scriptable 版沒有 */
