@@ -137,6 +137,10 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .step-body{flex:1;min-width:0}
 .step-t{font-size:16px;font-weight:600}
 .step-s{font-size:13px;color:var(--fg2);margin-top:2px}
+.group>.note{margin:0;padding:13px 16px;font-size:14px;line-height:1.45}
+.group>.note+.note{padding-top:0}
+.nt-form>.note{margin:0 0 10px}
+.nt-form>.note:first-child{margin-top:8px}
 .note.version{padding:6px 0;-webkit-user-select:none;user-select:none}
 .note.version:active{opacity:.5}
 .item .act{flex:none;width:40px;height:40px;margin:-4px -6px -4px 0;border-radius:20px;font-size:17px;color:var(--fg2);background:transparent}
