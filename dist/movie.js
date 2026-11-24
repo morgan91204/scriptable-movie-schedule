@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.25-0126
+// @movie-schedule-app 電影行程 v2026.11.25-0129
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/brand.ts
@@ -5437,7 +5437,7 @@ var App = class {
   }
   /** 最新版本是多少。網頁版問的是自己網站現在上線的版本（重新整理就會拿到的那一版），不是 GitHub 上的 */
   checkVersion() {
-    if (true) return checkLatest("2026.11.25-0126");
+    if (true) return checkLatest("2026.11.25-0129");
     return (async () => {
       try {
         let r = await globalThis.fetch("/version.json?t=" + Date.now(), { cache: "no-store" });
@@ -5445,7 +5445,7 @@ var App = class {
         const latest = String((await r.json()).version || "");
         if (!latest) return null;
         const num = (v) => Number(v.replace(/\D/g, "")) || 0;
-        return { latest, isLatest: num("2026.11.25-0126") >= num(latest) };
+        return { latest, isLatest: num("2026.11.25-0129") >= num(latest) };
       } catch (_) {
         return null;
       }
@@ -6676,7 +6676,7 @@ var App = class {
         return;
       }
       try {
-        await sendFeedback(cat.id, text, false ? this.isStandalone() ? "web-app" : "web" : "scriptable", "2026.11.25-0126");
+        await sendFeedback(cat.id, text, false ? this.isStandalone() ? "web-app" : "web" : "scriptable", "2026.11.25-0129");
         this.fbDraft = "";
         this.fbCat = "";
         await this.ui.toast("已送出，謝謝你的回饋");
@@ -6748,11 +6748,12 @@ var App = class {
   /** 管理員：用量。最近 14 天每天幾台裝置、各類請求幾次（伺服器自己數的約略值；日期是 UTC，跟 Cloudflare 每日額度同一個算法） */
   async adminUsageView() {
     const sy = this.sync();
-    let days = [], today = "", failed = "";
+    let days = [], today = "", failed = "", totals = null;
     try {
       const r = await sy.adm("usage", {});
       days = r.days || [];
       today = r.today || "";
+      totals = r.totals || null;
     } catch (e) {
       failed = String(e?.message || e);
     }
@@ -6764,9 +6765,9 @@ var App = class {
       const hit = d.n["fetch-hit"] || 0, f = d.n.fetch || 0;
       const parts = NAMES.filter(([k]) => d.n[k]).map(([k, label]) => `${label} ${num(d.n[k])}`).join("、");
       const pct = Math.round(total / LIMIT * 1e3) / 10;
-      return /* @__PURE__ */ h("div", { class: "us-day" }, /* @__PURE__ */ h("div", { class: "us-top" }, /* @__PURE__ */ h("b", null, esc(d.day.slice(5).replace("-", "/")), d.day === today ? "（今天）" : ""), /* @__PURE__ */ h("span", null, num(total), " 個請求｜", pct, "%")), /* @__PURE__ */ h("div", { class: "us-bar" }, /* @__PURE__ */ h("i", { style: `width:${Math.min(100, Math.max(1, pct))}%`, class: pct >= 80 ? "bad" : pct >= 50 ? "warn" : "" })), /* @__PURE__ */ h("div", { class: "us-sub2" }, d.devices ? `約 ${num(d.devices)} 台裝置，平均每台 ${num(total / d.devices)} 個` : "裝置數還沒有資料"), /* @__PURE__ */ h("div", { class: "us-sub2" }, esc(parts), f ? `｜查場次有 ${Math.round(hit / f * 100)}% 直接用暫存` : ""));
+      return /* @__PURE__ */ h("div", { class: "us-day" }, /* @__PURE__ */ h("div", { class: "us-top" }, /* @__PURE__ */ h("b", null, esc(d.day.slice(5).replace("-", "/")), d.day === today ? "（今天）" : ""), /* @__PURE__ */ h("span", null, num(total), " 個請求｜", pct, "%")), /* @__PURE__ */ h("div", { class: "us-bar" }, /* @__PURE__ */ h("i", { style: `width:${Math.min(100, Math.max(1, pct))}%`, class: pct >= 80 ? "bad" : pct >= 50 ? "warn" : "" })), /* @__PURE__ */ h("div", { class: "us-sub2" }, d.devices ? `約 ${num(d.devices)} 台裝置，平均每台 ${num(total / d.devices)} 個` : "裝置數還沒有資料", d.accounts ? `｜其中登入的帳號 ${num(d.accounts)} 個` : ""), /* @__PURE__ */ h("div", { class: "us-sub2" }, esc(parts), f ? `｜查場次有 ${Math.round(hit / f * 100)}% 直接用暫存` : ""));
     };
-    return /* @__PURE__ */ h(Page, { title: "用量", subtitle: "最近 14 天", onBack: () => this.back() }, failed ? /* @__PURE__ */ h(Section, null, /* @__PURE__ */ h(Note, { kind: "warn", text: failed })) : !days.length ? /* @__PURE__ */ h(Section, null, /* @__PURE__ */ h(Note, { text: "還沒有資料。這個統計從上線那一刻開始數，過幾分鐘再來看。" })) : /* @__PURE__ */ h(Section, { hint: "百分比是跟 Cloudflare 免費方案的每日 100,000 個請求比（只算網頁版這一支，評分伺服器另外算，量很小）。日期用世界標準時間：每天台灣時間早上 8 點換日，額度也是那時候重算。數字是約略值，會比 Cloudflare 後台略少。裝置數靠每天隨機更換的匿名代號估算，不含還沒更新到新版的人。" }, /* @__PURE__ */ h("div", { class: "us-days" }, days.map(row))));
+    return /* @__PURE__ */ h(Page, { title: "用量", subtitle: "最近 14 天", onBack: () => this.back() }, totals ? /* @__PURE__ */ h(Section, { title: "帳號總數", hint: "登入過的帳號：目前登入中、同步過設定、取過暱稱或有片單的帳號合起來算（登出後又沒留任何資料的不算）。「每天有幾個登入的帳號打開」列在下面每一天裡，從這一版上線開始數。" }, /* @__PURE__ */ h(Item, { kv: true, title: "登入過 Google 的帳號", right: `${num(totals.accounts)} 個`, chevron: false }), /* @__PURE__ */ h(Item, { kv: true, title: "目前登入中的裝置", right: `${num(totals.sessions)} 台`, chevron: false }), /* @__PURE__ */ h(Item, { kv: true, title: "取了暱稱", right: `${num(totals.named)} 個（公開 ${num(totals.pub)}）`, chevron: false }), /* @__PURE__ */ h(Item, { kv: true, title: "有片單", right: `${num(totals.diary)} 個`, chevron: false }), /* @__PURE__ */ h(Item, { kv: true, title: "開了通知的裝置", right: `${num(totals.subs)} 台（有登入 ${num(totals.linked)}）`, chevron: false })) : null, failed ? /* @__PURE__ */ h(Section, null, /* @__PURE__ */ h(Note, { kind: "warn", text: failed })) : !days.length ? /* @__PURE__ */ h(Section, null, /* @__PURE__ */ h(Note, { text: "還沒有資料。這個統計從上線那一刻開始數，過幾分鐘再來看。" })) : /* @__PURE__ */ h(Section, { hint: "百分比是跟 Cloudflare 免費方案的每日 100,000 個請求比（只算網頁版這一支，評分伺服器另外算，量很小）。日期用世界標準時間：每天台灣時間早上 8 點換日，額度也是那時候重算。數字是約略值，會比 Cloudflare 後台略少。裝置數靠每天隨機更換的匿名代號估算，不含還沒更新到新版的人。" }, /* @__PURE__ */ h("div", { class: "us-days" }, days.map(row))));
   }
   async adminListView() {
     const sy = this.sync();
@@ -7020,7 +7021,7 @@ var App = class {
       this.settings.seenLog = CHANGELOG_LATEST;
       saveSettings(this.settings);
     }
-    return /* @__PURE__ */ h(Page, { title: "更新內容", subtitle: `目前版本 ${"2026.11.25-0126"}`, onBack: () => this.back() }, CHANGELOG.map((e) => /* @__PURE__ */ h(Section, { title: e.date }, e.items.map((it) => /* @__PURE__ */ h(Item, { title: it.text, tag: { text: it.kind === "new" ? "新功能" : "改進", tone: it.kind === "new" ? "now" : "soon" }, chevron: false })))), /* @__PURE__ */ h(Note, { text: "只列出比較有感的變動；修小錯、調整文字這類不會寫在這裡。" }));
+    return /* @__PURE__ */ h(Page, { title: "更新內容", subtitle: `目前版本 ${"2026.11.25-0129"}`, onBack: () => this.back() }, CHANGELOG.map((e) => /* @__PURE__ */ h(Section, { title: e.date }, e.items.map((it) => /* @__PURE__ */ h(Item, { title: it.text, tag: { text: it.kind === "new" ? "新功能" : "改進", tone: it.kind === "new" ? "now" : "soon" }, chevron: false })))), /* @__PURE__ */ h(Note, { text: "只列出比較有感的變動；修小錯、調整文字這類不會寫在這裡。" }));
   }
   async aboutView() {
     return /* @__PURE__ */ h(Page, { title: "關於", onBack: () => this.back() }, /* @__PURE__ */ h(Section, { hint: "連鎖影城的場次來自場次通（twshowtimes.com），感謝場次通的整理；其他來自開眼電影網，以及誠品、光點、樂聲、內惟戲院官網。實際場次以影城公告為準。" }, /* @__PURE__ */ h(Item, { icon: "ℹ️", title: "關於與資料來源", accent: true, chevron: false, onTap: () => Safari.open(ABOUT_URL) }), /* @__PURE__ */ h(Item, { icon: "🔒", title: "隱私權政策", accent: true, chevron: false, onTap: () => Safari.open(PRIVACY_URL) }), /* @__PURE__ */ h(Item, { icon: "🙏", title: "前往場次通", subtitle: "比較各影城場次、看上映場數排行", accent: true, chevron: false, onTap: () => Safari.open("https://twshowtimes.com/") })));
@@ -7051,11 +7052,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.25-0126"}`);
+          Pasteboard.copy(`版本 ${"2026.11.25-0129"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.25-0126"}`,
+      `版本 ${"2026.11.25-0129"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -7700,7 +7701,7 @@ var App = class {
     if (false) {
       if (!r) return /* @__PURE__ */ h(Note, { text: "（無法確認是否為最新版：連不到網站）" });
       if (r.isLatest) return /* @__PURE__ */ h(Note, { text: "✅ 已是最新版" });
-      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.25-0126"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
+      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.25-0129"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
         globalThis.location.reload();
       } }));
     }

@@ -210,6 +210,7 @@ export async function social(hub, path, b) {
     uid = sess.uid;
     isAdmin = !!sess.adm && (await hub.isAdmin(sess.adm)); // 設定頁要不要多出「管理員專區」那一列
     if (isAdmin && op === "me") await hub.adminSeen(uid, sess.adm); // 之後有新的檢舉、回饋才通知得到他
+    if (op === "me") hub.usageAccount(uid); // 用量統計：今天有幾個登入的帳號打開過（過了當天只留人數）
   }
   const me = uid ? one(sql, "SELECT * FROM users WHERE uid = ?", uid) : null;
   const need = () => (uid ? null : json({ error: "not signed in" }, 401));

@@ -322,7 +322,7 @@ export class PushHub {
     if (path === "/sync/who") return json({ ok: true, admin });
     if (path === "/sync/admins" || path === "/sync/fb" || path === "/sync/users" || path === "/sync/usage") {
       if (!admin) return json({ error: "forbidden" }, 403);
-      if (path === "/sync/usage") return json({ ok: true, ...this.usageRead() });
+      if (path === "/sync/usage") return json({ ok: true, ...(await this.usageRead()) });
       if (path === "/sync/users") return socialAdmin(this, b.body || {});
       return path === "/sync/admins" ? this.adminList(b.body || {}, sess.adm) : this.adminFeedback(b.body || {});
     }
@@ -349,24 +349,43 @@ export class PushHub {
     }
     for (const id of (Array.isArray(b.ids) ? b.ids : []).slice(0, 3000)) if (/^[A-Za-z0-9]{10,20}$/.test(String(id))) sql.exec("INSERT OR IGNORE INTO usage_ids (day, id) VALUES (?, ?)", day, String(id));
     // 過了當天：只留「那天幾台裝置」，代號全部刪掉；統計最多留 60 天
-    for (const r of sql.exec("SELECT day, COUNT(*) AS c FROM usage_ids WHERE day < ? GROUP BY day", day).toArray()) {
+    // （代號有兩種：裝置的是純英數；「a:」開頭的是那天有打開片刻的登入帳號，見 usageAccount）
+    for (const r of sql.exec("SELECT day, SUM(id NOT LIKE 'a:%') AS c, SUM(id LIKE 'a:%') AS a FROM usage_ids WHERE day < ? GROUP BY day", day).toArray()) {
       sql.exec("INSERT INTO usage (day, cat, n) VALUES (?, 'devices', ?) ON CONFLICT(day, cat) DO UPDATE SET n = excluded.n", r.day, r.c);
+      sql.exec("INSERT INTO usage (day, cat, n) VALUES (?, 'accounts', ?) ON CONFLICT(day, cat) DO UPDATE SET n = excluded.n", r.day, r.a);
       sql.exec("DELETE FROM usage_ids WHERE day = ?", r.day);
     }
     sql.exec("DELETE FROM usage WHERE day < ?", new Date(Date.now() - 60 * 864e5).toISOString().slice(0, 10));
     return { ok: true };
   }
   /** 管理員專區的「用量」：最近 14 天，每天幾台裝置、各類請求幾次 */
-  usageRead() {
+  /** 記一筆「這個登入帳號今天有打開片刻」（社群的 me 每次開啟會打一次）。跟裝置代號一樣，過了當天只留人數 */
+  usageAccount(uid) {
+    this.state.storage.sql.exec("INSERT OR IGNORE INTO usage_ids (day, id) VALUES (?, ?)", new Date().toISOString().slice(0, 10), "a:" + String(uid).slice(0, 40));
+  }
+  /** 帳號的總數（評估規模用，只有數字）：登入過的帳號、取了暱稱的、公開的、有片單的；開通知的裝置 */
+  async usageTotals() {
+    const sql = this.state.storage.sql, st = this.state.storage;
+    const ids = new Set();
+    const scan = async (prefix, pick) => { let after; for (;;) { const page = await st.list({ prefix, limit: 1000, ...(after ? { startAfter: after } : {}) }); if (!page.size) break; for (const [k, v] of page) { after = k; pick(k, v); } if (page.size < 1000) break; } };
+    let sessions = 0, subs = 0, linked = 0;
+    await scan("t:", (_k, v) => { sessions++; if (v && v.uid) ids.add(v.uid); });   // 目前登入中的（一個帳號可以登入好幾台）
+    await scan("u:", (k) => ids.add(k.slice(2)));                                    // 有同步過設定的帳號
+    for (const r of sql.exec("SELECT uid FROM users UNION SELECT DISTINCT uid FROM entries").toArray()) ids.add(r.uid);
+    await scan("s:", (_k, v) => { subs++; if (v && v.u) linked++; });
+    const one = (q) => sql.exec(q).toArray()[0].c;
+    return { accounts: ids.size, sessions, named: one("SELECT COUNT(*) AS c FROM users"), pub: one("SELECT COUNT(*) AS c FROM users WHERE pub = 1 AND hidden = 0"), diary: one("SELECT COUNT(DISTINCT uid) AS c FROM entries"), subs, linked };
+  }
+  async usageRead() {
     const sql = this.state.storage.sql, today = new Date().toISOString().slice(0, 10);
     const days = {};
     for (const r of sql.exec("SELECT day, cat, n FROM usage WHERE day >= ? ORDER BY day DESC", new Date(Date.now() - 13 * 864e5).toISOString().slice(0, 10)).toArray()) {
-      const d = days[r.day] || (days[r.day] = { day: r.day, devices: 0, n: {} });
-      if (r.cat === "devices") d.devices = r.n; else d.n[r.cat] = r.n;
+      const d = days[r.day] || (days[r.day] = { day: r.day, devices: 0, accounts: 0, n: {} });
+      if (r.cat === "devices") d.devices = r.n; else if (r.cat === "accounts") d.accounts = r.n; else d.n[r.cat] = r.n;
     }
-    const live = sql.exec("SELECT COUNT(*) AS c FROM usage_ids WHERE day = ?", today).toArray()[0].c;
-    if (days[today] || live) (days[today] || (days[today] = { day: today, devices: 0, n: {} })).devices = live;
-    return { today, days: Object.values(days).sort((a, b) => (a.day < b.day ? 1 : -1)) };
+    const live = sql.exec("SELECT COALESCE(SUM(id NOT LIKE 'a:%'), 0) AS c, COALESCE(SUM(id LIKE 'a:%'), 0) AS a FROM usage_ids WHERE day = ?", today).toArray()[0];
+    if (days[today] || live.c || live.a) { const d = days[today] || (days[today] = { day: today, devices: 0, accounts: 0, n: {} }); d.devices = live.c; d.accounts = live.a; }
+    return { today, days: Object.values(days).sort((a, b) => (a.day < b.day ? 1 : -1)), totals: await this.usageTotals() };
   }
   /** 有人回覆、追蹤某個帳號：對那個帳號登入的每一台裝置推一則（那台有開這種通知才推）。
    *  在對方的勿擾時段就先記著（pq:…），等每小時的排程在勿擾時段過後一起送 */

@@ -1813,9 +1813,10 @@ class App {
   /** 管理員：用量。最近 14 天每天幾台裝置、各類請求幾次（伺服器自己數的約略值；日期是 UTC，跟 Cloudflare 每日額度同一個算法） */
   async adminUsageView(): Promise<string> {
     const sy = this.sync();
-    type Day = { day: string; devices: number; n: Record<string, number> };
-    let days: Day[] = [], today = "", failed = "";
-    try { const r = await sy.adm("usage", {}); days = r.days || []; today = r.today || ""; } catch (e) { failed = String((e as Error)?.message || e); }
+    type Day = { day: string; devices: number; accounts?: number; n: Record<string, number> };
+    type Totals = { accounts: number; sessions: number; named: number; pub: number; diary: number; subs: number; linked: number };
+    let days: Day[] = [], today = "", failed = "", totals: Totals | null = null;
+    try { const r = await sy.adm("usage", {}); days = r.days || []; today = r.today || ""; totals = r.totals || null; } catch (e) { failed = String((e as Error)?.message || e); }
     const LIMIT = 100000;
     const NAMES: [string, string][] = [["fetch", "查場次"], ["social", "社群／短評"], ["sync", "同步／登入"], ["push", "通知"], ["version", "檢查更新"], ["page", "頁面"], ["feedback", "回饋"], ["api", "其他"]];
     const num = (n: number) => String(Math.round(n)).replace(/\B(?=(\d{3})+$)/g, ",");
@@ -1828,13 +1829,22 @@ class App {
         <div class="us-day">
           <div class="us-top"><b>{esc(d.day.slice(5).replace("-", "/"))}{d.day === today ? "（今天）" : ""}</b><span>{num(total)} 個請求｜{pct}%</span></div>
           <div class="us-bar"><i style={`width:${Math.min(100, Math.max(1, pct))}%`} class={pct >= 80 ? "bad" : pct >= 50 ? "warn" : ""} /></div>
-          <div class="us-sub2">{d.devices ? `約 ${num(d.devices)} 台裝置，平均每台 ${num(total / d.devices)} 個` : "裝置數還沒有資料"}</div>
+          <div class="us-sub2">{d.devices ? `約 ${num(d.devices)} 台裝置，平均每台 ${num(total / d.devices)} 個` : "裝置數還沒有資料"}{d.accounts ? `｜其中登入的帳號 ${num(d.accounts)} 個` : ""}</div>
           <div class="us-sub2">{esc(parts)}{f ? `｜查場次有 ${Math.round((hit / f) * 100)}% 直接用暫存` : ""}</div>
         </div>
       );
     };
     return (
       <Page title="用量" subtitle="最近 14 天" onBack={() => this.back()}>
+        {totals ? (
+          <Section title="帳號總數" hint="登入過的帳號：目前登入中、同步過設定、取過暱稱或有片單的帳號合起來算（登出後又沒留任何資料的不算）。「每天有幾個登入的帳號打開」列在下面每一天裡，從這一版上線開始數。">
+            <Item kv title="登入過 Google 的帳號" right={`${num(totals.accounts)} 個`} chevron={false} />
+            <Item kv title="目前登入中的裝置" right={`${num(totals.sessions)} 台`} chevron={false} />
+            <Item kv title="取了暱稱" right={`${num(totals.named)} 個（公開 ${num(totals.pub)}）`} chevron={false} />
+            <Item kv title="有片單" right={`${num(totals.diary)} 個`} chevron={false} />
+            <Item kv title="開了通知的裝置" right={`${num(totals.subs)} 台（有登入 ${num(totals.linked)}）`} chevron={false} />
+          </Section>
+        ) : null}
         {failed ? <Section><Note kind="warn" text={failed} /></Section> : !days.length ? <Section><Note text="還沒有資料。這個統計從上線那一刻開始數，過幾分鐘再來看。" /></Section> : (
           <Section hint="百分比是跟 Cloudflare 免費方案的每日 100,000 個請求比（只算網頁版這一支，評分伺服器另外算，量很小）。日期用世界標準時間：每天台灣時間早上 8 點換日，額度也是那時候重算。數字是約略值，會比 Cloudflare 後台略少。裝置數靠每天隨機更換的匿名代號估算，不含還沒更新到新版的人。">
             <div class="us-days">{days.map(row)}</div>
