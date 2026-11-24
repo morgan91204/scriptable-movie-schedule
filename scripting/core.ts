@@ -527,6 +527,30 @@ async function chainDays(c: Cinema): Promise<Record<string, Movie[]> | null> {
   if (!/^showtimes-/.test(c.id)) return null;
   return (await chainAll())?.[c.id]?.schedules || null;
 }
+/** 只有秀泰官網有、場次通還沒有頁面的片（多半是預售中的大片、演唱會轉播）：片單裡給它一個自己的代號，場次全部來自官網 */
+const CHAIN_SLUG = "st:";
+export const isChainSlug = (slug: string): boolean => String(slug || "").indexOf(CHAIN_SLUG) === 0;
+/** 官網那份裡，場次通電影清單沒有的片（known = 清單上每部片各種寫法的比對字） */
+function chainOnlyMovies(chain: Record<string, MultiDay>, known: Record<string, boolean>, today: string): TwMovie[] {
+  const found: Record<string, { m: Movie; first: string; cinemas: Record<string, boolean> }> = {};
+  for (const id of Object.keys(chain)) {
+    const sch = chain[id].schedules || {};
+    for (const d of Object.keys(sch)) {
+      if (d < today) continue;
+      for (const m of sch[d]) {
+        if (known[normTitle(m.title)] || known[looseTitle(m.title)]) continue;
+        const k = normTitle(m.title);
+        const f = (found[k] ||= { m, first: d, cinemas: {} });
+        if (d < f.first) f.first = d;
+        f.cinemas[id] = true;
+      }
+    }
+  }
+  return Object.keys(found).map((k) => {
+    const f = found[k];
+    return { slug: CHAIN_SLUG + f.m.title, title: f.m.title, en: "", rating: f.m.rating || "", runtime: f.m.runtime || 0, cinemaCount: Object.keys(f.cinemas).length, comingSoon: f.first > today };
+  });
+}
 /** 全部秀泰影城的官網場次：影城代碼 → 日期 → 片單（電影頁要看「哪些影城有演」時用） */
 async function chainAll(): Promise<Record<string, MultiDay> | null> {
   const data = await loadServed<OfficialData>("showtimes", SHOWTIMES_URL, 12, (d) => typeof d.cinemas === "object").catch(() => null);
@@ -1033,6 +1057,7 @@ export function normImageUrl(u: string): string {
 const posterMem: Record<string, Promise<string>> = {};
 function twPoster(slug: string): Promise<string> {
   return (posterMem[slug] ||= (async () => {
+    if (isChainSlug(slug)) throw new Error("no page"); // 只有秀泰官網有的片：場次通沒有這部片的頁
     const path = encodeURIComponent(slug).replace(/%3A/gi, ":");
     const url = `${TW}/movies/${path}/`;
     if (movieDayCache[url]?.image) return movieDayCache[url].image!;
@@ -1670,6 +1695,17 @@ export async function loadMovies(): Promise<TwMovie[]> {
       }
     }
     const merged = mergeSameMovies(list);
+    // 秀泰官網已經開賣、場次通還沒有頁面的片也放進來（最多等 1.5 秒，等不到這次就先不放）
+    const chain = await Promise.race([chainAll(), delay(1500).then(() => null)]).catch(() => null);
+    if (chain) {
+      const known: Record<string, boolean> = {};
+      for (const m of merged) for (const t of [m.title, m.slug, ...(m.alts || [])]) { known[normTitle(t)] = true; known[looseTitle(t)] = true; }
+      for (const m of chainOnlyMovies(chain, known, today)) {
+        const e = meta && (meta.movies[normTitle(m.title)] || meta.movies[normTitle(baseTitle(m.title))]);
+        if (e?.rd) m.release = e.rd;
+        merged.push(m);
+      }
+    }
     const soon = merged.filter((m) => m.comingSoon).sort((a, b) => (a.release || "9999").localeCompare(b.release || "9999")); // 快上映的排前面
     moviesCache = [...merged.filter((m) => !m.comingSoon && !m.noShowToday), ...merged.filter((m) => m.noShowToday), ...soon];
   }
@@ -2602,12 +2638,26 @@ async function movieDayChain(slug: string, date?: string): Promise<{ day: TwMovi
   const today = todayTPE();
   // 官網那份最多等 1.5 秒（讀過會記住）；等不到就先只用場次通的，不拖慢電影頁
   const chainJob = Promise.race([chainAll(), delay(1500).then(() => null)]);
-  let base: TwMovieDay | null = await movieDayTw(slug, date).catch(() => null);
-  const chain = await chainJob;
+  let base: TwMovieDay | null = isChainSlug(slug) ? null : await movieDayTw(slug, date).catch(() => null);
+  const chain = await (isChainSlug(slug) ? chainAll() : chainJob);
+  if (!chain && isChainSlug(slug)) throw new Error("秀泰的場次暫時讀不到，請稍後再試");
   if (!chain) return { day: base || (await movieDayTw(slug, date)), chained: false };
-  // 場次通沒有這一天的頁（或回了別天）：拿預設那一天當底（片名、片長、海報這些），影城清空，等下只放官網的
+  // 只有秀泰官網有的片：沒有場次通的頁，整份從官網的資料組出來
   let pure = false;
-  if (date && (!base || base.date !== date)) {
+  if (isChainSlug(slug)) {
+    const title = slug.slice(CHAIN_SLUG.length), key = normTitle(title);
+    let info: Movie | null = null;
+    const days: Record<string, boolean> = {};
+    for (const id of Object.keys(chain)) for (const d of Object.keys(chain[id].schedules || {})) {
+      if (d < today) continue;
+      const m = chain[id].schedules[d].find((x) => normTitle(x.title) === key);
+      if (m) { days[d] = true; info = info || m; }
+    }
+    const all = Object.keys(days).sort();
+    if (!all.length || !info) throw new Error("這部片目前沒有場次");
+    base = { title, en: "", rating: info.rating || "", runtime: info.runtime || 0, date: date && days[date] ? date : all[0], dates: [], cinemas: [] } as TwMovieDay;
+    pure = true;
+  } else if (date && (!base || base.date !== date)) {
     const head = await movieDayTw(slug, undefined).catch(() => null);
     if (!head) { if (base) return { day: base, chained: false }; throw new Error("讀不到這部片的場次"); }
     base = { ...head, date, cinemas: [] };

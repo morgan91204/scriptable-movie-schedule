@@ -153,6 +153,7 @@
     globalSearch: () => globalSearch,
     groupByMovie: () => groupByMovie,
     hallOf: () => hallOf,
+    isChainSlug: () => isChainSlug,
     isFavMovie: () => isFavMovie,
     isLate: () => isLate,
     isLocalSrc: () => isLocalSrc,
@@ -1253,6 +1254,28 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     if (!/^showtimes-/.test(c.id)) return null;
     return (await chainAll())?.[c.id]?.schedules || null;
   }
+  var CHAIN_SLUG = "st:";
+  var isChainSlug = (slug) => String(slug || "").indexOf(CHAIN_SLUG) === 0;
+  function chainOnlyMovies(chain, known, today) {
+    const found = {};
+    for (const id of Object.keys(chain)) {
+      const sch = chain[id].schedules || {};
+      for (const d of Object.keys(sch)) {
+        if (d < today) continue;
+        for (const m of sch[d]) {
+          if (known[normTitle(m.title)] || known[looseTitle(m.title)]) continue;
+          const k = normTitle(m.title);
+          const f = found[k] ||= { m, first: d, cinemas: {} };
+          if (d < f.first) f.first = d;
+          f.cinemas[id] = true;
+        }
+      }
+    }
+    return Object.keys(found).map((k) => {
+      const f = found[k];
+      return { slug: CHAIN_SLUG + f.m.title, title: f.m.title, en: "", rating: f.m.rating || "", runtime: f.m.runtime || 0, cinemaCount: Object.keys(f.cinemas).length, comingSoon: f.first > today };
+    });
+  }
   async function chainAll() {
     const data = await loadServed("showtimes", SHOWTIMES_URL, 12, (d) => typeof d.cinemas === "object").catch(() => null);
     return data?.cinemas || null;
@@ -1651,6 +1674,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   var posterMem = {};
   function twPoster(slug) {
     return posterMem[slug] ||= (async () => {
+      if (isChainSlug(slug)) throw new Error("no page");
       const path = encodeURIComponent(slug).replace(/%3A/gi, ":");
       const url = `${TW}/movies/${path}/`;
       if (movieDayCache[url]?.image) return movieDayCache[url].image;
@@ -2221,6 +2245,19 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
         }
       }
       const merged = mergeSameMovies(list);
+      const chain = await Promise.race([chainAll(), delay(1500).then(() => null)]).catch(() => null);
+      if (chain) {
+        const known = {};
+        for (const m of merged) for (const t of [m.title, m.slug, ...m.alts || []]) {
+          known[normTitle(t)] = true;
+          known[looseTitle(t)] = true;
+        }
+        for (const m of chainOnlyMovies(chain, known, today)) {
+          const e = meta && (meta.movies[normTitle(m.title)] || meta.movies[normTitle(baseTitle(m.title))]);
+          if (e?.rd) m.release = e.rd;
+          merged.push(m);
+        }
+      }
       const soon = merged.filter((m) => m.comingSoon).sort((a, b) => (a.release || "9999").localeCompare(b.release || "9999"));
       moviesCache = [...merged.filter((m) => !m.comingSoon && !m.noShowToday), ...merged.filter((m) => m.noShowToday), ...soon];
     }
@@ -3039,11 +3076,28 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   async function movieDayChain(slug, date) {
     const today = todayTPE();
     const chainJob = Promise.race([chainAll(), delay(1500).then(() => null)]);
-    let base = await movieDayTw(slug, date).catch(() => null);
-    const chain = await chainJob;
+    let base = isChainSlug(slug) ? null : await movieDayTw(slug, date).catch(() => null);
+    const chain = await (isChainSlug(slug) ? chainAll() : chainJob);
+    if (!chain && isChainSlug(slug)) throw new Error("秀泰的場次暫時讀不到，請稍後再試");
     if (!chain) return { day: base || await movieDayTw(slug, date), chained: false };
     let pure = false;
-    if (date && (!base || base.date !== date)) {
+    if (isChainSlug(slug)) {
+      const title = slug.slice(CHAIN_SLUG.length), key = normTitle(title);
+      let info = null;
+      const days = {};
+      for (const id of Object.keys(chain)) for (const d of Object.keys(chain[id].schedules || {})) {
+        if (d < today) continue;
+        const m = chain[id].schedules[d].find((x) => normTitle(x.title) === key);
+        if (m) {
+          days[d] = true;
+          info = info || m;
+        }
+      }
+      const all2 = Object.keys(days).sort();
+      if (!all2.length || !info) throw new Error("這部片目前沒有場次");
+      base = { title, en: "", rating: info.rating || "", runtime: info.runtime || 0, date: date && days[date] ? date : all2[0], dates: [], cinemas: [] };
+      pure = true;
+    } else if (date && (!base || base.date !== date)) {
       const head = await movieDayTw(slug, void 0).catch(() => null);
       if (!head) {
         if (base) return { day: base, chained: false };
@@ -4252,7 +4306,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   var extra = { boxOffice, filmList, soonList, nowShowing, nowShowingMulti, movieBoard: movieBoard2, festivalBoard, festivalFilm, nearby, patchSettings, fillMovie, formatList };
   var BRIDGE_LEVEL = 2;
   globalThis.MS = {
-    version: "2026.11.24-1726",
+    version: "2026.11.24-1732",
     level: BRIDGE_LEVEL,
     init(saved) {
       cache = saved || {};

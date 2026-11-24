@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.24-1726
+// @movie-schedule-app 電影行程 v2026.11.24-1732
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/parsers.gen.ts
@@ -983,6 +983,28 @@ async function chainDays(c) {
   if (!/^showtimes-/.test(c.id)) return null;
   return (await chainAll())?.[c.id]?.schedules || null;
 }
+var CHAIN_SLUG = "st:";
+var isChainSlug = (slug) => String(slug || "").indexOf(CHAIN_SLUG) === 0;
+function chainOnlyMovies(chain, known, today) {
+  const found = {};
+  for (const id of Object.keys(chain)) {
+    const sch = chain[id].schedules || {};
+    for (const d of Object.keys(sch)) {
+      if (d < today) continue;
+      for (const m of sch[d]) {
+        if (known[normTitle(m.title)] || known[looseTitle(m.title)]) continue;
+        const k = normTitle(m.title);
+        const f = found[k] ||= { m, first: d, cinemas: {} };
+        if (d < f.first) f.first = d;
+        f.cinemas[id] = true;
+      }
+    }
+  }
+  return Object.keys(found).map((k) => {
+    const f = found[k];
+    return { slug: CHAIN_SLUG + f.m.title, title: f.m.title, en: "", rating: f.m.rating || "", runtime: f.m.runtime || 0, cinemaCount: Object.keys(f.cinemas).length, comingSoon: f.first > today };
+  });
+}
 async function chainAll() {
   const data = await loadServed("showtimes", SHOWTIMES_URL, 12, (d) => typeof d.cinemas === "object").catch(() => null);
   return data?.cinemas || null;
@@ -1368,6 +1390,7 @@ function normImageUrl(u) {
 var posterMem = {};
 function twPoster(slug) {
   return posterMem[slug] ||= (async () => {
+    if (isChainSlug(slug)) throw new Error("no page");
     const path = encodeURIComponent(slug).replace(/%3A/gi, ":");
     const url = `${TW}/movies/${path}/`;
     if (movieDayCache[url]?.image) return movieDayCache[url].image;
@@ -1910,6 +1933,19 @@ async function loadMovies() {
       }
     }
     const merged = mergeSameMovies(list);
+    const chain = await Promise.race([chainAll(), delay(1500).then(() => null)]).catch(() => null);
+    if (chain) {
+      const known = {};
+      for (const m of merged) for (const t of [m.title, m.slug, ...m.alts || []]) {
+        known[normTitle(t)] = true;
+        known[looseTitle(t)] = true;
+      }
+      for (const m of chainOnlyMovies(chain, known, today)) {
+        const e = meta && (meta.movies[normTitle(m.title)] || meta.movies[normTitle(baseTitle(m.title))]);
+        if (e?.rd) m.release = e.rd;
+        merged.push(m);
+      }
+    }
     const soon = merged.filter((m) => m.comingSoon).sort((a, b) => (a.release || "9999").localeCompare(b.release || "9999"));
     moviesCache = [...merged.filter((m) => !m.comingSoon && !m.noShowToday), ...merged.filter((m) => m.noShowToday), ...soon];
   }
@@ -2717,11 +2753,28 @@ async function movieDay(slug, date) {
 async function movieDayChain(slug, date) {
   const today = todayTPE();
   const chainJob = Promise.race([chainAll(), delay(1500).then(() => null)]);
-  let base = await movieDayTw(slug, date).catch(() => null);
-  const chain = await chainJob;
+  let base = isChainSlug(slug) ? null : await movieDayTw(slug, date).catch(() => null);
+  const chain = await (isChainSlug(slug) ? chainAll() : chainJob);
+  if (!chain && isChainSlug(slug)) throw new Error("秀泰的場次暫時讀不到，請稍後再試");
   if (!chain) return { day: base || await movieDayTw(slug, date), chained: false };
   let pure = false;
-  if (date && (!base || base.date !== date)) {
+  if (isChainSlug(slug)) {
+    const title = slug.slice(CHAIN_SLUG.length), key = normTitle(title);
+    let info = null;
+    const days = {};
+    for (const id of Object.keys(chain)) for (const d of Object.keys(chain[id].schedules || {})) {
+      if (d < today) continue;
+      const m = chain[id].schedules[d].find((x) => normTitle(x.title) === key);
+      if (m) {
+        days[d] = true;
+        info = info || m;
+      }
+    }
+    const all2 = Object.keys(days).sort();
+    if (!all2.length || !info) throw new Error("這部片目前沒有場次");
+    base = { title, en: "", rating: info.rating || "", runtime: info.runtime || 0, date: date && days[date] ? date : all2[0], dates: [], cinemas: [] };
+    pure = true;
+  } else if (date && (!base || base.date !== date)) {
     const head = await movieDayTw(slug, void 0).catch(() => null);
     if (!head) {
       if (base) return { day: base, chained: false };
@@ -4703,7 +4756,7 @@ var App = class {
   }
   /** 最新版本是多少。網頁版問的是自己網站現在上線的版本（重新整理就會拿到的那一版），不是 GitHub 上的 */
   checkVersion() {
-    if (true) return checkLatest("2026.11.24-1726");
+    if (true) return checkLatest("2026.11.24-1732");
     return (async () => {
       try {
         let r = await globalThis.fetch("/version.json?t=" + Date.now(), { cache: "no-store" });
@@ -4711,7 +4764,7 @@ var App = class {
         const latest = String((await r.json()).version || "");
         if (!latest) return null;
         const num = (v) => Number(v.replace(/\D/g, "")) || 0;
-        return { latest, isLatest: num("2026.11.24-1726") >= num(latest) };
+        return { latest, isLatest: num("2026.11.24-1732") >= num(latest) };
       } catch (_) {
         return null;
       }
@@ -5142,7 +5195,7 @@ var App = class {
         return;
       }
       try {
-        await sendFeedback(cat.id, text, false ? this.isStandalone() ? "web-app" : "web" : "scriptable", "2026.11.24-1726");
+        await sendFeedback(cat.id, text, false ? this.isStandalone() ? "web-app" : "web" : "scriptable", "2026.11.24-1732");
         this.fbDraft = "";
         this.fbCat = "";
         await this.ui.toast("已送出，謝謝你的回饋");
@@ -5454,7 +5507,7 @@ var App = class {
       this.settings.seenLog = CHANGELOG_LATEST;
       saveSettings(this.settings);
     }
-    return /* @__PURE__ */ h(Page, { title: "更新內容", subtitle: `目前版本 ${"2026.11.24-1726"}`, onBack: () => this.back() }, CHANGELOG.map((e) => /* @__PURE__ */ h(Section, { title: e.date }, e.items.map((it) => /* @__PURE__ */ h(Item, { title: it.text, tag: { text: it.kind === "new" ? "新功能" : "改進", tone: it.kind === "new" ? "now" : "soon" }, chevron: false })))), /* @__PURE__ */ h(Note, { text: "只列出比較有感的變動；修小錯、調整文字這類不會寫在這裡。" }));
+    return /* @__PURE__ */ h(Page, { title: "更新內容", subtitle: `目前版本 ${"2026.11.24-1732"}`, onBack: () => this.back() }, CHANGELOG.map((e) => /* @__PURE__ */ h(Section, { title: e.date }, e.items.map((it) => /* @__PURE__ */ h(Item, { title: it.text, tag: { text: it.kind === "new" ? "新功能" : "改進", tone: it.kind === "new" ? "now" : "soon" }, chevron: false })))), /* @__PURE__ */ h(Note, { text: "只列出比較有感的變動；修小錯、調整文字這類不會寫在這裡。" }));
   }
   async aboutView() {
     return /* @__PURE__ */ h(Page, { title: "關於", onBack: () => this.back() }, /* @__PURE__ */ h(Section, { hint: "連鎖影城的場次來自場次通（twshowtimes.com），感謝場次通的整理；其他來自開眼電影網，以及誠品、光點、樂聲、內惟戲院官網。實際場次以影城公告為準。" }, /* @__PURE__ */ h(Item, { icon: "ℹ️", title: "關於與資料來源", accent: true, chevron: false, onTap: () => Safari.open(ABOUT_URL) }), /* @__PURE__ */ h(Item, { icon: "🔒", title: "隱私權政策", accent: true, chevron: false, onTap: () => Safari.open(PRIVACY_URL) }), /* @__PURE__ */ h(Item, { icon: "🙏", title: "前往場次通", subtitle: "比較各影城場次、看上映場數排行", accent: true, chevron: false, onTap: () => Safari.open("https://twshowtimes.com/") })));
@@ -5485,11 +5538,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.24-1726"}`);
+          Pasteboard.copy(`版本 ${"2026.11.24-1732"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.24-1726"}`,
+      `版本 ${"2026.11.24-1732"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -5944,7 +5997,7 @@ var App = class {
     if (false) {
       if (!r) return /* @__PURE__ */ h(Note, { text: "（無法確認是否為最新版：連不到網站）" });
       if (r.isLatest) return /* @__PURE__ */ h(Note, { text: "✅ 已是最新版" });
-      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.24-1726"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
+      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.24-1732"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
         globalThis.location.reload();
       } }));
     }
