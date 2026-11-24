@@ -676,7 +676,21 @@ class App {
     if (r && r.data && r.at > sy.at()) { applyLocal(syncApply(this.settings, r.data as Partial<SyncData>)); sy.setAt(r.at); }
   }
   /** 設定頁的一列：點進去才是登入、同步、登出這些選項 */
-  meMem: { at: number; data: { user: Profile | null; counts: SocialCounts } } | null = null; // 設定頁最上面的帳號資訊（一分鐘內不重讀）
+  /** 管理員專區（設定頁「同步與登出」下面那一列點進來）：只有管理員名單裡的 Google 帳號登入後才看得到那一列；
+   *  就算有人硬開這一頁，裡面每個動作伺服器都會再驗一次身分 */
+  adminHomeView(): string {
+    return (
+      <Page title="管理員專區" onBack={() => this.back()}>
+        <Section hint="只有管理員名單裡的 Google 帳號登入後才看得到這一區。">
+            <Item icon="💬" title="意見回饋" subtitle="看使用者的回饋、回覆、標處理狀態" onTap={() => { this.adminFbTab = "open"; this.go(() => this.adminFeedbackView(), "讀取回饋…"); }} />
+            <Item icon="🛡" title="短評管理" subtitle="複查被檢舉的短評，或巡一遍最近的短評" onTap={() => { this.adminTab = "flagged"; this.go(() => this.adminNotesView(), "讀取短評…"); }} />
+            <Item icon="🪪" title="帳號管理" subtitle="被檢舉的帳號：停用個人頁、強制改暱稱" onTap={() => { this.adminUserQ = ""; this.go(() => this.adminUsersView(), "讀取帳號…"); }} />
+            <Item icon="👥" title="管理員名單" subtitle="新增或移除其他管理員" onTap={() => this.go(() => this.adminListView(), "讀取名單…")} />
+        </Section>
+      </Page>
+    );
+  }
+  meMem: { at: number; data: { user: Profile | null; counts: SocialCounts; admin?: boolean } } | null = null; // 設定頁最上面的帳號資訊（一分鐘內不重讀）
   /** 設定頁最上面：沒登入 = 用 Google 登入；登入了 = 帳號資訊（暱稱、Gmail、片單和追蹤的數字），以及片單、同步的入口 */
   async accountSection(): Promise<string> {
     const sy = this.sync();
@@ -689,7 +703,7 @@ class App {
       );
     if (!this.meMem || Date.now() - this.meMem.at > 60e3) {
       // 最多等 0.9 秒，不拖慢設定頁；等不到先顯示「讀取中」，下次重畫就有了
-      const job = social<{ user: Profile | null; counts: SocialCounts }>("me").then((d) => { this.meMem = { at: Date.now(), data: d }; }, () => undefined);
+      const job = social<{ user: Profile | null; counts: SocialCounts; admin?: boolean }>("me").then((d) => { this.meMem = { at: Date.now(), data: d }; }, () => undefined);
       await Promise.race([job, sleep(900)]);
     }
     const me = this.meMem ? this.meMem.data : null;
@@ -704,6 +718,7 @@ class App {
         </div>
         <Item icon="🎞" title="我的片單" subtitle={u ? "看過的片、評分和短評；動態、找人" : "取暱稱、記錄看過的片、追蹤別人"} onTap={open} />
         <Item icon="🔄" title="同步與登出" subtitle="收藏和設定自動同步中" onTap={() => this.go(() => this.syncView())} />
+        {me && me.admin ? <Item icon="🛡" title="管理員專區" subtitle="意見回饋、短評、帳號、管理員名單" onTap={() => this.go(() => this.adminHomeView())} /> : null}
       </Section>
     );
   }
@@ -1255,20 +1270,11 @@ class App {
   }
   async syncView(): Promise<string> {
     const sy = this.sync();
-    if (sy && sy.on() && !this.syncWho && sy.who) this.syncWho = await sy.who().catch(() => null);
     if (sy && !sy.on()) this.syncWho = null;
     const who = this.syncWho;
     return (
       <Page title="用 Google 帳號同步" onBack={() => this.back()}>
         {this.syncSection()}
-        {who && who.admin ? (
-          <Section title="管理員專區" hint="只有管理員名單裡的 Google 帳號登入後才看得到這一區。">
-            <Item icon="💬" title="意見回饋" subtitle="看使用者的回饋、回覆、標處理狀態" onTap={() => { this.adminFbTab = "open"; this.go(() => this.adminFeedbackView(), "讀取回饋…"); }} />
-            <Item icon="🛡" title="短評管理" subtitle="複查被檢舉的短評，或巡一遍最近的短評" onTap={() => { this.adminTab = "flagged"; this.go(() => this.adminNotesView(), "讀取短評…"); }} />
-            <Item icon="🪪" title="帳號管理" subtitle="被檢舉的帳號：停用個人頁、強制改暱稱" onTap={() => { this.adminUserQ = ""; this.go(() => this.adminUsersView(), "讀取帳號…"); }} />
-            <Item icon="👥" title="管理員名單" subtitle="新增或移除其他管理員" onTap={() => this.go(() => this.adminListView(), "讀取名單…")} />
-          </Section>
-        ) : null}
       </Page>
     );
   }

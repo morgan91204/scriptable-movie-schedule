@@ -94,12 +94,13 @@ export async function social(hub, path, b) {
   const rate = hub.env.RATE;
   const op = path.replace("/social/", "");
   // 登入的人是誰（沒帶憑證就是 null；憑證不對回 401）
-  let uid = "";
+  let uid = "", isAdmin = false;
   if (b.token) {
     if (!/^[0-9a-f]{64}$/.test(String(b.token))) return json({ error: "not signed in" }, 401);
     const sess = await hub.state.storage.get("t:" + (await sha256hex(String(b.token))));
     if (!sess) return json({ error: "not signed in" }, 401);
     uid = sess.uid;
+    isAdmin = !!sess.adm && (await hub.isAdmin(sess.adm)); // 設定頁要不要多出「管理員專區」那一列
   }
   const me = uid ? one(sql, "SELECT * FROM users WHERE uid = ?", uid) : null;
   const need = () => (uid ? null : json({ error: "not signed in" }, 401));
@@ -174,7 +175,7 @@ export async function social(hub, path, b) {
   // ── 以下都要登入 ──
   const no = need();
   if (no) return no;
-  if (op === "me") return json({ ok: true, user: me ? { ...userOut(me), pub: !!me.pub, hidden: !!me.hidden, canRename: Date.now() - me.named > RENAME_EVERY } : null, counts: counts(sql, uid, false) });
+  if (op === "me") return json({ ok: true, ...(isAdmin ? { admin: true } : {}), user: me ? { ...userOut(me), pub: !!me.pub, hidden: !!me.hidden, canRename: Date.now() - me.named > RENAME_EVERY } : null, counts: counts(sql, uid, false) });
   if (op === "mine") {
     const offset = Math.max(0, Number(b.offset) || 0);
     return json({ ok: true, list: all(sql, "SELECT * FROM entries WHERE uid = ? ORDER BY at DESC LIMIT 100 OFFSET ?", uid, offset).map(entryOut), total: counts(sql, uid, false).films });

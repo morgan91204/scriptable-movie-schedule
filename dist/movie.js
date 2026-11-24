@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.24-2132
+// @movie-schedule-app 電影行程 v2026.11.24-2136
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/parsers.gen.ts
@@ -4807,7 +4807,6 @@ var App = class {
     this.syncMute = false;
     // 正在套用伺服器的設定：這次存檔不要再傳回去
     this.syncTimer = null;
-    /** 設定頁的一列：點進去才是登入、同步、登出這些選項 */
     this.meMem = null;
     this.syncWho = null;
     // 這次登入是不是管理員（這次開啟問過一次就記著）
@@ -4987,7 +4986,7 @@ var App = class {
   }
   /** 最新版本是多少。網頁版問的是自己網站現在上線的版本（重新整理就會拿到的那一版），不是 GitHub 上的 */
   checkVersion() {
-    if (true) return checkLatest("2026.11.24-2132");
+    if (true) return checkLatest("2026.11.24-2136");
     return (async () => {
       try {
         let r = await globalThis.fetch("/version.json?t=" + Date.now(), { cache: "no-store" });
@@ -4995,7 +4994,7 @@ var App = class {
         const latest = String((await r.json()).version || "");
         if (!latest) return null;
         const num = (v) => Number(v.replace(/\D/g, "")) || 0;
-        return { latest, isLatest: num("2026.11.24-2132") >= num(latest) };
+        return { latest, isLatest: num("2026.11.24-2136") >= num(latest) };
       } catch (_) {
         return null;
       }
@@ -5424,6 +5423,21 @@ var App = class {
       sy.setAt(r.at);
     }
   }
+  /** 設定頁的一列：點進去才是登入、同步、登出這些選項 */
+  /** 管理員專區（設定頁「同步與登出」下面那一列點進來）：只有管理員名單裡的 Google 帳號登入後才看得到那一列；
+   *  就算有人硬開這一頁，裡面每個動作伺服器都會再驗一次身分 */
+  adminHomeView() {
+    return /* @__PURE__ */ h(Page, { title: "管理員專區", onBack: () => this.back() }, /* @__PURE__ */ h(Section, { hint: "只有管理員名單裡的 Google 帳號登入後才看得到這一區。" }, /* @__PURE__ */ h(Item, { icon: "💬", title: "意見回饋", subtitle: "看使用者的回饋、回覆、標處理狀態", onTap: () => {
+      this.adminFbTab = "open";
+      this.go(() => this.adminFeedbackView(), "讀取回饋…");
+    } }), /* @__PURE__ */ h(Item, { icon: "🛡", title: "短評管理", subtitle: "複查被檢舉的短評，或巡一遍最近的短評", onTap: () => {
+      this.adminTab = "flagged";
+      this.go(() => this.adminNotesView(), "讀取短評…");
+    } }), /* @__PURE__ */ h(Item, { icon: "🪪", title: "帳號管理", subtitle: "被檢舉的帳號：停用個人頁、強制改暱稱", onTap: () => {
+      this.adminUserQ = "";
+      this.go(() => this.adminUsersView(), "讀取帳號…");
+    } }), /* @__PURE__ */ h(Item, { icon: "👥", title: "管理員名單", subtitle: "新增或移除其他管理員", onTap: () => this.go(() => this.adminListView(), "讀取名單…") })));
+  }
   // 設定頁最上面的帳號資訊（一分鐘內不重讀）
   /** 設定頁最上面：沒登入 = 用 Google 登入；登入了 = 帳號資訊（暱稱、Gmail、片單和追蹤的數字），以及片單、同步的入口 */
   async accountSection() {
@@ -5446,7 +5460,7 @@ var App = class {
     };
     const u = me && me.user;
     const status = !me ? "讀取中…" : !u ? "還沒取暱稱" : u.hidden ? "個人頁被站長停用" : u.pub ? "個人頁公開中" : "個人頁不公開";
-    return /* @__PURE__ */ h(Section, { title: "帳號" }, /* @__PURE__ */ h("div", { role: "button", onTap: open }, this.profileCard({ name: u ? u.name : me ? "還沒取暱稱" : "已登入", color: u ? u.color : "gray", emoji: u ? u.emoji : "" }, me ? me.counts : null, [email, status].filter(Boolean).join("｜"), (kind) => this.go(() => this.profileListView("", kind), "讀取中…"))), /* @__PURE__ */ h(Item, { icon: "🎞", title: "我的片單", subtitle: u ? "看過的片、評分和短評；動態、找人" : "取暱稱、記錄看過的片、追蹤別人", onTap: open }), /* @__PURE__ */ h(Item, { icon: "🔄", title: "同步與登出", subtitle: "收藏和設定自動同步中", onTap: () => this.go(() => this.syncView()) }));
+    return /* @__PURE__ */ h(Section, { title: "帳號" }, /* @__PURE__ */ h("div", { role: "button", onTap: open }, this.profileCard({ name: u ? u.name : me ? "還沒取暱稱" : "已登入", color: u ? u.color : "gray", emoji: u ? u.emoji : "" }, me ? me.counts : null, [email, status].filter(Boolean).join("｜"), (kind) => this.go(() => this.profileListView("", kind), "讀取中…"))), /* @__PURE__ */ h(Item, { icon: "🎞", title: "我的片單", subtitle: u ? "看過的片、評分和短評；動態、找人" : "取暱稱、記錄看過的片、追蹤別人", onTap: open }), /* @__PURE__ */ h(Item, { icon: "🔄", title: "同步與登出", subtitle: "收藏和設定自動同步中", onTap: () => this.go(() => this.syncView()) }), me && me.admin ? /* @__PURE__ */ h(Item, { icon: "🛡", title: "管理員專區", subtitle: "意見回饋、短評、帳號、管理員名單", onTap: () => this.go(() => this.adminHomeView()) }) : null);
   }
   syncLink() {
     const sy = this.sync();
@@ -5770,7 +5784,7 @@ var App = class {
         return;
       }
       try {
-        await sendFeedback(cat.id, text, false ? this.isStandalone() ? "web-app" : "web" : "scriptable", "2026.11.24-2132");
+        await sendFeedback(cat.id, text, false ? this.isStandalone() ? "web-app" : "web" : "scriptable", "2026.11.24-2136");
         this.fbDraft = "";
         this.fbCat = "";
         await this.ui.toast("已送出，謝謝你的回饋");
@@ -5868,19 +5882,9 @@ var App = class {
   }
   async syncView() {
     const sy = this.sync();
-    if (sy && sy.on() && !this.syncWho && sy.who) this.syncWho = await sy.who().catch(() => null);
     if (sy && !sy.on()) this.syncWho = null;
     const who = this.syncWho;
-    return /* @__PURE__ */ h(Page, { title: "用 Google 帳號同步", onBack: () => this.back() }, this.syncSection(), who && who.admin ? /* @__PURE__ */ h(Section, { title: "管理員專區", hint: "只有管理員名單裡的 Google 帳號登入後才看得到這一區。" }, /* @__PURE__ */ h(Item, { icon: "💬", title: "意見回饋", subtitle: "看使用者的回饋、回覆、標處理狀態", onTap: () => {
-      this.adminFbTab = "open";
-      this.go(() => this.adminFeedbackView(), "讀取回饋…");
-    } }), /* @__PURE__ */ h(Item, { icon: "🛡", title: "短評管理", subtitle: "複查被檢舉的短評，或巡一遍最近的短評", onTap: () => {
-      this.adminTab = "flagged";
-      this.go(() => this.adminNotesView(), "讀取短評…");
-    } }), /* @__PURE__ */ h(Item, { icon: "🪪", title: "帳號管理", subtitle: "被檢舉的帳號：停用個人頁、強制改暱稱", onTap: () => {
-      this.adminUserQ = "";
-      this.go(() => this.adminUsersView(), "讀取帳號…");
-    } }), /* @__PURE__ */ h(Item, { icon: "👥", title: "管理員名單", subtitle: "新增或移除其他管理員", onTap: () => this.go(() => this.adminListView(), "讀取名單…") })) : null);
+    return /* @__PURE__ */ h(Page, { title: "用 Google 帳號同步", onBack: () => this.back() }, this.syncSection());
   }
   // 短評管理看哪一份：flagged 被檢舉的／recent 最近的
   /** 管理員專區：短評的人工審核。「待複查」是被檢舉過或被自動隱藏的；「最近的短評」是全部看得到的（新的在前），可以主動巡。
@@ -6092,7 +6096,7 @@ var App = class {
       this.settings.seenLog = CHANGELOG_LATEST;
       saveSettings(this.settings);
     }
-    return /* @__PURE__ */ h(Page, { title: "更新內容", subtitle: `目前版本 ${"2026.11.24-2132"}`, onBack: () => this.back() }, CHANGELOG.map((e) => /* @__PURE__ */ h(Section, { title: e.date }, e.items.map((it) => /* @__PURE__ */ h(Item, { title: it.text, tag: { text: it.kind === "new" ? "新功能" : "改進", tone: it.kind === "new" ? "now" : "soon" }, chevron: false })))), /* @__PURE__ */ h(Note, { text: "只列出比較有感的變動；修小錯、調整文字這類不會寫在這裡。" }));
+    return /* @__PURE__ */ h(Page, { title: "更新內容", subtitle: `目前版本 ${"2026.11.24-2136"}`, onBack: () => this.back() }, CHANGELOG.map((e) => /* @__PURE__ */ h(Section, { title: e.date }, e.items.map((it) => /* @__PURE__ */ h(Item, { title: it.text, tag: { text: it.kind === "new" ? "新功能" : "改進", tone: it.kind === "new" ? "now" : "soon" }, chevron: false })))), /* @__PURE__ */ h(Note, { text: "只列出比較有感的變動；修小錯、調整文字這類不會寫在這裡。" }));
   }
   async aboutView() {
     return /* @__PURE__ */ h(Page, { title: "關於", onBack: () => this.back() }, /* @__PURE__ */ h(Section, { hint: "連鎖影城的場次來自場次通（twshowtimes.com），感謝場次通的整理；其他來自開眼電影網，以及誠品、光點、樂聲、內惟戲院官網。實際場次以影城公告為準。" }, /* @__PURE__ */ h(Item, { icon: "ℹ️", title: "關於與資料來源", accent: true, chevron: false, onTap: () => Safari.open(ABOUT_URL) }), /* @__PURE__ */ h(Item, { icon: "🔒", title: "隱私權政策", accent: true, chevron: false, onTap: () => Safari.open(PRIVACY_URL) }), /* @__PURE__ */ h(Item, { icon: "🙏", title: "前往場次通", subtitle: "比較各影城場次、看上映場數排行", accent: true, chevron: false, onTap: () => Safari.open("https://twshowtimes.com/") })));
@@ -6123,11 +6127,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.24-2132"}`);
+          Pasteboard.copy(`版本 ${"2026.11.24-2136"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.24-2132"}`,
+      `版本 ${"2026.11.24-2136"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -6678,7 +6682,7 @@ var App = class {
     if (false) {
       if (!r) return /* @__PURE__ */ h(Note, { text: "（無法確認是否為最新版：連不到網站）" });
       if (r.isLatest) return /* @__PURE__ */ h(Note, { text: "✅ 已是最新版" });
-      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.24-2132"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
+      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.24-2136"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
         globalThis.location.reload();
       } }));
     }
