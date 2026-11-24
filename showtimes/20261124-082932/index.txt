@@ -1,0 +1,2 @@
+01.html 404 21 https://capi.showtimes.com.tw/robots.txt
+02.html 200 983717 https://capi.showtimes.com.tw/4/app/bootstrap
