@@ -525,8 +525,12 @@ async function twDay(c: Cinema, date?: string): Promise<TwDay> {
  *  官網那份有全部已經開賣的日期（含預售、特別場），拿來補場次通沒有的日期和場次。不是秀泰、或讀不到就是 null（照舊只用場次通） */
 async function chainDays(c: Cinema): Promise<Record<string, Movie[]> | null> {
   if (!/^showtimes-/.test(c.id)) return null;
+  return (await chainAll())?.[c.id]?.schedules || null;
+}
+/** 全部秀泰影城的官網場次：影城代碼 → 日期 → 片單（電影頁要看「哪些影城有演」時用） */
+async function chainAll(): Promise<Record<string, MultiDay> | null> {
   const data = await loadServed<OfficialData>("showtimes", SHOWTIMES_URL, 12, (d) => typeof d.cinemas === "object").catch(() => null);
-  return data?.cinemas[c.id]?.schedules || null;
+  return data?.cinemas || null;
 }
 /** 把官網有、場次通沒有的場次補進片單（同一部片、同一種版本的時間合在一起；不改到快取裡的片單） */
 function mergeChain(movies: Movie[], extra: Movie[]): Movie[] {
@@ -2583,7 +2587,65 @@ export function movieLines(m: TwMovie): [string, string] {
 const movieDayCache: Record<string, TwMovieDay> = {};
 const mergedDayCache: Record<string, TwMovieDay> = {};
 /** 某部電影某天在哪些影城放映（不給日期 = 今天）。同一部片在場次通分成好幾頁的（見 mergeSameMovies），幾頁的場次合在一起 */
+/** 一部片某一天在哪些影城演。場次通的電影頁之外，再把秀泰官網有、場次通沒列的補進來：
+ *  場次通還沒列出的日期（預售、特別場）、沒列到的秀泰影城、同一間影城少掉的版本和場次。
+ *  （影城頁早就這樣補了；電影頁沒補的話，同一場從影城看得到、從電影卻找不到） */
+const chainDayCache: Record<string, TwMovieDay> = {}; // 補過官網場次的結果（同一次使用拿到同一份，畫面上「已補齊版本」的記號才留得住）
 export async function movieDay(slug: string, date?: string): Promise<TwMovieDay> {
+  const ck = slug + "|" + (date || "");
+  if (chainDayCache[ck]) return chainDayCache[ck];
+  const out = await movieDayChain(slug, date);
+  if (out.chained) chainDayCache[ck] = out.day;
+  return out.day;
+}
+async function movieDayChain(slug: string, date?: string): Promise<{ day: TwMovieDay; chained: boolean }> {
+  const today = todayTPE();
+  // 官網那份最多等 1.5 秒（讀過會記住）；等不到就先只用場次通的，不拖慢電影頁
+  const chainJob = Promise.race([chainAll(), delay(1500).then(() => null)]);
+  let base: TwMovieDay | null = await movieDayTw(slug, date).catch(() => null);
+  const chain = await chainJob;
+  if (!chain) return { day: base || (await movieDayTw(slug, date)), chained: false };
+  // 場次通沒有這一天的頁（或回了別天）：拿預設那一天當底（片名、片長、海報這些），影城清空，等下只放官網的
+  let pure = false;
+  if (date && (!base || base.date !== date)) {
+    const head = await movieDayTw(slug, undefined).catch(() => null);
+    if (!head) { if (base) return { day: base, chained: false }; throw new Error("讀不到這部片的場次"); }
+    base = { ...head, date, cinemas: [] };
+    pure = true;
+  }
+  if (!base) return { day: await movieDayTw(slug, date), chained: false };
+  // 這部片在官網那份裡的寫法：片名本身，加上場次通其他頁的片名（沙丘／沙丘(重映版)）
+  const names = [base.title, slug, ...(altSlugs[slug] || [])].map((t) => normTitle(t)).filter(Boolean);
+  const hitOf = (list: Movie[] | undefined) => (list || []).filter((m) => names.indexOf(normTitle(m.title)) >= 0);
+  const want = base.date;
+  const more: Record<string, boolean> = {};
+  const add: { id: string; versions: Version[] }[] = [];
+  for (const id of Object.keys(chain)) {
+    const sch = chain[id].schedules || {};
+    for (const d of Object.keys(sch)) if (d >= today && hitOf(sch[d]).length) more[d] = true;
+    const vs = hitOf(sch[want]).flatMap((m) => m.versions);
+    if (vs.length) add.push({ id, versions: vs });
+  }
+  const dates = Array.from(new Set([...(base.dates.length ? base.dates : pure ? [] : [base.date]), ...Object.keys(more)])).sort();
+  if (!add.length && dates.length === base.dates.length) return { day: base, chained: true };
+  const all = add.length ? await loadCinemas().catch(() => [] as Cinema[]) : [];
+  const cinemas = base.cinemas.map((c) => ({ ...c, versions: c.versions.map((v) => ({ ...v, times: v.times.slice() })) }));
+  for (const a of add) {
+    let c = cinemas.find((x) => x.id === a.id);
+    if (!c) {
+      const info = all.find((x) => x.id === a.id);
+      if (!info) continue;
+      cinemas.push((c = { id: a.id, name: info.name, city: info.city, district: info.district, address: info.address || "", versions: [], full: true }));
+    }
+    for (const v of a.versions) {
+      const ov = c.versions.find((x) => x.label === v.label);
+      if (ov) ov.times = Array.from(new Set([...ov.times, ...v.times])).sort();
+      else c.versions.push({ label: v.label, times: v.times.slice() });
+    }
+  }
+  return { day: { ...base, dates, cinemas }, chained: true };
+}
+async function movieDayTw(slug: string, date?: string): Promise<TwMovieDay> {
   if (!moviesCache) await loadMovies().catch(() => null); // 要先知道這部片有沒有其他頁
   const alts = altSlugs[slug] || [];
   if (!alts.length) return movieDayOne(slug, date);

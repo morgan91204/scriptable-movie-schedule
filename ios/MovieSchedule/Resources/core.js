@@ -1251,8 +1251,11 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   }
   async function chainDays(c) {
     if (!/^showtimes-/.test(c.id)) return null;
+    return (await chainAll())?.[c.id]?.schedules || null;
+  }
+  async function chainAll() {
     const data = await loadServed("showtimes", SHOWTIMES_URL, 12, (d) => typeof d.cinemas === "object").catch(() => null);
-    return data?.cinemas[c.id]?.schedules || null;
+    return data?.cinemas || null;
   }
   function mergeChain(movies, extra2) {
     const out = movies.map((m) => ({ ...m, versions: m.versions.map((v) => ({ ...v, times: v.times.slice() })) }));
@@ -3025,7 +3028,62 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   }
   var movieDayCache = {};
   var mergedDayCache = {};
+  var chainDayCache = {};
   async function movieDay(slug, date) {
+    const ck = slug + "|" + (date || "");
+    if (chainDayCache[ck]) return chainDayCache[ck];
+    const out = await movieDayChain(slug, date);
+    if (out.chained) chainDayCache[ck] = out.day;
+    return out.day;
+  }
+  async function movieDayChain(slug, date) {
+    const today = todayTPE();
+    const chainJob = Promise.race([chainAll(), delay(1500).then(() => null)]);
+    let base = await movieDayTw(slug, date).catch(() => null);
+    const chain = await chainJob;
+    if (!chain) return { day: base || await movieDayTw(slug, date), chained: false };
+    let pure = false;
+    if (date && (!base || base.date !== date)) {
+      const head = await movieDayTw(slug, void 0).catch(() => null);
+      if (!head) {
+        if (base) return { day: base, chained: false };
+        throw new Error("讀不到這部片的場次");
+      }
+      base = { ...head, date, cinemas: [] };
+      pure = true;
+    }
+    if (!base) return { day: await movieDayTw(slug, date), chained: false };
+    const names = [base.title, slug, ...altSlugs[slug] || []].map((t) => normTitle(t)).filter(Boolean);
+    const hitOf = (list) => (list || []).filter((m) => names.indexOf(normTitle(m.title)) >= 0);
+    const want = base.date;
+    const more = {};
+    const add = [];
+    for (const id of Object.keys(chain)) {
+      const sch = chain[id].schedules || {};
+      for (const d of Object.keys(sch)) if (d >= today && hitOf(sch[d]).length) more[d] = true;
+      const vs = hitOf(sch[want]).flatMap((m) => m.versions);
+      if (vs.length) add.push({ id, versions: vs });
+    }
+    const dates = Array.from(/* @__PURE__ */ new Set([...base.dates.length ? base.dates : pure ? [] : [base.date], ...Object.keys(more)])).sort();
+    if (!add.length && dates.length === base.dates.length) return { day: base, chained: true };
+    const all = add.length ? await loadCinemas().catch(() => []) : [];
+    const cinemas = base.cinemas.map((c) => ({ ...c, versions: c.versions.map((v) => ({ ...v, times: v.times.slice() })) }));
+    for (const a of add) {
+      let c = cinemas.find((x) => x.id === a.id);
+      if (!c) {
+        const info = all.find((x) => x.id === a.id);
+        if (!info) continue;
+        cinemas.push(c = { id: a.id, name: info.name, city: info.city, district: info.district, address: info.address || "", versions: [], full: true });
+      }
+      for (const v of a.versions) {
+        const ov = c.versions.find((x) => x.label === v.label);
+        if (ov) ov.times = Array.from(/* @__PURE__ */ new Set([...ov.times, ...v.times])).sort();
+        else c.versions.push({ label: v.label, times: v.times.slice() });
+      }
+    }
+    return { day: { ...base, dates, cinemas }, chained: true };
+  }
+  async function movieDayTw(slug, date) {
     if (!moviesCache) await loadMovies().catch(() => null);
     const alts = altSlugs[slug] || [];
     if (!alts.length) return movieDayOne(slug, date);
@@ -4194,7 +4252,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   var extra = { boxOffice, filmList, soonList, nowShowing, nowShowingMulti, movieBoard: movieBoard2, festivalBoard, festivalFilm, nearby, patchSettings, fillMovie, formatList };
   var BRIDGE_LEVEL = 2;
   globalThis.MS = {
-    version: "2026.11.24-1722",
+    version: "2026.11.24-1726",
     level: BRIDGE_LEVEL,
     init(saved) {
       cache = saved || {};
