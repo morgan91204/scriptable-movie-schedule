@@ -1840,6 +1840,7 @@ class App {
       </Section>
     );
   }
+  notifyOffAsk = 0; // 按了「關閉通知」的時間：一分鐘內顯示「確定要關嗎」（過了就當沒按，免得下次進來還停在確認）
   notifyOpen = false; // 設定頁「算哪些影城」的選項有沒有展開
   /** 網頁版的通知介面（web/shim.ts 的 __push）；Scriptable 版沒有 */
   push(): any { return IS_WEB ? (globalThis as any).__push : null; }
@@ -2026,7 +2027,13 @@ class App {
         </Section>
         <Section hint={`已開啟${n ? `，目前收藏了 ${n} 部` : "；還沒有收藏的電影，到電影頁點愛心收藏"}。你收藏的片名存在我們的伺服器上，只用來判斷什麼時候通知；關閉通知時會一起刪掉。`}>
           <Item icon="📨" title="傳一則測試通知" subtitle="確認這台裝置收得到" chevron={false} onTap={async () => { await this.ui.toast((await p.test()) ? "已送出，幾秒內應該會收到" : "送不出去，請關閉通知後重新開啟"); }} />
-          <Item icon="🔕" title="關閉通知" subtitle="停止通知，並刪除伺服器上的資料" chevron={false} onTap={async () => { await p.disable(); await this.ui.toast("通知已關閉"); }} />
+          {Date.now() - this.notifyOffAsk < 60e3 ? (
+            <div class="nt-form">
+              <Note kind="warn" text="確定要關閉通知嗎？關閉後不會再收到任何通知（包含有人回覆、追蹤你），伺服器上跟通知有關的資料也會刪掉。之後想要可以再開，各種通知的開關要重新確認一次。" />
+              <Button label="確定關閉" kind="danger" onTap={async () => { this.notifyOffAsk = 0; await p.disable(); this.pushSt = "off"; await this.ui.toast("通知已關閉"); }} />
+              <Button label="不要關，保留通知" kind="secondary" onTap={() => { this.notifyOffAsk = 0; }} />
+            </div>
+          ) : <Item icon="🔕" title="關閉通知" subtitle="停止通知，並刪除伺服器上的資料" chevron={false} onTap={() => { this.notifyOffAsk = Date.now(); }} />}
         </Section>
       </>
     );
