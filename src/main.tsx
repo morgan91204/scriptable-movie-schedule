@@ -1818,10 +1818,13 @@ class App {
   noteEdit = false; // 短評頁上面寫短評的那一塊有沒有展開（預設收起來）
   noteFilter = "all"; // 短評清單的篩選：all 全部／follow 追蹤中／clean 不看有雷的
   noteSort = "hot"; // 排序：hot 熱門／new 最新／top 最多推／high 評分高到低／low 評分低到高
-  noteReset() { this.noteDraft = null; this.noteSpoil = null; this.noteAsk = ""; this.noteShown = []; this.noteEdit = false; }
+  noteReset() { this.noteDraft = null; this.noteSpoil = null; this.noteAsk = ""; this.noteShown = []; this.noteEdit = false; this.noteReplyTo = 0; this.noteReplyDraft = ""; this.noteMenu = 0; }
   /** 短評頁：上面寫（或改）自己的一句話，下面是大家的。另開一頁，不擠在電影頁。
    *  防雷：輸入框提醒不提劇情、可以自己標「可能有雷」、偵測到劇透字眼送出前問一次；有雷的預設摺疊，點了才顯示。
    *  每則可以檢舉（劇透／不當內容／廣告），被多人檢舉的由伺服器自動摺疊或隱藏 */
+  noteReplyTo = 0; // 正在回覆哪一則（0 = 沒有）
+  noteReplyDraft = ""; // 回覆打到一半的字
+  noteMenu = 0; // 哪一則的「⋯」選單是開的
   async notesView(title: string): Promise<string> {
     let list = notesCached(title);
     let failed = "";
@@ -1829,12 +1832,13 @@ class App {
     const c = communityCached(title) || (await communityStats(title).catch(() => null));
     const voted = c ? c.mine : 0;
     const notes = list ? list.notes : [];
-    const mineCount = notes.filter((n) => n.mine).length;
+    const tops = notes.filter((n) => !n.r);
+    const mineCount = tops.filter((n) => n.mine).length;
     const maxMine = (list && list.max) || 5;
     const draft = this.noteDraft === null ? "" : this.noteDraft;
     const spoil = !!this.noteSpoil;
     /** 每個按鈕都會帶著輸入框目前的字：先記下來，畫面重畫才不會把打到一半的字清掉 */
-    const keep = (v?: Record<string, string>) => { if (v && typeof v.x === "string") this.noteDraft = v.x; };
+    const keep = (v?: Record<string, string>) => { if (v && typeof v.x === "string") this.noteDraft = v.x; if (v && typeof v.rx === "string") this.noteReplyDraft = v.rx; };
     const say = async (job: Promise<unknown>, done: string) => {
       try { await job; if (done) await this.ui.toast(done); return true; } catch (e) { await this.ui.toast(String((e as Error)?.message || e)); return false; }
     };
@@ -1849,66 +1853,102 @@ class App {
       if (!spoil && noteLooksSpoiler(text) && this.noteAsk !== text) { this.noteAsk = text; return; } // 先問一次要不要標記
       await send(text, spoil);
     };
+    const sendReply = async (to: number, v?: Record<string, string>) => {
+      keep(v);
+      const text = this.noteReplyDraft.replace(/\s+/g, " ").trim();
+      if (!text) { await this.ui.toast("先寫一句再送出"); return; }
+      if (Array.from(text).length > noteMax()) { await this.ui.toast(`回覆最多 ${noteMax()} 個字`); return; }
+      if (await say(addNote(title, text, noteLooksSpoiler(text), to), "已回覆")) { this.noteReplyTo = 0; this.noteReplyDraft = ""; await this.askNickname(); }
+    };
     // 登入的人：這部片我追蹤的人怎麼評（沒追蹤任何人就是空的）。有寫短評的在下面的清單裡；只評分沒寫的另外列一行
     const friends = signedIn() ? ((await social<{ list: DiaryEntry[] }>("friends", { m: communityKey(title) }).catch(() => null)) || { list: [] }).list : [];
     const quiet = friends.filter((e) => e.by && e.s && !e.x);
-    // 一份清單（像留言區）：自己發的也在裡面。上面一排篩選、右邊選排序（預設「熱門」：推得多又比較新的在前）
-    const hasFollow = notes.some((n) => n.by && n.by.f);
-    const hasSpoiler = notes.some((n) => n.sp);
+    // 討論串：短評在第一層，回覆縮排接在底下。篩選、排序只管第一層；回覆照時間由舊到新
+    const hasFollow = tops.some((n) => n.by && n.by.f);
+    const hasSpoiler = tops.some((n) => n.sp);
     if (this.noteFilter === "follow" && !hasFollow) this.noteFilter = "all";
     if (this.noteFilter === "clean" && !hasSpoiler) this.noteFilter = "all";
     const byNew = (x: ReviewNote, y: ReviewNote) => y.at - x.at || y.id - x.id;
-    const shown = notes
+    const shown = tops
       .filter((n) => (this.noteFilter === "follow" ? !!(n.by && n.by.f) || !!n.mine : this.noteFilter === "clean" ? !n.sp : true))
       .sort((x, y) => (this.noteSort === "new" ? byNew(x, y) : this.noteSort === "top" ? (y.p || 0) - (x.p || 0) || byNew(x, y) : this.noteSort === "high" ? y.s - x.s || byNew(x, y) : this.noteSort === "low" ? x.s - y.s || byNew(x, y) : noteHot(y) - noteHot(x) || byNew(x, y)));
+    const kidsOf: Record<number, ReviewNote[]> = {};
+    for (const n of notes) if (n.r) (kidsOf[n.r] ||= []).push(n);
+    for (const k of Object.keys(kidsOf)) kidsOf[Number(k)].sort((x, y) => x.at - y.at || x.id - y.id);
     const SORTS = [{ id: "hot", label: "熱門" }, { id: "new", label: "最新" }, { id: "top", label: "最多推" }, { id: "high", label: "評分高到低" }, { id: "low", label: "評分低到高" }];
     const editing = this.noteEdit || !!this.noteAsk;
     const unsent = !!draft.trim(); // 打到一半、還沒送出的字
-    /** 一則留言：左邊頭像，右邊一個泡泡（名字＋評分＋內容），泡泡下面一行小字（時間、檢舉／刪除），最後面是推噓（▲ 分數 ▼） */
-    const row = (n: ReviewNote) => {
+    const total = notes.filter((n) => !n.del && !(n.hidden && !n.mine)).length;
+    // 圖示（自己畫的簡單線條）：回覆、向上、向下、更多
+    const ICO = {
+      reply: '<svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h9a7 7 0 0 1 7 7v3"/></svg>',
+      up: '<svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4 4.5 12.5H9V20h6v-7.5h4.5z"/></svg>',
+      down: '<svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20 4.5 11.5H9V4h6v7.5h4.5z"/></svg>',
+      more: '<svg viewBox="0 0 24 24" width="19" height="19" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>',
+    };
+    /** 一則（短評或回覆）：上面一行頭像＋名字＋時間，中間內容，右下一排圖示（更多、回覆、推 分數 噓），底下縮排接著它的回覆 */
+    const row = (n: ReviewNote, depth: number): string => {
+      const kids = kidsOf[n.id] || [];
+      const below = kids.length ? <div class="th-kids">{kids.map((k) => row(k, depth + 1))}</div> : null;
+      // 已刪除、或被隱藏（不是自己的）：只剩一個空殼撐住底下的回覆
+      if (n.del || (n.hidden && !n.mine)) return <div class="th"><div class="th-gone">{n.del ? "這則已經刪除" : "這則已被隱藏"}</div>{below}</div>;
       const p = n.p || 0;
-      // 有雷的、被噓到很低的都先摺起來，點了才顯示
-      const sunk = p <= NOTE_FOLD_AT && !n.mine;
+      const sunk = p <= NOTE_FOLD_AT && !n.mine; // 被噓到很低的先摺起來
       const open = (!n.sp && !sunk) || this.noteShown.indexOf(n.id) >= 0;
       const reported = !!list && list.reported.indexOf(n.id) >= 0;
       const who = n.by ? n.by.name : n.mine ? "我" : "匿名";
       const toProfile = n.by ? (v: Record<string, string>) => { keep(v); this.go(() => this.profileView(n.by!.name), "讀取個人頁…"); } : undefined;
       const vote = (dir: number) => async (v: Record<string, string>) => { keep(v); await say(voteNote(title, n.id, n.my === dir ? 0 : dir), ""); };
+      const menu = this.noteMenu === n.id;
+      const replying = this.noteReplyTo === n.id;
       return (
-        <div class={"cmt" + (n.mine ? " mine" : "")}>
-          {n.by ? <button class="cmt-av" aria-label={`${n.by.name} 的個人頁`} onTap={toProfile}>{this.avatar(n.by)}</button> : <span class="cmt-av"><span class="av anon" aria-hidden="true">{n.mine ? "我" : "匿"}</span></span>}
-          <div class="cmt-main">
-            <div class="cmt-bub">
-              <div class="cmt-head">
-                {toProfile ? <button class="cmt-name" onTap={toProfile}>{esc(who)}</button> : <span class="cmt-name dim">{esc(who)}</span>}
-                {n.s ? <span class={"nt-score " + ratingTier("imdb", n.s)}>{n.s} 分</span> : null}
-                {n.sp ? <span class="nt-sp">可能有雷</span> : null}
-              </div>
-              {open ? <div class="cmt-text">{esc(n.x)}</div> : <button class="nt-cover" onTap={(v: Record<string, string>) => { keep(v); this.noteShown = [...this.noteShown, n.id]; }}>{sunk && !n.sp ? "這則被噓到摺疊了，點一下顯示" : "這則可能有雷，點一下顯示"}</button>}
-            </div>
-            <div class="cmt-foot">
-              <span>{esc(noteDate(n.at))}</span>
-              {n.by && n.by.f ? <span class="f">追蹤中</span> : null}
-              {n.mine && n.by ? <span>我</span> : null}
-              {n.mine && n.hidden ? <span class="warn">已被隱藏（別人看不到）</span> : null}
-              {n.mine ? <button onTap={async (v: Record<string, string>) => { keep(v); await say(deleteNote(title, n.id), "已刪除"); }}>刪除</button> : reported ? <span>已檢舉</span> : <button aria-label="檢舉這則短評" onTap={(v: Record<string, string>) => { keep(v); this.go(() => this.reportView(title, n)); }}>檢舉</button>}
-              {/* 推和噓放在這一行的最後面：▲ 分數 ▼ */}
-              <span class="cmt-vote">
-                {n.mine ? <span class="vb off" aria-hidden="true">▲</span> : <button class={"vb" + (n.my === 1 ? " up" : "")} aria-label="推" aria-pressed={n.my === 1 ? "true" : "false"} onTap={vote(1)}>▲</button>}
-                <b class={p > 0 ? "pos" : p < 0 ? "neg" : ""} aria-label={`推減噓：${p}`}>{p}</b>
-                {n.mine ? <span class="vb off" aria-hidden="true">▼</span> : <button class={"vb" + (n.my === -1 ? " down" : "")} aria-label="噓" aria-pressed={n.my === -1 ? "true" : "false"} onTap={vote(-1)}>▼</button>}
-              </span>
-            </div>
+        <div class={"th" + (n.mine ? " mine" : "")}>
+          <div class="th-head">
+            {n.by ? <button class="th-av" aria-label={`${n.by.name} 的個人頁`} onTap={toProfile}>{this.avatar(n.by)}</button> : <span class="th-av"><span class="av anon" aria-hidden="true">{n.mine ? "我" : "匿"}</span></span>}
+            {toProfile ? <button class="th-name" onTap={toProfile}>{esc(who)}</button> : <span class="th-name dim">{esc(who)}</span>}
+            <span class="th-time">・{esc(noteDate(n.at))}</span>
+            {n.by && n.by.f ? <span class="th-f">追蹤中</span> : null}
+            {n.s && !n.r ? <span class={"nt-score " + ratingTier("imdb", n.s)}>{n.s} 分</span> : null}
+            {n.sp ? <span class="nt-sp">有雷</span> : null}
           </div>
+          {open ? <div class="th-text">{esc(n.x)}</div> : <button class="nt-cover" onTap={(v: Record<string, string>) => { keep(v); this.noteShown = [...this.noteShown, n.id]; }}>{sunk && !n.sp ? "被噓到摺疊了，點一下顯示" : "可能有雷，點一下顯示"}</button>}
+          {n.mine && n.hidden ? <div class="th-warn">這則被多人檢舉，目前別人看不到。</div> : null}
+          <div class="th-acts">
+            <button class={"ib" + (menu ? " on" : "")} aria-label="更多" aria-expanded={menu ? "true" : "false"} onTap={(v: Record<string, string>) => { keep(v); this.noteMenu = menu ? 0 : n.id; }}>{ICO.more}</button>
+            <button class={"ib" + (replying ? " on" : "")} aria-label="回覆" onTap={(v: Record<string, string>) => { keep(v); this.noteReplyDraft = ""; this.noteReplyTo = replying ? 0 : n.id; this.noteMenu = 0; }}>{ICO.reply}</button>
+            <span class="th-vote">
+              {n.mine ? <span class="ib off">{ICO.up}</span> : <button class={"ib" + (n.my === 1 ? " up" : "")} aria-label="推" aria-pressed={n.my === 1 ? "true" : "false"} onTap={vote(1)}>{ICO.up}</button>}
+              <b class={p > 0 ? "pos" : p < 0 ? "neg" : ""} aria-label={`推減噓：${p}`}>{p}</b>
+              {n.mine ? <span class="ib off">{ICO.down}</span> : <button class={"ib" + (n.my === -1 ? " down" : "")} aria-label="噓" aria-pressed={n.my === -1 ? "true" : "false"} onTap={vote(-1)}>{ICO.down}</button>}
+            </span>
+          </div>
+          {menu ? (
+            <div class="th-menu">
+              {n.mine ? <button class="danger" onTap={async (v: Record<string, string>) => { keep(v); this.noteMenu = 0; await say(deleteNote(title, n.id), "已刪除"); }}>刪除這則</button>
+                : reported ? <span>已經檢舉過了</span>
+                : <button onTap={(v: Record<string, string>) => { keep(v); this.noteMenu = 0; this.go(() => this.reportView(title, n)); }}>檢舉這則</button>}
+            </div>
+          ) : null}
+          {replying ? (
+            <div class="th-reply">
+              <textarea class="fb-area note" name="rx" maxlength={String(noteMax())} placeholder={`回覆 ${who}（最多 ${noteMax()} 字）`} autofocus>{esc(this.noteReplyDraft)}</textarea>
+              <div class="cmt-row">
+                <span class="sp" />
+                <button onTap={() => { this.noteReplyTo = 0; this.noteReplyDraft = ""; }}>取消</button>
+                <button class="go" onTap={(v: Record<string, string>) => sendReply(n.id, v)}>送出</button>
+              </div>
+            </div>
+          ) : null}
+          {below}
         </div>
       );
     };
     return (
       <Page title="短評" subtitle={`《${title}》`} onBack={() => this.back()}>
         <Section>
-          {!voted ? <Note text="先替這部片評分，就可以寫短評。推和噓不用先評分。" /> : mineCount >= maxMine ? <Note text={`這部片你已經發了 ${maxMine} 則，先刪掉一則才能再發。`} /> : !editing ? (
+          {!voted ? <Note text="先替這部片評分，就可以寫短評。回覆、推和噓不用先評分。" /> : mineCount >= maxMine ? <Note text={`這部片你已經發了 ${maxMine} 則短評，先刪掉一則才能再發（回覆不受這個限制）。`} /> : !editing ? (
             // 收起來的樣子：像留言區最上面那一格「寫點什麼…」，點了才展開
-            <button class="cmt-new" onTap={() => { this.noteEdit = true; }}>
+            <button class="cmt-new" onTap={() => { this.noteEdit = true; this.noteReplyTo = 0; }}>
               <span class={"cmt-new-box" + (unsent ? " draft" : "")}>{unsent ? esc(draft) : `${NOTE_PLACEHOLDER}…`}</span>
               <i>{unsent ? "還沒送出，繼續寫" : "寫短評"}</i>
             </button>
@@ -1940,8 +1980,8 @@ class App {
             </div>
           )}
         </Section>
-        <Section title={`短評（${notes.length}）`} hint={`${NOTE_RULES}覺得說得好就推（▲），不認同就噓（▼）；被噓到 ${NOTE_FOLD_AT} 以下的會自動摺疊。看到違規的可以點「檢舉」。`}>
-          {notes.length > 1 || hasFollow ? (
+        <Section title={`短評（${total}）`} hint={`${NOTE_RULES}被噓到 ${NOTE_FOLD_AT} 以下的會自動摺疊。違規的可以從「⋯」檢舉。`}>
+          {tops.length > 1 || hasFollow ? (
             <div class="cmt-bar">
               <div class="cmt-filters">
                 <button class={"cm-tag" + (this.noteFilter === "all" ? " on" : "")} onTap={(v: Record<string, string>) => { keep(v); this.noteFilter = "all"; }}>全部</button>
@@ -1955,7 +1995,7 @@ class App {
           ) : null}
           {quiet.length ? <div class="cmt-quiet">你追蹤的人也評了分：{quiet.map((e) => <button onTap={(v: Record<string, string>) => { keep(v); this.go(() => this.profileView(e.by!.name), "讀取個人頁…"); }}>{this.avatar(e.by!)}<span>{esc(e.by!.name)}</span><b>{e.s} 分</b></button>)}</div> : null}
           {failed ? <Note kind="warn" text={failed} /> : null}
-          {shown.length ? <div class="cmt-list">{shown.map(row)}</div> : failed ? null : <Note text={notes.length ? "這個篩選下沒有短評。" : "還沒有人寫短評。"} />}
+          {shown.length ? <div class="th-list">{shown.map((n) => row(n, 0))}</div> : failed ? null : <Note text={tops.length ? "這個篩選下沒有短評。" : "還沒有人寫短評。"} />}
         </Section>
       </Page>
     );

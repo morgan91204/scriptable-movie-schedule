@@ -4042,7 +4042,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   var notesMem = {};
   function keepNotes(k, data) {
     notesMem[k] = { at: Date.now(), data };
-    const n = data.notes.filter((x) => !x.hidden).length;
+    const n = data.notes.filter((x) => !x.hidden && !x.del).length;
     if (communityMem[k]) communityMem[k] = { ...communityMem[k], notes: n };
     const all = readMyVotes();
     if (all[k]) {
@@ -4067,12 +4067,12 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     const r = viaSite ? await socialCall(path, { m: k, title: baseTitle(title), ...body }).then((x) => ({ status: x.status, body: JSON.stringify(x.data) })) : await platform().fetchText(`${COMMUNITY_API}/v2/${path}`, { accept: "application/json", "content-type": "application/json" }, { method: "POST", body: JSON.stringify({ m: k, d: deviceId(), ...body }) });
     if (r.status === 429) throw new Error("操作太頻繁，請稍後再試");
     if (r.status === 409) throw new Error("要先評分才能寫短評");
-    if (r.status === 422) throw new Error(/too long/.test(r.body) ? `短評最多 ${noteMax()} 個字` : /too many notes/.test(r.body) ? "同一部片最多發 5 則短評，先刪掉一則再發" : /duplicate/.test(r.body) ? "這句你已經發過了" : "短評不能放連結或聯絡方式");
+    if (r.status === 422) throw new Error(/too long/.test(r.body) ? `短評最多 ${noteMax()} 個字` : /too many notes/.test(r.body) ? "同一部片最多發 5 則短評，先刪掉一則再發" : /too many replies/.test(r.body) ? "這部片你回覆得太多了，先刪掉幾則再回" : /parent gone/.test(r.body) ? "你要回覆的那一則已經不在了" : /duplicate/.test(r.body) ? "這句你已經發過了" : "短評不能放連結或聯絡方式");
     if (r.status !== 200) throw new Error(fail);
     return keepNotes(k, JSON.parse(r.body));
   }
   var saveNote = (title, text, spoiler) => notePost("note", title, { x: String(text || "").trim(), sp: spoiler ? 1 : 0 }, "短評沒有送出，請稍後再試");
-  var addNote = (title, text, spoiler) => notePost("note-add", title, { x: String(text || "").trim(), sp: spoiler ? 1 : 0 }, "短評沒有送出，請稍後再試");
+  var addNote = (title, text, spoiler, replyTo = 0) => notePost("note-add", title, { x: String(text || "").trim(), sp: spoiler ? 1 : 0, ...replyTo ? { r: replyTo } : {} }, "沒有送出，請稍後再試");
   var deleteNote = (title, id) => notePost("note-del", title, { id }, "沒有刪掉，請稍後再試");
   var voteNote = (title, id, v) => notePost("note-vote", title, { id, v }, "沒有送出，請稍後再試");
   var reportNote = (title, id, why) => notePost("report", title, { id, why }, "檢舉沒有送出，請稍後再試");
@@ -4423,7 +4423,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   var extra = { boxOffice, filmList, soonList, nowShowing, nowShowingMulti, movieBoard: movieBoard2, festivalBoard, festivalFilm, nearby, patchSettings, fillMovie, formatList };
   var BRIDGE_LEVEL = 2;
   globalThis.MS = {
-    version: "2026.11.24-2220",
+    version: "2026.11.24-2226",
     level: BRIDGE_LEVEL,
     init(saved) {
       cache = saved || {};

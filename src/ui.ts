@@ -353,6 +353,38 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .cmt-foot button{padding:0;font-size:12px;font-weight:600;color:var(--fg2)}
 .cmt-foot .f{color:var(--accent)}
 .cmt-foot .warn{color:var(--orange)}
+.th-list{padding:6px 16px 12px}
+.th{padding-top:14px}
+.th-head{display:flex;flex-wrap:wrap;align-items:center;gap:4px 7px;font-size:12.5px;color:var(--fg2)}
+.th-av{flex:none;padding:0;line-height:0}
+.th-av .av{width:28px;height:28px;font-size:14px}
+.th-av .av.emo{font-size:17px}
+.th-name{padding:0;font-size:14px;font-weight:700;color:var(--fg);max-width:11em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.th-name.dim{color:var(--fg2);font-weight:600}
+.th-f{color:var(--accent)}
+.th-text{margin-top:6px;font-size:16px;line-height:1.5;overflow-wrap:anywhere}
+.th.mine>.th-text{border-left:3px solid var(--accent);padding-left:9px}
+.th-warn{margin-top:4px;font-size:12px;color:var(--orange)}
+.th-gone{padding:4px 0;font-size:13.5px;color:var(--fg2);font-style:italic}
+.th-acts{display:flex;align-items:center;justify-content:flex-end;gap:10px;margin-top:4px;color:var(--fg2)}
+.ib{display:inline-flex;align-items:center;justify-content:center;width:34px;height:32px;padding:0;border-radius:8px;color:var(--fg2)}
+.ib:active{background:var(--chip)}
+.ib.on{color:var(--accent)}
+.ib.off{opacity:.25}
+.ib.up{color:#ff6a00}
+.ib.up svg,.ib.down svg{fill:currentColor}
+.ib.down{color:#5e7bff}
+.th-vote{display:inline-flex;align-items:center}
+.th-vote b{min-width:1.5em;text-align:center;font-size:14px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--fg2)}
+.th-vote b.pos{color:#ff6a00}
+.th-vote b.neg{color:#5e7bff}
+.th-menu{display:flex;justify-content:flex-end;margin-top:2px;font-size:14px;color:var(--fg2)}
+.th-menu button{padding:6px 12px;border-radius:9px;background:var(--chip);font-size:14px;color:var(--fg)}
+.th-menu button.danger{color:#ff3b30}
+.th-reply{margin-top:4px}
+.th-reply .fb-area.note{min-height:56px;margin-top:4px}
+.th-kids{margin:2px 0 0 13px;padding-left:13px;border-left:2px solid var(--line)}
+.th-kids .th{padding-top:12px}
 .nt-cover{display:block;width:100%;margin-top:6px;padding:9px 12px;border-radius:10px;background:var(--chip);color:var(--fg2);font-size:14px;text-align:left}
 .cm-star{font-size:28px;line-height:1;padding:2px 3px;color:var(--line)}
 @media(prefers-color-scheme:dark){.cm-star{color:#48484a}}
