@@ -142,7 +142,13 @@ class App {
     // 連點頁籤重新整理之後：回到剛才那個頁籤
     if (IS_WEB) { try { const G = globalThis as any; const t = G.sessionStorage.getItem("ms:reload-tab"); if (t) { G.sessionStorage.removeItem("ms:reload-tab"); if (/^(movies|cinemas|settings)$/.test(t)) this.switchTab(t); } } catch (_) {} }
     await this.openShared().catch(() => undefined);
-    if (this.syncNote) { this.switchTab("settings"); this.go(() => this.syncView()); } // 剛從 Google 登入回來：直接到同步那一頁看結果
+    if (this.followedAfterLogin) {
+      // 為了追蹤某個人才登入的：回到他的個人頁，再帶去取暱稱（設過或按過稍後再說就不問）
+      const who = this.followedAfterLogin;
+      this.switchTab("settings"); this.go(() => this.profileView(who), "讀取個人頁…");
+      this.ui.toast(`已登入，並追蹤了 ${who}`).catch(() => undefined);
+      await this.askNickname().catch(() => undefined);
+    } else if (this.syncNote) { this.switchTab("settings"); this.go(() => this.syncView()); } // 剛從 Google 登入回來：直接到同步那一頁看結果
     loadFestivals().catch(() => []); // 背景先看有沒有影展（有才會在電影分頁多出「影展」）
     const input = String(args.shortcutParameter || (args.urls && args.urls[0]) || (args.plainTexts && args.plainTexts[0]) || "");
     let pendingUrl = input;
@@ -655,6 +661,13 @@ class App {
       if (r && r.data) applyLocal(syncMerge(this.settings, r.data as Partial<SyncData>));
       await sy.push(syncPick(this.settings));
       const adopted = await adoptRatings().catch(() => 0); // 這台原本匿名評的分、寫的短評併進帳號
+      // 登入前按了某個人的「登入後追蹤」：現在追蹤，等一下直接開他的個人頁
+      try {
+        const G = globalThis as any;
+        const who = String(G.sessionStorage.getItem("ms:follow-after-login") || "").slice(0, 16);
+        G.sessionStorage.removeItem("ms:follow-after-login");
+        if (who) { await social("follow", { name: who, on: true }).catch(() => undefined); this.followedAfterLogin = who; }
+      } catch (_) {}
       this.syncNote = (r && r.data ? "已登入，這台和帳號裡的收藏已經合在一起。" : "已登入，這台的設定已經存到帳號裡。") + (adopted ? `這台原本評過的 ${adopted} 部片也併進你的片單了。` : "");
       return;
     }
@@ -827,12 +840,13 @@ class App {
           {u.films !== undefined ? <span class="us-sub">{u.films} 部片</span> : null}
         </button>
         {signedIn() ? <button class={"us-follow" + (u.following ? " on" : "")} onTap={async () => {
-          try { await social("follow", { name: u.name, on: !u.following }); await this.ui.toast(u.following ? "已取消追蹤" : `已追蹤 ${u.name}`); } catch (e) { await this.ui.toast(String((e as Error)?.message || e)); }
+          try { await social("follow", { name: u.name, on: !u.following }); this.meMem = null; await this.ui.toast(u.following ? "已取消追蹤" : `已追蹤 ${u.name}`); if (!u.following) await this.askNickname(); } catch (e) { await this.ui.toast(String((e as Error)?.message || e)); }
         }}>{u.following ? "追蹤中" : "追蹤"}</button> : null}
       </div>
     );
   }
   /** 編輯個人檔案：暱稱（唯一）、顏色、要不要公開；最下面可以把片單和個人檔案整個刪掉 */
+  followedAfterLogin = ""; // 登入前按了誰的「登入後追蹤」（登入完成時填上）
   hasProfile: boolean | null = null; // 登入的帳號取過暱稱了嗎（null = 還沒問過伺服器）
   /** 登入的人評分、寫短評之後：還沒取暱稱就帶去設定一次。設過、或按過「稍後再說」就不再問（之後到 設定 → 我的片單 改） */
   async askNickname(): Promise<void> {
@@ -856,7 +870,7 @@ class App {
     const custom = /^#/.test(d.color);
     return (
       <Page title={user ? "編輯個人檔案" : first ? "先取一個暱稱" : "設定暱稱"} onBack={() => this.back()}>
-        {first ? <Note text={(pushed ? "你的評分已經送出了。" : "歡迎使用「我的片單」。") + "取一個暱稱、公開個人頁，別人才找得到你、能追蹤你，你寫的短評旁邊也會顯示暱稱。只會問這一次，之後在「設定 → 我的片單」可以改。\n不想公開也沒關係：取消下面的「公開我的個人頁」，或按最下面的「稍後再說」，片單就只有你自己看得到（還是可以追蹤別人）。"} /> : null}
+        {first ? <Note text={(pushed ? "剛才的動作已經完成了。接下來，" : "歡迎使用「我的片單」。") + "取一個暱稱、公開個人頁，別人才找得到你、能追蹤你，你寫的短評旁邊也會顯示暱稱。只會問這一次，之後在「設定 → 我的片單」可以改。\n不想公開也沒關係：取消下面的「公開我的個人頁」，或按最下面的「稍後再說」，片單就只有你自己看得到（還是可以追蹤別人）。"} /> : null}
         <Section title="暱稱" hint="2～16 個字，只能用中英文、數字和底線；不能跟別人重複。14 天內只能改一次。請不要用真實姓名或冒用他人名義。">
           <div class="nt-form">
             <input class="field" name="n" maxlength="16" autocomplete="off" autocapitalize="off" value={d.name} placeholder="例如：愛看片的小明" />
@@ -937,9 +951,18 @@ class App {
           {this.profileCard(u, p.counts || null, p.self ? "這是你的個人頁（別人看到的不含你設成只有自己看得到的那幾筆）" : "")}
           {p.self ? null : signedIn() ? (
             <div class="nt-form"><Button label={p.following ? "追蹤中（點一下取消）" : "追蹤"} kind={p.following ? "secondary" : "primary"} onTap={async () => {
-              try { await social("follow", { name: u.name, on: !p!.following }); await this.ui.toast(p!.following ? "已取消追蹤" : `已追蹤 ${u.name}`); } catch (e) { await this.ui.toast(String((e as Error)?.message || e)); }
+              try { await social("follow", { name: u.name, on: !p!.following }); this.meMem = null; await this.ui.toast(p!.following ? "已取消追蹤" : `已追蹤 ${u.name}`); if (!p!.following) await this.askNickname(); } catch (e) { await this.ui.toast(String((e as Error)?.message || e)); }
             }} /></div>
-          ) : <Note text="登入後可以追蹤這個人（設定 → 我的片單）。" />}
+          ) : (
+            <div class="nt-form">
+              <Button label="登入後追蹤" onTap={() => {
+                // 記下「登入後要追蹤誰」，從 Google 回來就自動追蹤、回到這一頁，再帶去取暱稱
+                try { (globalThis as any).sessionStorage.setItem("ms:follow-after-login", u.name); } catch (_) {}
+                const sy = this.sync(); if (sy) sy.login();
+              }} />
+              <div class="cm-tagnote">用 Google 登入後會自動追蹤 {esc(u.name)}，接著請你取一個暱稱（也可以稍後再說）。</div>
+            </div>
+          )}
         </Section>
         {rated ? (
           <Section title={`評分分布（${rated} 部）`}>
