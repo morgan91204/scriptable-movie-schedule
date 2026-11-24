@@ -3887,6 +3887,8 @@ export const saveNote = (title: string, text: string, spoiler: boolean): Promise
 /** 新增一則短評（同一部片最多 5 則） */
 export const addNote = (title: string, text: string, spoiler: boolean, replyTo = 0): Promise<ReviewNotes> => notePost(replyTo && (notesViaSite || signedIn()) ? "note-reply" : "note-add", title, { x: String(text || "").trim(), sp: spoiler ? 1 : 0, ...(replyTo ? { r: replyTo } : {}) }, "沒有送出，請稍後再試");
 /** 刪掉自己的某一則短評 */
+/** 自己的短評事後補標或取消「有雷」 */
+export const spoilNote = (title: string, id: number, sp: boolean): Promise<ReviewNotes> => notePost("note-spoil", title, { id, sp: sp ? 1 : 0 }, "沒有改成功，請稍後再試");
 export const deleteNote = (title: string, id: number): Promise<ReviewNotes> => notePost("note-del", title, { id }, "沒有刪掉，請稍後再試");
 /** 推（1）、噓（-1）或收回（0）一則短評 */
 export const voteNote = (title: string, id: number, v: number): Promise<ReviewNotes> => notePost("note-vote", title, { id, v }, "沒有送出，請稍後再試");

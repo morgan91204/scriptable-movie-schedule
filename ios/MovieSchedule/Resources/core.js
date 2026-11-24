@@ -269,6 +269,7 @@
     social: () => social,
     soonBoard: () => soonBoard,
     soonGroups: () => soonGroups,
+    spoilNote: () => spoilNote,
     syncApply: () => syncApply,
     syncMerge: () => syncMerge,
     syncPick: () => syncPick,
@@ -4108,6 +4109,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   }
   var saveNote = (title, text, spoiler) => notePost("note", title, { x: String(text || "").trim(), sp: spoiler ? 1 : 0 }, "短評沒有送出，請稍後再試");
   var addNote = (title, text, spoiler, replyTo = 0) => notePost(replyTo && (notesViaSite || signedIn()) ? "note-reply" : "note-add", title, { x: String(text || "").trim(), sp: spoiler ? 1 : 0, ...replyTo ? { r: replyTo } : {} }, "沒有送出，請稍後再試");
+  var spoilNote = (title, id, sp) => notePost("note-spoil", title, { id, sp: sp ? 1 : 0 }, "沒有改成功，請稍後再試");
   var deleteNote = (title, id) => notePost("note-del", title, { id }, "沒有刪掉，請稍後再試");
   var voteNote = (title, id, v) => notePost("note-vote", title, { id, v }, "沒有送出，請稍後再試");
   var reportNote = (title, id, why) => notePost("report", title, { id, why }, "檢舉沒有送出，請稍後再試");
@@ -4458,7 +4460,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   var extra = { boxOffice, filmList, soonList, nowShowing, nowShowingMulti, movieBoard: movieBoard2, festivalBoard, festivalFilm, nearby, patchSettings, fillMovie, formatList };
   var BRIDGE_LEVEL = 2;
   globalThis.MS = {
-    version: "2026.11.25-0029",
+    version: "2026.11.25-0032",
     level: BRIDGE_LEVEL,
     init(saved) {
       cache = saved || {};

@@ -497,9 +497,9 @@ export async function social(hub, path, b) {
     const r = await rate.tags(m, udev(uid), b.t);
     return fail(r) || json(r);
   }
-  if (op === "note-add" || op === "note-del") {
+  if (op === "note-add" || op === "note-del" || op === "note-spoil") {
     // 新增一則／刪掉自己的某一則。片單上那一筆記的是「最新的一則」
-    const r = op === "note-add" ? await rate.noteAdd(m, udev(uid), b.x, b.sp, Number(b.r) || 0) : await rate.noteDel(m, udev(uid), Number(b.id));
+    const r = op === "note-add" ? await rate.noteAdd(m, udev(uid), b.x, b.sp, Number(b.r) || 0) : op === "note-spoil" ? await rate.noteSpoil(m, udev(uid), Number(b.id), b.sp ? 1 : 0) : await rate.noteDel(m, udev(uid), Number(b.id));
     const bad = fail(r);
     if (bad) return bad;
     // 片單上記的是自己最新的一則「短評」（回覆別人的不算）

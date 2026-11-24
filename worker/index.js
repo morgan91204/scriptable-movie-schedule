@@ -14,6 +14,7 @@
 //     檢舉規則：同一則被 2 台不同裝置檢舉劇透 → 自動標成「可能有雷」（摺疊）；被 3 台不同裝置檢舉 → 自動隱藏。站長可以還原（還原後不再被自動隱藏）
 //   POST /v2/note-add  { m, d, x, sp, r }    → 同上。新增一則（同一部片一個人最多 5 則）；帶 r = 回覆那一則（不用先評分，最多三層）；/v2/note 是舊版 App 用的「換掉我最新的那一則」
 //   POST /v2/note-del  { m, d, id }          → 同上。刪掉自己的某一則
+//   POST /v2/note-spoil { m, d, id, sp }     → 同上。自己的某一則補標或取消「有雷」
 //   POST /v2/note-vote { m, d, id, v }       → 同上。推（1）、噓（-1）、收回（0）；清單裡每則的 p = 推減噓，my = 我的表態
 //   GET  /v2/notes-all                       → { movies: { <片名鍵>: [{ id, x, sp, s, at }] } }（所有看得到的短評；每 30 分鐘匯出成靜態檔，也是備份）
 //   POST /admin { op, m, id, notes }         → 站長管理（要帶 x-admin-key；金鑰只由 GitHub Actions 的「短評管理」臨時產生、用完就換掉）
@@ -119,6 +120,7 @@ export class AccountRpc extends WorkerEntrypoint {
     if (noteHasContact(x)) return { error: "no links" };
     return (await this.movie(m).addNote(by, x, sp ? 1 : 0, m, true, parent)) || { error: "vote first" };
   }
+  async noteSpoil(m, dev, id, sp) { return this.ok(m, dev) && Number.isInteger(id) ? this.movie(m).spoilNote(dev, id, sp ? 1 : 0, m, true) : { error: "bad request" }; }
   async noteDel(m, dev, id) { return this.ok(m, dev) && Number.isInteger(id) ? this.movie(m).delNote(dev, id, m, true) : { error: "bad request" }; }
   async noteVote(m, by, id, v) {
     if (!okMovie(m) || !(okAccountDev(by) || okDevice(by)) || !Number.isInteger(id) || [1, 0, -1].indexOf(v) < 0) return { error: "bad request" };
@@ -245,7 +247,7 @@ export default {
 
       if (v === "2" && path === "/notes-all" && req.method === "GET") return json({ movies: await env.INDEX.get(env.INDEX.idFromName("all")).allNotes() });
 
-      if (v === "2" && (path === "/note-add" || path === "/note-del" || path === "/note-vote") && req.method === "POST") {
+      if (v === "2" && (path === "/note-add" || path === "/note-del" || path === "/note-vote" || path === "/note-spoil") && req.method === "POST") {
         let b;
         try {
           b = await req.json();
@@ -270,6 +272,7 @@ export default {
         const id = Number(b.id);
         if (!Number.isInteger(id) || id < 1) return json({ error: "bad request" }, 400);
         if (path === "/note-del") return json(await movie.delNote(d, id, m));
+        if (path === "/note-spoil") return json(await movie.spoilNote(d, id, b.sp ? 1 : 0, m));
         const vv = Number(b.v);
         if ([1, 0, -1].indexOf(vv) < 0) return json({ error: "bad request" }, 400);
         return json(await movie.voteNote(d, id, vv, m));
@@ -493,6 +496,11 @@ export class Movie extends DurableObject {
   /** 刪掉自己的某一則 */
   async delNote(dev, id, key, withAuthor = false) {
     if (this.sql.exec("SELECT 1 FROM notes WHERE id = ? AND dev = ? AND del = 0", id, dev).toArray().length) { this.dropNotes([id]); await this.syncNotes(key); }
+    return this.listNotes(dev, withAuthor);
+  }
+  /** 自己的短評事後補標（或取消）「有雷」：內容不能改，但有沒有雷可以改 */
+  async spoilNote(dev, id, sp, key, withAuthor = false) {
+    if (this.sql.exec("SELECT 1 FROM notes WHERE id = ? AND dev = ? AND del = 0", id, dev).toArray().length) { this.sql.exec("UPDATE notes SET sp = ? WHERE id = ?", sp ? 1 : 0, id); await this.syncNotes(key); }
     return this.listNotes(dev, withAuthor);
   }
   /** 推或噓一則短評：v = 1 推、-1 噓、0 收回。一個人對一則只算一次，不能推噓自己的 */
