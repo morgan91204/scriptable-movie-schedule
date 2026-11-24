@@ -2481,6 +2481,18 @@ export async function favMovieRows(s: Settings): Promise<FavRow[]> {
   const order: Record<string, number> = { movie: 0, soon: 1, fest: 2, box: 3, none: 4 };
   return rows.sort((a, b) => order[a.kind] - order[b.kind] || b.fav.at - a.fav.at);
 }
+// ── 收藏電影清單的快照：上一次查到的狀態（哪一類、說明那一行、海報）記在手機上，下次展開時先畫這一份，查好最新的再換上 ──
+export interface FavSnap { key: string; kind: string; line: string; poster: string }
+/** 這份收藏清單（sig = 收藏了哪些片）上一次的快照；沒有或太舊（超過 7 天）回傳 null */
+export function favSnapGet(sig: string): FavSnap[] | null {
+  try {
+    const c = JSON.parse(cacheGet("fav-rows.json") || "null");
+    return c && c.sig === sig && Array.isArray(c.rows) && Date.now() - c.at < 7 * 86400e3 ? c.rows : null;
+  } catch (_) { return null; }
+}
+export function favSnapSet(sig: string, rows: FavSnap[]): void {
+  try { cacheSet("fav-rows.json", JSON.stringify({ sig, at: Date.now(), rows })); } catch (_) {}
+}
 /** 已下檔的收藏片：到年度票房排行（2016 年至今）找它的票房資料；找不到回傳 null */
 export async function favMovieBox(fav: FavMovie): Promise<BoxOfficeItem | null> {
   const b = await loadBoxOfficeFull().catch(() => null);

@@ -44,7 +44,7 @@ try {
   if (localStorage.getItem(verKey) !== APP_VERSION) {
     // 不丟的：使用者自己的（評分的裝置代號、投過的票），以及「一部片一部片查出來」的結果（預告、海報、評分、片長）：
     // 這些要重新查很花時間（每部片好幾個請求），而且各自有自己的有效期限和版本檢查，不需要跟著整批清
-    const keep = /cache:(device-id\.txt|my-votes|extras\.json|ratings\.json|posters\.json|runtimes\.json)/;
+    const keep = /cache:(device-id\.txt|my-votes|extras\.json|ratings\.json|posters\.json|runtimes\.json|fav-rows\.json)/;
     for (const k of Object.keys(localStorage)) if (k.startsWith(LS + "cache:") && !keep.test(k)) localStorage.removeItem(k);
     localStorage.setItem(verKey, APP_VERSION);
   }

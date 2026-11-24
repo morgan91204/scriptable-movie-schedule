@@ -10,7 +10,7 @@ import { scriptablePlatform } from "./platform-scriptable";
 import {
   Cinema, Settings, Movie, Version, EXTRA, CITY_ORDER, AD_STEPS,
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
-  loadSettings, saveSettings, settingsStored, setSettingsSavedHook, syncPick, syncApply, syncMerge, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, communityKey, globalSearch, boxIsRerun, boxHasLaterRun, boxRunRows, boxRunsName, loadIntro, rerunDataReady, SITE_URL, TW,
+  loadSettings, saveSettings, settingsStored, setSettingsSavedHook, syncPick, syncApply, syncMerge, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, communityKey, globalSearch, favSnapGet, favSnapSet, boxIsRerun, boxHasLaterRun, boxRunRows, boxRunsName, loadIntro, rerunDataReady, SITE_URL, TW,
   FORMATS, formatsOf, filterVersions, filterVersionsAny, movieRows, movieDays, nearest, kmLabel, WINDOWS, findShowtimes, findShowtimesMulti, multiLabel, multiDetail, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText,
   hallOf, tmdbTest, movieExtras, moviePoster, movieRuntime, posterSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxCountries, boxByCountry, boxInfo, boxInfoRows, boxCountryText, BOX_COUNTRY_NOTE, boxCountryTag, boxCountriesPicked, loadMovieBoard, loadSoonBoard, notifyPrefs, notifyPayload, notifyEndScope, notifyEndPick, notifyQuiet, NOTIFY_PRE_STEPS, NOTIFY_KINDS, boxStatus, STATUS_LABEL, boxInfoBy, isFavMovie, toggleFavMovie, favMovieRows, favMovieBox, soonGroups, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityCached, communityVote, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalsReady, festivalNote, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, festivalDefaultDate, festivalStateLabel, festivalState, festivalFooter, linkMovies, nowGroupLine, nowFilter, festivalPick, movieAbout, festivalSearch, festivalSearchLines, festivalTrailer, festivalYears, festivalsAny, festivalGroups, festivalChipNote, festivalStatusLine, movieRatings, ratingTier, tomatoTier, popcornTier, popcornCount,
 } from "./core";
@@ -282,6 +282,18 @@ class App {
       return r.fav.poster ? Promise.resolve(r.fav.poster) : moviePoster(r.fav.title);
     },
   };
+  favRowsMemo: { sig: string; at: number; job: Promise<FavRow[]> } | null = null;
+  /** 收藏了哪些片（片名鍵＋影展）：清單有增減，這串字就不一樣 */
+  favSig(): string { return (this.settings.favMovies || []).map((f) => f.key + (f.fest ? "@" + f.fest.id : "")).join(","); }
+  /** 收藏的每部片現在的狀態：同一份收藏清單 5 分鐘內只查一次（首頁展開、返回、收藏電影頁都共用） */
+  favRowsJob(): Promise<FavRow[]> {
+    const sig = this.favSig();
+    const m = this.favRowsMemo;
+    if (m && m.sig === sig && Date.now() - m.at < 5 * 60e3) return m.job;
+    const job = favMovieRows(this.settings).catch(() => [] as FavRow[]);
+    this.favRowsMemo = { sig, at: Date.now(), job };
+    return job;
+  }
   favQuery = ""; // 收藏電影頁的搜尋字
   favJob: { q: string; job: Promise<GlobalHits> } | null = null;
   /** 收藏電影頁：管理收藏電影的地方。上面是已經收藏的（含現在的狀態）；
@@ -348,7 +360,7 @@ class App {
       );
     } else {
       // 沒搜尋：已經收藏的（含現在的狀態），加上現正上映的片可以直接點愛心
-      const rows = favs.length ? await favMovieRows(this.settings).catch(() => [] as FavRow[]) : [];
+      const rows = favs.length ? await this.favRowsJob() : []; // 這次執行查過（5 分鐘內）就直接用
       const movies = (await loadMovies().catch(() => [] as TwMovie[])).filter((m) => !m.comingSoon);
       const thumb = await this.listThumbs([
         ...rows.map((r) => ({ key: "fav|" + r.fav.key, job: this.posterJobOf.fav(r) })),
@@ -473,9 +485,19 @@ class App {
     // 收藏電影：收合時只顯示有幾部（不用讀資料）；展開才查每部片現在的狀態
     const favMovies = this.settings.favMovies || [];
     const favIssuers = this.settings.favIssuers || [];
-    const favRows = this.favMovOpen && favMovies.length ? await favMovieRows(this.settings).catch(() => [] as FavRow[]) : [];
+    // 展開時：每部片現在的狀態要查好幾份資料。這次執行查過（5 分鐘內）就直接用；
+    // 還沒查好就先畫上一次記在手機上的那一份（狀態、說明、海報），查好最新的再在原位換上
+    const favJob = this.favMovOpen && favMovies.length ? this.favRowsJob() : null;
+    const favGot = favJob ? await Promise.race([favJob, sleep(this.rerendering ? 0 : 150).then(() => null)]) : [];
+    const favSnap = favJob && !favGot ? favSnapGet(this.favSig()) : null;
+    if (favJob && !favGot) this.late = [...(this.late || []), favJob];
+    const favRows: FavRow[] = favGot || [];
     const openFav = (r: FavRow) => this.openFavRow(r);
-    const favThumb = await this.listThumbs(favRows.map((r) => ({ key: r.fav.key, job: this.posterJobOf.fav(r) })));
+    const favThumb = await this.listThumbs(favRows.map((r) => ({ key: r.fav.key, job: this.posterJobOf.fav(r) })), 200);
+    // 最新的狀態和海報都有了：記成下一次的快照
+    if (favGot && favRows.length) favSnapSet(this.favSig(), favRows.map((r) => ({ key: r.fav.key, kind: r.kind, line: r.line, poster: (favThumb(r.fav.key) || {}).url || r.fav.poster || "" })));
+    // 用快照畫的列：點了要等最新的查好，才知道該開哪一頁
+    const openSnap = async (key: string) => { const row = ((await favJob) || []).find((r) => r.fav.key === key); if (row) this.openFavRow(row); };
     // 全域搜尋：有打字就把下面的入口和收藏換成分組的結果（影城、現正上映、即將上映、歷年電影、影展），清空就恢復
     const q = this.homeQuery.trim();
     if (q) {
@@ -571,6 +593,9 @@ class App {
             {favRows.map((r) => (
               <Item thumb={favThumb(r.fav.key)} title={r.fav.title} subtitle={r.line} onTap={() => openFav(r)} />
             ))}
+            {this.favMovOpen && !favGot && favJob ? (favSnap
+              ? favMovies.map((f) => { const sn = favSnap.find((x) => x.key === f.key); const u = (sn && sn.poster) || f.poster || ""; return <Item thumb={{ src: u ? posterSrc(u) : "", url: u || undefined }} title={f.title} subtitle={sn ? sn.line : "讀取中…"} onTap={() => openSnap(f.key)} />; })
+              : favMovies.map((f) => <Item thumb={{ src: f.poster ? posterSrc(f.poster) : "", url: f.poster, pending: !f.poster }} title={f.title} subtitle="讀取中…" onTap={() => openSnap(f.key)} />)) : null}
             {this.favMovOpen ? <Item icon={favMovies.length ? "⚙️" : "👉"} title={favMovies.length ? "管理收藏電影" : "去找電影來收藏"} subtitle={favMovies.length ? "搜尋其他電影來收藏，或取消收藏" : "上映中、即將上映、已下檔、影展的片都找得到，點愛心（♡ 變 ♥）就收藏。"} accent onTap={() => { this.favQuery = ""; this.go(() => this.favManageView(), "讀取電影…"); }} /> : null}
           </Section>
         )}

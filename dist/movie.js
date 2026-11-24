@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.24-1316
+// @movie-schedule-app 電影行程 v2026.11.24-1320
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/parsers.gen.ts
@@ -2609,6 +2609,20 @@ async function favMovieRows(s) {
   const order = { movie: 0, soon: 1, fest: 2, box: 3, none: 4 };
   return rows.sort((a, b) => order[a.kind] - order[b.kind] || b.fav.at - a.fav.at);
 }
+function favSnapGet(sig) {
+  try {
+    const c = JSON.parse(cacheGet("fav-rows.json") || "null");
+    return c && c.sig === sig && Array.isArray(c.rows) && Date.now() - c.at < 7 * 864e5 ? c.rows : null;
+  } catch (_) {
+    return null;
+  }
+}
+function favSnapSet(sig, rows) {
+  try {
+    cacheSet("fav-rows.json", JSON.stringify({ sig, at: Date.now(), rows }));
+  } catch (_) {
+  }
+}
 async function favMovieBox(fav) {
   const b = await loadBoxOfficeFull().catch(() => null);
   if (!b || !b.years) return null;
@@ -4242,6 +4256,7 @@ var App = class {
         return r.fav.poster ? Promise.resolve(r.fav.poster) : moviePoster(r.fav.title);
       }
     };
+    this.favRowsMemo = null;
     this.favQuery = "";
     // 收藏電影頁的搜尋字
     this.favJob = null;
@@ -4374,7 +4389,7 @@ var App = class {
   }
   /** 最新版本是多少。網頁版問的是自己網站現在上線的版本（重新整理就會拿到的那一版），不是 GitHub 上的 */
   checkVersion() {
-    if (true) return checkLatest("2026.11.24-1316");
+    if (true) return checkLatest("2026.11.24-1320");
     return (async () => {
       try {
         let r = await globalThis.fetch("/version.json?t=" + Date.now(), { cache: "no-store" });
@@ -4382,7 +4397,7 @@ var App = class {
         const latest = String((await r.json()).version || "");
         if (!latest) return null;
         const num = (v) => Number(v.replace(/\D/g, "")) || 0;
-        return { latest, isLatest: num("2026.11.24-1316") >= num(latest) };
+        return { latest, isLatest: num("2026.11.24-1320") >= num(latest) };
       } catch (_) {
         return null;
       }
@@ -4545,6 +4560,19 @@ var App = class {
       return { src, url: u };
     };
   }
+  /** 收藏了哪些片（片名鍵＋影展）：清單有增減，這串字就不一樣 */
+  favSig() {
+    return (this.settings.favMovies || []).map((f) => f.key + (f.fest ? "@" + f.fest.id : "")).join(",");
+  }
+  /** 收藏的每部片現在的狀態：同一份收藏清單 5 分鐘內只查一次（首頁展開、返回、收藏電影頁都共用） */
+  favRowsJob() {
+    const sig = this.favSig();
+    const m = this.favRowsMemo;
+    if (m && m.sig === sig && Date.now() - m.at < 5 * 6e4) return m.job;
+    const job = favMovieRows(this.settings).catch(() => []);
+    this.favRowsMemo = { sig, at: Date.now(), job };
+    return job;
+  }
   /** 收藏電影頁：管理收藏電影的地方。上面是已經收藏的（含現在的狀態）；
    *  搜尋會把全部的電影一起找：上映中、即將上映、已下檔（2016 年至今）、影展片（含往年）。
    *  點片名進那部片的頁面；點右邊的愛心收藏或取消 */
@@ -4577,7 +4605,7 @@ var App = class {
       ], 300) : () => void 0;
       body = !hits ? /* @__PURE__ */ h(Note, { text: "正在找電影…" }) : /* @__PURE__ */ h(Fragment, null, this.searchTop(hits, q, tools, heart), hits.now.length ? /* @__PURE__ */ h(Section, null, head("now", `現正上映（${hits.now.length}）`), hits.now.slice(0, lim("now")).map((m) => /* @__PURE__ */ h(Item, { thumb: thumb("now|" + m.slug), title: m.title, subtitle: movieLines(m).filter(Boolean).join("\n"), tag: { text: "上映中", tone: "now" }, onTap: () => this.go(() => this.movieView(m, ""), `讀取《${m.title}》的放映影城…`), action: heart(m.title, { en: m.en }) })), more("now", hits.now.length, "部")) : null, hits.soon.length ? /* @__PURE__ */ h(Section, null, head("soon", `即將上映（${hits.soon.length}）`), hits.soon.slice(0, lim("soon")).map((e) => /* @__PURE__ */ h(Item, { thumb: thumb("soon|" + e.key), title: e.title, subtitle: e.lines.filter(Boolean).join("\n"), onTap: e.m ? () => this.go(() => this.movieView(e.m, ""), `讀取《${e.title}》的放映影城…`) : e.u ? () => this.go(() => this.soonMovieView(e.u), `讀取《${e.title}》…`) : void 0, action: heart(e.title, { en: e.m ? e.m.en : e.u ? e.u.en : "", poster: e.u ? e.u.poster : void 0 }) })), more("soon", hits.soon.length, "部")) : null, hits.year.length ? /* @__PURE__ */ h(Section, null, head("year", `已下檔（${hits.year.length}）`), hits.year.slice(0, lim("year")).map((x) => /* @__PURE__ */ h(Item, { thumb: thumb("year|" + x.name + "|" + x.release), title: x.name, subtitle: [boxIsRerun(x) ? "重映" : boxHasLaterRun(x) ? "首映" : "", String(x.release || "").slice(0, 10).replace(/-/g, "/") + " 上映", `票房 ${money(x.total)}`].filter(Boolean).join("｜"), tag: { text: STATUS_LABEL[boxStatus(x)], tone: boxStatus(x) }, onTap: () => this.go(() => this.boxMovieView(x), `讀取《${x.name}》…`), action: heart(x.name) })), more("year", hits.year.length, "部")) : null, hits.fest.length ? /* @__PURE__ */ h(Section, null, head("fest", `影展（${hits.fest.length}）`), hits.fest.slice(0, lim("fest")).map(({ f, film }) => /* @__PURE__ */ h(Item, { thumb: thumb("fest|" + f.id + "|" + film.id), title: film.title, subtitle: `${f.start.slice(0, 4)} ${f.name}`, onTap: () => this.go(() => this.festivalFilmView(f, film)), action: heart(film.title, { poster: film.poster, fest: { id: f.id, film: film.id, name: f.name } }) })), more("fest", hits.fest.length, "部")) : null, total ? null : /* @__PURE__ */ h(Empty, { icon: "🔎", text: "找不到相符的電影，換個關鍵字試試。" }));
     } else {
-      const rows = favs.length ? await favMovieRows(this.settings).catch(() => []) : [];
+      const rows = favs.length ? await this.favRowsJob() : [];
       const movies = (await loadMovies().catch(() => [])).filter((m) => !m.comingSoon);
       const thumb = await this.listThumbs([
         ...rows.map((r) => ({ key: "fav|" + r.fav.key, job: this.posterJobOf.fav(r) })),
@@ -4666,9 +4694,18 @@ var App = class {
     const favs = this.settings.favorites.map((id) => this.cinemas.find((c) => c.id === id)).filter(Boolean);
     const favMovies = this.settings.favMovies || [];
     const favIssuers = this.settings.favIssuers || [];
-    const favRows = this.favMovOpen && favMovies.length ? await favMovieRows(this.settings).catch(() => []) : [];
+    const favJob = this.favMovOpen && favMovies.length ? this.favRowsJob() : null;
+    const favGot = favJob ? await Promise.race([favJob, sleep(this.rerendering ? 0 : 150).then(() => null)]) : [];
+    const favSnap = favJob && !favGot ? favSnapGet(this.favSig()) : null;
+    if (favJob && !favGot) this.late = [...this.late || [], favJob];
+    const favRows = favGot || [];
     const openFav = (r) => this.openFavRow(r);
-    const favThumb = await this.listThumbs(favRows.map((r) => ({ key: r.fav.key, job: this.posterJobOf.fav(r) })));
+    const favThumb = await this.listThumbs(favRows.map((r) => ({ key: r.fav.key, job: this.posterJobOf.fav(r) })), 200);
+    if (favGot && favRows.length) favSnapSet(this.favSig(), favRows.map((r) => ({ key: r.fav.key, kind: r.kind, line: r.line, poster: (favThumb(r.fav.key) || {}).url || r.fav.poster || "" })));
+    const openSnap = async (key) => {
+      const row = (await favJob || []).find((r) => r.fav.key === key);
+      if (row) this.openFavRow(row);
+    };
     const q = this.homeQuery.trim();
     if (q) {
       if (!this.gsJob || this.gsJob.q !== q) this.gsJob = { q, job: globalSearch(q, this.cinemas) };
@@ -4704,7 +4741,11 @@ var App = class {
       this.favMovOpen = !this.favMovOpen;
     }, action: { label: this.favMovOpen ? "▾" : "▸", hint: this.favMovOpen ? "收合收藏電影" : "展開收藏電影", onTap: () => {
       this.favMovOpen = !this.favMovOpen;
-    } } }), favRows.map((r) => /* @__PURE__ */ h(Item, { thumb: favThumb(r.fav.key), title: r.fav.title, subtitle: r.line, onTap: () => openFav(r) })), this.favMovOpen ? /* @__PURE__ */ h(Item, { icon: favMovies.length ? "⚙️" : "👉", title: favMovies.length ? "管理收藏電影" : "去找電影來收藏", subtitle: favMovies.length ? "搜尋其他電影來收藏，或取消收藏" : "上映中、即將上映、已下檔、影展的片都找得到，點愛心（♡ 變 ♥）就收藏。", accent: true, onTap: () => {
+    } } }), favRows.map((r) => /* @__PURE__ */ h(Item, { thumb: favThumb(r.fav.key), title: r.fav.title, subtitle: r.line, onTap: () => openFav(r) })), this.favMovOpen && !favGot && favJob ? favSnap ? favMovies.map((f) => {
+      const sn = favSnap.find((x) => x.key === f.key);
+      const u = sn && sn.poster || f.poster || "";
+      return /* @__PURE__ */ h(Item, { thumb: { src: u ? posterSrc(u) : "", url: u || void 0 }, title: f.title, subtitle: sn ? sn.line : "讀取中…", onTap: () => openSnap(f.key) });
+    }) : favMovies.map((f) => /* @__PURE__ */ h(Item, { thumb: { src: f.poster ? posterSrc(f.poster) : "", url: f.poster, pending: !f.poster }, title: f.title, subtitle: "讀取中…", onTap: () => openSnap(f.key) })) : null, this.favMovOpen ? /* @__PURE__ */ h(Item, { icon: favMovies.length ? "⚙️" : "👉", title: favMovies.length ? "管理收藏電影" : "去找電影來收藏", subtitle: favMovies.length ? "搜尋其他電影來收藏，或取消收藏" : "上映中、即將上映、已下檔、影展的片都找得到，點愛心（♡ 變 ♥）就收藏。", accent: true, onTap: () => {
       this.favQuery = "";
       this.go(() => this.favManageView(), "讀取電影…");
     } }) : null), this.installEntry(), await this.versionNote());
@@ -4921,7 +4962,7 @@ var App = class {
       this.settings.seenLog = CHANGELOG_LATEST;
       saveSettings(this.settings);
     }
-    return /* @__PURE__ */ h(Page, { title: "更新內容", subtitle: `目前版本 ${"2026.11.24-1316"}`, onBack: () => this.back() }, CHANGELOG.map((e) => /* @__PURE__ */ h(Section, { title: e.date }, e.items.map((it) => /* @__PURE__ */ h(Item, { title: it.text, tag: { text: it.kind === "new" ? "新功能" : "改進", tone: it.kind === "new" ? "now" : "soon" }, chevron: false })))), /* @__PURE__ */ h(Note, { text: "只列出比較有感的變動；修小錯、調整文字這類不會寫在這裡。" }));
+    return /* @__PURE__ */ h(Page, { title: "更新內容", subtitle: `目前版本 ${"2026.11.24-1320"}`, onBack: () => this.back() }, CHANGELOG.map((e) => /* @__PURE__ */ h(Section, { title: e.date }, e.items.map((it) => /* @__PURE__ */ h(Item, { title: it.text, tag: { text: it.kind === "new" ? "新功能" : "改進", tone: it.kind === "new" ? "now" : "soon" }, chevron: false })))), /* @__PURE__ */ h(Note, { text: "只列出比較有感的變動；修小錯、調整文字這類不會寫在這裡。" }));
   }
   async aboutView() {
     return /* @__PURE__ */ h(Page, { title: "關於", onBack: () => this.back() }, /* @__PURE__ */ h(Section, { hint: "連鎖影城的場次來自場次通（twshowtimes.com），感謝場次通的整理；其他來自開眼電影網，以及誠品、光點、樂聲、內惟戲院官網。實際場次以影城公告為準。" }, /* @__PURE__ */ h(Item, { icon: "ℹ️", title: "關於與資料來源", accent: true, chevron: false, onTap: () => Safari.open(ABOUT_URL) }), /* @__PURE__ */ h(Item, { icon: "🔒", title: "隱私權政策", accent: true, chevron: false, onTap: () => Safari.open(PRIVACY_URL) }), /* @__PURE__ */ h(Item, { icon: "🙏", title: "前往場次通", subtitle: "比較各影城場次、看上映場數排行", accent: true, chevron: false, onTap: () => Safari.open("https://twshowtimes.com/") })));
@@ -4945,11 +4986,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.24-1316"}`);
+          Pasteboard.copy(`版本 ${"2026.11.24-1320"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.24-1316"}`,
+      `版本 ${"2026.11.24-1320"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -5293,7 +5334,7 @@ var App = class {
     if (false) {
       if (!r) return /* @__PURE__ */ h(Note, { text: "（無法確認是否為最新版：連不到網站）" });
       if (r.isLatest) return /* @__PURE__ */ h(Note, { text: "✅ 已是最新版" });
-      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.24-1316"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
+      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.24-1320"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
         globalThis.location.reload();
       } }));
     }

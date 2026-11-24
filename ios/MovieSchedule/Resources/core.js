@@ -101,6 +101,8 @@
     extractTmdbKey: () => extractTmdbKey,
     favMovieBox: () => favMovieBox,
     favMovieRows: () => favMovieRows,
+    favSnapGet: () => favSnapGet,
+    favSnapSet: () => favSnapSet,
     festivalChipNote: () => festivalChipNote,
     festivalCinema: () => festivalCinema,
     festivalDates: () => festivalDates,
@@ -2902,6 +2904,20 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     const order = { movie: 0, soon: 1, fest: 2, box: 3, none: 4 };
     return rows.sort((a, b) => order[a.kind] - order[b.kind] || b.fav.at - a.fav.at);
   }
+  function favSnapGet(sig) {
+    try {
+      const c = JSON.parse(cacheGet("fav-rows.json") || "null");
+      return c && c.sig === sig && Array.isArray(c.rows) && Date.now() - c.at < 7 * 864e5 ? c.rows : null;
+    } catch (_) {
+      return null;
+    }
+  }
+  function favSnapSet(sig, rows) {
+    try {
+      cacheSet("fav-rows.json", JSON.stringify({ sig, at: Date.now(), rows }));
+    } catch (_) {
+    }
+  }
   async function favMovieBox(fav) {
     const b = await loadBoxOfficeFull().catch(() => null);
     if (!b || !b.years) return null;
@@ -3975,7 +3991,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   var extra = { boxOffice, filmList, soonList, nowShowing, nowShowingMulti, movieBoard: movieBoard2, festivalBoard, festivalFilm, nearby, patchSettings, fillMovie, formatList };
   var BRIDGE_LEVEL = 2;
   globalThis.MS = {
-    version: "2026.11.24-1316",
+    version: "2026.11.24-1320",
     level: BRIDGE_LEVEL,
     init(saved) {
       cache = saved || {};
