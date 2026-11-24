@@ -2098,7 +2098,12 @@ class App {
     const shownCities = cities.filter((ct) => rows.some((r) => r.cinema.city === ct));
     const about = movieAbout(d);
     // 票房資訊（出品國別、發行、票房、票數…）：跟歷年電影那一頁同一份官方資料；票房資料還沒列入的片只顯示狀態
-    const box = await Promise.race([boxInfoBy(m.title).catch(() => null), sleep(this.rerendering ? 0 : 1200).then(() => null)]);
+    const boxJob = boxInfoBy(m.title).catch(() => null);
+    const boxGot = await Promise.race([boxJob, sleep(this.rerendering ? 0 : 400).then(() => undefined)]);
+    if (boxGot === undefined) this.late = [...(this.late || []), boxJob]; // 還沒好：先畫場次，讀好再補上（不讓整頁等它）
+    const box = boxGot || null;
+    // 「上映類型」「歷次上映」要另外兩份比較大的資料：票房資訊展開了才去讀，讀好再補上
+    if (box && this.infoOpen) { const rr = rerunDataReady(); if (rr) this.late = [...(this.late || []), rr]; }
     const status = m.comingSoon ? "soon" : "now";
     return (
       <Page title={m.title} subtitle={[m.rating || d.rating, runtime ? `${runtime} 分鐘` : "", `${d.cinemas.length} 間影城`].filter(Boolean).join("｜")} onBack={() => this.back()}>

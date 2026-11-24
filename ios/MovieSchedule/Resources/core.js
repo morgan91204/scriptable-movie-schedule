@@ -2305,7 +2305,6 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     const k = communityKey(title);
     const x = b ? b.list.find((i) => communityKey(i.name) === k) : null;
     if (!x) return null;
-    if (!boxFullLatest || !yearRatingsLatest) await Promise.race([Promise.all([loadBoxOfficeFull().catch(() => null), loadYearRatings().catch(() => null)]), delay(1500)]);
     return { x, info: await boxInfo(x).catch(() => null) };
   }
   var boxFullLatest = null;
@@ -4013,7 +4012,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   var extra = { boxOffice, filmList, soonList, nowShowing, nowShowingMulti, movieBoard: movieBoard2, festivalBoard, festivalFilm, nearby, patchSettings, fillMovie, formatList };
   var BRIDGE_LEVEL = 2;
   globalThis.MS = {
-    version: "2026.11.24-1351",
+    version: "2026.11.24-1427",
     level: BRIDGE_LEVEL,
     init(saved) {
       cache = saved || {};

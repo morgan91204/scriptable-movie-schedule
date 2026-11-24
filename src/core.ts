@@ -1806,7 +1806,7 @@ export async function boxInfoBy(title: string): Promise<{ x: BoxOfficeItem; info
   const k = communityKey(title);
   const x = b ? b.list.find((i) => communityKey(i.name) === k) : null;
   if (!x) return null;
-  if (!boxFullLatest || !yearRatingsLatest) await Promise.race([Promise.all([loadBoxOfficeFull().catch(() => null), loadYearRatings().catch(() => null)]), delay(1500)]);
+  // 判斷重映要用的兩份大檔（各年票房、首映年）不在這裡等：會讓每次進電影頁都卡一下。要用的時候由畫面另外讀（rerunDataReady），讀好再補上
   return { x, info: await boxInfo(x).catch(() => null) };
 }
 // ── 重映 ──
