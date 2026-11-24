@@ -3433,6 +3433,29 @@ export interface Community {
   avg: number; // 平均（1～10 分，一位小數；沒人評分是 0）
   dist: number[]; // 1 分～10 分各幾人
   mine: number; // 這支手機給的分數（0 = 還沒評）
+  tags?: Record<string, number>; // 心得標籤：代號 → 幾人選
+  myTags?: string[]; // 這支手機選的心得標籤
+}
+/** 心得標籤：評完分可以點選的看片心得（最多 5 個）。只有固定的選項、不能打字，所以不會暴雷。
+ *  代號送到伺服器統計，名稱只在 App 裡；要改名稱直接改這裡，代號不要動（動了舊的統計就對不上） */
+export const REVIEW_TAGS: { group: string; tags: { id: string; label: string }[] }[] = [
+  { group: "推薦程度", tags: [{ id: "cinema", label: "值得進戲院" }, { id: "stream", label: "等串流就好" }, { id: "again", label: "想二刷" }] },
+  { group: "亮點", tags: [{ id: "story", label: "劇情" }, { id: "cast", label: "演員" }, { id: "visual", label: "畫面" }, { id: "music", label: "配樂" }, { id: "pace", label: "節奏" }, { id: "ending", label: "結局有力" }] },
+  { group: "氛圍", tags: [{ id: "funny", label: "好笑" }, { id: "tears", label: "催淚" }, { id: "brainy", label: "燒腦" }, { id: "tense", label: "緊張" }, { id: "healing", label: "療癒" }, { id: "heavy", label: "沉重" }] },
+  { group: "觀影提醒", tags: [{ id: "credits", label: "有片尾彩蛋" }, { id: "prequel", label: "建議先看前作" }, { id: "bigscreen", label: "適合大銀幕" }, { id: "nokids", label: "不適合小孩" }, { id: "long", label: "片長有感" }] },
+];
+export const REVIEW_TAGS_MAX = 5;
+const TAG_LABEL: Record<string, string> = {};
+for (const g of REVIEW_TAGS) for (const t of g.tags) TAG_LABEL[t.id] = t.label;
+export const reviewTagLabel = (id: string): string => TAG_LABEL[id] || "";
+/** 最多人選的幾個心得標籤（評分滿 5 人才顯示；至少 2 人選的才列；pct = 佔評分人數的百分比） */
+export function topReviewTags(c: Community | null | false | undefined, max = 4): { id: string; label: string; n: number; pct: number }[] {
+  if (!c || c.n < COMMUNITY_MIN || !c.tags) return [];
+  return Object.keys(c.tags)
+    .map((id) => ({ id, label: reviewTagLabel(id), n: Number(c.tags![id]) || 0, pct: Math.round(((Number(c.tags![id]) || 0) / c.n) * 100) }))
+    .filter((t) => t.label && t.n >= 2)
+    .sort((a, b) => b.n - a.n || a.id.localeCompare(b.id))
+    .slice(0, max);
 }
 /** 這支手機的匿名代號：第一次用時隨機產生，存在本機；只用來做「一台一票、可以改票」 */
 function deviceId(): string {
@@ -3457,6 +3480,7 @@ export function communityCached(title: string): Community | null {
 export const COMMUNITY_SUMMARY_URL = "https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/data/community10.json"; // 10 分制的總表（舊版 App 讀的 5 星制是 community.json）
 type Summary = Record<string, number[]>;
 let summaryMem: { at: number; job: Promise<Summary | null> } | null = null;
+let summaryTags: Record<string, Record<string, number>> = {}; // 同一份檔裡的心得標籤統計（片名鍵 → 代號 → 人數）
 /** 靜態總表（記 5 分鐘）；還沒有這個檔或讀不到回傳 null，改用伺服器 */
 function loadSummary(): Promise<Summary | null> {
   if (summaryMem && Date.now() - summaryMem.at < 300e3) return summaryMem.job;
@@ -3464,7 +3488,9 @@ function loadSummary(): Promise<Summary | null> {
     try {
       const r = await platform().fetchText(COMMUNITY_SUMMARY_URL + "?t=" + Math.floor(Date.now() / 300e3), { accept: "application/json" });
       if (r.status !== 200) return null;
-      const m = JSON.parse(r.body)?.movies;
+      const data = JSON.parse(r.body);
+      const m = data?.movies;
+      if (m && typeof m === "object" && data.tags && typeof data.tags === "object") summaryTags = data.tags;
       return m && typeof m === "object" ? (m as Summary) : null;
     } catch (_) {
       return null;
@@ -3476,7 +3502,7 @@ function loadSummary(): Promise<Summary | null> {
 /** 所有片的片刻評分總表（片名鍵 → 1～10 分各幾人）；讀不到回傳 null */
 export const loadCommunitySummary = (): Promise<Record<string, number[]> | null> => loadSummary();
 /** 這支手機的投票紀錄：s = 我給的分數，at = 上次跟伺服器確認的時間；dist／dat = 伺服器最近回的統計（剛投完票時比靜態檔新） */
-interface MyVote { s: number; at: number; dist?: number[]; dat?: number }
+interface MyVote { s: number; at: number; dist?: number[]; dat?: number; t?: string[]; tags?: Record<string, number> }
 const readMyVotes = (): Record<string, MyVote> => {
   try {
     return JSON.parse(cacheGet("my-votes10b.json") || "{}") || {}; // 10 分制換了檔名：舊檔記的是 5 星制的分數，不能沿用（再換一次：改制時舊評分全部清掉了）
@@ -3487,7 +3513,8 @@ const readMyVotes = (): Record<string, MyVote> => {
 function saveMyVote(k: string, c: Community, fresh: boolean) {
   const all = readMyVotes();
   for (const [key, v] of Object.entries(all)) if (!v.s && Date.now() - v.at > 60 * 86400e3) delete all[key]; // 沒投票的舊紀錄清掉
-  all[k] = fresh ? { s: c.mine, at: Date.now(), dist: c.dist, dat: Date.now() } : { s: c.mine, at: Date.now() };
+  const t = c.myTags && c.myTags.length ? c.myTags : undefined;
+  all[k] = fresh ? { s: c.mine, at: Date.now(), dist: c.dist, dat: Date.now(), t, tags: c.tags } : { s: c.mine, at: Date.now(), t };
   cacheSet("my-votes10b.json", JSON.stringify(all));
 }
 const fromDist = (dist: number[], mine: number): Community => {
@@ -3500,13 +3527,14 @@ const fromDist = (dist: number[], mine: number): Community => {
 export async function communityStats(title: string): Promise<Community> {
   const k = communityKey(title);
   const hit = communityMem[k];
-  if (hit && Date.now() - hit.at < 5000) return { n: hit.n, avg: hit.avg, dist: hit.dist, mine: hit.mine };
+  if (hit && Date.now() - hit.at < 5000) return { n: hit.n, avg: hit.avg, dist: hit.dist, mine: hit.mine, tags: hit.tags, myTags: hit.myTags };
   const mine = readMyVotes()[k];
   if (mine && Date.now() - mine.at < 30 * 86400e3) {
     const summary = await loadSummary();
     if (summary) {
       // 剛投完票的 45 分鐘內用伺服器當時回的統計（靜態檔還沒更新）
-      const c = fromDist(mine.dist && mine.dat && Date.now() - mine.dat < 45 * 60e3 ? mine.dist : summary[k] || [], mine.s);
+      const recent = !!(mine.dist && mine.dat && Date.now() - mine.dat < 45 * 60e3);
+      const c: Community = { ...fromDist(recent ? mine.dist! : summary[k] || [], mine.s), tags: (recent && mine.tags) || summaryTags[k] || {}, myTags: mine.t || [] };
       communityMem[k] = { ...c, at: Date.now() };
       return c;
     }
@@ -3528,6 +3556,23 @@ export async function communityVote(title: string, score: number): Promise<Commu
   );
   if (r.status === 429) throw new Error("投票太頻繁，請稍後再試");
   if (r.status !== 200) throw new Error("評分沒有送出，請稍後再試");
+  const c = JSON.parse(r.body) as Community;
+  communityMem[k] = { ...c, at: Date.now() };
+  saveMyVote(k, c, true);
+  return c;
+}
+
+/** 送出心得標籤（整組換掉；空的 = 全部拿掉）。要先評過分。回傳更新後的統計 */
+export async function communityTags(title: string, tags: string[]): Promise<Community> {
+  const k = communityKey(title);
+  const r = await platform().fetchText(
+    `${COMMUNITY_API}/v2/tags`,
+    { accept: "application/json", "content-type": "application/json" },
+    { method: "POST", body: JSON.stringify({ m: k, d: deviceId(), t: tags.slice(0, REVIEW_TAGS_MAX) }) }
+  );
+  if (r.status === 429) throw new Error("操作太頻繁，請稍後再試");
+  if (r.status === 409) throw new Error("要先評分才能選心得標籤");
+  if (r.status !== 200) throw new Error("心得標籤沒有送出，請稍後再試");
   const c = JSON.parse(r.body) as Community;
   communityMem[k] = { ...c, at: Date.now() };
   saveMyVote(k, c, true);

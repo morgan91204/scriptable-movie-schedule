@@ -11,9 +11,12 @@ if (res.status === 404) {
   process.exit(0);
 }
 if (!res.ok) throw new Error("讀不到評分總表：" + res.status);
-const movies = (await res.json()).movies;
+const data = await res.json();
+const movies = data.movies;
 if (!movies || typeof movies !== "object") throw new Error("評分總表格式不對");
 // 不放時間戳：內容沒變就不會產生新的提交
 const sorted = Object.fromEntries(Object.keys(movies).sort().map((k) => [k, movies[k]]));
-fs.writeFileSync(out, JSON.stringify({ movies: sorted }) + "\n");
+// 心得標籤（只有 10 分制那份有）：片名鍵 → { 標籤代號: 人數 }
+const tags = VER === "v2" && data.tags && typeof data.tags === "object" ? Object.fromEntries(Object.keys(data.tags).sort().map((k) => [k, data.tags[k]])) : null;
+fs.writeFileSync(out, JSON.stringify(tags ? { movies: sorted, tags } : { movies: sorted }) + "\n");
 console.log("已匯出", Object.keys(sorted).length, "部片的評分");

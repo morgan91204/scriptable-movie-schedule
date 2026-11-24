@@ -5,7 +5,7 @@
 
 import {
   Button, ContentUnavailableView, Form, Group, HStack, Image, Label, LabeledContent, List, Navigation, NavigationLink,
-  NavigationStack, Picker, ProgressView, Script, Section, Spacer, Tab, TabView, Text, TextField, Toggle, VStack,
+  NavigationStack, Picker, ProgressView, Script, ScrollView, Section, Spacer, Tab, TabView, Text, TextField, Toggle, VStack,
   useEffect, useMemo, useObservable, useState,
 } from "scripting"
 import { setPlatform } from "./platform"
@@ -14,7 +14,7 @@ import {
   Cinema, Movie, Settings, Version, TwMovie, TwMovieCinema, CITY_ORDER, TW,
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
   loadSettings, saveSettings, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, cinemaAddress,
-  FORMATS, formatsOf, filterVersions, filterVersionsAny, movieRows, movieDays, nearest, kmLabel, WINDOWS, findShowtimes, findShowtimesMulti, multiLabel, multiDetail, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText, hallOf, tmdbTest, movieExtras, moviePoster, posterReady, posterTint, POSTER_TINTS, normImageUrl, movieRuntime, posterSrc, isLocalSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxCountries, boxByCountry, boxInfo, boxInfoRows, boxCountryText, BOX_COUNTRY_NOTE, boxCountryTag, boxCountriesPicked, movieBoard, loadBoxFor, loadCommunitySummary, loadYearRatings, loadUpcoming, soonBoard, isFavMovie, toggleFavMovie, favMovieRows, favMovieBox, boxStatus, STATUS_LABEL, boxInfoBy, soonGroups, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityVote, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, SCRIPTING_IMPORT_URL, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, festivalDefaultDate, festivalStateLabel, festivalState, festivalFooter, linkMovies, nowGroupLine, nowFilter, festivalPick, movieAbout, festivalSearch, festivalSearchLines, festivalTrailer, festivalYears, festivalGroups, festivalChipNote, festivalStatusLine, movieRatings, ratingTier, tomatoTier, popcornTier, dropStaleCaches, rerunDataReady, boxRunRows, boxRunsName, loadIntro, globalSearch, boxIsRerun, boxHasLaterRun, settingsStored, SITE_URL,
+  FORMATS, formatsOf, filterVersions, filterVersionsAny, movieRows, movieDays, nearest, kmLabel, WINDOWS, findShowtimes, findShowtimesMulti, multiLabel, multiDetail, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText, hallOf, tmdbTest, movieExtras, moviePoster, posterReady, posterTint, POSTER_TINTS, normImageUrl, movieRuntime, posterSrc, isLocalSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxCountries, boxByCountry, boxInfo, boxInfoRows, boxCountryText, BOX_COUNTRY_NOTE, boxCountryTag, boxCountriesPicked, movieBoard, loadBoxFor, loadCommunitySummary, loadYearRatings, loadUpcoming, soonBoard, isFavMovie, toggleFavMovie, favMovieRows, favMovieBox, boxStatus, STATUS_LABEL, boxInfoBy, soonGroups, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityVote, communityTags, REVIEW_TAGS, REVIEW_TAGS_MAX, reviewTagLabel, topReviewTags, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, SCRIPTING_IMPORT_URL, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, festivalDefaultDate, festivalStateLabel, festivalState, festivalFooter, linkMovies, nowGroupLine, nowFilter, festivalPick, movieAbout, festivalSearch, festivalSearchLines, festivalTrailer, festivalYears, festivalGroups, festivalChipNote, festivalStatusLine, movieRatings, ratingTier, tomatoTier, popcornTier, dropStaleCaches, rerunDataReady, boxRunRows, boxRunsName, loadIntro, globalSearch, boxIsRerun, boxHasLaterRun, settingsStored, SITE_URL,
 } from "./core"
 import { CHANGELOG, CHANGELOG_LATEST } from "./changelog"
 import type { GlobalHits } from "./core"
@@ -454,10 +454,27 @@ function CommunitySection({ title }: { title: string }) {
     }
     setBusy(false)
   }
+  const [tagsOpen, setTagsOpen] = useState(false)
+  const top = topReviewTags(c)
+  const myTags = c && c.myTags ? c.myTags.filter((id) => reviewTagLabel(id)) : []
+  const pickTag = async (id: string) => {
+    if (busy) return
+    const on = myTags.indexOf(id) >= 0
+    if (!on && myTags.length >= REVIEW_TAGS_MAX) { setMsg(`最多選 ${REVIEW_TAGS_MAX} 個，先取消一個再選`); return }
+    setBusy(true)
+    setMsg("")
+    try {
+      setVoted(await communityTags(title, on ? myTags.filter((x) => x !== id) : [...myTags, id]))
+      try { HapticFeedback.selection() } catch (_) {}
+    } catch (e) {
+      setMsg(String((e as Error)?.message || e))
+    }
+    setBusy(false)
+  }
   const status = c ? (n ? `${n} 人評分` : "還沒有人評分，來當第一個") : load.error ? "片刻評分暫時讀不到" : "讀取中…"
   // 平均分數的色塊跟 IMDb 同一套（綠／黃／紅）；自己的評分是一排 1～10，選幾分就亮到幾分
   const tc = n ? TIER[ratingTier("imdb", avg) as Tier] : TIER.none
-  return <Section header={<Text>片刻評分</Text>} footer={<Text>匿名評分，一台裝置一票，可以隨時更改；再點一次已選的分數可以取消。各版本的評分會一起統計。</Text>}>
+  return <Section header={<Text>片刻評分</Text>} footer={<Text>匿名評分，一台裝置一票，可以隨時更改；再點一次已選的分數可以取消。評分後可以再選心得標籤。各版本的評分會一起統計。</Text>}>
     {n ? <HStack spacing={12}>
       <HStack alignment={"lastTextBaseline"} spacing={2} padding={{ horizontal: 10, vertical: 5 }} background={tc.bg} clipShape={{ type: "rect", cornerRadius: 10 }} fixedSize>
         <Text font={"title"} fontWeight={"heavy"} monospacedDigit foregroundStyle={tc.fg} lineLimit={1} fixedSize>{avg.toFixed(1)}</Text>
@@ -493,6 +510,32 @@ function CommunitySection({ title }: { title: string }) {
         <Text font={"caption2"} foregroundStyle={"secondaryLabel"}>必看</Text>
       </HStack>
     </VStack>
+    {top.length ? <Text font={"footnote"} foregroundStyle={"secondaryLabel"}>{`大家的心得：${top.map((t) => `${t.label} ${t.pct}%`).join("｜")}`}</Text> : null}
+    {mine ? <Button action={() => setTagsOpen(!tagsOpen)} buttonStyle={"plain"}>
+      <HStack spacing={8}>
+        <Text fontWeight={"semibold"}>心得標籤</Text>
+        <Text font={"footnote"} foregroundStyle={"secondaryLabel"} lineLimit={1}>{myTags.length ? myTags.map(reviewTagLabel).join("、") : "點選幾個看完的感覺"}</Text>
+        <Spacer />
+        <Text font={"footnote"} foregroundStyle={"systemBlue"} fixedSize>{tagsOpen ? "收合" : myTags.length ? "修改" : "選擇"}</Text>
+      </HStack>
+    </Button> : null}
+    {mine && tagsOpen ? REVIEW_TAGS.map((g) =>
+      <VStack key={g.group} alignment={"leading"} spacing={5}>
+        <Text font={"caption2"} foregroundStyle={"secondaryLabel"}>{g.group}</Text>
+        <ScrollView axes={"horizontal"}>
+          <HStack spacing={6}>
+            {g.tags.map((t) => {
+              const on = myTags.indexOf(t.id) >= 0
+              return <Button key={t.id} action={() => pickTag(t.id)} buttonStyle={"plain"} disabled={busy}>
+                <Text font={"subheadline"} fontWeight={on ? "semibold" : "regular"} lineLimit={1} fixedSize padding={{ horizontal: 11, vertical: 6 }}
+                  foregroundStyle={on ? "white" : "label"} background={on ? "systemBlue" : "tertiarySystemFill"} clipShape={{ type: "capsule" }}>{t.label}</Text>
+              </Button>
+            })}
+          </HStack>
+        </ScrollView>
+      </VStack>
+    ) : null}
+    {mine && tagsOpen ? <Text font={"caption2"} foregroundStyle={"secondaryLabel"}>{`已選 ${myTags.length}／${REVIEW_TAGS_MAX}。只有這些選項，不會有劇透。`}</Text> : null}
     {msg ? <Text font={"caption"} foregroundStyle={"systemRed"}>{msg}</Text> : null}
   </Section>
 }

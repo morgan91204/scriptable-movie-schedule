@@ -1,0 +1,32 @@
+# 部署評分伺服器（Cloudflare Worker「movie-ratings」：片刻評分、心得標籤）：worker/ 有變動推到 main 就自動部署。
+# 金鑰跟網頁版用同一個 Actions secret（CLOUDFLARE_API_TOKEN）。
+name: 部署評分伺服器
+on:
+  push:
+    branches: [main]
+    paths:
+      - "worker/**"
+      - ".github/workflows/deploy-ratings.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: deploy-ratings
+  cancel-in-progress: false
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: 檢查語法
+        run: node --check worker/index.js
+      - name: 部署到 Cloudflare
+        working-directory: worker
+        run: npx wrangler@4 deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: 817e94b26f15cb4cedfde46021b6f0fe

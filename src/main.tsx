@@ -12,7 +12,7 @@ import {
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
   loadSettings, saveSettings, settingsStored, setSettingsSavedHook, syncPick, syncApply, syncMerge, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, communityKey, globalSearch, issuerRecent, favSnapGet, favSnapSet, boxIsRerun, boxHasLaterRun, boxRunRows, boxRunsName, loadIntro, rerunDataReady, SITE_URL, TW,
   FORMATS, formatsOf, filterVersions, filterVersionsAny, movieRows, movieDays, nearest, kmLabel, WINDOWS, findShowtimes, findShowtimesMulti, multiLabel, multiDetail, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText,
-  hallOf, tmdbTest, movieExtras, moviePoster, movieRuntime, posterSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxCountries, boxByCountry, boxInfo, boxInfoRows, boxCountryText, BOX_COUNTRY_NOTE, boxCountryTag, boxCountriesPicked, loadMovieBoard, loadSoonBoard, notifyPrefs, notifyPayload, notifyEndScope, notifyEndPick, notifyQuiet, NOTIFY_PRE_STEPS, NOTIFY_KINDS, boxStatus, STATUS_LABEL, boxInfoBy, isFavMovie, toggleFavMovie, favMovieRows, favMovieBox, soonGroups, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityCached, communityVote, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalsReady, festivalNote, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, festivalDefaultDate, festivalStateLabel, festivalState, festivalFooter, linkMovies, nowGroupLine, nowFilter, festivalPick, movieAbout, festivalSearch, festivalSearchLines, festivalTrailer, festivalYears, festivalsAny, festivalGroups, festivalChipNote, festivalStatusLine, movieRatings, ratingTier, tomatoTier, popcornTier, popcornCount,
+  hallOf, tmdbTest, movieExtras, moviePoster, movieRuntime, posterSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxCountries, boxByCountry, boxInfo, boxInfoRows, boxCountryText, BOX_COUNTRY_NOTE, boxCountryTag, boxCountriesPicked, loadMovieBoard, loadSoonBoard, notifyPrefs, notifyPayload, notifyEndScope, notifyEndPick, notifyQuiet, NOTIFY_PRE_STEPS, NOTIFY_KINDS, boxStatus, STATUS_LABEL, boxInfoBy, isFavMovie, toggleFavMovie, favMovieRows, favMovieBox, soonGroups, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityCached, communityVote, communityTags, REVIEW_TAGS, REVIEW_TAGS_MAX, reviewTagLabel, topReviewTags, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalsReady, festivalNote, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, festivalDefaultDate, festivalStateLabel, festivalState, festivalFooter, linkMovies, nowGroupLine, nowFilter, festivalPick, movieAbout, festivalSearch, festivalSearchLines, festivalTrailer, festivalYears, festivalsAny, festivalGroups, festivalChipNote, festivalStatusLine, movieRatings, ratingTier, tomatoTier, popcornTier, popcornCount,
 } from "./core";
 import type { MovieExtras, Ratings, Community, BoxOfficeItem, BoxSort, MovieEntry, SoonEntry, UpcomingFilm, FavMovie, FavRow, NotifyPrefs, NotifyKind, SyncData, GlobalHits, Festival, FestivalFilm, FestivalSession } from "./core";
 import { setTabBar, setBackGuard, esc } from "./jsx";
@@ -1132,8 +1132,22 @@ class App {
     return { x: x ?? null, r: r ?? null, p: p || "", px, loading, c: c === undefined ? communityCached(title) || undefined : c };
   }
 
-  /** 片刻評分卡片：平均、人數、分布，以及「你的評分」一排 1～10 的格子（點已選的那一格可以取消） */
+  tagsOpenFor = ""; // 哪一部片的心得標籤選單是展開的
+  /** 片刻評分卡片：平均、人數、分布，以及「你的評分」一排 1～10 的格子（點已選的那一格可以取消）。
+   *  評過分以後多一列「心得標籤」：點開是固定的選項（不能打字，所以不會暴雷），最多選 5 個；大家選最多的幾個列在平均分數下面 */
   community(title: string, c: Community | false | undefined): string {
+    const top = topReviewTags(c);
+    const myTags = c && c.myTags ? c.myTags.filter((id) => reviewTagLabel(id)) : [];
+    const tagsOpen = this.tagsOpenFor === communityKey(title);
+    const pickTag = async (id: string) => {
+      const on = myTags.indexOf(id) >= 0;
+      if (!on && myTags.length >= REVIEW_TAGS_MAX) { await this.ui.toast(`最多選 ${REVIEW_TAGS_MAX} 個，先取消一個再選`); return; }
+      try {
+        await communityTags(title, on ? myTags.filter((x) => x !== id) : [...myTags, id]);
+      } catch (e) {
+        await this.ui.toast(String((e as Error)?.message || e));
+      }
+    };
     const n = c ? c.n : 0;
     const avg = c && n ? c.avg : 0;
     const mine = c ? c.mine : 0;
@@ -1150,7 +1164,7 @@ class App {
     // 平均分數的色塊跟 IMDb 同一套（綠／黃／紅）；分布縮成一個小長條圖；自己的評分是一排 1～10 的格子，選幾分就亮到幾分
     const tier = n ? ratingTier("imdb", avg) : "none";
     return (
-      <Section title="片刻評分" hint="匿名評分，一台裝置一票，可以隨時更改；再點一次已選的分數可以取消。各版本的評分會一起統計。">
+      <Section title="片刻評分" hint="匿名評分，一台裝置一票，可以隨時更改；再點一次已選的分數可以取消。評分後可以再選心得標籤。各版本的評分會一起統計。">
         <div class="cm">
           {n ? (
             <div class="cm-top">
@@ -1169,6 +1183,7 @@ class App {
           ) : (
             <div class="cm-empty">{esc(status)}</div>
           )}
+          {top.length ? <div class="cm-toptags" aria-label="大家選最多的心得標籤">{top.map((t) => <span>{esc(t.label)} <b>{t.pct}%</b></span>)}</div> : null}
           <div class={"cm-mine" + (n ? " line" : "")}>
             <span>你的評分</span>
             {mine ? <b>{mine} 分</b> : <em>點一個分數</em>}
@@ -1181,6 +1196,28 @@ class App {
             ))}
           </div>
           <div class="cm-ends"><span>不推薦</span><span>必看</span></div>
+          {mine ? (
+            <>
+              <button class="cm-tagbar" aria-expanded={tagsOpen ? "true" : "false"} onTap={() => { this.tagsOpenFor = tagsOpen ? "" : communityKey(title); }}>
+                <span>心得標籤</span>
+                <em>{myTags.length ? esc(myTags.map(reviewTagLabel).join("、")) : "點選幾個看完的感覺（不用打字）"}</em>
+                <i>{tagsOpen ? "收合 ▾" : myTags.length ? "修改 ▸" : "選擇 ▸"}</i>
+              </button>
+              {tagsOpen ? (
+                <div class="cm-tags">
+                  {REVIEW_TAGS.map((g) => (
+                    <div class="cm-tagrow">
+                      <span class="cm-taghead">{esc(g.group)}</span>
+                      <div class="cm-tagset">
+                        {g.tags.map((t) => <button class={"cm-tag" + (myTags.indexOf(t.id) >= 0 ? " on" : "")} aria-pressed={myTags.indexOf(t.id) >= 0 ? "true" : "false"} onTap={() => pickTag(t.id)}>{esc(t.label)}</button>)}
+                      </div>
+                    </div>
+                  ))}
+                  <div class="cm-tagnote">已選 {myTags.length}／{REVIEW_TAGS_MAX}。只有這些選項，不會有劇透。</div>
+                </div>
+              ) : null}
+            </>
+          ) : null}
         </div>
       </Section>
     );

@@ -4,7 +4,9 @@
 // API（v2，10 分制）：
 //   GET  /v2/stats?m=<片名鍵>&d=<裝置代號>   → { n, avg, dist:[1分..10分人數], mine }
 //   POST /v2/vote  { m, d, s }               → 同上（s = 1～10；0 = 取消評分）
-//   GET  /v2/all                             → { movies: { <片名鍵>: [1分..10分人數] } }（所有有人評分的片）
+//   GET  /v2/all                             → { movies: { <片名鍵>: [1分..10分人數] }, tags: { <片名鍵>: { <標籤>: 人數 } } }（所有有人評分的片）
+//   POST /v2/tags  { m, d, t:[標籤代號] }    → 同 stats（心得標籤：要先評過分才能選，最多 5 個；取消評分時標籤一起拿掉）
+//   stats／vote／tags 的回應另外帶 tags（各標籤幾人選）和 myTags（這台裝置選的）
 // 舊版 App 用的 v1（5 星制）照常能用：投 n 星存成 2n 分；讀的時候把 10 分制兩兩併成 5 星（1–2 分 = 1 星…9–10 分 = 5 星）
 // 省請求數：GitHub Actions 每 30 分鐘把 /v1/all 存成靜態檔，App 平常讀靜態檔，只有投票（和每部片第一次查自己的票）才會打到這裡。
 import { DurableObject } from "cloudflare:workers";
@@ -19,6 +21,9 @@ const HEADERS = {
 const json = (o, status = 200) => new Response(JSON.stringify(o), { status, headers: HEADERS });
 const okMovie = (m) => typeof m === "string" && m.length >= 1 && m.length <= 120;
 const okDevice = (d) => typeof d === "string" && /^[A-Za-z0-9_-]{16,64}$/.test(d);
+// 心得標籤：只收代號（小寫英文），有哪些標籤、叫什麼名字由 App 決定；不收任何自由輸入的文字
+const TAGS_MAX = 5;
+const okTags = (t) => Array.isArray(t) && t.length <= TAGS_MAX && t.every((x) => typeof x === "string" && /^[a-z]{2,10}$/.test(x)) && new Set(t).size === t.length;
 /** 10 分制的各分人數 → 5 星制（給舊版 App）：1–2 分算 1 星…9–10 分算 5 星 */
 const dist5 = (d10) => [0, 1, 2, 3, 4].map((i) => (Number(d10[i * 2]) || 0) + (Number(d10[i * 2 + 1]) || 0));
 /** 還沒換算的舊資料（只有 5 格）→ 10 分制：n 星放在 2n 分 */
@@ -59,7 +64,8 @@ export default {
       if (v && path === "/all" && req.method === "GET") {
         const all = await env.INDEX.get(env.INDEX.idFromName("all")).all();
         for (const k of Object.keys(all)) all[k] = v === "1" ? dist5(dist10(all[k])) : dist10(all[k]);
-        return json({ movies: all });
+        if (v === "1") return json({ movies: all });
+        return json({ movies: all, tags: await env.INDEX.get(env.INDEX.idFromName("all")).allTags() });
       }
 
       if (v && path === "/vote" && req.method === "POST") {
@@ -74,6 +80,21 @@ export default {
         const ip = req.headers.get("cf-connecting-ip") || "unknown";
         if (!(await env.LIMIT.get(env.LIMIT.idFromName(ip)).hit(LIMIT_MAX, LIMIT_WINDOW))) return json({ error: "too many votes, try later" }, 429);
         return json(shape(await env.MOVIE.get(env.MOVIE.idFromName(m)).vote(d, v === "1" ? s * 2 : s, m)));
+      }
+
+      if (v === "2" && path === "/tags" && req.method === "POST") {
+        let b;
+        try {
+          b = await req.json();
+        } catch (_) {
+          return json({ error: "bad json" }, 400);
+        }
+        const m = b && b.m, d = b && b.d, t = b && b.t;
+        if (!okMovie(m) || !okDevice(d) || !okTags(t)) return json({ error: "bad request" }, 400);
+        const ip = req.headers.get("cf-connecting-ip") || "unknown";
+        if (!(await env.LIMIT.get(env.LIMIT.idFromName(ip)).hit(LIMIT_MAX, LIMIT_WINDOW))) return json({ error: "too many votes, try later" }, 429);
+        const out = await env.MOVIE.get(env.MOVIE.idFromName(m)).setTags(d, t, m);
+        return out ? json(out) : json({ error: "vote first" }, 409);
       }
 
       return json({ error: "not found" }, 404);
@@ -105,27 +126,46 @@ export class Movie extends DurableObject {
         this.sql.exec("INSERT INTO meta (k, v) VALUES ('reset', ?)", String(RESET_BEFORE));
       });
     }
+    this.ensureTags();
+  }
+  /** 心得標籤的欄位（後來才加的）：第一次用到時補上 */
+  ensureTags() {
+    if (this.sql.exec("SELECT v FROM meta WHERE k = 'tags'").toArray().length) return;
+    this.ctx.storage.transactionSync(() => {
+      this.sql.exec("ALTER TABLE votes ADD COLUMN tags TEXT NOT NULL DEFAULT ''");
+      this.sql.exec("INSERT INTO meta (k, v) VALUES ('tags', '1')");
+    });
   }
   /** 把這部片的統計同步到總表（有變才送）；失敗不影響投票 */
-  async sync(key, dist) {
+  async sync(key, dist, tags = {}) {
     if (!key) return;
-    const sig = "10:" + dist.join(","); // 前面的 10 = 十分制（跟換算前存的記號不同，換算後會重新同步一次）
+    const names = Object.keys(tags).sort();
+    // 前面的 10 = 十分制（跟換算前存的記號不同，換算後會重新同步一次）；沒有標籤時記號跟以前一樣，不會全部重送
+    const sig = "10:" + dist.join(",") + (names.length ? "|" + names.map((k) => k + tags[k]).join(",") : "");
     if ((await this.ctx.storage.get("indexed")) === sig) return;
     try {
-      await this.env.INDEX.get(this.env.INDEX.idFromName("all")).put(key, dist);
+      await this.env.INDEX.get(this.env.INDEX.idFromName("all")).put(key, dist, tags);
       await this.ctx.storage.put("indexed", sig);
     } catch (_) {}
   }
   async stats(dev, key) {
     const out = this.count(dev);
-    await this.sync(key, out.dist); // 跟總表對一次（有變才送）：有評分的補進去，清空了的從總表拿掉
+    await this.sync(key, out.dist, out.tags); // 跟總表對一次（有變才送）：有評分的補進去，清空了的從總表拿掉
+    return out;
+  }
+  /** 心得標籤：要先評過分；回傳 null = 還沒評分 */
+  async setTags(dev, tags, key) {
+    if (!this.sql.exec("SELECT 1 FROM votes WHERE dev = ?", dev).toArray().length) return null;
+    this.sql.exec("UPDATE votes SET tags = ? WHERE dev = ?", tags.join(","), dev);
+    const out = this.count(dev);
+    await this.sync(key, out.dist, out.tags);
     return out;
   }
   async vote(dev, score, key) {
     if (score === 0) this.sql.exec("DELETE FROM votes WHERE dev = ?", dev);
     else this.sql.exec("INSERT INTO votes (dev, score, at) VALUES (?, ?, ?) ON CONFLICT(dev) DO UPDATE SET score = excluded.score, at = excluded.at", dev, score, Date.now());
     const out = this.count(dev);
-    await this.sync(key, out.dist);
+    await this.sync(key, out.dist, out.tags);
     return out;
   }
   count(dev) {
@@ -133,12 +173,15 @@ export class Movie extends DurableObject {
     for (const r of this.sql.exec("SELECT score, COUNT(*) AS c FROM votes GROUP BY score")) if (r.score >= 1 && r.score <= 10) dist[r.score - 1] = r.c;
     const n = dist.reduce((a, b) => a + b, 0);
     const sum = dist.reduce((a, c, i) => a + c * (i + 1), 0);
-    let mine = 0;
+    const tags = {};
+    for (const r of this.sql.exec("SELECT tags FROM votes WHERE tags != ''")) for (const t of String(r.tags).split(",")) if (t) tags[t] = (tags[t] || 0) + 1;
+    let mine = 0, myTags = [];
     if (dev) {
-      const row = this.sql.exec("SELECT score FROM votes WHERE dev = ?", dev).toArray()[0];
+      const row = this.sql.exec("SELECT score, tags FROM votes WHERE dev = ?", dev).toArray()[0];
       mine = row ? row.score : 0;
+      myTags = row && row.tags ? String(row.tags).split(",").filter(Boolean) : [];
     }
-    return { n, avg: n ? Math.round((sum / n) * 10) / 10 : 0, dist, mine };
+    return { n, avg: n ? Math.round((sum / n) * 10) / 10 : 0, dist, mine, tags, myTags };
   }
 }
 
@@ -156,10 +199,23 @@ export class Index extends DurableObject {
         this.sql.exec("INSERT INTO meta (k, v) VALUES ('reset', ?)", String(RESET_BEFORE));
       });
     }
+    // 心得標籤的欄位（後來才加的）
+    if (!this.sql.exec("SELECT v FROM meta WHERE k = 'tags'").toArray().length) {
+      ctx.storage.transactionSync(() => {
+        this.sql.exec("ALTER TABLE summary ADD COLUMN t TEXT NOT NULL DEFAULT ''");
+        this.sql.exec("INSERT INTO meta (k, v) VALUES ('tags', '1')");
+      });
+    }
   }
-  put(key, dist) {
+  put(key, dist, tags = {}) {
     if (dist.every((x) => !x)) this.sql.exec("DELETE FROM summary WHERE k = ?", key);
-    else this.sql.exec("INSERT INTO summary (k, d) VALUES (?, ?) ON CONFLICT(k) DO UPDATE SET d = excluded.d", key, dist.join(","));
+    else this.sql.exec("INSERT INTO summary (k, d, t) VALUES (?, ?, ?) ON CONFLICT(k) DO UPDATE SET d = excluded.d, t = excluded.t", key, dist.join(","), Object.keys(tags).length ? JSON.stringify(tags) : "");
+  }
+  /** 每部片的心得標籤（各標籤幾人選）；沒有人選標籤的片不列 */
+  allTags() {
+    const out = {};
+    for (const r of this.sql.exec("SELECT k, t FROM summary WHERE t != '' ORDER BY k")) { try { out[r.k] = JSON.parse(r.t); } catch (_) {} }
+    return out;
   }
   all() {
     const out = {};

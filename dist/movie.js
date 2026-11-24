@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.24-1632
+// @movie-schedule-app 電影行程 v2026.11.24-1646
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/parsers.gen.ts
@@ -3322,6 +3322,20 @@ var SITE_URL = "https://app.twmovietime.workers.dev";
 var ABOUT_URL = SITE_URL + "/about/";
 var PRIVACY_URL = SITE_URL + "/privacy/";
 var COMMUNITY_API = "https://movie-ratings.twmovietime.workers.dev";
+var REVIEW_TAGS = [
+  { group: "推薦程度", tags: [{ id: "cinema", label: "值得進戲院" }, { id: "stream", label: "等串流就好" }, { id: "again", label: "想二刷" }] },
+  { group: "亮點", tags: [{ id: "story", label: "劇情" }, { id: "cast", label: "演員" }, { id: "visual", label: "畫面" }, { id: "music", label: "配樂" }, { id: "pace", label: "節奏" }, { id: "ending", label: "結局有力" }] },
+  { group: "氛圍", tags: [{ id: "funny", label: "好笑" }, { id: "tears", label: "催淚" }, { id: "brainy", label: "燒腦" }, { id: "tense", label: "緊張" }, { id: "healing", label: "療癒" }, { id: "heavy", label: "沉重" }] },
+  { group: "觀影提醒", tags: [{ id: "credits", label: "有片尾彩蛋" }, { id: "prequel", label: "建議先看前作" }, { id: "bigscreen", label: "適合大銀幕" }, { id: "nokids", label: "不適合小孩" }, { id: "long", label: "片長有感" }] }
+];
+var REVIEW_TAGS_MAX = 5;
+var TAG_LABEL = {};
+for (const g of REVIEW_TAGS) for (const t of g.tags) TAG_LABEL[t.id] = t.label;
+var reviewTagLabel = (id) => TAG_LABEL[id] || "";
+function topReviewTags(c, max = 4) {
+  if (!c || c.n < COMMUNITY_MIN || !c.tags) return [];
+  return Object.keys(c.tags).map((id) => ({ id, label: reviewTagLabel(id), n: Number(c.tags[id]) || 0, pct: Math.round((Number(c.tags[id]) || 0) / c.n * 100) })).filter((t) => t.label && t.n >= 2).sort((a, b) => b.n - a.n || a.id.localeCompare(b.id)).slice(0, max);
+}
 function deviceId() {
   const ok = (x) => !!x && /^[A-Za-z0-9_-]{16,64}$/.test(x);
   const saved = cacheGet("device-id.txt");
@@ -3339,13 +3353,16 @@ function communityCached(title) {
 }
 var COMMUNITY_SUMMARY_URL = "https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/data/community10.json";
 var summaryMem = null;
+var summaryTags = {};
 function loadSummary() {
   if (summaryMem && Date.now() - summaryMem.at < 3e5) return summaryMem.job;
   const job = (async () => {
     try {
       const r = await platform().fetchText(COMMUNITY_SUMMARY_URL + "?t=" + Math.floor(Date.now() / 3e5), { accept: "application/json" });
       if (r.status !== 200) return null;
-      const m = JSON.parse(r.body)?.movies;
+      const data = JSON.parse(r.body);
+      const m = data?.movies;
+      if (m && typeof m === "object" && data.tags && typeof data.tags === "object") summaryTags = data.tags;
       return m && typeof m === "object" ? m : null;
     } catch (_) {
       return null;
@@ -3365,7 +3382,8 @@ var readMyVotes = () => {
 function saveMyVote(k, c, fresh) {
   const all = readMyVotes();
   for (const [key, v] of Object.entries(all)) if (!v.s && Date.now() - v.at > 60 * 864e5) delete all[key];
-  all[k] = fresh ? { s: c.mine, at: Date.now(), dist: c.dist, dat: Date.now() } : { s: c.mine, at: Date.now() };
+  const t = c.myTags && c.myTags.length ? c.myTags : void 0;
+  all[k] = fresh ? { s: c.mine, at: Date.now(), dist: c.dist, dat: Date.now(), t, tags: c.tags } : { s: c.mine, at: Date.now(), t };
   cacheSet("my-votes10b.json", JSON.stringify(all));
 }
 var fromDist = (dist, mine) => {
@@ -3377,12 +3395,13 @@ var fromDist = (dist, mine) => {
 async function communityStats(title) {
   const k = communityKey(title);
   const hit = communityMem[k];
-  if (hit && Date.now() - hit.at < 5e3) return { n: hit.n, avg: hit.avg, dist: hit.dist, mine: hit.mine };
+  if (hit && Date.now() - hit.at < 5e3) return { n: hit.n, avg: hit.avg, dist: hit.dist, mine: hit.mine, tags: hit.tags, myTags: hit.myTags };
   const mine = readMyVotes()[k];
   if (mine && Date.now() - mine.at < 30 * 864e5) {
     const summary = await loadSummary();
     if (summary) {
-      const c2 = fromDist(mine.dist && mine.dat && Date.now() - mine.dat < 45 * 6e4 ? mine.dist : summary[k] || [], mine.s);
+      const recent = !!(mine.dist && mine.dat && Date.now() - mine.dat < 45 * 6e4);
+      const c2 = { ...fromDist(recent ? mine.dist : summary[k] || [], mine.s), tags: recent && mine.tags || summaryTags[k] || {}, myTags: mine.t || [] };
       communityMem[k] = { ...c2, at: Date.now() };
       return c2;
     }
@@ -3403,6 +3422,21 @@ async function communityVote(title, score) {
   );
   if (r.status === 429) throw new Error("投票太頻繁，請稍後再試");
   if (r.status !== 200) throw new Error("評分沒有送出，請稍後再試");
+  const c = JSON.parse(r.body);
+  communityMem[k] = { ...c, at: Date.now() };
+  saveMyVote(k, c, true);
+  return c;
+}
+async function communityTags(title, tags) {
+  const k = communityKey(title);
+  const r = await platform().fetchText(
+    `${COMMUNITY_API}/v2/tags`,
+    { accept: "application/json", "content-type": "application/json" },
+    { method: "POST", body: JSON.stringify({ m: k, d: deviceId(), t: tags.slice(0, REVIEW_TAGS_MAX) }) }
+  );
+  if (r.status === 429) throw new Error("操作太頻繁，請稍後再試");
+  if (r.status === 409) throw new Error("要先評分才能選心得標籤");
+  if (r.status !== 200) throw new Error("心得標籤沒有送出，請稍後再試");
   const c = JSON.parse(r.body);
   communityMem[k] = { ...c, at: Date.now() };
   saveMyVote(k, c, true);
@@ -3926,6 +3960,20 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .cm-num.on{background:var(--accent);color:#fff}
 .cm-num:active{transform:scale(.92)}
 .cm-ends{display:flex;justify-content:space-between;margin-top:5px;font-size:11.5px;color:var(--fg2)}
+.cm-toptags{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.cm-toptags span{font-size:12.5px;padding:3px 9px;border-radius:999px;background:var(--chip);color:var(--fg)}
+.cm-toptags b{font-weight:700;color:var(--fg2);font-variant-numeric:tabular-nums}
+.cm-tagbar{display:flex;align-items:baseline;gap:10px;width:100%;margin-top:12px;padding:11px 0 0;border-top:1px solid var(--line);text-align:left;font-size:15px;font-weight:600;color:var(--fg)}
+.cm-tagbar em{flex:1;min-width:0;font-style:normal;font-weight:400;font-size:13px;color:var(--fg2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cm-tagbar i{flex:none;font-style:normal;font-weight:400;font-size:13px;color:var(--accent)}
+.cm-tags{margin-top:8px}
+.cm-tagrow{margin-top:8px}
+.cm-taghead{display:block;font-size:11.5px;color:var(--fg2);margin-bottom:5px}
+.cm-tagset{display:flex;flex-wrap:wrap;gap:6px}
+.cm-tag{font-size:14px;padding:6px 11px;border-radius:999px;background:var(--chip);color:var(--fg)}
+.cm-tag.on{background:var(--accent);color:#fff;font-weight:600}
+.cm-tag:active{transform:scale(.94)}
+.cm-tagnote{margin-top:9px;font-size:11.5px;color:var(--fg2)}
 .cm-star{font-size:28px;line-height:1;padding:2px 3px;color:var(--line)}
 @media(prefers-color-scheme:dark){.cm-star{color:#48484a}}
 .cm-star.on{color:#ff9f0a}
@@ -4235,6 +4283,7 @@ var CHANGELOG = [
     id: "2026-11-24",
     date: "2026/11/24",
     items: [
+      { kind: "new", text: "片刻評分多了心得標籤：評完分可以點選看完的感覺（催淚、配樂、有片尾彩蛋…），不用打字、不會暴雷" },
       { kind: "new", text: "秀泰影城的預售日期和特別場也查得到了（直接讀秀泰官網的完整場次，補上場次通還沒列出的）" },
       { kind: "new", text: "首頁可以直接搜尋：影城、現正上映、即將上映、歷年電影、影展片一起找；可以用空白隔開好幾個字（例如「威秀 台中」），最符合的排最前面" },
       { kind: "new", text: "電影頁多了分享按鈕，朋友點連結會直接開到那部片" },
@@ -4338,6 +4387,7 @@ var App = class {
     this.late = [];
     /** 正在補畫：只用已經讀好的資料，不再等 */
     this.rerendering = false;
+    this.tagsOpenFor = "";
     // ── 依電影找 ──
     this.movieQuery = "";
     this.soonWhen = "";
@@ -4444,7 +4494,7 @@ var App = class {
   }
   /** 最新版本是多少。網頁版問的是自己網站現在上線的版本（重新整理就會拿到的那一版），不是 GitHub 上的 */
   checkVersion() {
-    if (true) return checkLatest("2026.11.24-1632");
+    if (true) return checkLatest("2026.11.24-1646");
     return (async () => {
       try {
         let r = await globalThis.fetch("/version.json?t=" + Date.now(), { cache: "no-store" });
@@ -4452,7 +4502,7 @@ var App = class {
         const latest = String((await r.json()).version || "");
         if (!latest) return null;
         const num = (v) => Number(v.replace(/\D/g, "")) || 0;
-        return { latest, isLatest: num("2026.11.24-1632") >= num(latest) };
+        return { latest, isLatest: num("2026.11.24-1646") >= num(latest) };
       } catch (_) {
         return null;
       }
@@ -5022,7 +5072,7 @@ var App = class {
       this.settings.seenLog = CHANGELOG_LATEST;
       saveSettings(this.settings);
     }
-    return /* @__PURE__ */ h(Page, { title: "更新內容", subtitle: `目前版本 ${"2026.11.24-1632"}`, onBack: () => this.back() }, CHANGELOG.map((e) => /* @__PURE__ */ h(Section, { title: e.date }, e.items.map((it) => /* @__PURE__ */ h(Item, { title: it.text, tag: { text: it.kind === "new" ? "新功能" : "改進", tone: it.kind === "new" ? "now" : "soon" }, chevron: false })))), /* @__PURE__ */ h(Note, { text: "只列出比較有感的變動；修小錯、調整文字這類不會寫在這裡。" }));
+    return /* @__PURE__ */ h(Page, { title: "更新內容", subtitle: `目前版本 ${"2026.11.24-1646"}`, onBack: () => this.back() }, CHANGELOG.map((e) => /* @__PURE__ */ h(Section, { title: e.date }, e.items.map((it) => /* @__PURE__ */ h(Item, { title: it.text, tag: { text: it.kind === "new" ? "新功能" : "改進", tone: it.kind === "new" ? "now" : "soon" }, chevron: false })))), /* @__PURE__ */ h(Note, { text: "只列出比較有感的變動；修小錯、調整文字這類不會寫在這裡。" }));
   }
   async aboutView() {
     return /* @__PURE__ */ h(Page, { title: "關於", onBack: () => this.back() }, /* @__PURE__ */ h(Section, { hint: "連鎖影城的場次來自場次通（twshowtimes.com），感謝場次通的整理；其他來自開眼電影網，以及誠品、光點、樂聲、內惟戲院官網。實際場次以影城公告為準。" }, /* @__PURE__ */ h(Item, { icon: "ℹ️", title: "關於與資料來源", accent: true, chevron: false, onTap: () => Safari.open(ABOUT_URL) }), /* @__PURE__ */ h(Item, { icon: "🔒", title: "隱私權政策", accent: true, chevron: false, onTap: () => Safari.open(PRIVACY_URL) }), /* @__PURE__ */ h(Item, { icon: "🙏", title: "前往場次通", subtitle: "比較各影城場次、看上映場數排行", accent: true, chevron: false, onTap: () => Safari.open("https://twshowtimes.com/") })));
@@ -5046,11 +5096,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.24-1632"}`);
+          Pasteboard.copy(`版本 ${"2026.11.24-1646"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.24-1632"}`,
+      `版本 ${"2026.11.24-1646"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -5186,8 +5236,25 @@ var App = class {
     if (late.length) this.late = late;
     return { x: x ?? null, r: r ?? null, p: p || "", px, loading, c: c === void 0 ? communityCached(title) || void 0 : c };
   }
-  /** 片刻評分卡片：平均、人數、分布，以及「你的評分」一排 1～10 的格子（點已選的那一格可以取消） */
+  // 哪一部片的心得標籤選單是展開的
+  /** 片刻評分卡片：平均、人數、分布，以及「你的評分」一排 1～10 的格子（點已選的那一格可以取消）。
+   *  評過分以後多一列「心得標籤」：點開是固定的選項（不能打字，所以不會暴雷），最多選 5 個；大家選最多的幾個列在平均分數下面 */
   community(title, c) {
+    const top = topReviewTags(c);
+    const myTags = c && c.myTags ? c.myTags.filter((id) => reviewTagLabel(id)) : [];
+    const tagsOpen = this.tagsOpenFor === communityKey(title);
+    const pickTag = async (id) => {
+      const on = myTags.indexOf(id) >= 0;
+      if (!on && myTags.length >= REVIEW_TAGS_MAX) {
+        await this.ui.toast(`最多選 ${REVIEW_TAGS_MAX} 個，先取消一個再選`);
+        return;
+      }
+      try {
+        await communityTags(title, on ? myTags.filter((x) => x !== id) : [...myTags, id]);
+      } catch (e) {
+        await this.ui.toast(String(e?.message || e));
+      }
+    };
     const n = c ? c.n : 0;
     const avg = c && n ? c.avg : 0;
     const mine = c ? c.mine : 0;
@@ -5202,7 +5269,9 @@ var App = class {
       }
     };
     const tier = n ? ratingTier("imdb", avg) : "none";
-    return /* @__PURE__ */ h(Section, { title: "片刻評分", hint: "匿名評分，一台裝置一票，可以隨時更改；再點一次已選的分數可以取消。各版本的評分會一起統計。" }, /* @__PURE__ */ h("div", { class: "cm" }, n ? /* @__PURE__ */ h("div", { class: "cm-top" }, /* @__PURE__ */ h("div", { class: "cm-avg " + tier, "aria-label": `平均 ${avg.toFixed(1)} 分，滿分 10 分` }, avg.toFixed(1), /* @__PURE__ */ h("small", null, "／10")), /* @__PURE__ */ h("div", { class: "cm-meta" }, /* @__PURE__ */ h("span", { class: "cm-n" }, esc(status)), /* @__PURE__ */ h("span", { class: "cm-by" }, "片刻使用者的評分")), c ? /* @__PURE__ */ h("div", { class: "cm-hist", "aria-hidden": "true" }, /* @__PURE__ */ h("div", { class: "bars" }, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((v) => /* @__PURE__ */ h("i", { class: c.dist[v - 1] ? "" : "zero", style: `height:${Math.max(8, Math.round((c.dist[v - 1] || 0) / max * 100))}%` }))), /* @__PURE__ */ h("div", { class: "axis" }, /* @__PURE__ */ h("span", null, "1"), /* @__PURE__ */ h("span", null, "10"))) : null) : /* @__PURE__ */ h("div", { class: "cm-empty" }, esc(status)), /* @__PURE__ */ h("div", { class: "cm-mine" + (n ? " line" : "") }, /* @__PURE__ */ h("span", null, "你的評分"), mine ? /* @__PURE__ */ h("b", null, mine, " 分") : /* @__PURE__ */ h("em", null, "點一個分數")), /* @__PURE__ */ h("div", { class: "cm-pick" }, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((v) => /* @__PURE__ */ h("button", { class: "cm-num" + (v <= mine ? " on" : ""), "aria-label": `${v} 分`, "aria-pressed": v === mine ? "true" : "false", onTap: () => vote(v) }, v))), /* @__PURE__ */ h("div", { class: "cm-ends" }, /* @__PURE__ */ h("span", null, "不推薦"), /* @__PURE__ */ h("span", null, "必看"))));
+    return /* @__PURE__ */ h(Section, { title: "片刻評分", hint: "匿名評分，一台裝置一票，可以隨時更改；再點一次已選的分數可以取消。評分後可以再選心得標籤。各版本的評分會一起統計。" }, /* @__PURE__ */ h("div", { class: "cm" }, n ? /* @__PURE__ */ h("div", { class: "cm-top" }, /* @__PURE__ */ h("div", { class: "cm-avg " + tier, "aria-label": `平均 ${avg.toFixed(1)} 分，滿分 10 分` }, avg.toFixed(1), /* @__PURE__ */ h("small", null, "／10")), /* @__PURE__ */ h("div", { class: "cm-meta" }, /* @__PURE__ */ h("span", { class: "cm-n" }, esc(status)), /* @__PURE__ */ h("span", { class: "cm-by" }, "片刻使用者的評分")), c ? /* @__PURE__ */ h("div", { class: "cm-hist", "aria-hidden": "true" }, /* @__PURE__ */ h("div", { class: "bars" }, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((v) => /* @__PURE__ */ h("i", { class: c.dist[v - 1] ? "" : "zero", style: `height:${Math.max(8, Math.round((c.dist[v - 1] || 0) / max * 100))}%` }))), /* @__PURE__ */ h("div", { class: "axis" }, /* @__PURE__ */ h("span", null, "1"), /* @__PURE__ */ h("span", null, "10"))) : null) : /* @__PURE__ */ h("div", { class: "cm-empty" }, esc(status)), top.length ? /* @__PURE__ */ h("div", { class: "cm-toptags", "aria-label": "大家選最多的心得標籤" }, top.map((t) => /* @__PURE__ */ h("span", null, esc(t.label), " ", /* @__PURE__ */ h("b", null, t.pct, "%")))) : null, /* @__PURE__ */ h("div", { class: "cm-mine" + (n ? " line" : "") }, /* @__PURE__ */ h("span", null, "你的評分"), mine ? /* @__PURE__ */ h("b", null, mine, " 分") : /* @__PURE__ */ h("em", null, "點一個分數")), /* @__PURE__ */ h("div", { class: "cm-pick" }, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((v) => /* @__PURE__ */ h("button", { class: "cm-num" + (v <= mine ? " on" : ""), "aria-label": `${v} 分`, "aria-pressed": v === mine ? "true" : "false", onTap: () => vote(v) }, v))), /* @__PURE__ */ h("div", { class: "cm-ends" }, /* @__PURE__ */ h("span", null, "不推薦"), /* @__PURE__ */ h("span", null, "必看")), mine ? /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h("button", { class: "cm-tagbar", "aria-expanded": tagsOpen ? "true" : "false", onTap: () => {
+      this.tagsOpenFor = tagsOpen ? "" : communityKey(title);
+    } }, /* @__PURE__ */ h("span", null, "心得標籤"), /* @__PURE__ */ h("em", null, myTags.length ? esc(myTags.map(reviewTagLabel).join("、")) : "點選幾個看完的感覺（不用打字）"), /* @__PURE__ */ h("i", null, tagsOpen ? "收合 ▾" : myTags.length ? "修改 ▸" : "選擇 ▸")), tagsOpen ? /* @__PURE__ */ h("div", { class: "cm-tags" }, REVIEW_TAGS.map((g) => /* @__PURE__ */ h("div", { class: "cm-tagrow" }, /* @__PURE__ */ h("span", { class: "cm-taghead" }, esc(g.group)), /* @__PURE__ */ h("div", { class: "cm-tagset" }, g.tags.map((t) => /* @__PURE__ */ h("button", { class: "cm-tag" + (myTags.indexOf(t.id) >= 0 ? " on" : ""), "aria-pressed": myTags.indexOf(t.id) >= 0 ? "true" : "false", onTap: () => pickTag(t.id) }, esc(t.label)))))), /* @__PURE__ */ h("div", { class: "cm-tagnote" }, "已選 ", myTags.length, "／", REVIEW_TAGS_MAX, "。只有這些選項，不會有劇透。")) : null) : null));
   }
   /** 海報旁邊那顆收藏的愛心：電影頁、影展片、即將上映、已下檔的片都用同一顆 */
   favOf(m) {
@@ -5394,7 +5463,7 @@ var App = class {
     if (false) {
       if (!r) return /* @__PURE__ */ h(Note, { text: "（無法確認是否為最新版：連不到網站）" });
       if (r.isLatest) return /* @__PURE__ */ h(Note, { text: "✅ 已是最新版" });
-      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.24-1632"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
+      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.24-1646"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
         globalThis.location.reload();
       } }));
     }

@@ -37,6 +37,8 @@
     POSTER_TINTS: () => POSTER_TINTS,
     PRIVACY_URL: () => PRIVACY_URL,
     RATE_SOURCES: () => RATE_SOURCES,
+    REVIEW_TAGS: () => REVIEW_TAGS,
+    REVIEW_TAGS_MAX: () => REVIEW_TAGS_MAX,
     SCRIPTING_IMPORT_URL: () => SCRIPTING_IMPORT_URL,
     SHOWTIMES_URL: () => SHOWTIMES_URL,
     SITE_URL: () => SITE_URL,
@@ -94,6 +96,7 @@
     communityCached: () => communityCached,
     communityKey: () => communityKey,
     communityStats: () => communityStats,
+    communityTags: () => communityTags,
     communityVote: () => communityVote,
     dateLabel: () => dateLabel,
     datesOf: () => datesOf,
@@ -210,6 +213,7 @@
     releaseOf: () => releaseOf,
     rerunByName: () => rerunByName,
     rerunDataReady: () => rerunDataReady,
+    reviewTagLabel: () => reviewTagLabel,
     saveSettings: () => saveSettings,
     searchTitles: () => searchTitles,
     setMetaEnabled: () => setMetaEnabled,
@@ -230,6 +234,7 @@
     toggleFavMovie: () => toggleFavMovie,
     tomatoLabel: () => tomatoLabel,
     tomatoTier: () => tomatoTier,
+    topReviewTags: () => topReviewTags,
     tpeDate: () => tpeDate,
     twDayLive: () => twDayLive,
     twReleaseDate: () => twReleaseDate,
@@ -3642,6 +3647,20 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   var ABOUT_URL = SITE_URL + "/about/";
   var PRIVACY_URL = SITE_URL + "/privacy/";
   var COMMUNITY_API = "https://movie-ratings.twmovietime.workers.dev";
+  var REVIEW_TAGS = [
+    { group: "推薦程度", tags: [{ id: "cinema", label: "值得進戲院" }, { id: "stream", label: "等串流就好" }, { id: "again", label: "想二刷" }] },
+    { group: "亮點", tags: [{ id: "story", label: "劇情" }, { id: "cast", label: "演員" }, { id: "visual", label: "畫面" }, { id: "music", label: "配樂" }, { id: "pace", label: "節奏" }, { id: "ending", label: "結局有力" }] },
+    { group: "氛圍", tags: [{ id: "funny", label: "好笑" }, { id: "tears", label: "催淚" }, { id: "brainy", label: "燒腦" }, { id: "tense", label: "緊張" }, { id: "healing", label: "療癒" }, { id: "heavy", label: "沉重" }] },
+    { group: "觀影提醒", tags: [{ id: "credits", label: "有片尾彩蛋" }, { id: "prequel", label: "建議先看前作" }, { id: "bigscreen", label: "適合大銀幕" }, { id: "nokids", label: "不適合小孩" }, { id: "long", label: "片長有感" }] }
+  ];
+  var REVIEW_TAGS_MAX = 5;
+  var TAG_LABEL = {};
+  for (const g of REVIEW_TAGS) for (const t of g.tags) TAG_LABEL[t.id] = t.label;
+  var reviewTagLabel = (id) => TAG_LABEL[id] || "";
+  function topReviewTags(c, max = 4) {
+    if (!c || c.n < COMMUNITY_MIN || !c.tags) return [];
+    return Object.keys(c.tags).map((id) => ({ id, label: reviewTagLabel(id), n: Number(c.tags[id]) || 0, pct: Math.round((Number(c.tags[id]) || 0) / c.n * 100) })).filter((t) => t.label && t.n >= 2).sort((a, b) => b.n - a.n || a.id.localeCompare(b.id)).slice(0, max);
+  }
   function deviceId() {
     const ok = (x) => !!x && /^[A-Za-z0-9_-]{16,64}$/.test(x);
     const saved = cacheGet("device-id.txt");
@@ -3659,13 +3678,16 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   }
   var COMMUNITY_SUMMARY_URL = "https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/data/community10.json";
   var summaryMem = null;
+  var summaryTags = {};
   function loadSummary() {
     if (summaryMem && Date.now() - summaryMem.at < 3e5) return summaryMem.job;
     const job = (async () => {
       try {
         const r = await platform().fetchText(COMMUNITY_SUMMARY_URL + "?t=" + Math.floor(Date.now() / 3e5), { accept: "application/json" });
         if (r.status !== 200) return null;
-        const m = JSON.parse(r.body)?.movies;
+        const data = JSON.parse(r.body);
+        const m = data?.movies;
+        if (m && typeof m === "object" && data.tags && typeof data.tags === "object") summaryTags = data.tags;
         return m && typeof m === "object" ? m : null;
       } catch (_) {
         return null;
@@ -3685,7 +3707,8 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   function saveMyVote(k, c, fresh) {
     const all = readMyVotes();
     for (const [key, v] of Object.entries(all)) if (!v.s && Date.now() - v.at > 60 * 864e5) delete all[key];
-    all[k] = fresh ? { s: c.mine, at: Date.now(), dist: c.dist, dat: Date.now() } : { s: c.mine, at: Date.now() };
+    const t = c.myTags && c.myTags.length ? c.myTags : void 0;
+    all[k] = fresh ? { s: c.mine, at: Date.now(), dist: c.dist, dat: Date.now(), t, tags: c.tags } : { s: c.mine, at: Date.now(), t };
     cacheSet("my-votes10b.json", JSON.stringify(all));
   }
   var fromDist = (dist, mine) => {
@@ -3697,12 +3720,13 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   async function communityStats(title) {
     const k = communityKey(title);
     const hit = communityMem[k];
-    if (hit && Date.now() - hit.at < 5e3) return { n: hit.n, avg: hit.avg, dist: hit.dist, mine: hit.mine };
+    if (hit && Date.now() - hit.at < 5e3) return { n: hit.n, avg: hit.avg, dist: hit.dist, mine: hit.mine, tags: hit.tags, myTags: hit.myTags };
     const mine = readMyVotes()[k];
     if (mine && Date.now() - mine.at < 30 * 864e5) {
       const summary = await loadSummary();
       if (summary) {
-        const c2 = fromDist(mine.dist && mine.dat && Date.now() - mine.dat < 45 * 6e4 ? mine.dist : summary[k] || [], mine.s);
+        const recent = !!(mine.dist && mine.dat && Date.now() - mine.dat < 45 * 6e4);
+        const c2 = { ...fromDist(recent ? mine.dist : summary[k] || [], mine.s), tags: recent && mine.tags || summaryTags[k] || {}, myTags: mine.t || [] };
         communityMem[k] = { ...c2, at: Date.now() };
         return c2;
       }
@@ -3723,6 +3747,21 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     );
     if (r.status === 429) throw new Error("投票太頻繁，請稍後再試");
     if (r.status !== 200) throw new Error("評分沒有送出，請稍後再試");
+    const c = JSON.parse(r.body);
+    communityMem[k] = { ...c, at: Date.now() };
+    saveMyVote(k, c, true);
+    return c;
+  }
+  async function communityTags(title, tags) {
+    const k = communityKey(title);
+    const r = await platform().fetchText(
+      `${COMMUNITY_API}/v2/tags`,
+      { accept: "application/json", "content-type": "application/json" },
+      { method: "POST", body: JSON.stringify({ m: k, d: deviceId(), t: tags.slice(0, REVIEW_TAGS_MAX) }) }
+    );
+    if (r.status === 429) throw new Error("操作太頻繁，請稍後再試");
+    if (r.status === 409) throw new Error("要先評分才能選心得標籤");
+    if (r.status !== 200) throw new Error("心得標籤沒有送出，請稍後再試");
     const c = JSON.parse(r.body);
     communityMem[k] = { ...c, at: Date.now() };
     saveMyVote(k, c, true);
@@ -4045,7 +4084,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   var extra = { boxOffice, filmList, soonList, nowShowing, nowShowingMulti, movieBoard: movieBoard2, festivalBoard, festivalFilm, nearby, patchSettings, fillMovie, formatList };
   var BRIDGE_LEVEL = 2;
   globalThis.MS = {
-    version: "2026.11.24-1632",
+    version: "2026.11.24-1646",
     level: BRIDGE_LEVEL,
     init(saved) {
       cache = saved || {};
