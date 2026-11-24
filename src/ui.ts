@@ -283,7 +283,7 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .av.big{width:76px;height:76px;font-size:34px}
 .av.big.emo{font-size:42px}
 .pf-body{min-width:0;flex:1}
-.pf-name{font-size:19px;font-weight:700;overflow-wrap:anywhere}
+.pf-name{display:flex;align-items:center;flex-wrap:wrap;gap:4px 8px;font-size:19px;font-weight:700;line-height:1.25;overflow-wrap:anywhere}
 .pf-nums{display:flex;gap:4px;margin-top:8px}
 .pf-stat{flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:flex-start;padding:0;text-align:left;color:var(--fg)}
 .pf-stat b{font-size:18px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.15;color:var(--fg)}
@@ -366,7 +366,7 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .cmt-foot button{padding:0;font-size:12px;font-weight:600;color:var(--fg2)}
 .cmt-foot .f{color:var(--accent)}
 .cmt-foot .warn{color:var(--orange)}
-.pf-tag{display:inline-block;vertical-align:middle;margin-left:8px;padding:2px 8px;border-radius:999px;font-size:11.5px;font-weight:600;background:var(--chip);color:var(--fg2)}
+.pf-tag{flex:none;padding:2px 8px;line-height:1.3;border-radius:999px;font-size:11.5px;font-weight:600;background:var(--chip);color:var(--fg2)}
 .pf-tag.good{background:rgba(48,209,88,.18);color:#1f9d45}
 .pf-tag.warn{background:rgba(255,159,10,.2);color:#c77700}
 .pf-tag.bad{background:rgba(255,69,58,.18);color:#d63a31}
