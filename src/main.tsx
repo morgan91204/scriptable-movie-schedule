@@ -12,7 +12,7 @@ import {
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
   loadSettings, saveSettings, settingsStored, setSettingsSavedHook, syncPick, syncApply, syncMerge, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, communityKey, globalSearch, issuerRecent, favSnapGet, favSnapSet, boxIsRerun, boxHasLaterRun, boxRunRows, boxRunsName, loadIntro, rerunDataReady, SITE_URL, TW,
   FORMATS, formatsOf, filterVersions, filterVersionsAny, movieRows, movieDays, nearest, kmLabel, WINDOWS, findShowtimes, findShowtimesMulti, multiLabel, multiDetail, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText,
-  hallOf, tmdbTest, movieExtras, moviePoster, movieRuntime, posterSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxCountries, boxByCountry, boxInfo, boxInfoRows, boxCountryText, BOX_COUNTRY_NOTE, boxCountryTag, boxCountriesPicked, loadMovieBoard, loadSoonBoard, notifyPrefs, notifyPayload, notifyEndScope, notifyEndPick, notifyQuiet, NOTIFY_PRE_STEPS, NOTIFY_KINDS, boxStatus, STATUS_LABEL, boxInfoBy, isFavMovie, toggleFavMovie, favMovieRows, favMovieBox, soonGroups, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityCached, communityVote, communityTags, social, signedIn, profileSkipped, setProfileSkipped, setAccount, setSiteBase, setNotesViaSite, adoptRatings, forgetMyVotes, noteMax, profileColor, seenLabel, PROFILE_COLORS, sendFeedback, loadMyFeedback, feedbackSent, feedbackUnread, feedbackMarkSeen, feedbackCat, FEEDBACK_CATS, FEEDBACK_STATUS, FEEDBACK_MAX, loadNotes, notesCached, saveNote, reportNote, noteLooksSpoiler, noteDate, NOTE_MAX, NOTE_PLACEHOLDER, NOTE_RULES, REPORT_REASONS, reviewTagsToggle, REVIEW_TAGS, REVIEW_TAGS_MAX, reviewTagLabel, topReviewTags, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalsReady, festivalNote, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, festivalDefaultDate, festivalStateLabel, festivalState, festivalFooter, linkMovies, nowGroupLine, nowFilter, festivalPick, movieAbout, festivalSearch, festivalSearchLines, festivalTrailer, festivalYears, festivalsAny, festivalGroups, festivalChipNote, festivalStatusLine, movieRatings, ratingTier, tomatoTier, popcornTier, popcornCount,
+  hallOf, tmdbTest, movieExtras, moviePoster, movieRuntime, posterSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxCountries, boxByCountry, boxInfo, boxInfoRows, boxCountryText, BOX_COUNTRY_NOTE, boxCountryTag, boxCountriesPicked, loadMovieBoard, loadSoonBoard, notifyPrefs, notifyPayload, notifyEndScope, notifyEndPick, notifyQuiet, NOTIFY_PRE_STEPS, NOTIFY_KINDS, boxStatus, STATUS_LABEL, boxInfoBy, isFavMovie, toggleFavMovie, favMovieRows, favMovieBox, soonGroups, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityCached, communityVote, communityTags, social, signedIn, WATCH_HOW, howLabel, profileSkipped, setProfileSkipped, setAccount, setSiteBase, setNotesViaSite, adoptRatings, forgetMyVotes, noteMax, profileColor, seenLabel, PROFILE_COLORS, sendFeedback, loadMyFeedback, feedbackSent, feedbackUnread, feedbackMarkSeen, feedbackCat, FEEDBACK_CATS, FEEDBACK_STATUS, FEEDBACK_MAX, loadNotes, notesCached, saveNote, reportNote, noteLooksSpoiler, noteDate, NOTE_MAX, NOTE_PLACEHOLDER, NOTE_RULES, REPORT_REASONS, reviewTagsToggle, REVIEW_TAGS, REVIEW_TAGS_MAX, reviewTagLabel, topReviewTags, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalsReady, festivalNote, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, festivalDefaultDate, festivalStateLabel, festivalState, festivalFooter, linkMovies, nowGroupLine, nowFilter, festivalPick, movieAbout, festivalSearch, festivalSearchLines, festivalTrailer, festivalYears, festivalsAny, festivalGroups, festivalChipNote, festivalStatusLine, movieRatings, ratingTier, tomatoTier, popcornTier, popcornCount,
 } from "./core";
 import type { Profile, DiaryEntry, SocialCounts, Feedback, ReviewNote, MovieExtras, Ratings, Community, BoxOfficeItem, BoxSort, MovieEntry, SoonEntry, UpcomingFilm, FavMovie, FavRow, NotifyPrefs, NotifyKind, SyncData, GlobalHits, Festival, FestivalFilm, FestivalSession } from "./core";
 import { setTabBar, setBackGuard, esc } from "./jsx";
@@ -703,7 +703,7 @@ class App {
           {e.priv ? <span class="fb-tag">只有自己看得到</span> : null}
           <span class="nt-rep">›</span>
         </div>
-        <div class="nt-meta">{esc([seenLabel(e.seen), `${noteDate(e.at)}記錄`].filter(Boolean).join("｜"))}</div>
+        <div class="nt-meta">{esc([seenLabel(e.seen), howLabel(e.how), `${noteDate(e.at)}記錄`].filter(Boolean).join("｜"))}</div>
         {e.x ? (open ? <div class="nt-text">{esc(e.x)}</div> : <button class="nt-cover" onTap={() => { this.noteShown = [...this.noteShown, -e.at]; }}>這則可能有雷，點一下顯示</button>) : null}
       </div>
     );
@@ -919,6 +919,11 @@ class App {
         <Section>
           {e && (e.s || e.x) ? <div class="nt-list">{this.entryRow(e, () => this.openTitle(title))}</div> : <Note text="還沒有評分。可以先標記看過，之後再到電影頁評分、寫短評。" />}
           <Item icon="🎬" title="打開這部片的頁面" subtitle="評分、心得標籤、短評都在那裡改" onTap={() => this.openTitle(title)} />
+        </Section>
+        <Section title="觀影方式（可複選）">
+          <div class="nt-form"><div class="fb-cats">
+            {WATCH_HOW.map((w) => { const how = (e && e.how) || []; const on = how.indexOf(w.id) >= 0; return <button class={"cm-tag" + (on ? " on" : "")} aria-pressed={on ? "true" : "false"} onTap={() => save({ how: on ? how.filter((x) => x !== w.id) : [...how, w.id] }, on ? `已取消「${w.label}」` : `已記下：${w.label}`)}>{esc(w.label)}</button>; })}
+          </div></div>
         </Section>
         <Section title="看過的日期" hint="不記得哪一天可以只標「看過」。">
           <div class="nt-form">
@@ -1796,6 +1801,55 @@ class App {
       </Page>
     );
   }
+  watchOpenFor = ""; // 哪一部片的「觀影紀錄」是展開的
+  /** 評分卡裡的「觀影紀錄」（登入的人才有）：觀影時間、觀影方式，跟心得標籤一樣在同一頁展開，不用跳頁。
+   *  沒評分也可以填（填了就算看過，會記進我的片單） */
+  watchInline(title: string): string {
+    const k = communityKey(title);
+    const open = this.watchOpenFor === k;
+    const e = (this.diaryMem ? this.diaryMem.list : []).find((x) => x.k === k) || null;
+    const seen = e ? e.seen : "", how = (e && e.how) || [];
+    const summary = [/^\d{4}-/.test(seen) ? seen.replace(/-/g, "/") : seen === "?" ? "看過" : "", howLabel(how)].filter(Boolean).join("｜");
+    const save = async (body: Record<string, unknown>, done: string) => {
+      try { await social("entry", { m: k, title, ...body }); await this.myDiary(true); await this.ui.toast(done); } catch (err) { await this.ui.toast(String((err as Error)?.message || err)); }
+    };
+    return (
+      <>
+        <button class="cm-tagbar" aria-expanded={open ? "true" : "false"} onTap={async () => {
+          if (open) { this.watchOpenFor = ""; return; }
+          await this.myDiary().catch(() => []); // 先讀自己的片單，才知道這部片填過什麼
+          this.watchOpenFor = k;
+        }}>
+          <span>觀影紀錄</span>
+          <em>{open ? "" : this.diaryMem ? summary || "什麼時候看的、在哪裡看的" : "什麼時候看的、在哪裡看的"}</em>
+          <i>{open ? "收合 ▾" : summary && this.diaryMem ? "修改 ▸" : "填寫 ▸"}</i>
+        </button>
+        {open ? (
+          <div class="cm-tags">
+            <div class="cm-tagrow">
+              <span class="cm-taghead">觀影時間{seen === "?" ? "（已標記看過，沒記日期）" : ""}</span>
+              <div class="wt-date">
+                <input class="field" name="wd" type="date" max={todayTPE()} value={/^\d{4}-/.test(seen) ? seen : ""} />
+                <button class="cm-tag on" onTap={async (v: Record<string, string>) => { const d = String(v.wd || ""); if (!d) { await this.ui.toast("先選日期"); return; } await save({ seen: d }, "已記下觀影時間"); }}>儲存</button>
+              </div>
+              <div class="cm-tagset wt-quick">
+                <button class={"cm-tag" + (seen === todayTPE() ? " on" : "")} onTap={() => save({ seen: todayTPE() }, "已記下：今天看的")}>今天</button>
+                <button class={"cm-tag" + (seen === "?" ? " on" : "")} onTap={() => save({ seen: "?" }, "已標記看過")}>不記得日期</button>
+                {seen ? <button class="cm-tag" onTap={() => save({ seen: "", how: [] }, "已清除觀影紀錄")}>清除</button> : null}
+              </div>
+            </div>
+            <div class="cm-tagrow">
+              <span class="cm-taghead">觀影方式（可複選）</span>
+              <div class="cm-tagset">
+                {WATCH_HOW.map((w) => { const on = how.indexOf(w.id) >= 0; return <button class={"cm-tag" + (on ? " on" : "")} aria-pressed={on ? "true" : "false"} onTap={() => save({ how: on ? how.filter((x) => x !== w.id) : [...how, w.id] }, on ? `已取消「${w.label}」` : `已記下：${w.label}`)}>{esc(w.label)}</button>; })}
+              </div>
+            </div>
+            <div class="cm-tagnote">會記進「設定 → 我的片單」。個人頁公開的話別人也看得到；要單獨隱藏這一筆，到我的片單裡設定。</div>
+          </div>
+        ) : null}
+      </>
+    );
+  }
   tagsOpenFor = ""; // 哪一部片的心得標籤選單是展開的
   /** 片刻評分卡片：平均、人數、分布，以及「你的評分」一排 1～10 的格子（點已選的那一格可以取消）。
    *  評過分以後多一列「心得標籤」：點開是固定的選項（不能打字，所以不會暴雷），最多選 5 個；大家選最多的幾個列在平均分數下面 */
@@ -1883,13 +1937,7 @@ class App {
               ) : null}
             </>
           ) : null}
-          {c && signedIn() ? (
-            <button class="cm-tagbar" onTap={() => this.go(() => this.entryView(title), "讀取片單…")}>
-              <span>我的片單</span>
-              <em>{mine ? "已記錄，可以標看過的日期" : "還沒評分也可以先標記看過"}</em>
-              <i>設定 ▸</i>
-            </button>
-          ) : null}
+          {c && signedIn() ? this.watchInline(title) : null}
           {c && (mine || c.notes) ? (
             <button class="cm-tagbar" onTap={() => { this.noteReset(); this.go(() => this.notesView(title), "讀取短評…"); }}>
               <span>短評</span>

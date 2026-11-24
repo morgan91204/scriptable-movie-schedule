@@ -3624,7 +3624,10 @@ export async function social<T = any>(op: string, body: Record<string, unknown> 
 export const profileSkipped = (): boolean => cacheGet("profile-skip.txt") === "1";
 export const setProfileSkipped = (on: boolean): void => cacheSet("profile-skip.txt", on ? "1" : "");
 export interface Profile { name: string; color: string; pub?: boolean; hidden?: boolean; canRename?: boolean }
-export interface DiaryEntry { k: string; title: string; s: number; x: string; sp: number; seen: string; at: number; priv?: number; by?: { name: string; color: string } }
+/** 觀影方式（可以複選） */
+export const WATCH_HOW: { id: string; label: string }[] = [{ id: "cinema", label: "電影院" }, { id: "second", label: "二輪電影院" }, { id: "stream", label: "串流" }];
+export const howLabel = (how?: string[]): string => WATCH_HOW.filter((h) => (how || []).indexOf(h.id) >= 0).map((h) => h.label).join("、");
+export interface DiaryEntry { k: string; title: string; s: number; x: string; sp: number; seen: string; at: number; priv?: number; how?: string[]; by?: { name: string; color: string } }
 export interface SocialCounts { films: number; notes: number; following: number; followers: number }
 export const PROFILE_COLORS: { id: string; hex: string }[] = [
   { id: "blue", hex: "#0a84ff" }, { id: "green", hex: "#30b158" }, { id: "orange", hex: "#ff9f0a" }, { id: "red", hex: "#ff453a" },

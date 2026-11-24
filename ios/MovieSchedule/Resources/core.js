@@ -56,6 +56,7 @@
     TW_FAR_URL: () => TW_FAR_URL,
     TW_NEAR_URL: () => TW_NEAR_URL,
     UPCOMING_URL: () => UPCOMING_URL,
+    WATCH_HOW: () => WATCH_HOW,
     WEEK: () => WEEK,
     WINDOWS: () => WINDOWS,
     YEAR_RATINGS_URL: () => YEAR_RATINGS_URL,
@@ -156,6 +157,7 @@
     globalSearch: () => globalSearch,
     groupByMovie: () => groupByMovie,
     hallOf: () => hallOf,
+    howLabel: () => howLabel,
     isChainSlug: () => isChainSlug,
     isFavMovie: () => isFavMovie,
     isLate: () => isLate,
@@ -3861,6 +3863,8 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   }
   var profileSkipped = () => cacheGet("profile-skip.txt") === "1";
   var setProfileSkipped = (on) => cacheSet("profile-skip.txt", on ? "1" : "");
+  var WATCH_HOW = [{ id: "cinema", label: "電影院" }, { id: "second", label: "二輪電影院" }, { id: "stream", label: "串流" }];
+  var howLabel = (how) => WATCH_HOW.filter((h) => (how || []).indexOf(h.id) >= 0).map((h) => h.label).join("、");
   var PROFILE_COLORS = [
     { id: "blue", hex: "#0a84ff" },
     { id: "green", hex: "#30b158" },
@@ -4394,7 +4398,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   var extra = { boxOffice, filmList, soonList, nowShowing, nowShowingMulti, movieBoard: movieBoard2, festivalBoard, festivalFilm, nearby, patchSettings, fillMovie, formatList };
   var BRIDGE_LEVEL = 2;
   globalThis.MS = {
-    version: "2026.11.24-1818",
+    version: "2026.11.24-1824",
     level: BRIDGE_LEVEL,
     init(saved) {
       cache = saved || {};

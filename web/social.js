@@ -35,6 +35,8 @@ export function socialInit(sql) {
   // users.pub：1 = 個人頁公開；hidden：站長把這個帳號的個人頁藏起來。entries.priv：1 = 這一筆只有自己看得到
   sql.exec("CREATE TABLE IF NOT EXISTS users (uid TEXT PRIMARY KEY, name TEXT NOT NULL UNIQUE COLLATE NOCASE, color TEXT NOT NULL DEFAULT 'blue', pub INTEGER NOT NULL DEFAULT 0, hidden INTEGER NOT NULL DEFAULT 0, at INTEGER NOT NULL, named INTEGER NOT NULL DEFAULT 0)");
   sql.exec("CREATE TABLE IF NOT EXISTS entries (uid TEXT NOT NULL, k TEXT NOT NULL, title TEXT NOT NULL DEFAULT '', s INTEGER NOT NULL DEFAULT 0, x TEXT NOT NULL DEFAULT '', sp INTEGER NOT NULL DEFAULT 0, seen TEXT NOT NULL DEFAULT '', priv INTEGER NOT NULL DEFAULT 0, at INTEGER NOT NULL, PRIMARY KEY (uid, k))");
+  // how = 觀影方式（後來才加的欄位）：cinema 電影院／second 二輪電影院／stream 串流，可以複選，用逗號接
+  if (!sql.exec("SELECT 1 FROM pragma_table_info('entries') WHERE name = 'how'").toArray().length) sql.exec("ALTER TABLE entries ADD COLUMN how TEXT NOT NULL DEFAULT ''");
   sql.exec("CREATE INDEX IF NOT EXISTS entries_at ON entries (at)");
   sql.exec("CREATE INDEX IF NOT EXISTS entries_k ON entries (k)");
   sql.exec("CREATE TABLE IF NOT EXISTS follows (a TEXT NOT NULL, b TEXT NOT NULL, at INTEGER NOT NULL, PRIMARY KEY (a, b))");
@@ -45,7 +47,8 @@ export function socialInit(sql) {
 
 const one = (sql, q, ...a) => sql.exec(q, ...a).toArray()[0] || null;
 const all = (sql, q, ...a) => sql.exec(q, ...a).toArray();
-const entryOut = (r) => ({ k: r.k, title: r.title, s: r.s, x: r.x, sp: r.sp ? 1 : 0, seen: r.seen, at: r.at, ...(r.priv ? { priv: 1 } : {}) });
+const HOW = ["cinema", "second", "stream"];
+const entryOut = (r) => ({ k: r.k, title: r.title, s: r.s, x: r.x, sp: r.sp ? 1 : 0, seen: r.seen, at: r.at, ...(r.priv ? { priv: 1 } : {}), ...(r.how ? { how: String(r.how).split(",").filter(Boolean) } : {}) });
 const userOut = (u) => ({ name: u.name, color: u.color });
 
 /** 這個帳號的數字：片單幾部、短評幾則、追蹤幾人、被幾人追蹤 */
@@ -61,11 +64,12 @@ function counts(sql, uid, onlyPublic) {
 /** 評分伺服器回的那一筆（分數、短評）寫進片單；沒有分數、沒有短評、也沒標看過，就不留 */
 function upsertEntry(sql, uid, k, title, patch) {
   const old = one(sql, "SELECT * FROM entries WHERE uid = ? AND k = ?", uid, k);
-  const e = { title: cleanTitle(title) || (old ? old.title : k), s: old ? old.s : 0, x: old ? old.x : "", sp: old ? old.sp : 0, seen: old ? old.seen : "", priv: old ? old.priv : 0, at: old ? old.at : Date.now(), ...patch };
+  const e = { title: cleanTitle(title) || (old ? old.title : k), s: old ? old.s : 0, x: old ? old.x : "", sp: old ? old.sp : 0, seen: old ? old.seen : "", priv: old ? old.priv : 0, how: old ? old.how || "" : "", at: old ? old.at : Date.now(), ...patch };
+  if (e.how && !e.seen) e.seen = "?"; // 填了觀影方式就算看過（沒記日期）
   if (!e.s && !e.x && !e.seen) { sql.exec("DELETE FROM entries WHERE uid = ? AND k = ?", uid, k); return null; }
   if (patch.at) e.at = patch.at;
   else if (!old || patch.touch) e.at = Date.now();
-  sql.exec("INSERT INTO entries (uid, k, title, s, x, sp, seen, priv, at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(uid, k) DO UPDATE SET title = excluded.title, s = excluded.s, x = excluded.x, sp = excluded.sp, seen = excluded.seen, priv = excluded.priv, at = excluded.at", uid, k, e.title, e.s, e.x, e.sp ? 1 : 0, e.seen, e.priv ? 1 : 0, e.at);
+  sql.exec("INSERT INTO entries (uid, k, title, s, x, sp, seen, priv, how, at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(uid, k) DO UPDATE SET title = excluded.title, s = excluded.s, x = excluded.x, sp = excluded.sp, seen = excluded.seen, priv = excluded.priv, how = excluded.how, at = excluded.at", uid, k, e.title, e.s, e.x, e.sp ? 1 : 0, e.seen, e.priv ? 1 : 0, e.how || "", e.at);
   return e;
 }
 function quotaOk(sql, uid) {
@@ -220,6 +224,11 @@ export async function social(hub, path, b) {
     const patch = {};
     if (b.seen !== undefined) { const seen = b.seen === "?" ? "?" : String(b.seen || ""); if (seen !== "?" && !okDate(seen)) return json({ error: "bad date" }, 400); patch.seen = seen; patch.touch = !one(sql, "SELECT 1 AS x FROM entries WHERE uid = ? AND k = ?", uid, m); }
     if (b.priv !== undefined) patch.priv = b.priv ? 1 : 0;
+    if (b.how !== undefined) {
+      if (!Array.isArray(b.how) || b.how.some((x) => HOW.indexOf(x) < 0)) return json({ error: "bad request" }, 400);
+      patch.how = HOW.filter((x) => b.how.indexOf(x) >= 0).join(",");
+      if (!patch.how && b.seen === undefined) { const old = one(sql, "SELECT seen FROM entries WHERE uid = ? AND k = ?", uid, m); if (old && old.seen === "?" ) patch.seen = "?"; }
+    }
     const e = upsertEntry(sql, uid, m, b.title, patch);
     return json({ ok: true, entry: e ? entryOut({ ...e, k: m }) : null });
   }
