@@ -12,7 +12,7 @@ import {
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
   loadSettings, saveSettings, settingsStored, setSettingsSavedHook, syncPick, syncApply, syncMerge, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, communityKey, globalSearch, issuerRecent, favSnapGet, favSnapSet, boxIsRerun, boxHasLaterRun, boxRunRows, boxRunsName, loadIntro, rerunDataReady, SITE_URL, TW,
   FORMATS, formatsOf, filterVersions, filterVersionsAny, movieRows, movieDays, nearest, kmLabel, WINDOWS, findShowtimes, findShowtimesMulti, multiLabel, multiDetail, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText,
-  hallOf, tmdbTest, movieExtras, moviePoster, movieRuntime, posterSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxCountries, boxByCountry, boxInfo, boxInfoRows, boxCountryText, BOX_COUNTRY_NOTE, boxCountryTag, boxCountriesPicked, loadMovieBoard, loadSoonBoard, notifyPrefs, notifyPayload, notifyEndScope, notifyEndPick, notifyQuiet, NOTIFY_PRE_STEPS, NOTIFY_KINDS, boxStatus, STATUS_LABEL, boxInfoBy, isFavMovie, toggleFavMovie, favMovieRows, favMovieBox, soonGroups, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityCached, communityVote, communityTags, social, signedIn, profileInk, PROFILE_EMOJI, WATCH_HOW, howLabel, profileSkipped, setProfileSkipped, setAccount, setSiteBase, setNotesViaSite, adoptRatings, forgetMyVotes, noteMax, profileColor, seenLabel, PROFILE_COLORS, sendFeedback, loadMyFeedback, feedbackSent, feedbackUnread, feedbackMarkSeen, feedbackCat, FEEDBACK_CATS, FEEDBACK_STATUS, FEEDBACK_MAX, loadNotes, notesCached, saveNote, reportNote, noteLooksSpoiler, noteDate, NOTE_MAX, NOTE_PLACEHOLDER, NOTE_RULES, REPORT_REASONS, reviewTagsToggle, REVIEW_TAGS, REVIEW_TAGS_MAX, reviewTagLabel, topReviewTags, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalsReady, festivalNote, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, festivalDefaultDate, festivalStateLabel, festivalState, festivalFooter, linkMovies, nowGroupLine, nowFilter, festivalPick, movieAbout, festivalSearch, festivalSearchLines, festivalTrailer, festivalYears, festivalsAny, festivalGroups, festivalChipNote, festivalStatusLine, movieRatings, ratingTier, tomatoTier, popcornTier, popcornCount,
+  hallOf, tmdbTest, movieExtras, moviePoster, movieRuntime, posterSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxCountries, boxByCountry, boxInfo, boxInfoRows, boxCountryText, BOX_COUNTRY_NOTE, boxCountryTag, boxCountriesPicked, loadMovieBoard, loadSoonBoard, notifyPrefs, notifyPayload, notifyEndScope, notifyEndPick, notifyQuiet, NOTIFY_PRE_STEPS, NOTIFY_KINDS, boxStatus, STATUS_LABEL, boxInfoBy, isFavMovie, toggleFavMovie, favMovieRows, favMovieBox, soonGroups, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityCached, communityVote, communityTags, social, signedIn, profileInk, PROFILE_EMOJI, WATCH_HOW, howLabel, profileSkipped, setProfileSkipped, setAccount, setSiteBase, setNotesViaSite, adoptRatings, forgetMyVotes, noteMax, profileColor, seenLabel, PROFILE_COLORS, sendFeedback, loadMyFeedback, feedbackSent, feedbackUnread, feedbackMarkSeen, feedbackCat, FEEDBACK_CATS, FEEDBACK_STATUS, FEEDBACK_MAX, loadNotes, notesCached, addNote, deleteNote, voteNote, noteHot, NOTE_FOLD_AT, reportNote, noteLooksSpoiler, noteDate, NOTE_MAX, NOTE_PLACEHOLDER, NOTE_RULES, REPORT_REASONS, reviewTagsToggle, REVIEW_TAGS, REVIEW_TAGS_MAX, reviewTagLabel, topReviewTags, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalsReady, festivalNote, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, festivalDefaultDate, festivalStateLabel, festivalState, festivalFooter, linkMovies, nowGroupLine, nowFilter, festivalPick, movieAbout, festivalSearch, festivalSearchLines, festivalTrailer, festivalYears, festivalsAny, festivalGroups, festivalChipNote, festivalStatusLine, movieRatings, ratingTier, tomatoTier, popcornTier, popcornCount,
 } from "./core";
 import type { Profile, DiaryEntry, SocialCounts, Feedback, ReviewNote, MovieExtras, Ratings, Community, BoxOfficeItem, BoxSort, MovieEntry, SoonEntry, UpcomingFilm, FavMovie, FavRow, NotifyPrefs, NotifyKind, SyncData, GlobalHits, Festival, FestivalFilm, FestivalSession } from "./core";
 import { setTabBar, setBackGuard, esc } from "./jsx";
@@ -1817,7 +1817,7 @@ class App {
   noteShown: number[] = []; // 已經點開的「可能有雷」短評
   noteEdit = false; // 短評頁上面寫短評的那一塊有沒有展開（預設收起來）
   noteFilter = "all"; // 短評清單的篩選：all 全部／follow 追蹤中／clean 不看有雷的
-  noteSort = "new"; // 排序：new 最新／high 分數高到低／low 分數低到高
+  noteSort = "hot"; // 排序：hot 熱門／new 最新／top 最多推／high 評分高到低／low 評分低到高
   noteReset() { this.noteDraft = null; this.noteSpoil = null; this.noteAsk = ""; this.noteShown = []; this.noteEdit = false; }
   /** 短評頁：上面寫（或改）自己的一句話，下面是大家的。另開一頁，不擠在電影頁。
    *  防雷：輸入框提醒不提劇情、可以自己標「可能有雷」、偵測到劇透字眼送出前問一次；有雷的預設摺疊，點了才顯示。
@@ -1829,24 +1829,21 @@ class App {
     const c = communityCached(title) || (await communityStats(title).catch(() => null));
     const voted = c ? c.mine : 0;
     const notes = list ? list.notes : [];
-    const my = notes.find((n) => n.mine) || null;
-    const draft = this.noteDraft === null ? (my ? my.x : "") : this.noteDraft;
-    const spoil = this.noteSpoil === null ? !!(my && my.sp) : this.noteSpoil;
+    const mineCount = notes.filter((n) => n.mine).length;
+    const maxMine = (list && list.max) || 5;
+    const draft = this.noteDraft === null ? "" : this.noteDraft;
+    const spoil = !!this.noteSpoil;
     /** 每個按鈕都會帶著輸入框目前的字：先記下來，畫面重畫才不會把打到一半的字清掉 */
     const keep = (v?: Record<string, string>) => { if (v && typeof v.x === "string") this.noteDraft = v.x; };
+    const say = async (job: Promise<unknown>, done: string) => {
+      try { await job; if (done) await this.ui.toast(done); return true; } catch (e) { await this.ui.toast(String((e as Error)?.message || e)); return false; }
+    };
     const send = async (text: string, sp: boolean) => {
-      try {
-        await saveNote(title, text, sp);
-        this.noteReset();
-        await this.ui.toast(text ? "短評已送出" : "已刪除你的短評");
-        if (text) await this.askNickname();
-      } catch (e) {
-        await this.ui.toast(String((e as Error)?.message || e));
-      }
+      if (await say(addNote(title, text, sp), "短評已送出")) { this.noteReset(); await this.askNickname(); }
     };
     const submit = async (v?: Record<string, string>) => {
       keep(v);
-      const text = String(this.noteDraft === null ? draft : this.noteDraft).replace(/\s+/g, " ").trim();
+      const text = String(this.noteDraft === null ? "" : this.noteDraft).replace(/\s+/g, " ").trim();
       if (!text) { await this.ui.toast("先寫一句再送出"); return; }
       if (Array.from(text).length > noteMax()) { await this.ui.toast(`短評最多 ${noteMax()} 個字`); return; }
       if (!spoil && noteLooksSpoiler(text) && this.noteAsk !== text) { this.noteAsk = text; return; } // 先問一次要不要標記
@@ -1855,25 +1852,35 @@ class App {
     // 登入的人：這部片我追蹤的人怎麼評（沒追蹤任何人就是空的）。有寫短評的在下面的清單裡；只評分沒寫的另外列一行
     const friends = signedIn() ? ((await social<{ list: DiaryEntry[] }>("friends", { m: communityKey(title) }).catch(() => null)) || { list: [] }).list : [];
     const quiet = friends.filter((e) => e.by && e.s && !e.x);
-    // 一份清單（像留言區）：自己的那一則也在裡面。上面一排篩選、右邊選排序
+    // 一份清單（像留言區）：自己發的也在裡面。上面一排篩選、右邊選排序（預設「熱門」：推得多又比較新的在前）
     const hasFollow = notes.some((n) => n.by && n.by.f);
     const hasSpoiler = notes.some((n) => n.sp);
     if (this.noteFilter === "follow" && !hasFollow) this.noteFilter = "all";
     if (this.noteFilter === "clean" && !hasSpoiler) this.noteFilter = "all";
+    const byNew = (x: ReviewNote, y: ReviewNote) => y.at - x.at || y.id - x.id;
     const shown = notes
       .filter((n) => (this.noteFilter === "follow" ? !!(n.by && n.by.f) || !!n.mine : this.noteFilter === "clean" ? !n.sp : true))
-      .sort((x, y) => (this.noteSort === "high" ? y.s - x.s || y.at - x.at : this.noteSort === "low" ? x.s - y.s || y.at - x.at : y.at - x.at));
-    const SORTS = [{ id: "new", label: "最新" }, { id: "high", label: "分數高到低" }, { id: "low", label: "分數低到高" }];
+      .sort((x, y) => (this.noteSort === "new" ? byNew(x, y) : this.noteSort === "top" ? (y.p || 0) - (x.p || 0) || byNew(x, y) : this.noteSort === "high" ? y.s - x.s || byNew(x, y) : this.noteSort === "low" ? x.s - y.s || byNew(x, y) : noteHot(y) - noteHot(x) || byNew(x, y)));
+    const SORTS = [{ id: "hot", label: "熱門" }, { id: "new", label: "最新" }, { id: "top", label: "最多推" }, { id: "high", label: "評分高到低" }, { id: "low", label: "評分低到高" }];
     const editing = this.noteEdit || !!this.noteAsk;
-    const unsent = this.noteDraft !== null && this.noteDraft.trim() !== (my ? my.x : ""); // 打到一半、還沒送出的字
-    /** 一則留言：左邊頭像，右邊一個泡泡（名字＋分數＋內容），泡泡下面一行小字（時間、檢舉） */
+    const unsent = !!draft.trim(); // 打到一半、還沒送出的字
+    /** 一則留言：最左邊推噓（▲ 分數 ▼），再來頭像，右邊一個泡泡（名字＋評分＋內容），泡泡下面一行小字（時間、檢舉／刪除） */
     const row = (n: ReviewNote) => {
-      const open = !n.sp || this.noteShown.indexOf(n.id) >= 0;
+      const p = n.p || 0;
+      // 有雷的、被噓到很低的都先摺起來，點了才顯示
+      const sunk = p <= NOTE_FOLD_AT && !n.mine;
+      const open = (!n.sp && !sunk) || this.noteShown.indexOf(n.id) >= 0;
       const reported = !!list && list.reported.indexOf(n.id) >= 0;
       const who = n.by ? n.by.name : n.mine ? "我" : "匿名";
       const toProfile = n.by ? (v: Record<string, string>) => { keep(v); this.go(() => this.profileView(n.by!.name), "讀取個人頁…"); } : undefined;
+      const vote = (dir: number) => async (v: Record<string, string>) => { keep(v); await say(voteNote(title, n.id, n.my === dir ? 0 : dir), ""); };
       return (
         <div class={"cmt" + (n.mine ? " mine" : "")}>
+          <div class="cmt-vote">
+            {n.mine ? <span class="vb off" aria-hidden="true">▲</span> : <button class={"vb" + (n.my === 1 ? " up" : "")} aria-label="推" aria-pressed={n.my === 1 ? "true" : "false"} onTap={vote(1)}>▲</button>}
+            <b class={p > 0 ? "pos" : p < 0 ? "neg" : ""} aria-label={`推減噓：${p}`}>{p}</b>
+            {n.mine ? <span class="vb off" aria-hidden="true">▼</span> : <button class={"vb" + (n.my === -1 ? " down" : "")} aria-label="噓" aria-pressed={n.my === -1 ? "true" : "false"} onTap={vote(-1)}>▼</button>}
+          </div>
           {n.by ? <button class="cmt-av" aria-label={`${n.by.name} 的個人頁`} onTap={toProfile}>{this.avatar(n.by)}</button> : <span class="cmt-av"><span class="av anon" aria-hidden="true">{n.mine ? "我" : "匿"}</span></span>}
           <div class="cmt-main">
             <div class="cmt-bub">
@@ -1882,14 +1889,14 @@ class App {
                 {n.s ? <span class={"nt-score " + ratingTier("imdb", n.s)}>{n.s} 分</span> : null}
                 {n.sp ? <span class="nt-sp">可能有雷</span> : null}
               </div>
-              {open ? <div class="cmt-text">{esc(n.x)}</div> : <button class="nt-cover" onTap={(v: Record<string, string>) => { keep(v); this.noteShown = [...this.noteShown, n.id]; }}>這則可能有雷，點一下顯示</button>}
+              {open ? <div class="cmt-text">{esc(n.x)}</div> : <button class="nt-cover" onTap={(v: Record<string, string>) => { keep(v); this.noteShown = [...this.noteShown, n.id]; }}>{sunk && !n.sp ? "這則被噓到摺疊了，點一下顯示" : "這則可能有雷，點一下顯示"}</button>}
             </div>
             <div class="cmt-foot">
               <span>{esc(noteDate(n.at))}</span>
               {n.by && n.by.f ? <span class="f">追蹤中</span> : null}
               {n.mine && n.by ? <span>我</span> : null}
-              {n.mine && n.hidden ? <span class="warn">已被隱藏</span> : null}
-              {n.mine ? <button onTap={(v: Record<string, string>) => { keep(v); this.noteEdit = true; }}>修改</button> : reported ? <span>已檢舉</span> : <button aria-label="檢舉這則短評" onTap={(v: Record<string, string>) => { keep(v); this.go(() => this.reportView(title, n)); }}>檢舉</button>}
+              {n.mine && n.hidden ? <span class="warn">已被隱藏（別人看不到）</span> : null}
+              {n.mine ? <button onTap={async (v: Record<string, string>) => { keep(v); await say(deleteNote(title, n.id), "已刪除"); }}>刪除</button> : reported ? <span>已檢舉</span> : <button aria-label="檢舉這則短評" onTap={(v: Record<string, string>) => { keep(v); this.go(() => this.reportView(title, n)); }}>檢舉</button>}
             </div>
           </div>
         </div>
@@ -1898,15 +1905,14 @@ class App {
     return (
       <Page title="短評" subtitle={`《${title}》`} onBack={() => this.back()}>
         <Section>
-          {!voted ? <Note text="先替這部片評分，就可以寫一句短評。" /> : !editing ? (
+          {!voted ? <Note text="先替這部片評分，就可以寫短評。推和噓不用先評分。" /> : mineCount >= maxMine ? <Note text={`這部片你已經發了 ${maxMine} 則，先刪掉一則才能再發。`} /> : !editing ? (
             // 收起來的樣子：像留言區最上面那一格「寫點什麼…」，點了才展開
             <button class="cmt-new" onTap={() => { this.noteEdit = true; }}>
-              <span class={"cmt-new-box" + (unsent ? " draft" : "")}>{unsent ? esc(draft) : my ? esc(my.x) : `${NOTE_PLACEHOLDER}…`}</span>
-              <i>{unsent ? "還沒送出，繼續寫" : my ? "修改" : "寫短評"}</i>
+              <span class={"cmt-new-box" + (unsent ? " draft" : "")}>{unsent ? esc(draft) : `${NOTE_PLACEHOLDER}…`}</span>
+              <i>{unsent ? "還沒送出，繼續寫" : "寫短評"}</i>
             </button>
           ) : (
             <div class="nt-form">
-              {my && my.hidden ? <Note kind="warn" text="你的短評被多人檢舉，目前別人看不到。可以修改後重新送出。" /> : null}
               {/* 往下滑看別人的短評時自動收起來（沒在打字的時候）；打到一半的字會留著 */}
               <button class="hid" data-fold="" aria-hidden="true" tabindex="-1" onTap={(v: Record<string, string>) => { keep(v); if (!this.noteAsk) this.noteEdit = false; }} />
               <textarea class="fb-area note" name="x" maxlength={String(noteMax())} placeholder={`${NOTE_PLACEHOLDER}（最多 ${noteMax()} 字）`}>{esc(draft)}</textarea>
@@ -1921,19 +1927,19 @@ class App {
                   </div>
                 </>
               ) : (
-                // 一排搞定：左邊勾「可能有雷」，右邊刪除、取消、送出
+                // 一排搞定：左邊勾「可能有雷」，右邊取消、送出。發出去之後不能改（改了別人的推噓就不準了），只能刪掉重發
                 <div class="cmt-row">
                   <button class={"cmt-spoil" + (spoil ? " on" : "")} aria-pressed={spoil ? "true" : "false"} aria-label="可能有雷：勾了以後預設摺疊，點了才會顯示" onTap={(v: Record<string, string>) => { keep(v); this.noteSpoil = !spoil; }}><i>{spoil ? "✓" : ""}</i>可能有雷</button>
                   <span class="sp" />
-                  {my ? <button class="danger" onTap={() => send("", false)}>刪除</button> : null}
                   <button onTap={() => { this.noteEdit = false; this.noteDraft = null; this.noteSpoil = null; this.noteAsk = ""; }}>取消</button>
-                  <button class="go" onTap={submit}>{my ? "更新" : "送出"}</button>
+                  <button class="go" onTap={submit}>送出</button>
                 </div>
               )}
+              {mineCount ? <div class="cm-tagnote">這部片你已經發了 {mineCount}／{maxMine} 則。發出去之後不能修改，只能刪掉重發。</div> : null}
             </div>
           )}
         </Section>
-        <Section title={`短評（${notes.length}）`} hint={`${NOTE_RULES}${notes.length ? "看到的話可以點「檢舉」。" : ""}`}>
+        <Section title={`短評（${notes.length}）`} hint={`${NOTE_RULES}覺得說得好就推（▲），不認同就噓（▼）；被噓到 ${NOTE_FOLD_AT} 以下的會自動摺疊。看到違規的可以點「檢舉」。`}>
           {notes.length > 1 || hasFollow ? (
             <div class="cmt-bar">
               <div class="cmt-filters">
@@ -1941,7 +1947,7 @@ class App {
                 {hasFollow ? <button class={"cm-tag" + (this.noteFilter === "follow" ? " on" : "")} onTap={(v: Record<string, string>) => { keep(v); this.noteFilter = "follow"; }}>追蹤中</button> : null}
                 {hasSpoiler ? <button class={"cm-tag" + (this.noteFilter === "clean" ? " on" : "")} onTap={(v: Record<string, string>) => { keep(v); this.noteFilter = "clean"; }}>不看有雷的</button> : null}
               </div>
-              <select class="sel" name="ns" aria-label="排序" onInput={(v: Record<string, string>) => { keep(v); this.noteSort = v.ns || "new"; }}>
+              <select class="sel" name="ns" aria-label="排序" onInput={(v: Record<string, string>) => { keep(v); this.noteSort = v.ns || "hot"; }}>
                 {SORTS.map((o) => <option value={o.id} selected={o.id === this.noteSort}>{esc(o.label)}</option>)}
               </select>
             </div>

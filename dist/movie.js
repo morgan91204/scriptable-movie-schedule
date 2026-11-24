@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.24-2207
+// @movie-schedule-app 電影行程 v2026.11.24-2219
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/parsers.gen.ts
@@ -3647,6 +3647,11 @@ var notesViaSite = false;
 function setNotesViaSite(on) {
   notesViaSite = on;
 }
+var NOTE_FOLD_AT = -5;
+var noteHot = (n) => {
+  const p = n.p || 0;
+  return Math.sign(p) * Math.log10(Math.max(Math.abs(p), 1)) + n.at / 1e3 / 45e3;
+};
 var NOTE_MAX = 60;
 var NOTE_PLACEHOLDER = "不提劇情，說說看完的感覺";
 var NOTE_RULES = "請不要劇透、人身攻擊或貼廣告、連結。被多人檢舉的短評會自動摺疊或隱藏。";
@@ -3690,15 +3695,17 @@ async function loadNotes(title) {
 }
 async function notePost(path, title, body, fail) {
   const k = communityKey(title);
-  const viaSite = signedIn() || notesViaSite && path === "report";
+  const viaSite = signedIn() || notesViaSite && (path === "report" || path === "note-vote");
   const r = viaSite ? await socialCall(path, { m: k, title: baseTitle(title), ...body }).then((x) => ({ status: x.status, body: JSON.stringify(x.data) })) : await platform().fetchText(`${COMMUNITY_API}/v2/${path}`, { accept: "application/json", "content-type": "application/json" }, { method: "POST", body: JSON.stringify({ m: k, d: deviceId(), ...body }) });
   if (r.status === 429) throw new Error("操作太頻繁，請稍後再試");
   if (r.status === 409) throw new Error("要先評分才能寫短評");
-  if (r.status === 422) throw new Error(/too long/.test(r.body) ? `短評最多 ${noteMax()} 個字` : "短評不能放連結或聯絡方式");
+  if (r.status === 422) throw new Error(/too long/.test(r.body) ? `短評最多 ${noteMax()} 個字` : /too many notes/.test(r.body) ? "同一部片最多發 5 則短評，先刪掉一則再發" : /duplicate/.test(r.body) ? "這句你已經發過了" : "短評不能放連結或聯絡方式");
   if (r.status !== 200) throw new Error(fail);
   return keepNotes(k, JSON.parse(r.body));
 }
-var saveNote = (title, text, spoiler) => notePost("note", title, { x: String(text || "").trim(), sp: spoiler ? 1 : 0 }, "短評沒有送出，請稍後再試");
+var addNote = (title, text, spoiler) => notePost("note-add", title, { x: String(text || "").trim(), sp: spoiler ? 1 : 0 }, "短評沒有送出，請稍後再試");
+var deleteNote = (title, id) => notePost("note-del", title, { id }, "沒有刪掉，請稍後再試");
+var voteNote = (title, id, v) => notePost("note-vote", title, { id, v }, "沒有送出，請稍後再試");
 var reportNote = (title, id, why) => notePost("report", title, { id, why }, "檢舉沒有送出，請稍後再試");
 var FEEDBACK_CATS = [
   { id: "bug", label: "問題回報", hint: "哪一頁、做了什麼、看到什麼（例如：某間影城的場次打不開）" },
@@ -4373,6 +4380,14 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .cmt-list{padding:10px 16px 14px}
 .cmt{display:flex;align-items:flex-start;gap:9px;margin-top:12px}
 .cmt:first-child{margin-top:0}
+.cmt-vote{flex:none;display:flex;flex-direction:column;align-items:center;width:30px;margin-top:-2px}
+.cmt-vote .vb{width:30px;height:24px;padding:0;font-size:15px;line-height:24px;text-align:center;color:var(--fg2);opacity:.7}
+.cmt-vote .vb.off{opacity:.2}
+.cmt-vote .vb.up{color:#ff6a00;opacity:1}
+.cmt-vote .vb.down{color:#5e7bff;opacity:1}
+.cmt-vote b{font-size:13.5px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--fg2);line-height:1.2}
+.cmt-vote b.pos{color:#ff6a00}
+.cmt-vote b.neg{color:#5e7bff}
 .cmt-av{flex:none;padding:0;line-height:0}
 .cmt-av .av{width:34px;height:34px;font-size:16px}
 .cmt-av .av.emo{font-size:20px}
@@ -4704,6 +4719,7 @@ var CHANGELOG = [
     id: "2026-11-24",
     date: "2026/11/24",
     items: [
+      { kind: "new", text: "短評變成留言區：同一部片可以發好幾則，看到別人的可以推（▲）或噓（▼），預設依熱門排序" },
       { kind: "better", text: "個人檔案的頭像可以選表情符號，底色可以自訂任何顏色" },
       { kind: "new", text: "我的片單（設定 → 我的片單，網頁版）：用 Google 登入後，評過分、寫過短評、標記看過的片會集中在一起，換裝置也在" },
       { kind: "new", text: "可以取暱稱、公開個人頁，追蹤別人、看追蹤對象的動態；登入後短評可以寫到 140 字，公開的話旁邊會顯示暱稱" },
@@ -4857,7 +4873,7 @@ var App = class {
     // 短評頁上面寫短評的那一塊有沒有展開（預設收起來）
     this.noteFilter = "all";
     // 短評清單的篩選：all 全部／follow 追蹤中／clean 不看有雷的
-    this.noteSort = "new";
+    this.noteSort = "hot";
     this.rateOpenFor = "";
     // 哪一部片的「你的評分」是展開的（預設收起來，省空間）
     this.watchOpenFor = "";
@@ -4986,7 +5002,7 @@ var App = class {
   }
   /** 最新版本是多少。網頁版問的是自己網站現在上線的版本（重新整理就會拿到的那一版），不是 GitHub 上的 */
   checkVersion() {
-    if (true) return checkLatest("2026.11.24-2207");
+    if (true) return checkLatest("2026.11.24-2219");
     return (async () => {
       try {
         let r = await globalThis.fetch("/version.json?t=" + Date.now(), { cache: "no-store" });
@@ -4994,7 +5010,7 @@ var App = class {
         const latest = String((await r.json()).version || "");
         if (!latest) return null;
         const num = (v) => Number(v.replace(/\D/g, "")) || 0;
-        return { latest, isLatest: num("2026.11.24-2207") >= num(latest) };
+        return { latest, isLatest: num("2026.11.24-2219") >= num(latest) };
       } catch (_) {
         return null;
       }
@@ -5784,7 +5800,7 @@ var App = class {
         return;
       }
       try {
-        await sendFeedback(cat.id, text, false ? this.isStandalone() ? "web-app" : "web" : "scriptable", "2026.11.24-2207");
+        await sendFeedback(cat.id, text, false ? this.isStandalone() ? "web-app" : "web" : "scriptable", "2026.11.24-2219");
         this.fbDraft = "";
         this.fbCat = "";
         await this.ui.toast("已送出，謝謝你的回饋");
@@ -6096,7 +6112,7 @@ var App = class {
       this.settings.seenLog = CHANGELOG_LATEST;
       saveSettings(this.settings);
     }
-    return /* @__PURE__ */ h(Page, { title: "更新內容", subtitle: `目前版本 ${"2026.11.24-2207"}`, onBack: () => this.back() }, CHANGELOG.map((e) => /* @__PURE__ */ h(Section, { title: e.date }, e.items.map((it) => /* @__PURE__ */ h(Item, { title: it.text, tag: { text: it.kind === "new" ? "新功能" : "改進", tone: it.kind === "new" ? "now" : "soon" }, chevron: false })))), /* @__PURE__ */ h(Note, { text: "只列出比較有感的變動；修小錯、調整文字這類不會寫在這裡。" }));
+    return /* @__PURE__ */ h(Page, { title: "更新內容", subtitle: `目前版本 ${"2026.11.24-2219"}`, onBack: () => this.back() }, CHANGELOG.map((e) => /* @__PURE__ */ h(Section, { title: e.date }, e.items.map((it) => /* @__PURE__ */ h(Item, { title: it.text, tag: { text: it.kind === "new" ? "新功能" : "改進", tone: it.kind === "new" ? "now" : "soon" }, chevron: false })))), /* @__PURE__ */ h(Note, { text: "只列出比較有感的變動；修小錯、調整文字這類不會寫在這裡。" }));
   }
   async aboutView() {
     return /* @__PURE__ */ h(Page, { title: "關於", onBack: () => this.back() }, /* @__PURE__ */ h(Section, { hint: "連鎖影城的場次來自場次通（twshowtimes.com），感謝場次通的整理；其他來自開眼電影網，以及誠品、光點、樂聲、內惟戲院官網。實際場次以影城公告為準。" }, /* @__PURE__ */ h(Item, { icon: "ℹ️", title: "關於與資料來源", accent: true, chevron: false, onTap: () => Safari.open(ABOUT_URL) }), /* @__PURE__ */ h(Item, { icon: "🔒", title: "隱私權政策", accent: true, chevron: false, onTap: () => Safari.open(PRIVACY_URL) }), /* @__PURE__ */ h(Item, { icon: "🙏", title: "前往場次通", subtitle: "比較各影城場次、看上映場數排行", accent: true, chevron: false, onTap: () => Safari.open("https://twshowtimes.com/") })));
@@ -6127,11 +6143,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.24-2207"}`);
+          Pasteboard.copy(`版本 ${"2026.11.24-2219"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.24-2207"}`,
+      `版本 ${"2026.11.24-2219"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -6268,7 +6284,7 @@ var App = class {
     if (late.length) this.late = late;
     return { x: x ?? null, r: r ?? null, p: p || "", px, loading, c: c === void 0 ? communityCached(title) || void 0 : c };
   }
-  // 排序：new 最新／high 分數高到低／low 分數低到高
+  // 排序：hot 熱門／new 最新／top 最多推／high 評分高到低／low 評分低到高
   noteReset() {
     this.noteDraft = null;
     this.noteSpoil = null;
@@ -6290,25 +6306,32 @@ var App = class {
     const c = communityCached(title) || await communityStats(title).catch(() => null);
     const voted = c ? c.mine : 0;
     const notes = list ? list.notes : [];
-    const my = notes.find((n) => n.mine) || null;
-    const draft = this.noteDraft === null ? my ? my.x : "" : this.noteDraft;
-    const spoil = this.noteSpoil === null ? !!(my && my.sp) : this.noteSpoil;
+    const mineCount = notes.filter((n) => n.mine).length;
+    const maxMine = list && list.max || 5;
+    const draft = this.noteDraft === null ? "" : this.noteDraft;
+    const spoil = !!this.noteSpoil;
     const keep = (v) => {
       if (v && typeof v.x === "string") this.noteDraft = v.x;
     };
-    const send = async (text, sp) => {
+    const say = async (job, done) => {
       try {
-        await saveNote(title, text, sp);
-        this.noteReset();
-        await this.ui.toast(text ? "短評已送出" : "已刪除你的短評");
-        if (text) await this.askNickname();
+        await job;
+        if (done) await this.ui.toast(done);
+        return true;
       } catch (e) {
         await this.ui.toast(String(e?.message || e));
+        return false;
+      }
+    };
+    const send = async (text, sp) => {
+      if (await say(addNote(title, text, sp), "短評已送出")) {
+        this.noteReset();
+        await this.askNickname();
       }
     };
     const submit = async (v) => {
       keep(v);
-      const text = String(this.noteDraft === null ? draft : this.noteDraft).replace(/\s+/g, " ").trim();
+      const text = String(this.noteDraft === null ? "" : this.noteDraft).replace(/\s+/g, " ").trim();
       if (!text) {
         await this.ui.toast("先寫一句再送出");
         return;
@@ -6329,35 +6352,42 @@ var App = class {
     const hasSpoiler = notes.some((n) => n.sp);
     if (this.noteFilter === "follow" && !hasFollow) this.noteFilter = "all";
     if (this.noteFilter === "clean" && !hasSpoiler) this.noteFilter = "all";
-    const shown = notes.filter((n) => this.noteFilter === "follow" ? !!(n.by && n.by.f) || !!n.mine : this.noteFilter === "clean" ? !n.sp : true).sort((x, y) => this.noteSort === "high" ? y.s - x.s || y.at - x.at : this.noteSort === "low" ? x.s - y.s || y.at - x.at : y.at - x.at);
-    const SORTS = [{ id: "new", label: "最新" }, { id: "high", label: "分數高到低" }, { id: "low", label: "分數低到高" }];
+    const byNew = (x, y) => y.at - x.at || y.id - x.id;
+    const shown = notes.filter((n) => this.noteFilter === "follow" ? !!(n.by && n.by.f) || !!n.mine : this.noteFilter === "clean" ? !n.sp : true).sort((x, y) => this.noteSort === "new" ? byNew(x, y) : this.noteSort === "top" ? (y.p || 0) - (x.p || 0) || byNew(x, y) : this.noteSort === "high" ? y.s - x.s || byNew(x, y) : this.noteSort === "low" ? x.s - y.s || byNew(x, y) : noteHot(y) - noteHot(x) || byNew(x, y));
+    const SORTS = [{ id: "hot", label: "熱門" }, { id: "new", label: "最新" }, { id: "top", label: "最多推" }, { id: "high", label: "評分高到低" }, { id: "low", label: "評分低到高" }];
     const editing = this.noteEdit || !!this.noteAsk;
-    const unsent = this.noteDraft !== null && this.noteDraft.trim() !== (my ? my.x : "");
+    const unsent = !!draft.trim();
     const row = (n) => {
-      const open = !n.sp || this.noteShown.indexOf(n.id) >= 0;
+      const p = n.p || 0;
+      const sunk = p <= NOTE_FOLD_AT && !n.mine;
+      const open = !n.sp && !sunk || this.noteShown.indexOf(n.id) >= 0;
       const reported = !!list && list.reported.indexOf(n.id) >= 0;
       const who = n.by ? n.by.name : n.mine ? "我" : "匿名";
       const toProfile = n.by ? (v) => {
         keep(v);
         this.go(() => this.profileView(n.by.name), "讀取個人頁…");
       } : void 0;
-      return /* @__PURE__ */ h("div", { class: "cmt" + (n.mine ? " mine" : "") }, n.by ? /* @__PURE__ */ h("button", { class: "cmt-av", "aria-label": `${n.by.name} 的個人頁`, onTap: toProfile }, this.avatar(n.by)) : /* @__PURE__ */ h("span", { class: "cmt-av" }, /* @__PURE__ */ h("span", { class: "av anon", "aria-hidden": "true" }, n.mine ? "我" : "匿")), /* @__PURE__ */ h("div", { class: "cmt-main" }, /* @__PURE__ */ h("div", { class: "cmt-bub" }, /* @__PURE__ */ h("div", { class: "cmt-head" }, toProfile ? /* @__PURE__ */ h("button", { class: "cmt-name", onTap: toProfile }, esc(who)) : /* @__PURE__ */ h("span", { class: "cmt-name dim" }, esc(who)), n.s ? /* @__PURE__ */ h("span", { class: "nt-score " + ratingTier("imdb", n.s) }, n.s, " 分") : null, n.sp ? /* @__PURE__ */ h("span", { class: "nt-sp" }, "可能有雷") : null), open ? /* @__PURE__ */ h("div", { class: "cmt-text" }, esc(n.x)) : /* @__PURE__ */ h("button", { class: "nt-cover", onTap: (v) => {
+      const vote = (dir) => async (v) => {
+        keep(v);
+        await say(voteNote(title, n.id, n.my === dir ? 0 : dir), "");
+      };
+      return /* @__PURE__ */ h("div", { class: "cmt" + (n.mine ? " mine" : "") }, /* @__PURE__ */ h("div", { class: "cmt-vote" }, n.mine ? /* @__PURE__ */ h("span", { class: "vb off", "aria-hidden": "true" }, "▲") : /* @__PURE__ */ h("button", { class: "vb" + (n.my === 1 ? " up" : ""), "aria-label": "推", "aria-pressed": n.my === 1 ? "true" : "false", onTap: vote(1) }, "▲"), /* @__PURE__ */ h("b", { class: p > 0 ? "pos" : p < 0 ? "neg" : "", "aria-label": `推減噓：${p}` }, p), n.mine ? /* @__PURE__ */ h("span", { class: "vb off", "aria-hidden": "true" }, "▼") : /* @__PURE__ */ h("button", { class: "vb" + (n.my === -1 ? " down" : ""), "aria-label": "噓", "aria-pressed": n.my === -1 ? "true" : "false", onTap: vote(-1) }, "▼")), n.by ? /* @__PURE__ */ h("button", { class: "cmt-av", "aria-label": `${n.by.name} 的個人頁`, onTap: toProfile }, this.avatar(n.by)) : /* @__PURE__ */ h("span", { class: "cmt-av" }, /* @__PURE__ */ h("span", { class: "av anon", "aria-hidden": "true" }, n.mine ? "我" : "匿")), /* @__PURE__ */ h("div", { class: "cmt-main" }, /* @__PURE__ */ h("div", { class: "cmt-bub" }, /* @__PURE__ */ h("div", { class: "cmt-head" }, toProfile ? /* @__PURE__ */ h("button", { class: "cmt-name", onTap: toProfile }, esc(who)) : /* @__PURE__ */ h("span", { class: "cmt-name dim" }, esc(who)), n.s ? /* @__PURE__ */ h("span", { class: "nt-score " + ratingTier("imdb", n.s) }, n.s, " 分") : null, n.sp ? /* @__PURE__ */ h("span", { class: "nt-sp" }, "可能有雷") : null), open ? /* @__PURE__ */ h("div", { class: "cmt-text" }, esc(n.x)) : /* @__PURE__ */ h("button", { class: "nt-cover", onTap: (v) => {
         keep(v);
         this.noteShown = [...this.noteShown, n.id];
-      } }, "這則可能有雷，點一下顯示")), /* @__PURE__ */ h("div", { class: "cmt-foot" }, /* @__PURE__ */ h("span", null, esc(noteDate(n.at))), n.by && n.by.f ? /* @__PURE__ */ h("span", { class: "f" }, "追蹤中") : null, n.mine && n.by ? /* @__PURE__ */ h("span", null, "我") : null, n.mine && n.hidden ? /* @__PURE__ */ h("span", { class: "warn" }, "已被隱藏") : null, n.mine ? /* @__PURE__ */ h("button", { onTap: (v) => {
+      } }, sunk && !n.sp ? "這則被噓到摺疊了，點一下顯示" : "這則可能有雷，點一下顯示")), /* @__PURE__ */ h("div", { class: "cmt-foot" }, /* @__PURE__ */ h("span", null, esc(noteDate(n.at))), n.by && n.by.f ? /* @__PURE__ */ h("span", { class: "f" }, "追蹤中") : null, n.mine && n.by ? /* @__PURE__ */ h("span", null, "我") : null, n.mine && n.hidden ? /* @__PURE__ */ h("span", { class: "warn" }, "已被隱藏（別人看不到）") : null, n.mine ? /* @__PURE__ */ h("button", { onTap: async (v) => {
         keep(v);
-        this.noteEdit = true;
-      } }, "修改") : reported ? /* @__PURE__ */ h("span", null, "已檢舉") : /* @__PURE__ */ h("button", { "aria-label": "檢舉這則短評", onTap: (v) => {
+        await say(deleteNote(title, n.id), "已刪除");
+      } }, "刪除") : reported ? /* @__PURE__ */ h("span", null, "已檢舉") : /* @__PURE__ */ h("button", { "aria-label": "檢舉這則短評", onTap: (v) => {
         keep(v);
         this.go(() => this.reportView(title, n));
       } }, "檢舉"))));
     };
-    return /* @__PURE__ */ h(Page, { title: "短評", subtitle: `《${title}》`, onBack: () => this.back() }, /* @__PURE__ */ h(Section, null, !voted ? /* @__PURE__ */ h(Note, { text: "先替這部片評分，就可以寫一句短評。" }) : !editing ? (
+    return /* @__PURE__ */ h(Page, { title: "短評", subtitle: `《${title}》`, onBack: () => this.back() }, /* @__PURE__ */ h(Section, null, !voted ? /* @__PURE__ */ h(Note, { text: "先替這部片評分，就可以寫短評。推和噓不用先評分。" }) : mineCount >= maxMine ? /* @__PURE__ */ h(Note, { text: `這部片你已經發了 ${maxMine} 則，先刪掉一則才能再發。` }) : !editing ? (
       // 收起來的樣子：像留言區最上面那一格「寫點什麼…」，點了才展開
       /* @__PURE__ */ h("button", { class: "cmt-new", onTap: () => {
         this.noteEdit = true;
-      } }, /* @__PURE__ */ h("span", { class: "cmt-new-box" + (unsent ? " draft" : "") }, unsent ? esc(draft) : my ? esc(my.x) : `${NOTE_PLACEHOLDER}…`), /* @__PURE__ */ h("i", null, unsent ? "還沒送出，繼續寫" : my ? "修改" : "寫短評"))
-    ) : /* @__PURE__ */ h("div", { class: "nt-form" }, my && my.hidden ? /* @__PURE__ */ h(Note, { kind: "warn", text: "你的短評被多人檢舉，目前別人看不到。可以修改後重新送出。" }) : null, /* @__PURE__ */ h("button", { class: "hid", "data-fold": "", "aria-hidden": "true", tabindex: "-1", onTap: (v) => {
+      } }, /* @__PURE__ */ h("span", { class: "cmt-new-box" + (unsent ? " draft" : "") }, unsent ? esc(draft) : `${NOTE_PLACEHOLDER}…`), /* @__PURE__ */ h("i", null, unsent ? "還沒送出，繼續寫" : "寫短評"))
+    ) : /* @__PURE__ */ h("div", { class: "nt-form" }, /* @__PURE__ */ h("button", { class: "hid", "data-fold": "", "aria-hidden": "true", tabindex: "-1", onTap: (v) => {
       keep(v);
       if (!this.noteAsk) this.noteEdit = false;
     } }), /* @__PURE__ */ h("textarea", { class: "fb-area note", name: "x", maxlength: String(noteMax()), placeholder: `${NOTE_PLACEHOLDER}（最多 ${noteMax()} 字）` }, esc(draft)), this.noteAsk ? /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: "這句看起來可能有雷。要標記「可能有雷」再送出嗎？" }), /* @__PURE__ */ h("div", { class: "cmt-row" }, /* @__PURE__ */ h("button", { onTap: () => {
@@ -6369,17 +6399,17 @@ var App = class {
       keep(v);
       await send(this.noteAsk, true);
     } }, "標記後送出"))) : (
-      // 一排搞定：左邊勾「可能有雷」，右邊刪除、取消、送出
+      // 一排搞定：左邊勾「可能有雷」，右邊取消、送出。發出去之後不能改（改了別人的推噓就不準了），只能刪掉重發
       /* @__PURE__ */ h("div", { class: "cmt-row" }, /* @__PURE__ */ h("button", { class: "cmt-spoil" + (spoil ? " on" : ""), "aria-pressed": spoil ? "true" : "false", "aria-label": "可能有雷：勾了以後預設摺疊，點了才會顯示", onTap: (v) => {
         keep(v);
         this.noteSpoil = !spoil;
-      } }, /* @__PURE__ */ h("i", null, spoil ? "✓" : ""), "可能有雷"), /* @__PURE__ */ h("span", { class: "sp" }), my ? /* @__PURE__ */ h("button", { class: "danger", onTap: () => send("", false) }, "刪除") : null, /* @__PURE__ */ h("button", { onTap: () => {
+      } }, /* @__PURE__ */ h("i", null, spoil ? "✓" : ""), "可能有雷"), /* @__PURE__ */ h("span", { class: "sp" }), /* @__PURE__ */ h("button", { onTap: () => {
         this.noteEdit = false;
         this.noteDraft = null;
         this.noteSpoil = null;
         this.noteAsk = "";
-      } }, "取消"), /* @__PURE__ */ h("button", { class: "go", onTap: submit }, my ? "更新" : "送出"))
-    ))), /* @__PURE__ */ h(Section, { title: `短評（${notes.length}）`, hint: `${NOTE_RULES}${notes.length ? "看到的話可以點「檢舉」。" : ""}` }, notes.length > 1 || hasFollow ? /* @__PURE__ */ h("div", { class: "cmt-bar" }, /* @__PURE__ */ h("div", { class: "cmt-filters" }, /* @__PURE__ */ h("button", { class: "cm-tag" + (this.noteFilter === "all" ? " on" : ""), onTap: (v) => {
+      } }, "取消"), /* @__PURE__ */ h("button", { class: "go", onTap: submit }, "送出"))
+    ), mineCount ? /* @__PURE__ */ h("div", { class: "cm-tagnote" }, "這部片你已經發了 ", mineCount, "／", maxMine, " 則。發出去之後不能修改，只能刪掉重發。") : null)), /* @__PURE__ */ h(Section, { title: `短評（${notes.length}）`, hint: `${NOTE_RULES}覺得說得好就推（▲），不認同就噓（▼）；被噓到 ${NOTE_FOLD_AT} 以下的會自動摺疊。看到違規的可以點「檢舉」。` }, notes.length > 1 || hasFollow ? /* @__PURE__ */ h("div", { class: "cmt-bar" }, /* @__PURE__ */ h("div", { class: "cmt-filters" }, /* @__PURE__ */ h("button", { class: "cm-tag" + (this.noteFilter === "all" ? " on" : ""), onTap: (v) => {
       keep(v);
       this.noteFilter = "all";
     } }, "全部"), hasFollow ? /* @__PURE__ */ h("button", { class: "cm-tag" + (this.noteFilter === "follow" ? " on" : ""), onTap: (v) => {
@@ -6390,7 +6420,7 @@ var App = class {
       this.noteFilter = "clean";
     } }, "不看有雷的") : null), /* @__PURE__ */ h("select", { class: "sel", name: "ns", "aria-label": "排序", onInput: (v) => {
       keep(v);
-      this.noteSort = v.ns || "new";
+      this.noteSort = v.ns || "hot";
     } }, SORTS.map((o) => /* @__PURE__ */ h("option", { value: o.id, selected: o.id === this.noteSort }, esc(o.label))))) : null, quiet.length ? /* @__PURE__ */ h("div", { class: "cmt-quiet" }, "你追蹤的人也評了分：", quiet.map((e) => /* @__PURE__ */ h("button", { onTap: (v) => {
       keep(v);
       this.go(() => this.profileView(e.by.name), "讀取個人頁…");
@@ -6682,7 +6712,7 @@ var App = class {
     if (false) {
       if (!r) return /* @__PURE__ */ h(Note, { text: "（無法確認是否為最新版：連不到網站）" });
       if (r.isLatest) return /* @__PURE__ */ h(Note, { text: "✅ 已是最新版" });
-      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.24-2207"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
+      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.24-2219"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
         globalThis.location.reload();
       } }));
     }

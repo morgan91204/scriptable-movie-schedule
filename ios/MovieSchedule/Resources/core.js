@@ -33,6 +33,7 @@
     FORMATS: () => FORMATS,
     MAPS_LABEL: () => MAPS_LABEL,
     META_URL: () => META_URL,
+    NOTE_FOLD_AT: () => NOTE_FOLD_AT,
     NOTE_MAX: () => NOTE_MAX,
     NOTE_PLACEHOLDER: () => NOTE_PLACEHOLDER,
     NOTE_RULES: () => NOTE_RULES,
@@ -62,6 +63,7 @@
     WINDOWS: () => WINDOWS,
     YEAR_RATINGS_URL: () => YEAR_RATINGS_URL,
     addDays: () => addDays,
+    addNote: () => addNote,
     adoptRatings: () => adoptRatings,
     atDayLive: () => atDayLive,
     baseTitle: () => baseTitle,
@@ -111,6 +113,7 @@
     communityVote: () => communityVote,
     dateLabel: () => dateLabel,
     datesOf: () => datesOf,
+    deleteNote: () => deleteNote,
     distanceKm: () => distanceKm,
     dropStaleCaches: () => dropStaleCaches,
     extractTmdbKey: () => extractTmdbKey,
@@ -210,6 +213,7 @@
     normImageUrl: () => normImageUrl,
     normTitle: () => normTitle,
     noteDate: () => noteDate,
+    noteHot: () => noteHot,
     noteLooksSpoiler: () => noteLooksSpoiler,
     noteMax: () => noteMax,
     notesCached: () => notesCached,
@@ -276,6 +280,7 @@
     tpeDate: () => tpeDate,
     twDayLive: () => twDayLive,
     twReleaseDate: () => twReleaseDate,
+    voteNote: () => voteNote,
     weekday: () => weekday,
     yearRatingKey: () => yearRatingKey,
     ytScore: () => ytScore
@@ -4010,6 +4015,11 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   function setNotesViaSite(on) {
     notesViaSite = on;
   }
+  var NOTE_FOLD_AT = -5;
+  var noteHot = (n) => {
+    const p = n.p || 0;
+    return Math.sign(p) * Math.log10(Math.max(Math.abs(p), 1)) + n.at / 1e3 / 45e3;
+  };
   var NOTE_MAX = 60;
   var NOTE_PLACEHOLDER = "不提劇情，說說看完的感覺";
   var NOTE_RULES = "請不要劇透、人身攻擊或貼廣告、連結。被多人檢舉的短評會自動摺疊或隱藏。";
@@ -4053,15 +4063,18 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   }
   async function notePost(path, title, body, fail) {
     const k = communityKey(title);
-    const viaSite = signedIn() || notesViaSite && path === "report";
+    const viaSite = signedIn() || notesViaSite && (path === "report" || path === "note-vote");
     const r = viaSite ? await socialCall(path, { m: k, title: baseTitle(title), ...body }).then((x) => ({ status: x.status, body: JSON.stringify(x.data) })) : await platform().fetchText(`${COMMUNITY_API}/v2/${path}`, { accept: "application/json", "content-type": "application/json" }, { method: "POST", body: JSON.stringify({ m: k, d: deviceId(), ...body }) });
     if (r.status === 429) throw new Error("操作太頻繁，請稍後再試");
     if (r.status === 409) throw new Error("要先評分才能寫短評");
-    if (r.status === 422) throw new Error(/too long/.test(r.body) ? `短評最多 ${noteMax()} 個字` : "短評不能放連結或聯絡方式");
+    if (r.status === 422) throw new Error(/too long/.test(r.body) ? `短評最多 ${noteMax()} 個字` : /too many notes/.test(r.body) ? "同一部片最多發 5 則短評，先刪掉一則再發" : /duplicate/.test(r.body) ? "這句你已經發過了" : "短評不能放連結或聯絡方式");
     if (r.status !== 200) throw new Error(fail);
     return keepNotes(k, JSON.parse(r.body));
   }
   var saveNote = (title, text, spoiler) => notePost("note", title, { x: String(text || "").trim(), sp: spoiler ? 1 : 0 }, "短評沒有送出，請稍後再試");
+  var addNote = (title, text, spoiler) => notePost("note-add", title, { x: String(text || "").trim(), sp: spoiler ? 1 : 0 }, "短評沒有送出，請稍後再試");
+  var deleteNote = (title, id) => notePost("note-del", title, { id }, "沒有刪掉，請稍後再試");
+  var voteNote = (title, id, v) => notePost("note-vote", title, { id, v }, "沒有送出，請稍後再試");
   var reportNote = (title, id, why) => notePost("report", title, { id, why }, "檢舉沒有送出，請稍後再試");
   var FEEDBACK_CATS = [
     { id: "bug", label: "問題回報", hint: "哪一頁、做了什麼、看到什麼（例如：某間影城的場次打不開）" },
@@ -4410,7 +4423,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   var extra = { boxOffice, filmList, soonList, nowShowing, nowShowingMulti, movieBoard: movieBoard2, festivalBoard, festivalFilm, nearby, patchSettings, fillMovie, formatList };
   var BRIDGE_LEVEL = 2;
   globalThis.MS = {
-    version: "2026.11.24-2207",
+    version: "2026.11.24-2219",
     level: BRIDGE_LEVEL,
     init(saved) {
       cache = saved || {};

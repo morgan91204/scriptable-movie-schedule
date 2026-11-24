@@ -328,6 +328,14 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .cmt-list{padding:10px 16px 14px}
 .cmt{display:flex;align-items:flex-start;gap:9px;margin-top:12px}
 .cmt:first-child{margin-top:0}
+.cmt-vote{flex:none;display:flex;flex-direction:column;align-items:center;width:30px;margin-top:-2px}
+.cmt-vote .vb{width:30px;height:24px;padding:0;font-size:15px;line-height:24px;text-align:center;color:var(--fg2);opacity:.7}
+.cmt-vote .vb.off{opacity:.2}
+.cmt-vote .vb.up{color:#ff6a00;opacity:1}
+.cmt-vote .vb.down{color:#5e7bff;opacity:1}
+.cmt-vote b{font-size:13.5px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--fg2);line-height:1.2}
+.cmt-vote b.pos{color:#ff6a00}
+.cmt-vote b.neg{color:#5e7bff}
 .cmt-av{flex:none;padding:0;line-height:0}
 .cmt-av .av{width:34px;height:34px;font-size:16px}
 .cmt-av .av.emo{font-size:20px}
