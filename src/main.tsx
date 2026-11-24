@@ -646,6 +646,37 @@ class App {
     if (r && r.data && r.at > sy.at()) { applyLocal(syncApply(this.settings, r.data as Partial<SyncData>)); sy.setAt(r.at); }
   }
   /** 設定頁的一列：點進去才是登入、同步、登出這些選項 */
+  meMem: { at: number; data: { user: Profile | null; counts: SocialCounts } } | null = null; // 設定頁最上面的帳號資訊（一分鐘內不重讀）
+  /** 設定頁最上面：沒登入 = 用 Google 登入；登入了 = 帳號資訊（暱稱、Gmail、片單和追蹤的數字），以及片單、同步的入口 */
+  async accountSection(): Promise<string> {
+    const sy = this.sync();
+    if (!sy) return "";
+    if (!sy.on())
+      return (
+        <Section title="帳號" hint="登入後：收藏和設定會跟著帳號走；評過的片會記成片單；可以取暱稱、公開個人頁、追蹤別人。不登入也能照常使用。">
+          <Item icon="👤" title="用 Google 登入" subtitle="同步收藏、記錄片單、追蹤朋友" accent onTap={() => sy.login()} />
+        </Section>
+      );
+    if (!this.meMem || Date.now() - this.meMem.at > 60e3) {
+      // 最多等 0.9 秒，不拖慢設定頁；等不到先顯示「讀取中」，下次重畫就有了
+      const job = social<{ user: Profile | null; counts: SocialCounts }>("me").then((d) => { this.meMem = { at: Date.now(), data: d }; }, () => undefined);
+      await Promise.race([job, sleep(900)]);
+    }
+    const me = this.meMem ? this.meMem.data : null;
+    const email = String((sy.email && sy.email()) || "");
+    const open = () => { this.diaryTab = "mine"; this.diaryMem = null; this.go(() => this.diaryView(), "讀取片單…"); };
+    const u = me && me.user;
+    const status = !me ? "讀取中…" : !u ? "還沒取暱稱" : u.hidden ? "個人頁被站長停用" : u.pub ? "個人頁公開中" : "個人頁不公開";
+    return (
+      <Section title="帳號">
+        <div role="button" onTap={open}>
+          {this.profileCard({ name: u ? u.name : me ? "還沒取暱稱" : "已登入", color: u ? u.color : "gray" }, me ? me.counts : null, [email, status].filter(Boolean).join("｜"))}
+        </div>
+        <Item icon="🎞" title="我的片單" subtitle={u ? "看過的片、評分和短評；動態、找人" : "取暱稱、記錄看過的片、追蹤別人"} onTap={open} />
+        <Item icon="🔄" title="同步與登出" subtitle="收藏和設定自動同步中" onTap={() => this.go(() => this.syncView())} />
+      </Section>
+    );
+  }
   syncLink(): string {
     const sy = this.sync();
     if (!sy) return "";
@@ -715,7 +746,7 @@ class App {
       return (
         <Page title="我的片單" onBack={() => this.back()}>
           <Section hint="登入後，你評過分、寫過短評的片會集中在這裡，換裝置也在；還可以標記看過的日期。想要的話可以取一個暱稱、公開個人頁，讓別人追蹤你，也去追蹤別人。不登入也能照常匿名評分。">
-            <Item icon="🎞" title="用 Google 登入，開始記錄" subtitle="我們只存帳號的識別碼（經過雜湊），不存 email 和姓名" accent onTap={() => sy && sy.login()} />
+            <Item icon="🎞" title="用 Google 登入，開始記錄" subtitle="伺服器只存帳號的識別碼（經過雜湊）；email 只留在這台裝置上顯示用" accent onTap={() => sy && sy.login()} />
           </Section>
         </Page>
       );
@@ -821,7 +852,7 @@ class App {
             <Button label="儲存" onTap={async (v) => {
               keep(v);
               const p = this.profileDraft!;
-              try { await social("profile-set", { name: p.name.trim(), color: p.color, pub: p.pub }); this.profileDraft = null; this.hasProfile = true; setProfileSkipped(false); await this.ui.toast(first ? "暱稱設定好了" : "已儲存"); if (!first || pushed) this.back(); } catch (e) { await this.ui.toast(String((e as Error)?.message || e)); }
+              try { await social("profile-set", { name: p.name.trim(), color: p.color, pub: p.pub }); this.profileDraft = null; this.hasProfile = true; this.meMem = null; setProfileSkipped(false); await this.ui.toast(first ? "暱稱設定好了" : "已儲存"); if (!first || pushed) this.back(); } catch (e) { await this.ui.toast(String((e as Error)?.message || e)); }
             }} />
             {first ? <Button label="稍後再說" kind="secondary" onTap={() => { setProfileSkipped(true); this.profileDraft = null; if (pushed) this.back(); }} /> : null}
           </div>
@@ -1122,7 +1153,7 @@ class App {
             <Section title="站長" hint="存在伺服器的加密設定裡，任何人都讀不出來、這裡也改不到（避免被誤刪而進不來）。要換的話到 Cloudflare 後台改。">
               {root.map((e) => <Item icon="👑" title={e} chevron={false} />)}
             </Section>
-            <Section title={`其他管理員（${extra.length}）`} hint="新增後，對方要在「設定 → 同步」用「管理員登入」登入那個 Google 帳號。移除後立刻失效。">
+            <Section title={`其他管理員（${extra.length}）`} hint="新增後，對方要登出再用那個 Google 帳號重新登入一次才會生效。移除後立刻失效。">
               {extra.map((e) => <Item icon="👤" title={e} chevron={false} action={{ label: "移除", hint: "移除這位管理員", onTap: change("remove", e, "已移除") }} />)}
               <div class="nt-form">
                 <input class="field" name="e" type="email" autocomplete="off" autocapitalize="off" placeholder="要新增的 Google 帳號（email）" />
@@ -1143,7 +1174,7 @@ class App {
       <Page title="用 Google 帳號同步" onBack={() => this.back()}>
         {this.syncSection()}
         {who && who.admin ? (
-          <Section title="管理員專區" hint="只有管理員名單裡的 Google 帳號、用「管理員登入」登入後才看得到這一區。">
+          <Section title="管理員專區" hint="只有管理員名單裡的 Google 帳號登入後才看得到這一區。">
             <Item icon="💬" title="意見回饋" subtitle="看使用者的回饋、回覆、標處理狀態" onTap={() => { this.adminFbTab = "open"; this.go(() => this.adminFeedbackView(), "讀取回饋…"); }} />
             <Item icon="🛡" title="短評管理" subtitle="複查被檢舉的短評，或巡一遍最近的短評" onTap={() => { this.adminTab = "flagged"; this.go(() => this.adminNotesView(), "讀取短評…"); }} />
             <Item icon="🪪" title="帳號管理" subtitle="被檢舉的帳號：停用個人頁、強制改暱稱" onTap={() => { this.adminUserQ = ""; this.go(() => this.adminUsersView(), "讀取帳號…"); }} />
@@ -1212,9 +1243,8 @@ class App {
     if (!sy) return "";
     if (!sy.on())
       return (
-        <Section hint={this.syncNote || "登入後，收藏影城、收藏電影、收藏發行商和各項設定會存到你的帳號，在別的裝置或瀏覽器登入同一個帳號就會帶過來。我們只存帳號的識別碼（經過雜湊）和設定，不存 email 和姓名。不登入也能照常使用。"}>
+        <Section hint={this.syncNote || "登入後，收藏影城、收藏電影、收藏發行商和各項設定會存到你的帳號，在別的裝置或瀏覽器登入同一個帳號就會帶過來。伺服器只存帳號的識別碼（經過雜湊）和設定；你的 email 只留在這台裝置上顯示用，伺服器不存。不登入也能照常使用。"}>
           <Item icon="🔄" title="用 Google 登入來同步" subtitle="例如讓主畫面的 App 和 Safari 用同一份收藏" accent onTap={() => sy.login()} />
-          <Item icon="🛡" title="管理員登入" subtitle="站長用；一般使用者不需要。會向 Google 確認你的 email 是不是管理員" onTap={() => sy.login(true)} />
         </Section>
       );
     return (
@@ -1224,7 +1254,7 @@ class App {
           if (r && r.data && r.at > sy.at()) { this.syncMute = true; this.settings = syncApply(this.settings, r.data as Partial<SyncData>); saveSettings(this.settings); this.syncMute = false; sy.setAt(r.at); this.pushSync(); await this.ui.toast("已帶入帳號裡比較新的設定"); }
           else await this.ui.toast((await sy.push(syncPick(this.settings))) ? "已同步" : "同步失敗，請稍後再試");
         }} />
-        <Item icon="🚪" title="登出" subtitle="這台的收藏會留著，只是不再同步" chevron={false} onTap={async () => { await sy.logout(); forgetMyVotes(); this.syncWho = null; this.diaryMem = null; this.hasProfile = null; this.syncNote = ""; await this.ui.toast("已登出"); }} />
+        <Item icon="🚪" title="登出" subtitle="這台的收藏會留著，只是不再同步" chevron={false} onTap={async () => { await sy.logout(); forgetMyVotes(); this.syncWho = null; this.diaryMem = null; this.meMem = null; this.hasProfile = null; this.syncNote = ""; await this.ui.toast("已登出"); }} />
         <Item icon="🗑" title="刪除帳號裡的資料並登出" subtitle="伺服器上的設定、片單、暱稱和你用帳號評的分都會刪掉，所有裝置都會登出；這台的收藏會留著" chevron={false} onTap={async () => { await this.wipeSocial().catch(() => undefined); await sy.wipe(); this.syncWho = null; this.syncNote = ""; await this.ui.toast("已刪除並登出"); }} />
       </Section>
     );
@@ -1451,6 +1481,7 @@ class App {
     this.calendarName = (await currentCalendar(this.settings)).title;
     return (
       <Page title="設定">
+        {await this.accountSection()}
         <Section title="加入行事曆時" hint={`廣告預告：${ADS_NOTE}`}>
           <Item icon="📅" title="寫入的行事曆" subtitle={this.calendarName} onTap={() => this.go(() => this.calendarView())} />
           <Item icon="📺" title="廣告預告" subtitle={`預計散場時間會加上 ${this.settings.ads} 分鐘`} right="點一下切換" chevron={false} onTap={() => this.cycleAds()} />
@@ -1465,12 +1496,6 @@ class App {
           <Item icon="🏢" title="收藏發行商" subtitle="搜尋發行商、增加或取消收藏" right={(this.settings.favIssuers || []).length ? `${(this.settings.favIssuers || []).length} 家` : "還沒有"} onTap={() => { this.issuerQuery = ""; this.go(() => this.issuerManageView(), "讀取發行商…"); }} />
         </Section>
         {await this.notifyLink()}
-        {this.sync() ? (
-          <Section title="我的片單">
-            <Item icon="🎞" title="我的片單" subtitle={signedIn() ? "看過的片、評分和短評；追蹤的人的動態" : "登入後記錄看過的片，也能公開個人頁、追蹤別人"} onTap={() => { this.diaryTab = "mine"; this.diaryMem = null; this.go(() => this.diaryView(), "讀取片單…"); }} />
-          </Section>
-        ) : null}
-        {this.syncLink()}
         <Section title="關於">
           {IS_WEB && !this.isStandalone() ? <Item icon="📲" title="加到主畫面" subtitle="像 App 一樣從主畫面開啟，看圖示教學" onTap={() => this.go(() => this.installView())} /> : null}
           <Item icon="ℹ️" title="關於" subtitle="資料來源、隱私權政策、場次通" onTap={() => this.go(() => this.aboutView())} />

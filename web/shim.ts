@@ -225,7 +225,15 @@ window.addEventListener("pageshow", (e) => { if ((e as PageTransitionEvent).pers
 // ── 用 Google 登入同步設定 ──
 // 登入：整頁跳到 Google，回來時身分憑證在網址的 # 後面（不經過伺服器的網址紀錄）；拿它跟我們的伺服器換一張登入憑證存在這台。
 const GOOGLE_CLIENT_ID = "591652673833-vluv8bc246871jpv40ijqalpus3tm2ge.apps.googleusercontent.com";
-const SY = { token: "ms:sync-token", at: "ms:sync-at", nonce: "ms:sync-nonce" };
+const SY = { token: "ms:sync-token", at: "ms:sync-at", nonce: "ms:sync-nonce", email: "ms:sync-email" };
+/** 從 Google 的身分憑證裡讀出 email（只留在這台裝置上，給設定頁顯示「現在登入的是哪個帳號」；伺服器不存） */
+const emailOf = (idToken: string): string => {
+  try {
+    const part = idToken.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+    const c = JSON.parse(decodeURIComponent(Array.from(atob(part), (ch) => "%" + ch.charCodeAt(0).toString(16).padStart(2, "0")).join("")));
+    return c && c.email && (c.email_verified === true || c.email_verified === "true") ? String(c.email).slice(0, 120) : "";
+  } catch (_) { return ""; }
+};
 const lsGet = (k: string) => { try { return localStorage.getItem(k) || ""; } catch (_) { return ""; } };
 const lsSet = (k: string, v: string) => { try { if (v) localStorage.setItem(k, v); else localStorage.removeItem(k); } catch (_) {} };
 const syncPost = async (path: string, body: Record<string, unknown>): Promise<any> => {
@@ -236,13 +244,14 @@ const syncPost = async (path: string, body: Record<string, unknown>): Promise<an
 g.__sync = {
   on: () => !!lsGet(SY.token),
   token: () => lsGet(SY.token) || "",
+  email: () => (lsGet(SY.token) ? lsGet(SY.email) || "" : ""),
   at: () => Number(lsGet(SY.at)) || 0,
   setAt: (at: number) => lsSet(SY.at, String(at || "")),
   login(admin?: boolean) {
     const raw = new Uint8Array(16); crypto.getRandomValues(raw);
     const nonce = Array.from(raw).map((x) => x.toString(16).padStart(2, "0")).join("");
     lsSet(SY.nonce, nonce);
-    location.href = "https://accounts.google.com/o/oauth2/v2/auth?" + new URLSearchParams({ client_id: GOOGLE_CLIENT_ID, redirect_uri: location.origin + "/api/auth/google", response_type: "id_token", scope: admin ? "openid email" : "openid", nonce, prompt: "select_account" }).toString();
+    location.href = "https://accounts.google.com/o/oauth2/v2/auth?" + new URLSearchParams({ client_id: GOOGLE_CLIENT_ID, redirect_uri: location.origin + "/api/auth/google", response_type: "id_token", scope: "openid email", nonce, prompt: "select_account" }).toString();
   },
   /** 剛從 Google 回來的話，把登入完成：回傳 "ok"／"fail"；不是剛回來回傳 "" */
   async finish(): Promise<string> {
@@ -257,6 +266,7 @@ g.__sync = {
       const r = await syncPost("login", { id_token: idToken, nonce });
       if (!r || !r.token) return "fail";
       lsSet(SY.token, r.token);
+      lsSet(SY.email, emailOf(idToken));
       lsSet(SY.at, "");
       return "ok";
     } catch (_) { return "fail"; }
@@ -291,8 +301,8 @@ g.__sync = {
     if (r.result && r.result.error) throw new Error("動作沒有完成（" + r.result.error + "）");
     return r.result;
   },
-  async logout(): Promise<void> { const t = lsGet(SY.token); lsSet(SY.token, ""); lsSet(SY.at, ""); if (t) await syncPost("logout", { token: t }).catch(() => null); },
-  async wipe(): Promise<void> { const t = lsGet(SY.token); lsSet(SY.token, ""); lsSet(SY.at, ""); if (t) await syncPost("wipe", { token: t }).catch(() => null); },
+  async logout(): Promise<void> { const t = lsGet(SY.token); lsSet(SY.token, ""); lsSet(SY.email, ""); lsSet(SY.at, ""); if (t) await syncPost("logout", { token: t }).catch(() => null); },
+  async wipe(): Promise<void> { const t = lsGet(SY.token); lsSet(SY.token, ""); lsSet(SY.email, ""); lsSet(SY.at, ""); if (t) await syncPost("wipe", { token: t }).catch(() => null); },
 };
 
 // ── 收藏電影通知（Web Push）──
