@@ -173,7 +173,8 @@ class App {
     if (IS_WEB && this.tab === "home" && this.stack.length === 1 && !/[?&](u|tab|fav|c|m)=/.test(String((globalThis as any).location?.search || ""))) {
       if (this.isStandalone()) {
         // 第一次從主畫面的圖示開啟：問要不要開通知（只問這一次；之後寫短評、追蹤別人時還會再問）
-        if (!this.settings.firstRunAsked) { this.settings.firstRunAsked = true; saveSettings(this.settings); await this.askNotify(true).catch(() => undefined); }
+        // 問完通知（不管開不開）接著問要不要用 Google 登入；這台已經開了通知或不支援通知的，直接問登入
+        if (!this.settings.firstRunAsked) { this.settings.firstRunAsked = true; saveSettings(this.settings); if (!(await this.askNotify(true).catch(() => false))) this.askLogin(); }
       } else if (!this.settings.installSeen) {
         // 第一次用瀏覽器打開：先告訴他可以加到主畫面（可以跳過，之後首頁最上面還有一條提醒）
         this.settings.installSeen = Date.now(); saveSettings(this.settings);
@@ -1204,15 +1205,42 @@ class App {
     }}>{esc(label)}</button>;
   }
   /** 寫了短評、回覆或追蹤別人之後：還沒開通知的話問一次要不要開（只問一次；之後社群頁籤上還是有一條提醒） */
-  async askNotify(first = false): Promise<void> {
+  /** 第一次從主畫面開啟：問完通知之後，邀請用 Google 登入（只問這一次；已經登入的不問） */
+  askLogin(): void {
+    const sy = this.sync();
+    if (!sy || sy.on()) return;
+    this.go(() => (
+      <Page title="歡迎使用片刻" onBack={() => this.back()}>
+        <Section>
+          <div class="nb-ask">
+            <div class="nb-ico" aria-hidden="true">👤</div>
+            <b>用 Google 帳號登入</b>
+            <p>不登入也能查場次。登入之後多這些：</p>
+          </div>
+          <Item icon="💾" title="紀錄不會不見" subtitle="收藏、評分、看過的片存在帳號裡，換手機或重裝都還在" chevron={false} />
+          <Item icon="🎞" title="自己的片單" subtitle="評過分、寫過短評的片集中在一起，還能記觀影日期" chevron={false} />
+          <Item icon="👥" title="跟大家互動" subtitle="取暱稱、追蹤朋友、看他們最近看了什麼；有人回覆你會通知" chevron={false} />
+          <div class="nt-form">
+            <Button label="用 Google 登入" onTap={() => sy.login()} />
+            <Button label="先不用" kind="secondary" onTap={() => this.back()} />
+          </div>
+        </Section>
+        <p class="hint">伺服器只存帳號的識別碼（經過雜湊），email 只留在這台裝置上顯示用。之後也可以在「設定」最上面登入。</p>
+      </Page>
+    ));
+  }
+  /** 回傳有沒有真的跳出詢問頁 */
+  async askNotify(first = false): Promise<boolean> {
     const p = this.push();
     // 問過之後兩個禮拜內不再問（選了「稍後再說」的人，之後追蹤別人、寫短評時還會再問一次）
     const last = Number(this.settings.notifyAsked) || 0;
-    if (!p || (!first && !signedIn()) || Date.now() - last < 14 * 864e5) return;
+    if (!p || (!first && !signedIn()) || Date.now() - last < 14 * 864e5) return false;
     const st: string = await p.refresh().catch(() => "");
     this.pushSt = st;
-    if (st !== "off" && st !== "needs-install") return;
+    if (st !== "off" && st !== "needs-install") return false;
     this.settings.notifyAsked = Date.now(); saveSettings(this.settings);
+    // 第一次開啟時：按了開啟或稍後再說，接著問要不要登入
+    const next = () => { this.back(); if (first) this.askLogin(); };
     this.go(() => (
       <Page title={first ? "歡迎使用片刻" : "要開通知嗎？"} onBack={() => this.back()}>
         <Section>
@@ -1227,13 +1255,14 @@ class App {
           <div class="nt-form">
             {this.pushSt === "needs-install"
               ? <Button label="看怎麼加入主畫面" onTap={() => { this.back(); this.go(() => this.notifyView(), "讀取中…"); }} />
-              : this.notifyButton("開啟通知", "btn primary", () => this.back())}
-            <Button label="稍後再說" kind="secondary" onTap={() => this.back()} />
+              : this.notifyButton("開啟通知", "btn primary", next)}
+            <Button label="稍後再說" kind="secondary" onTap={next} />
           </div>
         </Section>
         <p class="hint">之後可以在 設定 → 通知 隨時開關，也可以只關掉其中幾種。</p>
       </Page>
     ));
+    return true;
   }
   /** 社群頁籤最上面的提醒：這台還沒開通知（可以按掉，按掉後只在「通知」那一格裡留著） */
   pushNudge(): string {

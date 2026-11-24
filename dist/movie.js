@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.25-0123
+// @movie-schedule-app 電影行程 v2026.11.25-0126
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/brand.ts
@@ -5437,7 +5437,7 @@ var App = class {
   }
   /** 最新版本是多少。網頁版問的是自己網站現在上線的版本（重新整理就會拿到的那一版），不是 GitHub 上的 */
   checkVersion() {
-    if (true) return checkLatest("2026.11.25-0123");
+    if (true) return checkLatest("2026.11.25-0126");
     return (async () => {
       try {
         let r = await globalThis.fetch("/version.json?t=" + Date.now(), { cache: "no-store" });
@@ -5445,7 +5445,7 @@ var App = class {
         const latest = String((await r.json()).version || "");
         if (!latest) return null;
         const num = (v) => Number(v.replace(/\D/g, "")) || 0;
-        return { latest, isLatest: num("2026.11.25-0123") >= num(latest) };
+        return { latest, isLatest: num("2026.11.25-0126") >= num(latest) };
       } catch (_) {
         return null;
       }
@@ -5517,7 +5517,7 @@ var App = class {
         if (!this.settings.firstRunAsked) {
           this.settings.firstRunAsked = true;
           saveSettings(this.settings);
-          await this.askNotify(true).catch(() => void 0);
+          if (!await this.askNotify(true).catch(() => false)) this.askLogin();
         }
       } else if (!this.settings.installSeen) {
         this.settings.installSeen = Date.now();
@@ -6301,19 +6301,31 @@ var App = class {
     } }, esc(label));
   }
   /** 寫了短評、回覆或追蹤別人之後：還沒開通知的話問一次要不要開（只問一次；之後社群頁籤上還是有一條提醒） */
+  /** 第一次從主畫面開啟：問完通知之後，邀請用 Google 登入（只問這一次；已經登入的不問） */
+  askLogin() {
+    const sy = this.sync();
+    if (!sy || sy.on()) return;
+    this.go(() => /* @__PURE__ */ h(Page, { title: "歡迎使用片刻", onBack: () => this.back() }, /* @__PURE__ */ h(Section, null, /* @__PURE__ */ h("div", { class: "nb-ask" }, /* @__PURE__ */ h("div", { class: "nb-ico", "aria-hidden": "true" }, "👤"), /* @__PURE__ */ h("b", null, "用 Google 帳號登入"), /* @__PURE__ */ h("p", null, "不登入也能查場次。登入之後多這些：")), /* @__PURE__ */ h(Item, { icon: "💾", title: "紀錄不會不見", subtitle: "收藏、評分、看過的片存在帳號裡，換手機或重裝都還在", chevron: false }), /* @__PURE__ */ h(Item, { icon: "🎞", title: "自己的片單", subtitle: "評過分、寫過短評的片集中在一起，還能記觀影日期", chevron: false }), /* @__PURE__ */ h(Item, { icon: "👥", title: "跟大家互動", subtitle: "取暱稱、追蹤朋友、看他們最近看了什麼；有人回覆你會通知", chevron: false }), /* @__PURE__ */ h("div", { class: "nt-form" }, /* @__PURE__ */ h(Button, { label: "用 Google 登入", onTap: () => sy.login() }), /* @__PURE__ */ h(Button, { label: "先不用", kind: "secondary", onTap: () => this.back() }))), /* @__PURE__ */ h("p", { class: "hint" }, "伺服器只存帳號的識別碼（經過雜湊），email 只留在這台裝置上顯示用。之後也可以在「設定」最上面登入。")));
+  }
+  /** 回傳有沒有真的跳出詢問頁 */
   async askNotify(first = false) {
     const p = this.push();
     const last = Number(this.settings.notifyAsked) || 0;
-    if (!p || !first && !signedIn() || Date.now() - last < 14 * 864e5) return;
+    if (!p || !first && !signedIn() || Date.now() - last < 14 * 864e5) return false;
     const st = await p.refresh().catch(() => "");
     this.pushSt = st;
-    if (st !== "off" && st !== "needs-install") return;
+    if (st !== "off" && st !== "needs-install") return false;
     this.settings.notifyAsked = Date.now();
     saveSettings(this.settings);
+    const next = () => {
+      this.back();
+      if (first) this.askLogin();
+    };
     this.go(() => /* @__PURE__ */ h(Page, { title: first ? "歡迎使用片刻" : "要開通知嗎？", onBack: () => this.back() }, /* @__PURE__ */ h(Section, null, /* @__PURE__ */ h("div", { class: "nb-ask" }, /* @__PURE__ */ h("div", { class: "nb-ico", "aria-hidden": "true" }, "🔔"), /* @__PURE__ */ h("b", null, first ? "要開啟通知嗎？" : "有人回覆你的時候，馬上知道"), /* @__PURE__ */ h("p", null, first ? "開了通知，你收藏的電影開放場次、上映、快下檔時會通知你；登入之後，有人回覆、提到或追蹤你也會通知。每一種都可以各別關掉。" : "開了通知，有人回覆或提到你、追蹤你，手機會跳通知，主畫面的片刻圖示也會顯示數字。推和噓不會吵你，只會列在「社群」裡。"), this.pushSt === "needs-install" ? /* @__PURE__ */ h("p", { class: "nb-warn" }, "iPhone 要先把片刻「加入主畫面」，從主畫面打開才能開通知。") : null), /* @__PURE__ */ h("div", { class: "nt-form" }, this.pushSt === "needs-install" ? /* @__PURE__ */ h(Button, { label: "看怎麼加入主畫面", onTap: () => {
       this.back();
       this.go(() => this.notifyView(), "讀取中…");
-    } }) : this.notifyButton("開啟通知", "btn primary", () => this.back()), /* @__PURE__ */ h(Button, { label: "稍後再說", kind: "secondary", onTap: () => this.back() }))), /* @__PURE__ */ h("p", { class: "hint" }, "之後可以在 設定 → 通知 隨時開關，也可以只關掉其中幾種。")));
+    } }) : this.notifyButton("開啟通知", "btn primary", next), /* @__PURE__ */ h(Button, { label: "稍後再說", kind: "secondary", onTap: next }))), /* @__PURE__ */ h("p", { class: "hint" }, "之後可以在 設定 → 通知 隨時開關，也可以只關掉其中幾種。")));
+    return true;
   }
   /** 社群頁籤最上面的提醒：這台還沒開通知（可以按掉，按掉後只在「通知」那一格裡留著） */
   pushNudge() {
@@ -6664,7 +6676,7 @@ var App = class {
         return;
       }
       try {
-        await sendFeedback(cat.id, text, false ? this.isStandalone() ? "web-app" : "web" : "scriptable", "2026.11.25-0123");
+        await sendFeedback(cat.id, text, false ? this.isStandalone() ? "web-app" : "web" : "scriptable", "2026.11.25-0126");
         this.fbDraft = "";
         this.fbCat = "";
         await this.ui.toast("已送出，謝謝你的回饋");
@@ -7008,7 +7020,7 @@ var App = class {
       this.settings.seenLog = CHANGELOG_LATEST;
       saveSettings(this.settings);
     }
-    return /* @__PURE__ */ h(Page, { title: "更新內容", subtitle: `目前版本 ${"2026.11.25-0123"}`, onBack: () => this.back() }, CHANGELOG.map((e) => /* @__PURE__ */ h(Section, { title: e.date }, e.items.map((it) => /* @__PURE__ */ h(Item, { title: it.text, tag: { text: it.kind === "new" ? "新功能" : "改進", tone: it.kind === "new" ? "now" : "soon" }, chevron: false })))), /* @__PURE__ */ h(Note, { text: "只列出比較有感的變動；修小錯、調整文字這類不會寫在這裡。" }));
+    return /* @__PURE__ */ h(Page, { title: "更新內容", subtitle: `目前版本 ${"2026.11.25-0126"}`, onBack: () => this.back() }, CHANGELOG.map((e) => /* @__PURE__ */ h(Section, { title: e.date }, e.items.map((it) => /* @__PURE__ */ h(Item, { title: it.text, tag: { text: it.kind === "new" ? "新功能" : "改進", tone: it.kind === "new" ? "now" : "soon" }, chevron: false })))), /* @__PURE__ */ h(Note, { text: "只列出比較有感的變動；修小錯、調整文字這類不會寫在這裡。" }));
   }
   async aboutView() {
     return /* @__PURE__ */ h(Page, { title: "關於", onBack: () => this.back() }, /* @__PURE__ */ h(Section, { hint: "連鎖影城的場次來自場次通（twshowtimes.com），感謝場次通的整理；其他來自開眼電影網，以及誠品、光點、樂聲、內惟戲院官網。實際場次以影城公告為準。" }, /* @__PURE__ */ h(Item, { icon: "ℹ️", title: "關於與資料來源", accent: true, chevron: false, onTap: () => Safari.open(ABOUT_URL) }), /* @__PURE__ */ h(Item, { icon: "🔒", title: "隱私權政策", accent: true, chevron: false, onTap: () => Safari.open(PRIVACY_URL) }), /* @__PURE__ */ h(Item, { icon: "🙏", title: "前往場次通", subtitle: "比較各影城場次、看上映場數排行", accent: true, chevron: false, onTap: () => Safari.open("https://twshowtimes.com/") })));
@@ -7039,11 +7051,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.25-0123"}`);
+          Pasteboard.copy(`版本 ${"2026.11.25-0126"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.25-0123"}`,
+      `版本 ${"2026.11.25-0126"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -7688,7 +7700,7 @@ var App = class {
     if (false) {
       if (!r) return /* @__PURE__ */ h(Note, { text: "（無法確認是否為最新版：連不到網站）" });
       if (r.isLatest) return /* @__PURE__ */ h(Note, { text: "✅ 已是最新版" });
-      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.25-0123"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
+      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.25-0126"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
         globalThis.location.reload();
       } }));
     }
