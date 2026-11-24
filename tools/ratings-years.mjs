@@ -52,7 +52,9 @@ for (const y of Object.keys(years).sort().reverse()) { // 新的年份先查
     seen.add(k);
     const old = ratings[k];
     const fresh = Date.parse(x.release || "") > now - 180 * DAY; // 近半年上映的片分數還在變
-    if (old && !(fresh && today - (old.a || 0) >= 14)) continue;
+    // 爆米花 90% 以上的才可能是「認證熱門」：這個標記是後來才開始記的（x = 1 表示查過），沒查過的補查一次
+    const needHot = old && old.p >= 90 && !old.x;
+    if (old && !needHot && !(fresh && today - (old.a || 0) >= 14)) continue;
     if (!old && miss[k] && today - miss[k] < 60) continue;
     todo.push({ k, name: x.name, year: Number(String(x.release || "").slice(0, 4)) || 0, redo: !!old });
   }
@@ -105,10 +107,10 @@ await Promise.all(Array.from({ length: LANES }, async (_, lane) => {
       const r = await core.ratingsOfIdent(who);
       if (r.err && !(r.imdb || r.tomato || r.popcorn)) { failed++; streak++; continue; } // 連線問題：不記，下次再查
       streak = 0;
-      const rec = { id: who.id, a: today };
+      const rec = { id: who.id, a: today, x: 1 };
       if (r.imdb) { rec.i = r.imdb.score; rec.v = r.imdb.votes; }
       if (r.tomato) { rec.t = r.tomato.score; if (r.tomato.certified) rec.c = 1; }
-      if (r.popcorn) rec.p = r.popcorn.score;
+      if (r.popcorn) { rec.p = r.popcorn.score; if (r.popcorn.certified) rec.h = 1; }
       const u = ((r.tomato || r.popcorn || {}).url || "").match(/rottentomatoes\.com\/m\/([\w-]+)/);
       if (u) rec.u = u[1];
       ratings[m.k] = rec;

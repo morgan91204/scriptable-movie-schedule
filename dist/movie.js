@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.24-0806
+// @movie-schedule-app 電影行程 v2026.11.24-0823
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/parsers.gen.ts
@@ -1861,7 +1861,10 @@ async function loadMovies() {
         m.tomato = e.r.tomato.score;
         m.tomatoCert = !!e.r.tomato.certified;
       }
-      if (e?.r?.popcorn && typeof e.r.popcorn.score === "number") m.popcorn = e.r.popcorn.score;
+      if (e?.r?.popcorn && typeof e.r.popcorn.score === "number") {
+        m.popcorn = e.r.popcorn.score;
+        m.popcornCert = !!e.r.popcorn.certified;
+      }
       if (m.comingSoon && m.release && m.release <= today) {
         m.comingSoon = false;
         m.noShowToday = true;
@@ -2107,7 +2110,7 @@ function movieBoard(b, movies, opt = {}) {
         const t = r && r.t !== void 0 ? r.t : m ? m.tomato : void 0;
         const p = r && r.p !== void 0 ? r.p : m ? m.popcorn : void 0;
         if (rate === "tomato") return t !== void 0 ? { tier: 2, v: t, hi: { kind: "tomato", text: `${t}%`, tier: tomatoTier(t, r && r.t !== void 0 ? !!r.c : !!(m && m.tomatoCert)), note: tomatoLabel(t, r && r.t !== void 0 ? !!r.c : !!(m && m.tomatoCert)) } } : { tier: 0, v: 0, hi: noneHi("tomato") };
-        if (rate === "popcorn") return p !== void 0 ? { tier: 2, v: p, hi: { kind: "popcorn", text: `${p}%`, tier: ratingTier("pct", p) } } : { tier: 0, v: 0, hi: noneHi("popcorn") };
+        if (rate === "popcorn") return p !== void 0 ? { tier: 2, v: p, hi: { kind: "popcorn", text: `${p}%`, tier: popcornTier(p, r && r.p !== void 0 ? !!r.h : !!(m && m.popcornCert)), note: popcornLabel(p, r && r.p !== void 0 ? !!r.h : !!(m && m.popcornCert)) } } : { tier: 0, v: 0, hi: noneHi("popcorn") };
         return i ? { tier: i.few && fewLast ? 1 : 2, v: i.s, hi: { kind: "imdb", text: i.s.toFixed(1), tier: ratingTier("imdb", i.s), ...i.few ? { note: "評分人數少" } : {} } } : { tier: 0, v: 0, hi: noneHi("imdb") };
       }
       if (sort === "tickets" || sort === "price") return moneyKey(x);
@@ -2211,7 +2214,7 @@ function movieBoard(b, movies, opt = {}) {
   const none = (kind, note) => ({ kind, text: "–", tier: "none", ...note ? { note } : {} });
   const rated = (m) => {
     if (rate === "tomato") return m.tomato !== void 0 ? { tier: 2, v: m.tomato, hi: { kind: "tomato", text: `${m.tomato}%`, tier: tomatoTier(m.tomato, m.tomatoCert), note: tomatoLabel(m.tomato, m.tomatoCert) } } : { tier: 0, v: 0, hi: none("tomato") };
-    if (rate === "popcorn") return m.popcorn !== void 0 ? { tier: 2, v: m.popcorn, hi: { kind: "popcorn", text: `${m.popcorn}%`, tier: ratingTier("pct", m.popcorn) } } : { tier: 0, v: 0, hi: none("popcorn") };
+    if (rate === "popcorn") return m.popcorn !== void 0 ? { tier: 2, v: m.popcorn, hi: { kind: "popcorn", text: `${m.popcorn}%`, tier: popcornTier(m.popcorn, m.popcornCert), note: popcornLabel(m.popcorn, m.popcornCert) } } : { tier: 0, v: 0, hi: none("popcorn") };
     if (rate === "community") {
       const c = opt.community && opt.community[communityKey(m.title)] ? fromDist(opt.community[communityKey(m.title)], 0) : null;
       return c && c.n >= COMMUNITY_MIN ? { tier: 2, v: c.avg, hi: { kind: "community", text: c.avg.toFixed(1), tier: ratingTier("imdb", c.avg), note: `${c.n} 人` } } : { tier: 0, v: 0, hi: none("community", c && c.n ? `${c.n} 人，未滿 ${COMMUNITY_MIN} 人` : "") };
@@ -2914,7 +2917,7 @@ async function rtPage(url) {
     year = m ? Number(m[2]) : Number(String(o.dateCreated || "").slice(0, 4)) || 0;
   } catch (_) {
   }
-  return { critics: pct(d.criticsScore), certified: !!d.criticsScore?.certified, audience: pct(d.audienceScore), name, year };
+  return { critics: pct(d.criticsScore), certified: !!d.criticsScore?.certified, audience: pct(d.audienceScore), hot: !!d.audienceScore?.certified, avg: Number(d.audienceScore?.averageRating) || 0, count: String(d.audienceScore?.bandedRatingCount || "").slice(0, 60), name, year };
 }
 var normEn = (s) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
 async function rtFind(name, year) {
@@ -2980,7 +2983,7 @@ async function findRatings(title, en, slug, known) {
     const f = await rtFind(who.name, who.year);
     if (!f) return;
     if (f.s.critics >= 0) out.tomato = { score: f.s.critics, certified: f.s.certified, url: f.url };
-    if (f.s.audience >= 0) out.popcorn = { score: f.s.audience, url: f.url };
+    if (f.s.audience >= 0) out.popcorn = { score: f.s.audience, url: f.url, ...f.s.hot ? { certified: true } : {}, ...f.s.avg ? { avg: f.s.avg } : {}, ...f.s.count ? { count: f.s.count } : {} };
   })().catch(() => errs.push("爛番茄暫時讀不到"));
   await Promise.all([imdbJob, rtJob]);
   if (errs.length) out.err = errs.join("；");
@@ -3017,6 +3020,9 @@ var RATINGS_V = 2;
 function tomatoTier(score, certified) {
   return score < 60 ? "bad" : certified ? "good" : "mid";
 }
+var popcornTier = (score, certified) => score < 60 ? "bad" : certified ? "good" : "mid";
+var popcornLabel = (score, certified) => score < 60 ? "冷掉" : certified ? "認證熱門" : "熱門";
+var popcornCount = (s) => String(s || "").replace(/\s*Verified Ratings?/i, " 則已驗證評分").replace(/\s*Ratings?/i, " 則評分").replace(/Fewer than\s*/i, "不到 ").trim();
 var tomatoLabel = (score, certified) => score < 60 ? "腐爛" : certified ? "認證新鮮" : "新鮮";
 function ratingTier(kind, v) {
   const x = kind === "imdb" ? v * 10 : v;
@@ -3374,7 +3380,7 @@ function Section(props) {
 function Item(props) {
   const cls = ["item", props.head ? "head" : "", props.kv ? "kv" : "", props.onTap ? "tap" : "", props.muted ? "muted" : "", props.accent ? "accent" : "", props.onLongPress ? "long" : ""].join(" ");
   const fallback = "if(this.dataset.url&&this.src!==this.dataset.url){this.src=this.dataset.url}else{this.remove()}";
-  return /* @__PURE__ */ h("div", { class: cls, onTap: props.onTap, onLongPress: props.onLongPress }, props.rank ? /* @__PURE__ */ h("span", { class: "rank" + (props.rank <= 3 ? " top" : "") + (props.rank >= 1e3 ? " d4" : props.rank >= 100 ? " d3" : "") }, props.rank) : null, props.thumb ? props.thumb.pending && !props.thumb.src ? /* @__PURE__ */ h("span", { class: "thumb none" }) : /* @__PURE__ */ h(GenPoster, { cls: "thumb", title: props.title }, props.thumb.src ? /* @__PURE__ */ h("img", { src: props.thumb.src, "data-url": props.thumb.url && props.thumb.url !== props.thumb.src ? props.thumb.url : void 0, alt: "", loading: "lazy", onerror: fallback }) : null) : null, props.icon ? /* @__PURE__ */ h("span", { class: "ico" }, props.icon) : null, /* @__PURE__ */ h("div", { class: "body" }, /* @__PURE__ */ h("div", { class: props.tag && !props.kv ? "title tagged" : "title" }, esc(props.title), props.tag && !props.kv ? /* @__PURE__ */ h("span", { class: "pill " + props.tag.tone }, esc(props.tag.text)) : null), props.subtitle ? props.subtitle.includes("\n") ? props.subtitle.split("\n").map((l, i) => /* @__PURE__ */ h("div", { class: "sub one" + (i ? " dim" : "") }, esc(l))) : /* @__PURE__ */ h("div", { class: "sub" }, esc(props.subtitle)) : null), props.badge ? /* @__PURE__ */ h("span", { class: "badge" }, esc(props.badge)) : null, props.right ? /* @__PURE__ */ h("span", { class: "right" }, esc(props.right)) : null, props.tag && props.kv ? /* @__PURE__ */ h("span", { class: "right" }, /* @__PURE__ */ h("span", { class: "pill " + props.tag.tone }, esc(props.tag.text))) : null, props.hi ? /* @__PURE__ */ h("span", { class: `hi ${props.hi.kind} ${props.hi.tier}` }, /* @__PURE__ */ h("span", { class: "hv" }, props.hi.kind === "imdb" ? /* @__PURE__ */ h("i", { class: "imdb" }, "IMDb") : props.hi.kind === "tomato" ? /* @__PURE__ */ h("i", { class: "emo" }, props.hi.tier === "bad" ? "🤢" : "🍅") : props.hi.kind === "popcorn" ? /* @__PURE__ */ h("i", { class: "emo" }, props.hi.tier === "bad" ? "🫗" : "🍿") : props.hi.kind === "community" ? /* @__PURE__ */ h("i", { class: "emo star" }, "★") : null, /* @__PURE__ */ h("b", null, esc(props.hi.text))), props.hi.note ? /* @__PURE__ */ h("small", null, esc(props.hi.note)) : null) : null, props.onTap && props.chevron !== false && !props.action ? /* @__PURE__ */ h("span", { class: "chev" }, "›") : null, props.action ? /* @__PURE__ */ h("button", { class: "act", "aria-label": props.action.hint || props.action.label, onTap: props.action.onTap }, esc(props.action.label)) : null);
+  return /* @__PURE__ */ h("div", { class: cls, onTap: props.onTap, onLongPress: props.onLongPress }, props.rank ? /* @__PURE__ */ h("span", { class: "rank" + (props.rank <= 3 ? " top" : "") + (props.rank >= 1e3 ? " d4" : props.rank >= 100 ? " d3" : "") }, props.rank) : null, props.thumb ? props.thumb.pending && !props.thumb.src ? /* @__PURE__ */ h("span", { class: "thumb none" }) : /* @__PURE__ */ h(GenPoster, { cls: "thumb", title: props.title }, props.thumb.src ? /* @__PURE__ */ h("img", { src: props.thumb.src, "data-url": props.thumb.url && props.thumb.url !== props.thumb.src ? props.thumb.url : void 0, alt: "", loading: "lazy", onerror: fallback }) : null) : null, props.icon ? /* @__PURE__ */ h("span", { class: "ico" }, props.icon) : null, /* @__PURE__ */ h("div", { class: "body" }, /* @__PURE__ */ h("div", { class: props.tag && !props.kv ? "title tagged" : "title" }, esc(props.title), props.tag && !props.kv ? /* @__PURE__ */ h("span", { class: "pill " + props.tag.tone }, esc(props.tag.text)) : null), props.subtitle ? props.subtitle.includes("\n") ? props.subtitle.split("\n").map((l, i) => /* @__PURE__ */ h("div", { class: "sub one" + (i ? " dim" : "") }, esc(l))) : /* @__PURE__ */ h("div", { class: "sub" }, esc(props.subtitle)) : null), props.badge ? /* @__PURE__ */ h("span", { class: "badge" }, esc(props.badge)) : null, props.right ? /* @__PURE__ */ h("span", { class: "right" }, esc(props.right)) : null, props.tag && props.kv ? /* @__PURE__ */ h("span", { class: "right" }, /* @__PURE__ */ h("span", { class: "pill " + props.tag.tone }, esc(props.tag.text))) : null, props.hi ? /* @__PURE__ */ h("span", { class: `hi ${props.hi.kind} ${props.hi.tier}` }, /* @__PURE__ */ h("span", { class: "hv" }, props.hi.kind === "imdb" ? /* @__PURE__ */ h("i", { class: "imdb" }, "IMDb") : props.hi.kind === "tomato" || props.hi.kind === "popcorn" ? /* @__PURE__ */ h("i", { class: "emo" }, rateIcon(props.hi.kind, props.hi.tier)) : props.hi.kind === "community" ? /* @__PURE__ */ h("i", { class: "emo star" }, "★") : null, /* @__PURE__ */ h("b", null, esc(props.hi.text))), props.hi.note ? /* @__PURE__ */ h("small", null, esc(props.hi.note)) : null) : null, props.onTap && props.chevron !== false && !props.action ? /* @__PURE__ */ h("span", { class: "chev" }, "›") : null, props.action ? /* @__PURE__ */ h("button", { class: "act", "aria-label": props.action.hint || props.action.label, onTap: props.action.onTap }, esc(props.action.label)) : null);
 }
 function Chips(props) {
   return /* @__PURE__ */ h("div", { class: props.tabs ? "chips tabs" : props.scroll ? "chips scroll" : "chips" }, props.children);
@@ -3391,9 +3397,21 @@ function PickRow(props) {
 function Button(props) {
   return /* @__PURE__ */ h("button", { class: "btn " + (props.kind || "primary"), onTap: props.onTap, "data-enter": props.enter ? "" : void 0 }, esc(props.label));
 }
+var RATE_ICON = {
+  "tomato:good": '<ellipse cx="12" cy="13.6" rx="9.2" ry="8.2" fill="#e8372c"/><ellipse cx="8.4" cy="10.6" rx="2.6" ry="1.5" fill="#ff8a7d" opacity=".75" transform="rotate(-28 8.4 10.6)"/><path d="M12 7.4c-1.6-2.4-4.3-2.9-6-2.1 1.5.5 2.4 1.5 2.9 2.7-1.2-.1-2.4.4-3.2 1.3 2.2-.5 4.2-.3 6.3.6 2.1-.9 4.1-1.1 6.3-.6-.8-.9-2-1.4-3.2-1.3.5-1.2 1.4-2.2 2.9-2.7-1.7-.8-4.4-.3-6 2.1z" fill="#2f9e44"/><path d="M12 7.6V4.2" stroke="#2b8a3e" stroke-width="1.5" stroke-linecap="round"/><g transform="translate(13.2 13.2)"><circle cx="5.4" cy="5.4" r="5.4" fill="#f5b301" stroke="#fff" stroke-width="1.2"/><path d="M2.9 5.5l1.8 1.8 3.3-3.6" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></g>',
+  "tomato:mid": '<ellipse cx="12" cy="13.6" rx="9.2" ry="8.2" fill="#e8372c"/><ellipse cx="8.4" cy="10.6" rx="2.6" ry="1.5" fill="#ff8a7d" opacity=".75" transform="rotate(-28 8.4 10.6)"/><path d="M12 7.4c-1.6-2.4-4.3-2.9-6-2.1 1.5.5 2.4 1.5 2.9 2.7-1.2-.1-2.4.4-3.2 1.3 2.2-.5 4.2-.3 6.3.6 2.1-.9 4.1-1.1 6.3-.6-.8-.9-2-1.4-3.2-1.3.5-1.2 1.4-2.2 2.9-2.7-1.7-.8-4.4-.3-6 2.1z" fill="#2f9e44"/><path d="M12 7.6V4.2" stroke="#2b8a3e" stroke-width="1.5" stroke-linecap="round"/>',
+  "tomato:bad": '<g fill="#3fb950"><circle cx="12" cy="12.4" r="6.3"/><g stroke="#3fb950" stroke-linecap="round"><path d="M12 12L5.2 6.6" stroke-width="5"/><path d="M12 12l6.6-6" stroke-width="4.2"/><path d="M12 12l8 3.4" stroke-width="5"/><path d="M12 12l1.4 8.2" stroke-width="4.4"/><path d="M12 12L5.4 18" stroke-width="4"/></g><circle cx="4.8" cy="6.2" r="3"/><circle cx="19" cy="5.6" r="2.5"/><circle cx="20.4" cy="15.6" r="2.9"/><circle cx="13.5" cy="20.6" r="2.5"/><circle cx="5" cy="18.4" r="2.3"/><circle cx="2.2" cy="12.2" r="1.1"/><circle cx="21.6" cy="21.4" r="1"/><circle cx="11.6" cy="2.2" r="1"/></g><ellipse cx="9.6" cy="9.6" rx="2" ry="1.1" fill="#8ee69b" opacity=".8" transform="rotate(-30 9.6 9.6)"/>',
+  "popcorn:good": '<circle cx="7.4" cy="7.6" r="2.5" fill="#fff3c4" stroke="#e6b94a" stroke-width=".7"/><circle cx="12" cy="5.4" r="3" fill="#fff3c4" stroke="#e6b94a" stroke-width=".7"/><circle cx="16.6" cy="7.6" r="2.5" fill="#fff3c4" stroke="#e6b94a" stroke-width=".7"/><circle cx="9.8" cy="8.6" r="2.2" fill="#fff3c4" stroke="#e6b94a" stroke-width=".7"/><circle cx="14.3" cy="8.6" r="2.2" fill="#fff3c4" stroke="#e6b94a" stroke-width=".7"/><path d="M5.6 10h12.8l-1.6 11.2a1 1 0 0 1-1 .8H8.2a1 1 0 0 1-1-.8z" fill="#e8372c"/><path d="M8.6 10h2.2l.5 12H9.4zM13.2 10h2.2l-.8 12h-1.9z" fill="#fff"/><path d="M5.2 9.2h13.6v1.6H5.2z" fill="#c92a20"/><g transform="translate(13.2 13.2)"><circle cx="5.4" cy="5.4" r="5.4" fill="#f5b301" stroke="#fff" stroke-width="1.2"/><path d="M2.9 5.5l1.8 1.8 3.3-3.6" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></g>',
+  "popcorn:mid": '<circle cx="7.4" cy="7.6" r="2.5" fill="#fff3c4" stroke="#e6b94a" stroke-width=".7"/><circle cx="12" cy="5.4" r="3" fill="#fff3c4" stroke="#e6b94a" stroke-width=".7"/><circle cx="16.6" cy="7.6" r="2.5" fill="#fff3c4" stroke="#e6b94a" stroke-width=".7"/><circle cx="9.8" cy="8.6" r="2.2" fill="#fff3c4" stroke="#e6b94a" stroke-width=".7"/><circle cx="14.3" cy="8.6" r="2.2" fill="#fff3c4" stroke="#e6b94a" stroke-width=".7"/><path d="M5.6 10h12.8l-1.6 11.2a1 1 0 0 1-1 .8H8.2a1 1 0 0 1-1-.8z" fill="#e8372c"/><path d="M8.6 10h2.2l.5 12H9.4zM13.2 10h2.2l-.8 12h-1.9z" fill="#fff"/><path d="M5.2 9.2h13.6v1.6H5.2z" fill="#c92a20"/>',
+  "popcorn:bad": '<g transform="rotate(-9 8 14)"><path d="M2 10.4L13.4 7.6v12.8L2 17.6a1 1 0 0 1-.8-1v-5.2a1 1 0 0 1 .8-1z" fill="#e8372c"/><path d="M1.2 12.6l12.2-1.5v2.4L1.2 14.4zM1.6 16.2l11.8 1.6v2.2L2 17.6z" fill="#fff"/><path d="M1.6 10.6l11.8-2.6v1.9L1.2 11.6z" fill="#fff" opacity="0"/><ellipse cx="13.6" cy="14" rx="1.5" ry="6.6" fill="#8f1f18"/></g><circle cx="15.2" cy="10.6" r="1.9" fill="#fff3c4" stroke="#e6b94a" stroke-width=".7"/><circle cx="17.2" cy="17.2" r="2.6" fill="#fff3c4" stroke="#e6b94a" stroke-width=".7"/><circle cx="20.8" cy="19.4" r="2.1" fill="#fff3c4" stroke="#e6b94a" stroke-width=".7"/><circle cx="17.6" cy="13" r="1.9" fill="#fff3c4" stroke="#e6b94a" stroke-width=".7"/><circle cx="21.2" cy="15.6" r="1.7" fill="#fff3c4" stroke="#e6b94a" stroke-width=".7"/><circle cx="13.6" cy="20.4" r="1.8" fill="#fff3c4" stroke="#e6b94a" stroke-width=".7"/>'
+};
+function rateIcon(kind, tier) {
+  const inner = RATE_ICON[`${kind}:${tier === "none" ? "mid" : tier}`] || RATE_ICON[`${kind}:mid`];
+  return `<svg class="ri" viewBox="0 0 24 24" aria-hidden="true">${inner}</svg>`;
+}
 function Badges(props) {
   if (!props.items.length) return "";
-  return /* @__PURE__ */ h("div", { class: "ratings" }, props.items.map((b) => /* @__PURE__ */ h("button", { class: "rate " + b.tier, onTap: b.tier === "none" ? void 0 : b.onTap, "aria-label": b.kind === "imdb" ? "IMDb" : b.kind === "tomato" ? "番茄指數" : "爆米花指數" }, b.kind === "imdb" ? /* @__PURE__ */ h("span", { class: "imdb" }, "IMDb") : /* @__PURE__ */ h("span", { class: "emo" }, b.kind === "tomato" ? b.tier === "bad" ? "🤢" : "🍅" : b.tier === "bad" ? "🫗" : "🍿"), /* @__PURE__ */ h("span", { class: "v" }, esc(b.value)), b.note ? /* @__PURE__ */ h("span", { class: "n" }, esc(b.note)) : null)));
+  return /* @__PURE__ */ h("div", { class: "ratings" }, props.items.map((b) => /* @__PURE__ */ h("button", { class: "rate " + b.tier, onTap: b.tier === "none" ? void 0 : b.onTap, "aria-label": b.kind === "imdb" ? "IMDb" : b.kind === "tomato" ? "番茄指數" : "爆米花指數" }, b.kind === "imdb" ? /* @__PURE__ */ h("span", { class: "imdb" }, "IMDb") : /* @__PURE__ */ h("span", { class: "emo" }, rateIcon(b.kind, b.tier)), /* @__PURE__ */ h("span", { class: "v" }, esc(b.value)), b.note ? /* @__PURE__ */ h("span", { class: "n" }, esc(b.note)) : null)));
 }
 function GenPoster(props) {
   const n = Array.from(props.title).length;
@@ -3577,6 +3595,8 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 @media(prefers-color-scheme:dark){.rate.good{color:#30d158}.rate.mid{color:#ffb340}.rate.bad{color:#ff6961}}
 .rate .imdb{background:#f5c518;color:#000;font-size:9px;font-weight:800;padding:1px 3px;border-radius:3px;letter-spacing:-.2px}
 .rate .emo{font-size:12px}
+.emo{display:inline-flex;align-items:center}
+.emo .ri{width:1.3em;height:1.3em;display:block;flex:none}
 .rate .n{font-size:10px;font-weight:600;opacity:.85}
 .rate:active{opacity:.6}
 .hero-acts{display:flex;align-items:center;gap:8px;margin-top:8px}
@@ -4063,14 +4083,14 @@ var App = class {
   }
   /** 最新版本是多少。網頁版問的是自己網站現在上線的版本（重新整理就會拿到的那一版），不是 GitHub 上的 */
   checkVersion() {
-    if (true) return checkLatest("2026.11.24-0806");
+    if (true) return checkLatest("2026.11.24-0823");
     return (async () => {
       try {
         const r = await globalThis.fetch("/api/version?t=" + Date.now(), { cache: "no-store" });
         const latest = String((await r.json()).version || "");
         if (!latest) return null;
         const num = (v) => Number(v.replace(/\D/g, "")) || 0;
-        return { latest, isLatest: num("2026.11.24-0806") >= num(latest) };
+        return { latest, isLatest: num("2026.11.24-0823") >= num(latest) };
       } catch (_) {
         return null;
       }
@@ -4414,11 +4434,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.24-0806"}`);
+          Pasteboard.copy(`版本 ${"2026.11.24-0823"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.24-0806"}`,
+      `版本 ${"2026.11.24-0823"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -4593,8 +4613,8 @@ var App = class {
     const badges = [];
     if (r) {
       badges.push(r.imdb ? { kind: "imdb", value: r.imdb.score.toFixed(1), tier: ratingTier("imdb", r.imdb.score), onTap: () => Safari.open(r.imdb.url) } : { kind: "imdb", value: "-", tier: "none" });
-      badges.push(r.tomato ? { kind: "tomato", value: `${r.tomato.score}%`, tier: tomatoTier(r.tomato.score, r.tomato.certified), note: r.tomato.certified ? "✓" : void 0, onTap: () => Safari.open(r.tomato.url) } : { kind: "tomato", value: "-", tier: "none" });
-      badges.push(r.popcorn ? { kind: "popcorn", value: `${r.popcorn.score}%`, tier: ratingTier("pct", r.popcorn.score), onTap: () => Safari.open(r.popcorn.url) } : { kind: "popcorn", value: "-", tier: "none" });
+      badges.push(r.tomato ? { kind: "tomato", value: `${r.tomato.score}%`, tier: tomatoTier(r.tomato.score, r.tomato.certified), onTap: () => Safari.open(r.tomato.url) } : { kind: "tomato", value: "-", tier: "none" });
+      badges.push(r.popcorn ? { kind: "popcorn", value: `${r.popcorn.score}%`, tier: popcornTier(r.popcorn.score, r.popcorn.certified), onTap: () => Safari.open(r.popcorn.url) } : { kind: "popcorn", value: "-", tier: "none" });
     }
     return badges;
   }
@@ -4605,6 +4625,7 @@ var App = class {
     if (poster && poster === posterUrl) cachePoster(posterUrl);
     const search = `https://www.youtube.com/results?search_query=${encodeURIComponent(title + " 預告")}`;
     const badges = this.ratingBadges(r);
+    if (r?.popcorn && (r.popcorn.avg || r.popcorn.count)) lines = [...lines, ["爆米花", r.popcorn.avg ? `觀眾平均 ${r.popcorn.avg}／5` : "", popcornCount(r.popcorn.count)].filter(Boolean).join("｜")];
     if (!r && e.loading) lines = [...lines, "評分讀取中…"];
     else if (!r) lines = [...lines, "評分讀不到"];
     if (r?.err && !(r.imdb || r.tomato || r.popcorn)) lines = [...lines, `評分讀不到：${r.err}`];
@@ -4760,7 +4781,7 @@ var App = class {
     if (false) {
       if (!r) return /* @__PURE__ */ h(Note, { text: "（無法確認是否為最新版：連不到網站）" });
       if (r.isLatest) return /* @__PURE__ */ h(Note, { text: "✅ 已是最新版" });
-      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.24-0806"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
+      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.24-0823"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
         globalThis.location.reload();
       } }));
     }

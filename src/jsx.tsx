@@ -238,7 +238,7 @@ export function Item(props: {
       {props.hi ? (
         <span class={`hi ${props.hi.kind} ${props.hi.tier}`}>
           <span class="hv">
-            {props.hi.kind === "imdb" ? <i class="imdb">IMDb</i> : props.hi.kind === "tomato" ? <i class="emo">{props.hi.tier === "bad" ? "🤢" : "🍅"}</i> : props.hi.kind === "popcorn" ? <i class="emo">{props.hi.tier === "bad" ? "🫗" : "🍿"}</i> : props.hi.kind === "community" ? <i class="emo star">★</i> : null}
+            {props.hi.kind === "imdb" ? <i class="imdb">IMDb</i> : props.hi.kind === "tomato" || props.hi.kind === "popcorn" ? <i class="emo">{rateIcon(props.hi.kind, props.hi.tier)}</i> : props.hi.kind === "community" ? <i class="emo star">★</i> : null}
             <b>{esc(props.hi.text)}</b>
           </span>
           {props.hi.note ? <small>{esc(props.hi.note)}</small> : null}
@@ -298,6 +298,20 @@ export interface RatingBadge {
   note?: string; // 例如「新鮮認證」
   onTap?: Handler;
 }
+// 評分圖示（自己畫的，不是爛番茄的商標圖）：番茄＝認證新鮮／新鮮／腐爛，爆米花＝認證熱門／熱門／冷掉。大小跟著字
+const RATE_ICON: Record<string, string> = {
+  "tomato:good": "<ellipse cx=\"12\" cy=\"13.6\" rx=\"9.2\" ry=\"8.2\" fill=\"#e8372c\"/><ellipse cx=\"8.4\" cy=\"10.6\" rx=\"2.6\" ry=\"1.5\" fill=\"#ff8a7d\" opacity=\".75\" transform=\"rotate(-28 8.4 10.6)\"/><path d=\"M12 7.4c-1.6-2.4-4.3-2.9-6-2.1 1.5.5 2.4 1.5 2.9 2.7-1.2-.1-2.4.4-3.2 1.3 2.2-.5 4.2-.3 6.3.6 2.1-.9 4.1-1.1 6.3-.6-.8-.9-2-1.4-3.2-1.3.5-1.2 1.4-2.2 2.9-2.7-1.7-.8-4.4-.3-6 2.1z\" fill=\"#2f9e44\"/><path d=\"M12 7.6V4.2\" stroke=\"#2b8a3e\" stroke-width=\"1.5\" stroke-linecap=\"round\"/><g transform=\"translate(13.2 13.2)\"><circle cx=\"5.4\" cy=\"5.4\" r=\"5.4\" fill=\"#f5b301\" stroke=\"#fff\" stroke-width=\"1.2\"/><path d=\"M2.9 5.5l1.8 1.8 3.3-3.6\" fill=\"none\" stroke=\"#fff\" stroke-width=\"1.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></g>",
+  "tomato:mid": "<ellipse cx=\"12\" cy=\"13.6\" rx=\"9.2\" ry=\"8.2\" fill=\"#e8372c\"/><ellipse cx=\"8.4\" cy=\"10.6\" rx=\"2.6\" ry=\"1.5\" fill=\"#ff8a7d\" opacity=\".75\" transform=\"rotate(-28 8.4 10.6)\"/><path d=\"M12 7.4c-1.6-2.4-4.3-2.9-6-2.1 1.5.5 2.4 1.5 2.9 2.7-1.2-.1-2.4.4-3.2 1.3 2.2-.5 4.2-.3 6.3.6 2.1-.9 4.1-1.1 6.3-.6-.8-.9-2-1.4-3.2-1.3.5-1.2 1.4-2.2 2.9-2.7-1.7-.8-4.4-.3-6 2.1z\" fill=\"#2f9e44\"/><path d=\"M12 7.6V4.2\" stroke=\"#2b8a3e\" stroke-width=\"1.5\" stroke-linecap=\"round\"/>",
+  "tomato:bad": "<g fill=\"#3fb950\"><circle cx=\"12\" cy=\"12.4\" r=\"6.3\"/><g stroke=\"#3fb950\" stroke-linecap=\"round\"><path d=\"M12 12L5.2 6.6\" stroke-width=\"5\"/><path d=\"M12 12l6.6-6\" stroke-width=\"4.2\"/><path d=\"M12 12l8 3.4\" stroke-width=\"5\"/><path d=\"M12 12l1.4 8.2\" stroke-width=\"4.4\"/><path d=\"M12 12L5.4 18\" stroke-width=\"4\"/></g><circle cx=\"4.8\" cy=\"6.2\" r=\"3\"/><circle cx=\"19\" cy=\"5.6\" r=\"2.5\"/><circle cx=\"20.4\" cy=\"15.6\" r=\"2.9\"/><circle cx=\"13.5\" cy=\"20.6\" r=\"2.5\"/><circle cx=\"5\" cy=\"18.4\" r=\"2.3\"/><circle cx=\"2.2\" cy=\"12.2\" r=\"1.1\"/><circle cx=\"21.6\" cy=\"21.4\" r=\"1\"/><circle cx=\"11.6\" cy=\"2.2\" r=\"1\"/></g><ellipse cx=\"9.6\" cy=\"9.6\" rx=\"2\" ry=\"1.1\" fill=\"#8ee69b\" opacity=\".8\" transform=\"rotate(-30 9.6 9.6)\"/>",
+  "popcorn:good": "<circle cx=\"7.4\" cy=\"7.6\" r=\"2.5\" fill=\"#fff3c4\" stroke=\"#e6b94a\" stroke-width=\".7\"/><circle cx=\"12\" cy=\"5.4\" r=\"3\" fill=\"#fff3c4\" stroke=\"#e6b94a\" stroke-width=\".7\"/><circle cx=\"16.6\" cy=\"7.6\" r=\"2.5\" fill=\"#fff3c4\" stroke=\"#e6b94a\" stroke-width=\".7\"/><circle cx=\"9.8\" cy=\"8.6\" r=\"2.2\" fill=\"#fff3c4\" stroke=\"#e6b94a\" stroke-width=\".7\"/><circle cx=\"14.3\" cy=\"8.6\" r=\"2.2\" fill=\"#fff3c4\" stroke=\"#e6b94a\" stroke-width=\".7\"/><path d=\"M5.6 10h12.8l-1.6 11.2a1 1 0 0 1-1 .8H8.2a1 1 0 0 1-1-.8z\" fill=\"#e8372c\"/><path d=\"M8.6 10h2.2l.5 12H9.4zM13.2 10h2.2l-.8 12h-1.9z\" fill=\"#fff\"/><path d=\"M5.2 9.2h13.6v1.6H5.2z\" fill=\"#c92a20\"/><g transform=\"translate(13.2 13.2)\"><circle cx=\"5.4\" cy=\"5.4\" r=\"5.4\" fill=\"#f5b301\" stroke=\"#fff\" stroke-width=\"1.2\"/><path d=\"M2.9 5.5l1.8 1.8 3.3-3.6\" fill=\"none\" stroke=\"#fff\" stroke-width=\"1.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></g>",
+  "popcorn:mid": "<circle cx=\"7.4\" cy=\"7.6\" r=\"2.5\" fill=\"#fff3c4\" stroke=\"#e6b94a\" stroke-width=\".7\"/><circle cx=\"12\" cy=\"5.4\" r=\"3\" fill=\"#fff3c4\" stroke=\"#e6b94a\" stroke-width=\".7\"/><circle cx=\"16.6\" cy=\"7.6\" r=\"2.5\" fill=\"#fff3c4\" stroke=\"#e6b94a\" stroke-width=\".7\"/><circle cx=\"9.8\" cy=\"8.6\" r=\"2.2\" fill=\"#fff3c4\" stroke=\"#e6b94a\" stroke-width=\".7\"/><circle cx=\"14.3\" cy=\"8.6\" r=\"2.2\" fill=\"#fff3c4\" stroke=\"#e6b94a\" stroke-width=\".7\"/><path d=\"M5.6 10h12.8l-1.6 11.2a1 1 0 0 1-1 .8H8.2a1 1 0 0 1-1-.8z\" fill=\"#e8372c\"/><path d=\"M8.6 10h2.2l.5 12H9.4zM13.2 10h2.2l-.8 12h-1.9z\" fill=\"#fff\"/><path d=\"M5.2 9.2h13.6v1.6H5.2z\" fill=\"#c92a20\"/>",
+  "popcorn:bad": "<g transform=\"rotate(-9 8 14)\"><path d=\"M2 10.4L13.4 7.6v12.8L2 17.6a1 1 0 0 1-.8-1v-5.2a1 1 0 0 1 .8-1z\" fill=\"#e8372c\"/><path d=\"M1.2 12.6l12.2-1.5v2.4L1.2 14.4zM1.6 16.2l11.8 1.6v2.2L2 17.6z\" fill=\"#fff\"/><path d=\"M1.6 10.6l11.8-2.6v1.9L1.2 11.6z\" fill=\"#fff\" opacity=\"0\"/><ellipse cx=\"13.6\" cy=\"14\" rx=\"1.5\" ry=\"6.6\" fill=\"#8f1f18\"/></g><circle cx=\"15.2\" cy=\"10.6\" r=\"1.9\" fill=\"#fff3c4\" stroke=\"#e6b94a\" stroke-width=\".7\"/><circle cx=\"17.2\" cy=\"17.2\" r=\"2.6\" fill=\"#fff3c4\" stroke=\"#e6b94a\" stroke-width=\".7\"/><circle cx=\"20.8\" cy=\"19.4\" r=\"2.1\" fill=\"#fff3c4\" stroke=\"#e6b94a\" stroke-width=\".7\"/><circle cx=\"17.6\" cy=\"13\" r=\"1.9\" fill=\"#fff3c4\" stroke=\"#e6b94a\" stroke-width=\".7\"/><circle cx=\"21.2\" cy=\"15.6\" r=\"1.7\" fill=\"#fff3c4\" stroke=\"#e6b94a\" stroke-width=\".7\"/><circle cx=\"13.6\" cy=\"20.4\" r=\"1.8\" fill=\"#fff3c4\" stroke=\"#e6b94a\" stroke-width=\".7\"/>",
+};
+/** 一個評分圖示：tier 是 good（認證）／mid（及格）／bad（不及格）；none（沒有評分）用及格的那個圖，外面會轉成灰色 */
+export function rateIcon(kind: "tomato" | "popcorn", tier: string): string {
+  const inner = RATE_ICON[`${kind}:${tier === "none" ? "mid" : tier}`] || RATE_ICON[`${kind}:mid`];
+  return `<svg class="ri" viewBox="0 0 24 24" aria-hidden="true">${inner}</svg>`;
+}
 /** 評分徽章列：tier 為 none 表示沒有這項評分（顯示「-」，灰色、不可點） */
 export function Badges(props: { items: RatingBadge[] }): string {
   if (!props.items.length) return "";
@@ -305,7 +319,7 @@ export function Badges(props: { items: RatingBadge[] }): string {
     <div class="ratings">
       {props.items.map((b) => (
         <button class={"rate " + b.tier} onTap={b.tier === "none" ? undefined : b.onTap} aria-label={b.kind === "imdb" ? "IMDb" : b.kind === "tomato" ? "番茄指數" : "爆米花指數"}>
-          {b.kind === "imdb" ? <span class="imdb">IMDb</span> : <span class="emo">{b.kind === "tomato" ? (b.tier === "bad" ? "🤢" : "🍅") : b.tier === "bad" ? "🫗" : "🍿"}</span>}
+          {b.kind === "imdb" ? <span class="imdb">IMDb</span> : <span class="emo">{rateIcon(b.kind, b.tier)}</span>}
           <span class="v">{esc(b.value)}</span>
           {b.note ? <span class="n">{esc(b.note)}</span> : null}
         </button>

@@ -1606,7 +1606,7 @@ export async function loadMovies(): Promise<TwMovie[]> {
         m.scoreFew = (e.r.imdb.votes || 0) < 500;
       }
       if (e?.r?.tomato && typeof e.r.tomato.score === "number") { m.tomato = e.r.tomato.score; m.tomatoCert = !!e.r.tomato.certified; }
-      if (e?.r?.popcorn && typeof e.r.popcorn.score === "number") m.popcorn = e.r.popcorn.score;
+      if (e?.r?.popcorn && typeof e.r.popcorn.score === "number") { m.popcorn = e.r.popcorn.score; m.popcornCert = !!e.r.popcorn.certified; }
       if (m.comingSoon && m.release && m.release <= today) {
         m.comingSoon = false;
         m.noShowToday = true;
@@ -1930,7 +1930,7 @@ export function movieBoard(b: BoxOffice | null, movies: TwMovie[], opt: { scope?
         const t = r && r.t !== undefined ? r.t : m ? m.tomato : undefined;
         const p = r && r.p !== undefined ? r.p : m ? m.popcorn : undefined;
         if (rate === "tomato") return t !== undefined ? { tier: 2, v: t, hi: { kind: "tomato", text: `${t}%`, tier: tomatoTier(t, r && r.t !== undefined ? !!r.c : !!(m && m.tomatoCert)), note: tomatoLabel(t, r && r.t !== undefined ? !!r.c : !!(m && m.tomatoCert)) } } : { tier: 0, v: 0, hi: noneHi("tomato") };
-        if (rate === "popcorn") return p !== undefined ? { tier: 2, v: p, hi: { kind: "popcorn", text: `${p}%`, tier: ratingTier("pct", p) } } : { tier: 0, v: 0, hi: noneHi("popcorn") };
+        if (rate === "popcorn") return p !== undefined ? { tier: 2, v: p, hi: { kind: "popcorn", text: `${p}%`, tier: popcornTier(p, r && r.p !== undefined ? !!r.h : !!(m && m.popcornCert)), note: popcornLabel(p, r && r.p !== undefined ? !!r.h : !!(m && m.popcornCert)) } } : { tier: 0, v: 0, hi: noneHi("popcorn") };
         return i ? { tier: i.few && fewLast ? 1 : 2, v: i.s, hi: { kind: "imdb", text: i.s.toFixed(1), tier: ratingTier("imdb", i.s), ...(i.few ? { note: "評分人數少" } : {}) } } : { tier: 0, v: 0, hi: noneHi("imdb") };
       }
       if (sort === "tickets" || sort === "price") return moneyKey(x);
@@ -2015,7 +2015,7 @@ export function movieBoard(b: BoxOffice | null, movies: TwMovie[], opt: { scope?
   const none = (kind: EntryHi["kind"], note?: string): EntryHi => ({ kind, text: "–", tier: "none", ...(note ? { note } : {}) });
   const rated = (m: TwMovie): { tier: number; v: number; hi: EntryHi } => {
     if (rate === "tomato") return m.tomato !== undefined ? { tier: 2, v: m.tomato, hi: { kind: "tomato", text: `${m.tomato}%`, tier: tomatoTier(m.tomato, m.tomatoCert), note: tomatoLabel(m.tomato, m.tomatoCert) } } : { tier: 0, v: 0, hi: none("tomato") };
-    if (rate === "popcorn") return m.popcorn !== undefined ? { tier: 2, v: m.popcorn, hi: { kind: "popcorn", text: `${m.popcorn}%`, tier: ratingTier("pct", m.popcorn) } } : { tier: 0, v: 0, hi: none("popcorn") };
+    if (rate === "popcorn") return m.popcorn !== undefined ? { tier: 2, v: m.popcorn, hi: { kind: "popcorn", text: `${m.popcorn}%`, tier: popcornTier(m.popcorn, m.popcornCert), note: popcornLabel(m.popcorn, m.popcornCert) } } : { tier: 0, v: 0, hi: none("popcorn") };
     if (rate === "community") {
       const c = opt.community && opt.community[communityKey(m.title)] ? fromDist(opt.community[communityKey(m.title)], 0) : null;
       // 票數太少的不列入排序：不然一個人打 10 分就排第一
@@ -2158,7 +2158,7 @@ export async function loadSoonBoard(query?: string, opt: SoonOpt = {}): Promise<
 // ───────────────────────── 年度排行的三大評分（伺服器慢慢建立的總表） ─────────────────────────
 export const YEAR_RATINGS_URL = "https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/data/ratings-years.json";
 /** 一部片的紀錄：i = IMDb 分數、v = 評分人數、t = 番茄指數、c = 1 新鮮認證、p = 爆米花指數、id = IMDb 編號、u = 爛番茄網址的片名代稱 */
-export interface YearRating { id?: string; i?: number; v?: number; t?: number; c?: number; p?: number; u?: string }
+export interface YearRating { id?: string; i?: number; v?: number; t?: number; c?: number; p?: number; h?: number /* 1 = 爆米花認證熱門 */; u?: string }
 export interface YearRatings { total: number; missed: number; ratings: Record<string, YearRating> }
 /** 總表的鍵：去掉標點空白的片名｜上映年（跟 tools/ratings-years.mjs 同一把） */
 export const yearRatingKey = (name: string, release: string): string => `${normTitle(name)}|${String(release || "").slice(0, 4)}`;
@@ -2865,7 +2865,7 @@ export const nowGroupLine = (g: { hits: unknown[]; runtime?: number; rating?: st
 export interface Ratings {
   imdb?: { score: number; votes: number; url: string };
   tomato?: { score: number; certified: boolean; url: string }; // 番茄指數（影評）
-  popcorn?: { score: number; url: string }; // 爆米花指數（觀眾）
+  popcorn?: { score: number; url: string; certified?: boolean; avg?: number; count?: string }; // 爆米花指數（觀眾）：certified = 認證熱門；avg = 觀眾平均（滿分 5）；count = 評分人數級距
   err?: string; // 查詢失敗的原因（不會存進快取，方便回報問題）
 }
 /** 把例外變成一句看得懂的話（不把 JSON、HTML 內容印到畫面上） */
@@ -2925,7 +2925,7 @@ async function identify(title: string, en: string | undefined, errs: string[], y
 const rtSlug = (name: string) => name.toLowerCase().replace(/&/g, " and ").replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
 
 /** 讀爛番茄電影頁：回傳分數與頁面上的片名／年份（用來確認猜對頁） */
-async function rtPage(url: string): Promise<{ critics: number; certified: boolean; audience: number; name: string; year: number } | null> {
+async function rtPage(url: string): Promise<{ critics: number; certified: boolean; audience: number; hot: boolean; avg: number; count: string; name: string; year: number } | null> {
   const r = await get(url);
   if (!r.ok) return null;
   const page = r.body;
@@ -2941,7 +2941,7 @@ async function rtPage(url: string): Promise<{ critics: number; certified: boolea
     name = m ? m[1] : String(o.name || "");
     year = m ? Number(m[2]) : Number(String(o.dateCreated || "").slice(0, 4)) || 0;
   } catch (_) {}
-  return { critics: pct(d.criticsScore), certified: !!d.criticsScore?.certified, audience: pct(d.audienceScore), name, year };
+  return { critics: pct(d.criticsScore), certified: !!d.criticsScore?.certified, audience: pct(d.audienceScore), hot: !!d.audienceScore?.certified, avg: Number(d.audienceScore?.averageRating) || 0, count: String(d.audienceScore?.bandedRatingCount || "").slice(0, 60), name, year };
 }
 
 const normEn = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
@@ -3021,7 +3021,7 @@ async function findRatings(title: string, en?: string, slug?: string, known?: Id
     const f = await rtFind(who.name, who.year);
     if (!f) return;
     if (f.s.critics >= 0) out.tomato = { score: f.s.critics, certified: f.s.certified, url: f.url };
-    if (f.s.audience >= 0) out.popcorn = { score: f.s.audience, url: f.url };
+    if (f.s.audience >= 0) out.popcorn = { score: f.s.audience, url: f.url, ...(f.s.hot ? { certified: true } : {}), ...(f.s.avg ? { avg: f.s.avg } : {}), ...(f.s.count ? { count: f.s.count } : {}) };
   })().catch(() => errs.push("爛番茄暫時讀不到"));
   await Promise.all([imdbJob, rtJob]);
   if (errs.length) out.err = errs.join("；");
@@ -3068,6 +3068,11 @@ const RATINGS_V = 2;
 export function tomatoTier(score: number, certified?: boolean): "good" | "mid" | "bad" {
   return score < 60 ? "bad" : certified ? "good" : "mid";
 }
+/** 爆米花指數照爛番茄自己的三級：認證熱門（爛番茄給的標章，綠）／熱門（60% 以上，黃）／冷掉（低於 60%，紅） */
+export const popcornTier = (score: number, certified?: boolean): "good" | "mid" | "bad" => (score < 60 ? "bad" : certified ? "good" : "mid");
+export const popcornLabel = (score: number, certified?: boolean): string => (score < 60 ? "冷掉" : certified ? "認證熱門" : "熱門");
+/** 爛番茄的評分人數級距（英文）換成中文：「5,000+ Verified Ratings」→「5,000+ 則已驗證評分」 */
+export const popcornCount = (s?: string): string => String(s || "").replace(/\s*Verified Ratings?/i, " 則已驗證評分").replace(/\s*Ratings?/i, " 則評分").replace(/Fewer than\s*/i, "不到 ").trim();
 export const tomatoLabel = (score: number, certified?: boolean): string => (score < 60 ? "腐爛" : certified ? "認證新鮮" : "新鮮");
 export function ratingTier(kind: "imdb" | "pct", v: number): "good" | "mid" | "bad" {
   const x = kind === "imdb" ? v * 10 : v;

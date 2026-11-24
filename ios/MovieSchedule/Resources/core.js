@@ -181,6 +181,9 @@
     nowFilter: () => nowFilter,
     nowGroupLine: () => nowGroupLine,
     nowHM: () => nowHM,
+    popcornCount: () => popcornCount,
+    popcornLabel: () => popcornLabel,
+    popcornTier: () => popcornTier,
     posterKnown: () => posterKnown,
     posterLight: () => posterLight,
     posterReady: () => posterReady,
@@ -2116,7 +2119,10 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
           m.tomato = e.r.tomato.score;
           m.tomatoCert = !!e.r.tomato.certified;
         }
-        if (e?.r?.popcorn && typeof e.r.popcorn.score === "number") m.popcorn = e.r.popcorn.score;
+        if (e?.r?.popcorn && typeof e.r.popcorn.score === "number") {
+          m.popcorn = e.r.popcorn.score;
+          m.popcornCert = !!e.r.popcorn.certified;
+        }
         if (m.comingSoon && m.release && m.release <= today) {
           m.comingSoon = false;
           m.noShowToday = true;
@@ -2373,7 +2379,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
           const t = r && r.t !== void 0 ? r.t : m ? m.tomato : void 0;
           const p = r && r.p !== void 0 ? r.p : m ? m.popcorn : void 0;
           if (rate === "tomato") return t !== void 0 ? { tier: 2, v: t, hi: { kind: "tomato", text: `${t}%`, tier: tomatoTier(t, r && r.t !== void 0 ? !!r.c : !!(m && m.tomatoCert)), note: tomatoLabel(t, r && r.t !== void 0 ? !!r.c : !!(m && m.tomatoCert)) } } : { tier: 0, v: 0, hi: noneHi("tomato") };
-          if (rate === "popcorn") return p !== void 0 ? { tier: 2, v: p, hi: { kind: "popcorn", text: `${p}%`, tier: ratingTier("pct", p) } } : { tier: 0, v: 0, hi: noneHi("popcorn") };
+          if (rate === "popcorn") return p !== void 0 ? { tier: 2, v: p, hi: { kind: "popcorn", text: `${p}%`, tier: popcornTier(p, r && r.p !== void 0 ? !!r.h : !!(m && m.popcornCert)), note: popcornLabel(p, r && r.p !== void 0 ? !!r.h : !!(m && m.popcornCert)) } } : { tier: 0, v: 0, hi: noneHi("popcorn") };
           return i ? { tier: i.few && fewLast ? 1 : 2, v: i.s, hi: { kind: "imdb", text: i.s.toFixed(1), tier: ratingTier("imdb", i.s), ...i.few ? { note: "評分人數少" } : {} } } : { tier: 0, v: 0, hi: noneHi("imdb") };
         }
         if (sort === "tickets" || sort === "price") return moneyKey(x);
@@ -2477,7 +2483,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     const none = (kind, note) => ({ kind, text: "–", tier: "none", ...note ? { note } : {} });
     const rated = (m) => {
       if (rate === "tomato") return m.tomato !== void 0 ? { tier: 2, v: m.tomato, hi: { kind: "tomato", text: `${m.tomato}%`, tier: tomatoTier(m.tomato, m.tomatoCert), note: tomatoLabel(m.tomato, m.tomatoCert) } } : { tier: 0, v: 0, hi: none("tomato") };
-      if (rate === "popcorn") return m.popcorn !== void 0 ? { tier: 2, v: m.popcorn, hi: { kind: "popcorn", text: `${m.popcorn}%`, tier: ratingTier("pct", m.popcorn) } } : { tier: 0, v: 0, hi: none("popcorn") };
+      if (rate === "popcorn") return m.popcorn !== void 0 ? { tier: 2, v: m.popcorn, hi: { kind: "popcorn", text: `${m.popcorn}%`, tier: popcornTier(m.popcorn, m.popcornCert), note: popcornLabel(m.popcorn, m.popcornCert) } } : { tier: 0, v: 0, hi: none("popcorn") };
       if (rate === "community") {
         const c = opt.community && opt.community[communityKey(m.title)] ? fromDist(opt.community[communityKey(m.title)], 0) : null;
         return c && c.n >= COMMUNITY_MIN ? { tier: 2, v: c.avg, hi: { kind: "community", text: c.avg.toFixed(1), tier: ratingTier("imdb", c.avg), note: `${c.n} 人` } } : { tier: 0, v: 0, hi: none("community", c && c.n ? `${c.n} 人，未滿 ${COMMUNITY_MIN} 人` : "") };
@@ -3202,7 +3208,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
       year = m ? Number(m[2]) : Number(String(o.dateCreated || "").slice(0, 4)) || 0;
     } catch (_) {
     }
-    return { critics: pct(d.criticsScore), certified: !!d.criticsScore?.certified, audience: pct(d.audienceScore), name, year };
+    return { critics: pct(d.criticsScore), certified: !!d.criticsScore?.certified, audience: pct(d.audienceScore), hot: !!d.audienceScore?.certified, avg: Number(d.audienceScore?.averageRating) || 0, count: String(d.audienceScore?.bandedRatingCount || "").slice(0, 60), name, year };
   }
   var normEn = (s) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
   async function rtFind(name, year) {
@@ -3269,7 +3275,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
       const f = await rtFind(who.name, who.year);
       if (!f) return;
       if (f.s.critics >= 0) out.tomato = { score: f.s.critics, certified: f.s.certified, url: f.url };
-      if (f.s.audience >= 0) out.popcorn = { score: f.s.audience, url: f.url };
+      if (f.s.audience >= 0) out.popcorn = { score: f.s.audience, url: f.url, ...f.s.hot ? { certified: true } : {}, ...f.s.avg ? { avg: f.s.avg } : {}, ...f.s.count ? { count: f.s.count } : {} };
     })().catch(() => errs.push("爛番茄暫時讀不到"));
     await Promise.all([imdbJob, rtJob]);
     if (errs.length) out.err = errs.join("；");
@@ -3306,6 +3312,9 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   function tomatoTier(score, certified) {
     return score < 60 ? "bad" : certified ? "good" : "mid";
   }
+  var popcornTier = (score, certified) => score < 60 ? "bad" : certified ? "good" : "mid";
+  var popcornLabel = (score, certified) => score < 60 ? "冷掉" : certified ? "認證熱門" : "熱門";
+  var popcornCount = (s) => String(s || "").replace(/\s*Verified Ratings?/i, " 則已驗證評分").replace(/\s*Ratings?/i, " 則評分").replace(/Fewer than\s*/i, "不到 ").trim();
   var tomatoLabel = (score, certified) => score < 60 ? "腐爛" : certified ? "認證新鮮" : "新鮮";
   function ratingTier(kind, v) {
     const x = kind === "imdb" ? v * 10 : v;
@@ -3718,7 +3727,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   var extra = { boxOffice, filmList, soonList, nowShowing, nowShowingMulti, movieBoard: movieBoard2, festivalBoard, festivalFilm, nearby, patchSettings, fillMovie, formatList };
   var BRIDGE_LEVEL = 2;
   globalThis.MS = {
-    version: "2026.11.24-0806",
+    version: "2026.11.24-0823",
     level: BRIDGE_LEVEL,
     init(saved) {
       cache = saved || {};
