@@ -8,6 +8,7 @@
 import fs from "node:fs";
 import { buildSync } from "esbuild";
 import { DOMParser } from "linkedom";
+import { cleanIntro } from "./intro-text.mjs";
 
 const [prevPath, outPath = "ratings-years.json"] = process.argv.slice(2);
 const TOKEN = (process.env.TMDB_TOKEN || "").trim();
@@ -144,9 +145,8 @@ const introOf = (year) => (intros[year] ||= (INTRO_DIR ? read(`${INTRO_DIR}/intr
         if (y) { rec.y = y; years++; } else rec.yq = 1;
       }
       if (INTRO_DIR) {
-        const text = hit ? String(hit.overview || "").replace(/\s+/g, " ").trim().slice(0, 600) : "";
-        // 要有中文字才算（TMDB 沒有中文簡介時會回空的，偶爾回別的語言）
-        if (text.length >= 20 && /[\u4e00-\u9fff]/.test(text)) { introOf(k.split("|").pop())[k] = text; texts++; }
+        const text = cleanIntro(hit ? hit.overview : ""); // 太短、不是中文、簡體字寫的都不收（見 tools/intro-text.mjs）
+        if (text) { introOf(k.split("|").pop())[k] = text; texts++; }
         rec.o = 1;
       }
     } catch (_) { /* 連線出錯：下一輪再補 */ }
@@ -156,7 +156,8 @@ const introOf = (year) => (intros[year] ||= (INTRO_DIR ? read(`${INTRO_DIR}/intr
   if (INTRO_DIR) {
     fs.mkdirSync(INTRO_DIR, { recursive: true });
     for (const year of Object.keys(intros)) {
-      for (const k of Object.keys(intros[year])) if (!seen.has(k)) delete intros[year][k];
+      // 已經存著的也重新把關一次（規則改嚴之後，舊的不合格的要拿掉）
+      for (const k of Object.keys(intros[year])) { const t = seen.has(k) ? cleanIntro(intros[year][k]) : ""; if (t) intros[year][k] = t; else delete intros[year][k]; }
       fs.writeFileSync(`${INTRO_DIR}/intro-${year}.json`, JSON.stringify(sorted(intros[year])) + "\n");
     }
   }

@@ -5,6 +5,7 @@
 // 一天只抓四次（六小時內抓過就沿用上一份）。
 // 用法：TMDB_TOKEN=… node tools/upcoming.mjs <上一份 upcoming.json> <輸出 upcoming.json>
 import fs from "node:fs";
+import { cleanIntro } from "./intro-text.mjs";
 
 const [prevPath, outPath = "upcoming.json"] = process.argv.slice(2);
 const TOKEN = (process.env.TMDB_TOKEN || "").trim();
@@ -119,8 +120,7 @@ if (process.argv[1] && process.argv[1].endsWith("upcoming.mjs")) {
         if (!r.ok) throw new Error("TMDB " + r.status);
         const hit = ((await r.json()).movie_results || [])[0];
         const p = hit && /^\/[\w.-]+$/.test(hit.poster_path || "") ? hit.poster_path : "";
-        const text = hit ? String(hit.overview || "").replace(/\s+/g, " ").trim().slice(0, 600) : "";
-        tmdb[f.id] = { p, en: hit ? String(hit.original_title || "").slice(0, 120) : "", o: text.length >= 20 && /[\u4e00-\u9fff]/.test(text) ? text : "", at: now };
+        tmdb[f.id] = { p, en: hit ? String(hit.original_title || "").slice(0, 120) : "", o: cleanIntro(hit ? hit.overview : ""), at: now };
       } catch (_) { /* 連線出錯：下次再查 */ }
       await new Promise((r) => setTimeout(r, 60));
     }
