@@ -12,9 +12,9 @@ import {
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
   loadSettings, saveSettings, settingsStored, setSettingsSavedHook, syncPick, syncApply, syncMerge, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, communityKey, globalSearch, issuerRecent, favSnapGet, favSnapSet, boxIsRerun, boxHasLaterRun, boxRunRows, boxRunsName, loadIntro, rerunDataReady, SITE_URL, TW,
   FORMATS, formatsOf, filterVersions, filterVersionsAny, movieRows, movieDays, nearest, kmLabel, WINDOWS, findShowtimes, findShowtimesMulti, multiLabel, multiDetail, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText,
-  hallOf, tmdbTest, movieExtras, moviePoster, movieRuntime, posterSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxCountries, boxByCountry, boxInfo, boxInfoRows, boxCountryText, BOX_COUNTRY_NOTE, boxCountryTag, boxCountriesPicked, loadMovieBoard, loadSoonBoard, notifyPrefs, notifyPayload, notifyEndScope, notifyEndPick, notifyQuiet, NOTIFY_PRE_STEPS, NOTIFY_KINDS, boxStatus, STATUS_LABEL, boxInfoBy, isFavMovie, toggleFavMovie, favMovieRows, favMovieBox, soonGroups, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityCached, communityVote, communityTags, social, signedIn, profileInk, PROFILE_EMOJI, WATCH_HOW, howLabel, profileSkipped, setProfileSkipped, setAccount, setSiteBase, setNotesViaSite, adoptRatings, forgetMyVotes, noteMax, profileColor, seenLabel, PROFILE_COLORS, sendFeedback, loadMyFeedback, feedbackSent, feedbackUnread, feedbackMarkSeen, feedbackCat, FEEDBACK_CATS, FEEDBACK_STATUS, FEEDBACK_MAX, loadNotes, notesCached, addNote, deleteNote, voteNote, noteHot, NOTE_FOLD_AT, reportNote, noteLooksSpoiler, noteDate, NOTE_MAX, NOTE_PLACEHOLDER, NOTE_RULES, REPORT_REASONS, reviewTagsToggle, REVIEW_TAGS, REVIEW_TAGS_MAX, reviewTagLabel, topReviewTags, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalsReady, festivalNote, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, festivalDefaultDate, festivalStateLabel, festivalState, festivalFooter, linkMovies, nowGroupLine, nowFilter, festivalPick, movieAbout, festivalSearch, festivalSearchLines, festivalTrailer, festivalYears, festivalsAny, festivalGroups, festivalChipNote, festivalStatusLine, movieRatings, ratingTier, tomatoTier, popcornTier, popcornCount,
+  hallOf, tmdbTest, movieExtras, moviePoster, movieRuntime, posterSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxCountries, boxByCountry, boxInfo, boxInfoRows, boxCountryText, BOX_COUNTRY_NOTE, boxCountryTag, boxCountriesPicked, loadMovieBoard, loadSoonBoard, notifyPrefs, notifyPayload, notifyEndScope, notifyEndPick, notifyQuiet, NOTIFY_PRE_STEPS, NOTIFY_KINDS, boxStatus, STATUS_LABEL, boxInfoBy, isFavMovie, toggleFavMovie, favMovieRows, favMovieBox, soonGroups, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityCached, communityVote, communityTags, agoLabel, social, signedIn, profileInk, PROFILE_EMOJI, WATCH_HOW, howLabel, profileSkipped, setProfileSkipped, setAccount, setSiteBase, setNotesViaSite, adoptRatings, forgetMyVotes, noteMax, profileColor, seenLabel, PROFILE_COLORS, sendFeedback, loadMyFeedback, feedbackSent, feedbackUnread, feedbackMarkSeen, feedbackCat, FEEDBACK_CATS, FEEDBACK_STATUS, FEEDBACK_MAX, loadNotes, notesCached, addNote, deleteNote, voteNote, noteHot, NOTE_FOLD_AT, reportNote, noteLooksSpoiler, noteDate, NOTE_MAX, NOTE_PLACEHOLDER, NOTE_RULES, REPORT_REASONS, reviewTagsToggle, REVIEW_TAGS, REVIEW_TAGS_MAX, reviewTagLabel, topReviewTags, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalsReady, festivalNote, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, festivalDefaultDate, festivalStateLabel, festivalState, festivalFooter, linkMovies, nowGroupLine, nowFilter, festivalPick, movieAbout, festivalSearch, festivalSearchLines, festivalTrailer, festivalYears, festivalsAny, festivalGroups, festivalChipNote, festivalStatusLine, movieRatings, ratingTier, tomatoTier, popcornTier, popcornCount,
 } from "./core";
-import type { Profile, DiaryEntry, SocialCounts, Feedback, ReviewNote, MovieExtras, Ratings, Community, BoxOfficeItem, BoxSort, MovieEntry, SoonEntry, UpcomingFilm, FavMovie, FavRow, NotifyPrefs, NotifyKind, SyncData, GlobalHits, Festival, FestivalFilm, FestivalSession } from "./core";
+import type { Activity, Profile, DiaryEntry, SocialCounts, Feedback, ReviewNote, MovieExtras, Ratings, Community, BoxOfficeItem, BoxSort, MovieEntry, SoonEntry, UpcomingFilm, FavMovie, FavRow, NotifyPrefs, NotifyKind, SyncData, GlobalHits, Festival, FestivalFilm, FestivalSession } from "./core";
 import { setTabBar, setBackGuard, esc } from "./jsx";
 import { CHANGELOG, CHANGELOG_LATEST } from "./changelog";
 import type { TwMovie, TwMovieCinema, Format, LatLng, Hit } from "./core";
@@ -66,12 +66,17 @@ class App {
   }
   // ── 底部分頁：首頁／電影／影城／設定，各自是一個根畫面；點目前的分頁會回到該分頁的根
   tab = "home";
-  readonly TABS = [
-    { id: "home", label: "首頁", icon: "house" },
-    { id: "movies", label: "電影", icon: "film" },
-    { id: "cinemas", label: "影城", icon: "building" },
-    { id: "settings", label: "設定", icon: "gear" },
-  ];
+  /** 網頁版多一個「通知」（有人推、噓、回覆你的短評，或追蹤你）；其他版本沒有帳號，不顯示 */
+  get TABS(): { id: string; label: string; icon: string }[] {
+    return [
+      { id: "home", label: "首頁", icon: "house" },
+      { id: "movies", label: "電影", icon: "film" },
+      { id: "cinemas", label: "影城", icon: "building" },
+      ...(this.sync() ? [{ id: "activity", label: "通知", icon: "bell" }] : []),
+      { id: "settings", label: "設定", icon: "gear" },
+    ];
+  }
+  unread = 0; // 還沒看過的通知有幾筆（頁籤上的紅點）
   lastTabTap = { id: "", at: 0 }; // 上一次點的是哪個頁籤、什麼時候（用來認「連點兩下」）
   /** 點下面的頁籤。連點同一個兩下（0.6 秒內）＝重新整理：整頁重新載入，資料重抓，有新版也會順便換上，並回到同一個頁籤 */
   tapTab(id: string) {
@@ -94,6 +99,7 @@ class App {
       movies: [() => this.movieListView(), "讀取電影清單…"],
       cinemas: [() => this.citiesView(), "讀取中…"],
       settings: [() => this.settingsView(), "讀取中…"],
+      activity: [() => this.activityView(), "讀取通知…"],
     };
     const [view, loading] = root[id] || root.home;
     this.loadingText = loading;
@@ -133,14 +139,16 @@ class App {
     await this.syncStart().catch(() => undefined);
     // 更新內容：第一次使用的人沒有「舊版」可以比，直接當成看過，不亮紅點
     if (!settingsStored && this.settings.seenLog === undefined) this.settings.seenLog = CHANGELOG_LATEST;
-    setTabBar(() => ({ active: this.tab, items: this.TABS.map((t) => (t.id === "settings" && this.logUnread() ? { ...t, dot: true } : t)), onTap: (id) => this.tapTab(id) }));
+    setTabBar(() => ({ active: this.tab, items: this.TABS.map((t) => ((t.id === "settings" && this.logUnread()) || (t.id === "activity" && this.unread > 0) ? { ...t, dot: true } : t)), onTap: (id) => this.tapTab(id) }));
     setBackGuard(() => this.stack.length > 1);
     this.go(() => this.homeView(), "讀取影城清單…");
     // 從通知點進來（?tab=soon／?tab=fest）：直接開電影分頁的那一類
     const startTab = IS_WEB ? (/[?&]tab=(soon|fest)\b/.exec(String((globalThis as any).location?.search || "")) || [])[1] : "";
     if (startTab) { this.movieMode = startTab as "soon" | "fest"; this.switchTab("movies"); }
     // 連點頁籤重新整理之後：回到剛才那個頁籤
-    if (IS_WEB) { try { const G = globalThis as any; const t = G.sessionStorage.getItem("ms:reload-tab"); if (t) { G.sessionStorage.removeItem("ms:reload-tab"); if (/^(movies|cinemas|settings)$/.test(t)) this.switchTab(t); } } catch (_) {} }
+    if (IS_WEB) { try { const G = globalThis as any; const t = G.sessionStorage.getItem("ms:reload-tab"); if (t) { G.sessionStorage.removeItem("ms:reload-tab"); if (/^(movies|cinemas|settings|activity)$/.test(t)) this.switchTab(t); } } catch (_) {} }
+    // 登入的人：開機時看一下有沒有新通知（頁籤上的紅點），不等它
+    if (signedIn()) social<{ unread?: number }>("me").then((d) => { this.unread = d.unread || 0; }, () => undefined);
     await this.openShared().catch(() => undefined);
     if (this.followedAfterLogin) {
       // 為了追蹤某個人才登入的：回到他的個人頁，再帶去取暱稱（設過或按過稍後再說就不問）
@@ -703,7 +711,7 @@ class App {
       );
     if (!this.meMem || Date.now() - this.meMem.at > 60e3) {
       // 最多等 0.9 秒，不拖慢設定頁；等不到先顯示「讀取中」，下次重畫就有了
-      const job = social<{ user: Profile | null; counts: SocialCounts; admin?: boolean }>("me").then((d) => { this.meMem = { at: Date.now(), data: d }; }, () => undefined);
+      const job = social<{ user: Profile | null; counts: SocialCounts; admin?: boolean; unread?: number }>("me").then((d) => { this.meMem = { at: Date.now(), data: d }; this.unread = d.unread || 0; }, () => undefined);
       await Promise.race([job, sleep(900)]);
     }
     const me = this.meMem ? this.meMem.data : null;
@@ -1150,6 +1158,68 @@ class App {
             }} />
           </div>
         </Section>
+      </Page>
+    );
+  }
+
+  // ── 通知頁（網頁版最下面的頁籤）：有人推、噓、回覆你的短評，或追蹤你 ──
+  async activityView(): Promise<string> {
+    const sy = this.sync();
+    if (!sy || !sy.on())
+      return (
+        <Page title="通知">
+          <Section hint="登入後，有人推或回覆你的短評、追蹤你，都會列在這裡。">
+            <Item icon="👤" title="用 Google 登入" subtitle="登入後才收得到通知" accent onTap={() => sy && sy.login()} />
+          </Section>
+        </Page>
+      );
+    let list: Activity[] = [], failed = "";
+    try { list = (await social<{ list: Activity[] }>("activity")).list || []; this.unread = 0; if (this.meMem) this.meMem.data = { ...this.meMem.data, unread: 0 } as any; } catch (e) { failed = String((e as Error)?.message || e); }
+    const row = (a: Activity) => {
+      const names = a.who.map((w) => w.name);
+      const rest = a.n - names.length;
+      // 「A、B 和另外 2 人」；都沒有公開個人頁就是「有人」「3 個人」
+      const whoText = names.length ? names.join("、") + (rest > 0 ? ` 和另外 ${rest} 人` : "") : a.n > 1 ? `${a.n} 個人` : "有人";
+      const quote = (t?: string) => (t ? `「${t}${Array.from(t).length >= 40 ? "…" : ""}」` : "");
+      const what = a.kind === "up" ? `推了你在《${a.title}》的短評${quote(a.px)}`
+        : a.kind === "down" ? `噓了你在《${a.title}》的短評${quote(a.px)}`
+        : a.kind === "reply" ? `在《${a.title}》回覆你：${a.x || ""}`
+        : a.returned ? "也回追你了" : "開始追蹤你";
+      const open = a.kind === "follow"
+        ? (names.length ? () => this.go(() => this.profileView(names[0]), "讀取個人頁…") : undefined)
+        : () => { this.noteReset(); if (a.px) this.noteFocus = { x: a.px, at: Date.now(), head: true }; this.go(() => this.notesView(a.title || ""), "讀取短評…"); };
+      const first = a.who[0];
+      const mark = a.kind === "up" ? "▲" : a.kind === "down" ? "▼" : a.kind === "reply" ? "↩" : "＋";
+      return (
+        <div class={"ac" + (a.fresh ? " fresh" : "")}>
+          <button class="ac-main" onTap={open}>
+            <span class="ac-av">
+              {first ? this.avatar(first) : <span class="av anon" aria-hidden="true">{a.kind === "down" ? "？" : "匿"}</span>}
+              {a.who[1] ? <span class="ac-av2">{this.avatar(a.who[1])}</span> : null}
+              <i class={"ac-mark " + a.kind} aria-hidden="true">{mark}</i>
+            </span>
+            <span class="ac-text">{a.kind === "down" ? <b>{a.n > 1 ? `${a.n} 個人` : "有人"}</b> : <b>{esc(whoText)}</b>} {esc(what)}<em>・{esc(agoLabel(a.at))}</em></span>
+          </button>
+          {a.kind === "follow" && names.length === 1 && !a.back ? <button class="ac-btn go" onTap={async () => {
+            try { await social("follow", { name: names[0], on: true }); this.meMem = null; await this.ui.toast(`已追蹤 ${names[0]}`); } catch (e) { await this.ui.toast(String((e as Error)?.message || e)); }
+          }}>回追</button> : a.kind === "follow" && a.back ? <span class="ac-btn">互相追蹤</span> : null}
+        </div>
+      );
+    };
+    const week = Date.now() - 7 * 86400e3;
+    const fresh = list.filter((a) => a.fresh), recent = list.filter((a) => !a.fresh && a.at >= week), older = list.filter((a) => !a.fresh && a.at < week);
+    return (
+      <Page title="通知">
+        {failed ? <Section><Note kind="warn" text={failed} /></Section> : !list.length ? (
+          <Section hint="噓只會顯示人數，不會顯示是誰。"><Note text="還沒有通知。有人推、噓或回覆你的短評，或是追蹤你，會出現在這裡。" /></Section>
+        ) : (
+          <>
+            {fresh.length ? <Section title="新的"><div class="ac-list">{fresh.map(row)}</div></Section> : null}
+            {recent.length ? <Section title="過去 7 天"><div class="ac-list">{recent.map(row)}</div></Section> : null}
+            {older.length ? <Section title="更早"><div class="ac-list">{older.map(row)}</div></Section> : null}
+            <p class="hint">噓只會顯示人數，不會顯示是誰。沒有公開個人頁的人會顯示成「有人」。</p>
+          </>
+        )}
       </Page>
     );
   }
@@ -1846,7 +1916,7 @@ class App {
   /** 短評頁：上面寫（或改）自己的一句話，下面是大家的。另開一頁，不擠在電影頁。
    *  防雷：輸入框提醒不提劇情、可以自己標「可能有雷」、偵測到劇透字眼送出前問一次；有雷的預設摺疊，點了才顯示。
    *  每則可以檢舉（劇透／不當內容／廣告），被多人檢舉的由伺服器自動摺疊或隱藏 */
-  noteFocus: { x: string; at: number } | null = null; // 從片單、個人頁點某一則短評進來：到討論區後捲到那一則並標亮（用內容對）
+  noteFocus: { x: string; at: number; head?: boolean } | null = null; // 從片單、個人頁點某一則短評進來：到討論區後捲到那一則並標亮（用內容對）
   noteReplyTo = 0; // 正在回覆哪一則（0 = 沒有）
   noteReplyDraft = ""; // 回覆打到一半的字
   noteMenu = 0; // 哪一則的「⋯」選單是開的
@@ -1904,8 +1974,10 @@ class App {
     const editing = this.noteEdit || !!this.noteAsk;
     const unsent = !!draft.trim(); // 打到一半、還沒送出的字
     // 要標亮的那一則（第一層裡內容一樣的；有雷、被噓到摺疊的也直接打開）。排序、篩選把它藏起來的話，改回「全部」
-    const focus = this.noteFocus ? tops.find((n) => n.x === this.noteFocus!.x) || null : null;
-    if (focus && shown.indexOf(focus) < 0) { this.noteFilter = "all"; shown.push(focus); }
+    // head = 只知道開頭（從通知進來的）：找內容是這樣開頭的那一則，回覆也算
+    const nf = this.noteFocus;
+    const focus = nf ? (nf.head ? notes.find((n) => !n.del && n.x.indexOf(nf.x) === 0) : tops.find((n) => n.x === nf.x)) || null : null;
+    if (focus && !focus.r && shown.indexOf(focus) < 0) { this.noteFilter = "all"; shown.push(focus); }
     if (focus && this.noteShown.indexOf(focus.id) < 0) this.noteShown = [...this.noteShown, focus.id];
     const total = notes.filter((n) => !n.del && !(n.hidden && !n.mine)).length;
     // 圖示（自己畫的簡單線條）：回覆、向上、向下、更多

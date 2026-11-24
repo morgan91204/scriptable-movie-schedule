@@ -108,6 +108,16 @@ export class AccountRpc extends WorkerEntrypoint {
     if (noteHasContact(x)) return { error: "no links" };
     return (await this.movie(m).addNote(dev, x, sp ? 1 : 0, m, true, Number.isInteger(parent) && parent > 0 ? parent : 0)) || { error: "vote first" };
   }
+  /** 回覆某一則（帳號或裝置都可以，不用先評分）。裝置的字數上限跟匿名短評一樣 */
+  async noteReply(m, by, text, sp, parent) {
+    const acct = okAccountDev(by);
+    if (!okMovie(m) || !(acct || okDevice(by)) || typeof text !== "string" || text.length > 1200 || !Number.isInteger(parent) || parent < 1) return { error: "bad request" };
+    const x = cleanNote(text);
+    if (!x) return { error: "bad request" };
+    if (Array.from(x).length > (acct ? NOTE_MAX_ACCOUNT : NOTE_MAX)) return { error: "too long" };
+    if (noteHasContact(x)) return { error: "no links" };
+    return (await this.movie(m).addNote(by, x, sp ? 1 : 0, m, true, parent)) || { error: "vote first" };
+  }
   async noteDel(m, dev, id) { return this.ok(m, dev) && Number.isInteger(id) ? this.movie(m).delNote(dev, id, m, true) : { error: "bad request" }; }
   async noteVote(m, by, id, v) {
     if (!okMovie(m) || !(okAccountDev(by) || okDevice(by)) || !Number.isInteger(id) || [1, 0, -1].indexOf(v) < 0) return { error: "bad request" };
@@ -462,9 +472,11 @@ export class Movie extends DurableObject {
   /** 新增一則短評，或回覆某一則（parent）。短評要先評過分、同一部片一個人最多 NOTES_PER_FILM 則；
    *  回覆不用先評分、一個人最多 REPLIES_PER_FILM 則。內容跟自己之前的一樣不重複加。回傳 null = 還沒評分；{ error } = 不行的原因 */
   async addNote(dev, x, sp, key, withAuthor = false, parent = 0) {
+    let target = null; // 被回覆的那一則（發通知用）
     if (parent) {
-      const p = this.sql.exec("SELECT id, parent FROM notes WHERE id = ? AND hidden = 0 AND del = 0", parent).toArray()[0];
+      const p = this.sql.exec("SELECT id, parent, dev, x FROM notes WHERE id = ? AND hidden = 0 AND del = 0", parent).toArray()[0];
       if (!p) return { error: "parent gone" };
+      if (p.dev !== dev) target = { a: isAccountDev(p.dev) ? p.dev.slice(2) : "", x: Array.from(p.x).slice(0, 40).join(""), id: p.id };
       // 討論串最多三層回覆（短評底下三層）：回第三層的，接在同一層後面。level = 被回的那一則在第幾層（短評本身是 0）
       let level = 0, up = p.parent;
       while (up && level < 9) { level++; up = (this.sql.exec("SELECT parent FROM notes WHERE id = ?", up).toArray()[0] || {}).parent || 0; }
@@ -475,7 +487,7 @@ export class Movie extends DurableObject {
     if (mine.filter((r) => (parent ? r.parent : !r.parent)).length >= (parent ? REPLIES_PER_FILM : NOTES_PER_FILM)) return { error: parent ? "too many replies" : "too many notes" };
     this.sql.exec("INSERT INTO notes (dev, x, sp, at, parent) VALUES (?, ?, ?, ?, ?)", dev, x, sp, Date.now(), parent);
     await this.syncNotes(key);
-    return this.listNotes(dev, withAuthor);
+    return { ...this.listNotes(dev, withAuthor), ...(withAuthor && target ? { t: target } : {}) };
   }
   /** 刪掉自己的某一則 */
   async delNote(dev, id, key, withAuthor = false) {
@@ -484,13 +496,14 @@ export class Movie extends DurableObject {
   }
   /** 推或噓一則短評：v = 1 推、-1 噓、0 收回。一個人對一則只算一次，不能推噓自己的 */
   async voteNote(dev, id, v, key, withAuthor = false) {
-    const note = this.sql.exec("SELECT dev FROM notes WHERE id = ? AND hidden = 0 AND del = 0", id).toArray()[0];
+    const note = this.sql.exec("SELECT dev, x FROM notes WHERE id = ? AND hidden = 0 AND del = 0", id).toArray()[0];
     if (note && note.dev !== dev) {
       if (v) this.sql.exec("INSERT INTO note_votes (id, dev, v) VALUES (?, ?, ?) ON CONFLICT(id, dev) DO UPDATE SET v = excluded.v", id, dev, v);
       else this.sql.exec("DELETE FROM note_votes WHERE id = ? AND dev = ?", id, dev);
       await this.syncNotes(key);
     }
-    return this.listNotes(dev, withAuthor);
+    // t = 被推噓的那一則是誰的（帳號才有 a）、內容開頭：只有走服務綁定進來的才會帶，網頁版伺服器拿來發通知，不會傳給 App
+    return { ...this.listNotes(dev, withAuthor), ...(withAuthor && note && note.dev !== dev ? { t: { a: isAccountDev(note.dev) ? note.dev.slice(2) : "", x: Array.from(note.x).slice(0, 40).join(""), id } } : {}) };
   }
   /** 把匿名裝置在這部片的紀錄併進帳號。回傳帳號現在的 { s 分數, t 標籤, x 最新一則短評, sp, at }（沒有評分就是 s = 0） */
   async adopt(from, to, key) {

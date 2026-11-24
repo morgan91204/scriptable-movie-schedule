@@ -46,9 +46,26 @@ export function socialInit(sql) {
   sql.exec("CREATE TABLE IF NOT EXISTS follows (a TEXT NOT NULL, b TEXT NOT NULL, at INTEGER NOT NULL, PRIMARY KEY (a, b))");
   sql.exec("CREATE INDEX IF NOT EXISTS follows_b ON follows (b)");
   sql.exec("CREATE TABLE IF NOT EXISTS user_reports (uid TEXT NOT NULL, by TEXT NOT NULL, why TEXT NOT NULL, at INTEGER NOT NULL, PRIMARY KEY (uid, by))");
+  // 通知頁的紀錄：to = 收通知的帳號（識別碼的前 40 個字，跟評分伺服器用的代號一樣）；kind = up 推／down 噓／reply 回覆／follow 追蹤；
+  // actor = 做這件事的人（帳號識別碼，或 d:裝置代號；畫面上不會顯示代號）；k、title = 哪部片；note = 哪一則；x = 回覆的內容；px = 被推噓或被回覆的那一則的開頭
+  sql.exec("CREATE TABLE IF NOT EXISTS activity (id INTEGER PRIMARY KEY AUTOINCREMENT, \"to\" TEXT NOT NULL, kind TEXT NOT NULL, actor TEXT NOT NULL, k TEXT NOT NULL DEFAULT '', title TEXT NOT NULL DEFAULT '', note INTEGER NOT NULL DEFAULT 0, x TEXT NOT NULL DEFAULT '', px TEXT NOT NULL DEFAULT '', at INTEGER NOT NULL)");
+  sql.exec("CREATE INDEX IF NOT EXISTS activity_to ON activity (\"to\", at)");
+  sql.exec("CREATE TABLE IF NOT EXISTS activity_seen (\"to\" TEXT PRIMARY KEY, at INTEGER NOT NULL)");
   sql.exec("CREATE TABLE IF NOT EXISTS write_quota (uid TEXT PRIMARY KEY, start INTEGER NOT NULL, n INTEGER NOT NULL)");
 }
 
+const ACT_KEEP = 300; // 一個人最多留幾筆通知
+/** 記一筆通知。自己對自己的不記；同一個人對同一則的推噓只留最新的一筆（改來改去不會洗版） */
+function notify(sql, to, kind, actor, more = {}) {
+  if (!to || !actor || actor.slice(0, 40) === to) return;
+  if (kind === "up" || kind === "down" || kind === "unvote") sql.exec('DELETE FROM activity WHERE "to" = ? AND actor = ? AND note = ? AND kind IN (\'up\', \'down\')', to, actor, more.note || 0);
+  if (kind === "follow" || kind === "unfollow") sql.exec('DELETE FROM activity WHERE "to" = ? AND actor = ? AND kind = \'follow\'', to, actor);
+  if (kind === "unvote" || kind === "unfollow") return;
+  sql.exec('INSERT INTO activity ("to", kind, actor, k, title, note, x, px, at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', to, kind, actor, more.k || "", cleanTitle(more.title) || more.k || "", more.note || 0, String(more.x || "").slice(0, 200), String(more.px || "").slice(0, 80), Date.now());
+  // 太多了就把最舊的清掉
+  const n = sql.exec('SELECT COUNT(*) AS c FROM activity WHERE "to" = ?', to).toArray()[0].c;
+  if (n > ACT_KEEP + 50) sql.exec('DELETE FROM activity WHERE "to" = ? AND id NOT IN (SELECT id FROM activity WHERE "to" = ? ORDER BY at DESC LIMIT ?)', to, to, ACT_KEEP);
+}
 const one = (sql, q, ...a) => sql.exec(q, ...a).toArray()[0] || null;
 const all = (sql, q, ...a) => sql.exec(q, ...a).toArray();
 const HOW = ["cinema", "second", "stream"];
@@ -133,7 +150,25 @@ export async function social(hub, path, b) {
     if (!okKey(m) || !by || !rate) return json({ error: "bad request" }, 400);
     if (uid && !quotaOk(sql, uid)) return json({ error: "too many" }, 429);
     const r = await rate.noteVote(m, by, Number(b.id), Number(b.v));
+    if (r && r.t) {
+      const v = Number(b.v);
+      if (r.t.a) notify(sql, r.t.a, v === 1 ? "up" : v === -1 ? "down" : "unvote", uid || "d:" + by, { k: m, title: b.title, note: r.t.id, px: r.t.x });
+      delete r.t;
+    }
     return fail(r) || json(withAuthors(sql, r, uid, m));
+  }
+  if (op === "note-reply") {
+    const by = uid ? udev(uid) : okDev(b.d) ? b.d : "";
+    if (!okKey(m) || !by || !rate) return json({ error: "bad request" }, 400);
+    if (uid && !quotaOk(sql, uid)) return json({ error: "too many" }, 429);
+    const r = await rate.noteReply(m, by, b.x, b.sp, Number(b.r) || 0);
+    const bad = fail(r);
+    if (bad) return bad;
+    if (r.t) {
+      if (r.t.a) notify(sql, r.t.a, "reply", uid || "d:" + by, { k: m, title: b.title, note: r.t.id, x: cleanTitle(b.x).slice(0, 140), px: r.t.x });
+      delete r.t;
+    }
+    return json(withAuthors(sql, r, uid, m));
   }
   if (op === "profile") {
     const u = one(sql, "SELECT * FROM users WHERE name = ?", String(b.name || ""));
@@ -194,7 +229,40 @@ export async function social(hub, path, b) {
   // ── 以下都要登入 ──
   const no = need();
   if (no) return no;
-  if (op === "me") return json({ ok: true, ...(isAdmin ? { admin: true } : {}), user: me ? { ...userOut(me), bio: me.bio || "", pub: !!me.pub, hidden: !!me.hidden, canRename: Date.now() - me.named > RENAME_EVERY } : null, counts: counts(sql, uid, false) });
+  if (op === "me") return json({ ok: true, unread: one(sql, 'SELECT COUNT(*) AS c FROM activity WHERE "to" = ? AND at > ?', uid.slice(0, 40), (one(sql, 'SELECT at FROM activity_seen WHERE "to" = ?', uid.slice(0, 40)) || { at: 0 }).at).c, ...(isAdmin ? { admin: true } : {}), user: me ? { ...userOut(me), bio: me.bio || "", pub: !!me.pub, hidden: !!me.hidden, canRename: Date.now() - me.named > RENAME_EVERY } : null, counts: counts(sql, uid, false) });
+  if (op === "activity") {
+    // 通知頁：最近的 150 筆，整理成一列一列（同一則的推合成一列、噓只算人數）。打開就算看過
+    const to = uid.slice(0, 40);
+    const seen = (one(sql, 'SELECT at FROM activity_seen WHERE "to" = ?', to) || { at: 0 }).at;
+    const rows = all(sql, 'SELECT * FROM activity WHERE "to" = ? ORDER BY at DESC LIMIT 150', to);
+    const who = {};
+    const actorOf = (a) => {
+      if (a.indexOf("d:") === 0) return null; // 沒登入的人
+      if (!(a in who)) { const u = one(sql, "SELECT name, color, emoji, pub, hidden FROM users WHERE uid = ?", a); who[a] = u && u.pub && !u.hidden ? userOut(u) : null; }
+      return who[a];
+    };
+    const iFollow = new Set(all(sql, "SELECT b FROM follows WHERE a = ?", uid).map((r) => r.b));
+    const items = [], votes = {};
+    for (const r of rows) {
+      if (r.kind === "up" || r.kind === "down") {
+        const key = r.kind + ":" + r.k + ":" + r.note;
+        let it = votes[key];
+        if (!it) { it = votes[key] = { kind: r.kind, k: r.k, title: r.title, px: r.px, at: r.at, n: 0, who: [], ...(r.at > seen ? { fresh: 1 } : {}) }; items.push(it); }
+        it.n++;
+        // 推：列出前兩個有公開個人頁的人；噓：只算人數，不說是誰
+        if (r.kind === "up") { const a = actorOf(r.actor); if (a && it.who.length < 2 && !it.who.some((x) => x.name === a.name)) it.who.push(a); }
+      } else if (r.kind === "reply") {
+        items.push({ kind: "reply", k: r.k, title: r.title, x: r.x, px: r.px, at: r.at, who: [actorOf(r.actor)].filter(Boolean), n: 1, ...(r.at > seen ? { fresh: 1 } : {}) });
+      } else if (r.kind === "follow") {
+        const a = actorOf(r.actor);
+        // back = 我也有追蹤他；先追蹤他、他才追蹤我的話就是「回追」
+        const mine = one(sql, "SELECT at FROM follows WHERE a = ? AND b = ?", uid, r.actor);
+        items.push({ kind: "follow", at: r.at, who: [a].filter(Boolean), n: 1, ...(iFollow.has(r.actor) ? { back: 1 } : {}), ...(mine && mine.at < r.at ? { returned: 1 } : {}), ...(r.at > seen ? { fresh: 1 } : {}) });
+      }
+    }
+    sql.exec('INSERT INTO activity_seen ("to", at) VALUES (?, ?) ON CONFLICT("to") DO UPDATE SET at = excluded.at', to, Date.now());
+    return json({ ok: true, list: items.slice(0, 80) });
+  }
   if (op === "mine") {
     const offset = Math.max(0, Number(b.offset) || 0);
     return json({ ok: true, list: all(sql, "SELECT * FROM entries WHERE uid = ? ORDER BY at DESC LIMIT 100 OFFSET ?", uid, offset).map(entryOut), total: counts(sql, uid, false).films });
@@ -238,8 +306,13 @@ export async function social(hub, path, b) {
     if (b.on) {
       if (!u.pub || u.hidden) return json({ error: "private" }, 403);
       if (one(sql, "SELECT COUNT(*) AS c FROM follows WHERE a = ?", uid).c >= 500) return json({ error: "too many follows" }, 400);
+      const fresh = !one(sql, "SELECT 1 AS x FROM follows WHERE a = ? AND b = ?", uid, u.uid);
       sql.exec("INSERT OR IGNORE INTO follows (a, b, at) VALUES (?, ?, ?)", uid, u.uid, Date.now());
-    } else sql.exec("DELETE FROM follows WHERE a = ? AND b = ?", uid, u.uid);
+      if (fresh) notify(sql, u.uid.slice(0, 40), "follow", uid);
+    } else {
+      sql.exec("DELETE FROM follows WHERE a = ? AND b = ?", uid, u.uid);
+      notify(sql, u.uid.slice(0, 40), "unfollow", uid);
+    }
     return json({ ok: true, following: !!b.on, followers: counts(sql, u.uid, true).followers });
   }
   if (op === "wipe") {
@@ -252,6 +325,8 @@ export async function social(hub, path, b) {
     const left = one(sql, "SELECT COUNT(*) AS c FROM entries WHERE uid = ?", uid).c;
     if (!left) {
       sql.exec("DELETE FROM follows WHERE a = ? OR b = ?", uid, uid);
+      sql.exec('DELETE FROM activity WHERE "to" = ? OR actor = ?', uid.slice(0, 40), uid);
+      sql.exec('DELETE FROM activity_seen WHERE "to" = ?', uid.slice(0, 40));
       sql.exec("DELETE FROM user_reports WHERE uid = ? OR by = ?", uid, uid);
       sql.exec("DELETE FROM users WHERE uid = ?", uid);
       sql.exec("DELETE FROM write_quota WHERE uid = ?", uid);
@@ -305,6 +380,7 @@ export async function social(hub, path, b) {
     const bad = fail(r);
     if (bad) return bad;
     // 片單上記的是自己最新的一則「短評」（回覆別人的不算）
+    if (r.t) delete r.t; // 發通知用的資料不傳給 App
     const mine = (r.notes || []).filter((n) => n.mine && !n.r).sort((x, y) => y.at - x.at)[0];
     upsertEntry(sql, uid, m, b.title, { x: mine ? mine.x : "", sp: mine ? mine.sp : 0, ...(mine ? { s: mine.s } : {}), touch: op === "note-add" && !b.r });
     return json(withAuthors(sql, r, uid, m));

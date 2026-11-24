@@ -3628,6 +3628,17 @@ export interface Profile { name: string; color: string; emoji?: string; bio?: st
 export const WATCH_HOW: { id: string; label: string }[] = [{ id: "cinema", label: "電影院" }, { id: "second", label: "二輪電影院" }, { id: "stream", label: "串流" }];
 export const howLabel = (how?: string[]): string => WATCH_HOW.filter((h) => (how || []).indexOf(h.id) >= 0).map((h) => h.label).join("、");
 export interface DiaryEntry { k: string; title: string; s: number; x: string; sp: number; seen: string; at: number; priv?: number; how?: string[]; by?: { name: string; color: string; emoji?: string } }
+/** 通知頁的一列：up 有人推我的短評／down 有人噓／reply 有人回覆我／follow 有人追蹤我。who = 是誰（最多列兩個有公開個人頁的人），n = 總共幾個人 */
+export interface Activity { kind: "up" | "down" | "reply" | "follow"; at: number; n: number; who: { name: string; color: string; emoji?: string }[]; k?: string; title?: string; x?: string; px?: string; back?: number; returned?: number; fresh?: number }
+/** 通知上的時間：剛剛、幾分鐘、幾小時、幾天，再久就寫日期 */
+export function agoLabel(at: number): string {
+  const m = Math.floor((Date.now() - at) / 60000);
+  if (m < 1) return "剛剛";
+  if (m < 60) return `${m} 分鐘`;
+  if (m < 60 * 24) return `${Math.floor(m / 60)} 小時`;
+  if (m < 60 * 24 * 30) return `${Math.floor(m / 1440)} 天`;
+  return noteDate(at);
+}
 export interface SocialCounts { films: number; notes: number; following: number; followers: number }
 export const PROFILE_COLORS: { id: string; hex: string }[] = [
   { id: "blue", hex: "#0a84ff" }, { id: "green", hex: "#30b158" }, { id: "orange", hex: "#ff9f0a" }, { id: "red", hex: "#ff453a" },
@@ -3848,7 +3859,7 @@ export async function loadNotes(title: string): Promise<ReviewNotes> {
 async function notePost(path: string, title: string, body: Record<string, unknown>, fail: string): Promise<ReviewNotes> {
   const k = communityKey(title);
   // 登入的人用帳號身分送；檢舉在網頁版也走自己的伺服器（回來的清單才有暱稱）
-  const viaSite = signedIn() || (notesViaSite && (path === "report" || path === "note-vote"));
+  const viaSite = signedIn() || (notesViaSite && (path === "report" || path === "note-vote" || path === "note-reply"));
   const r = viaSite
     ? await socialCall(path, { m: k, title: baseTitle(title), ...body }).then((x) => ({ status: x.status, body: JSON.stringify(x.data) }))
     : await platform().fetchText(`${COMMUNITY_API}/v2/${path}`, { accept: "application/json", "content-type": "application/json" }, { method: "POST", body: JSON.stringify({ m: k, d: deviceId(), ...body }) });
@@ -3861,7 +3872,7 @@ async function notePost(path: string, title: string, body: Record<string, unknow
 /** 送出（或修改）自己的短評；text 空的 = 刪掉 */
 export const saveNote = (title: string, text: string, spoiler: boolean): Promise<ReviewNotes> => notePost("note", title, { x: String(text || "").trim(), sp: spoiler ? 1 : 0 }, "短評沒有送出，請稍後再試");
 /** 新增一則短評（同一部片最多 5 則） */
-export const addNote = (title: string, text: string, spoiler: boolean, replyTo = 0): Promise<ReviewNotes> => notePost("note-add", title, { x: String(text || "").trim(), sp: spoiler ? 1 : 0, ...(replyTo ? { r: replyTo } : {}) }, "沒有送出，請稍後再試");
+export const addNote = (title: string, text: string, spoiler: boolean, replyTo = 0): Promise<ReviewNotes> => notePost(replyTo && (notesViaSite || signedIn()) ? "note-reply" : "note-add", title, { x: String(text || "").trim(), sp: spoiler ? 1 : 0, ...(replyTo ? { r: replyTo } : {}) }, "沒有送出，請稍後再試");
 /** 刪掉自己的某一則短評 */
 export const deleteNote = (title: string, id: number): Promise<ReviewNotes> => notePost("note-del", title, { id }, "沒有刪掉，請稍後再試");
 /** 推（1）、噓（-1）或收回（0）一則短評 */
