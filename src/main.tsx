@@ -917,8 +917,8 @@ class App {
     if (poster && poster === posterUrl) cachePoster(posterUrl); // 這次用網址顯示，順便抓進快取
     const search = `https://www.youtube.com/results?search_query=${encodeURIComponent(title + " 預告")}`;
     const badges = this.ratingBadges(r);
-    // 爆米花指數的補充：觀眾平均幾分（滿分 5）、有多少人評（人數少的參考性比較低）
-    if (r?.popcorn && (r.popcorn.avg || r.popcorn.count)) lines = [...lines, ["爆米花", r.popcorn.avg ? `觀眾平均 ${r.popcorn.avg}／5` : "", popcornCount(r.popcorn.count)].filter(Boolean).join("｜")];
+    // 爆米花指數的補充，一行放得下：觀眾平均幾分（滿分 5）｜多少人評（人數少的參考性比較低）
+    if (r?.popcorn && (r.popcorn.avg || r.popcorn.count)) lines = [...lines, [r.popcorn.avg ? `爆米花 ${r.popcorn.avg}／5` : "爆米花", popcornCount(r.popcorn.count)].filter(Boolean).join("｜")];
     if (!r && e.loading) lines = [...lines, "評分讀取中…"];
     else if (!r) lines = [...lines, "評分讀不到"];
     if (r?.err && !(r.imdb || r.tomato || r.popcorn)) lines = [...lines, `評分讀不到：${r.err}`];

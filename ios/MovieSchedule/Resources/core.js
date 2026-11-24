@@ -3352,7 +3352,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   }
   var popcornTier = (score, certified) => score < 60 ? "bad" : certified ? "good" : "mid";
   var popcornLabel = (score, certified) => score < 60 ? "冷掉" : certified ? "認證熱門" : "熱門";
-  var popcornCount = (s) => String(s || "").replace(/\s*Verified Ratings?/i, " 則已驗證評分").replace(/\s*Ratings?/i, " 則評分").replace(/Fewer than\s*/i, "不到 ").trim();
+  var popcornCount = (s) => String(s || "").replace(/\s*(Verified\s+)?Ratings?/i, " 人評").replace(/Fewer than\s*/i, "不到 ").trim();
   var tomatoLabel = (score, certified) => score < 60 ? "腐爛" : certified ? "認證新鮮" : "新鮮";
   function ratingTier(kind, v) {
     const x = kind === "imdb" ? v * 10 : v;
@@ -3765,7 +3765,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   var extra = { boxOffice, filmList, soonList, nowShowing, nowShowingMulti, movieBoard: movieBoard2, festivalBoard, festivalFilm, nearby, patchSettings, fillMovie, formatList };
   var BRIDGE_LEVEL = 2;
   globalThis.MS = {
-    version: "2026.11.24-0846",
+    version: "2026.11.24-0848",
     level: BRIDGE_LEVEL,
     init(saved) {
       cache = saved || {};

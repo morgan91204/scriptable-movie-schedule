@@ -3113,8 +3113,8 @@ export function tomatoTier(score: number, certified?: boolean): "good" | "mid" |
 /** 爆米花指數照爛番茄自己的三級：認證熱門（爛番茄給的標章，綠）／熱門（60% 以上，黃）／冷掉（低於 60%，紅） */
 export const popcornTier = (score: number, certified?: boolean): "good" | "mid" | "bad" => (score < 60 ? "bad" : certified ? "good" : "mid");
 export const popcornLabel = (score: number, certified?: boolean): string => (score < 60 ? "冷掉" : certified ? "認證熱門" : "熱門");
-/** 爛番茄的評分人數級距（英文）換成中文：「5,000+ Verified Ratings」→「5,000+ 則已驗證評分」 */
-export const popcornCount = (s?: string): string => String(s || "").replace(/\s*Verified Ratings?/i, " 則已驗證評分").replace(/\s*Ratings?/i, " 則評分").replace(/Fewer than\s*/i, "不到 ").trim();
+/** 爛番茄的評分人數級距（英文）換成短的中文：「5,000+ Verified Ratings」→「5,000+ 人評」 */
+export const popcornCount = (s?: string): string => String(s || "").replace(/\s*(Verified\s+)?Ratings?/i, " 人評").replace(/Fewer than\s*/i, "不到 ").trim();
 export const tomatoLabel = (score: number, certified?: boolean): string => (score < 60 ? "腐爛" : certified ? "認證新鮮" : "新鮮");
 export function ratingTier(kind: "imdb" | "pct", v: number): "good" | "mid" | "bad" {
   const x = kind === "imdb" ? v * 10 : v;
