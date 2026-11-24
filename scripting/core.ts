@@ -1764,8 +1764,39 @@ export async function boxInfoBy(title: string): Promise<{ x: BoxOfficeItem; info
   const k = communityKey(title);
   const x = b ? b.list.find((i) => communityKey(i.name) === k) : null;
   if (!x) return null;
+  if (!boxFullLatest) await Promise.race([loadBoxOfficeFull().catch(() => null), delay(1500)]);
   return { x, info: await boxInfo(x).catch(() => null) };
 }
+// ── 重映 ──
+// 官方票房資料把每一次重映都算成新的一筆：有自己的上映日期，累計票房也只算那一次重映，不含首輪。
+// 所以同一部片會有好幾筆，重映那一筆的「累計票房」看起來會少得不合理。這裡找出它更早的那一筆（首輪），畫面上標「重映」並把首輪的數字一起列出來。
+let boxFullLatest: BoxOffice | null = null; // 最近一次讀到的完整票房資料（2016 年至今各年）
+const rerunIndex = new WeakMap<object, Record<string, BoxOfficeItem[]>>();
+/** 片名本身就寫明是重映的（首輪在 2016 年以前、資料裡找不到首輪時靠這個）。「莎翁經典劇集」這種是另一部作品，不算 */
+export const rerunByName = (name: string): boolean => /重映|修復|週年|周年|[紀記]念版|數位經典|經典劇場|特別版/.test(name || "");
+const plainName = (s: string) => String(s || "").toLowerCase().replace(/[\s:：．.。・·,，、!！?？'"「」《》\-—_]/g, "");
+/** 這一筆的首輪：同一部片、上映日早了三百天以上的最早那一筆；沒有就是 null。
+ *  「同一部片」要嚴一點，免得把同名的不同作品湊在一起：出品國別要一樣，而且
+ *  片名（不看標點）完全相同，或這一筆的片名寫了重映字樣、去掉之後跟那一筆（片名沒有括號註記的）相同 */
+export function boxFirstRun(x: BoxOfficeItem, b: BoxOffice | null = boxFullLatest): BoxOfficeItem | null {
+  if (!b || !b.years || !x || !x.release) return null;
+  let idx = rerunIndex.get(b);
+  if (!idx) {
+    idx = {};
+    for (const y of Object.keys(b.years)) for (const i of b.years[y]) { const k = communityKey(i.name); if (k && i.release) (idx[k] ||= []).push(i); }
+    for (const k of Object.keys(idx)) idx[k].sort((a, c) => a.release.localeCompare(c.release));
+    rerunIndex.set(b, idx);
+  }
+  const marked = rerunByName(x.name);
+  for (const f of idx[communityKey(x.name)] || []) {
+    if (!(Date.parse(x.release) - Date.parse(f.release) > 300 * 86400e3)) break; // 依上映日排好的：後面的都不夠早
+    if (x.country && f.country && boxMainCountry(x.country) !== boxMainCountry(f.country)) continue;
+    if (plainName(f.name) === plainName(x.name) || (marked && !/[（(［\[]/.test(f.name))) return f;
+  }
+  return null;
+}
+/** 這一筆是不是重映（找得到首輪，或片名自己寫了重映） */
+export const boxIsRerun = (x: BoxOfficeItem, b: BoxOffice | null = boxFullLatest): boolean => !!boxFirstRun(x, b) || rerunByName(x.name);
 /** 票房頁「個別資訊」的各列：[標題, 內容]。跟官方網站列的欄位一樣（國別、發行、出品、上映日期、上映院數、累計票數、累計金額），沒有的不列 */
 export function boxInfoRows(x: BoxOfficeItem, info: BoxInfo | null): [string, string][] {
   const num = (n: number) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
@@ -1776,7 +1807,11 @@ export function boxInfoRows(x: BoxOfficeItem, info: BoxInfo | null): [string, st
   rows.push(["上映日期", x.release.replace(/-/g, "/")]);
   if (x.theaters) rows.push(["上映戲院", `${x.theaters} 間`]);
   if (x.week !== null && !x.since) rows.push(["本週票房", money(x.week)]);
-  rows.push(["累計票房", `${money(x.total)}（${num(x.total)} 元）`]);
+  // 重映的片：官方的累計只算這一次重映，寫清楚，並把首輪的票房列在下面（資料從 2016 年開始，更早的首輪沒有數字）
+  const first = boxFirstRun(x), rerun = !!first || rerunByName(x.name);
+  rows.push([rerun ? "這次重映累計" : "累計票房", `${money(x.total)}（${num(x.total)} 元）`]);
+  if (first) rows.push(["先前上映票房", `${money(first.total)}（${first.release.slice(0, 4)} 年上映）`]);
+  else if (rerun) rows.push(["先前上映票房", "官方資料從 2016 年開始，沒有更早的紀錄"]);
   const tickets = (info && info.tickets) || x.tickets || 0;
   if (tickets) {
     rows.push(["累計票數", `${num(tickets)} 張`]);
@@ -1944,7 +1979,7 @@ export function movieBoard(b: BoxOffice | null, movies: TwMovie[], opt: { scope?
     if (sort === "rating" || sort === "cinemas" || sort === "tickets" || sort === "price") keyed.slice().sort((a, c) => c.k.tier - a.k.tier || c.k.v - a.k.v).forEach((e, i) => { if (e.k.tier > 0) e.rank = i + 1; });
     keyed.sort((a, c) => c.k.tier - a.k.tier || (asc ? a.k.v - c.k.v : c.k.v - a.k.v));
     const entries = keyed.map(({ x, m, k: kk, rank }): MovieEntry => {
-      const info = [boxMainCountry(x.country), sort === "date" ? "" : releaseLabel(dateOf(x, m)), theatersOf(x, m) && sort !== "cinemas" ? `${theatersOf(x, m)} 間戲院` : ""].filter(Boolean).join("｜");
+      const info = [boxIsRerun(x, b) ? "重映" : "", boxMainCountry(x.country), sort === "date" ? "" : releaseLabel(dateOf(x, m)), theatersOf(x, m) && sort !== "cinemas" ? `${theatersOf(x, m)} 間戲院` : ""].filter(Boolean).join("｜");
       return { key: `${x.name}|${x.release}`, rank, name: x.name, x, m, lines: sort === "total" ? [info, ""] : [`票房 ${money(x.total)}`, info], light: !m, hi: kk.hi, status: boxStatus(x) };
     });
     const rateName = rates.find((r) => r.id === rate)!.label;
@@ -3313,7 +3348,7 @@ export function loadBoxOfficeFull(): Promise<BoxOffice> {
     // 年份檔為了省空間沒有 week、country 欄位：補上預設值
     const full: Record<string, BoxOfficeItem[]> = {};
     for (const y of Object.keys(years)) full[y] = years[y].map((x) => { const r = x as BoxOfficeItem & { c?: number; d?: number; k?: number }; return { ...x, week: null, country: x.country || countries[r.c ?? -1] || "", issue: x.issue || issuers[r.d ?? -1] || "", tickets: x.tickets || r.k || 0 }; });
-    return { ...b, years: { ...(b.years || {}), ...full } };
+    return (boxFullLatest = { ...b, years: { ...(b.years || {}), ...full } }); // 記下來：找重映片的首輪時用
   })().catch(async (e) => {
     boxYearsMem = null; // 下次再試
     return loadBoxOffice(); // 至少有今年的
