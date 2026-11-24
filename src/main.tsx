@@ -3,7 +3,7 @@
 // 畫面：WebView（HTML/CSS），事件迴圈在 run()。資料層在 core.ts，網頁解析在 parsers.ts。
 
 import { SOCIALS, socialIcon } from "./brand";
-import { readLetterboxd, lbxNote } from "./lbx";
+import { readLetterboxd, lbxNote, LBX_NOTE_MAX } from "./lbx";
 import type { LbxItem } from "./lbx";
 import { loadYearRatings, normTitle as lbxNorm } from "./core";
 import { h, Fragment, Page, Section, Item, Chips, Chip, Button, Search, PickRow, Note, Para, Loading, Empty, Hero, Steps } from "./jsx";
@@ -924,7 +924,7 @@ class App {
         // IMDb 編號 → 片刻用的片名（同一部片有好幾種版本的話取最短的那個，就是本片）
         const byImdb: Record<string, string> = {};
         for (const key of Object.keys((years && years.ratings) || {})) { const id = years!.ratings[key].id, name = key.split("|")[0]; if (id && (!byImdb[id] || name.length < byImdb[id].length)) byImdb[id] = name; }
-        const max = noteMax();
+        const max = LBX_NOTE_MAX;
         for (let i = 0; i < items.length; i += BATCH) {
           if (this.lbx !== st) return; // 使用者重來或離開了
           const part = items.slice(i, i + BATCH);
@@ -1001,7 +1001,7 @@ class App {
               <label class="btn primary lb-pick">選擇 Letterboxd 匯出的 zip 檔<input type="file" accept=".zip,.csv,application/zip,text/csv" multiple onFile={() => this.lbxStart()} /></label>
             </div>
           </Section>
-          <p class="hint">會匯入：評分（半顆星換成 1 分，五顆星 = 10 分，會算進片刻的平均）、觀影日期、影評（變成短評，最多 {noteMax()} 字，可以逐筆決定要不要匯、有沒有雷）。片刻裡已經評過分的片不會被蓋掉。</p>
+          <p class="hint">會匯入：評分（半顆星換成 1 分，五顆星 = 10 分，會算進片刻的平均）、觀影日期、影評（變成短評，最多留 {LBX_NOTE_MAX} 字，可以逐筆決定要不要匯、有沒有雷）。片刻裡已經評過分的片不會被蓋掉。</p>
         </Page>
       );
     }
@@ -1044,7 +1044,7 @@ class App {
               <div class="lb-opts">
                 <button class={"cm-tag" + (r.noteOn ? " on" : "")} aria-pressed={r.noteOn ? "true" : "false"} onTap={() => { r.noteOn = !r.noteOn; }}>{r.noteOn ? "匯入影評 ✓" : "匯入影評"}</button>
                 {r.noteOn ? <button class={"cm-tag" + (r.sp ? " on" : "")} aria-pressed={r.sp ? "true" : "false"} onTap={() => { r.sp = !r.sp; }}>{r.sp ? "有雷 ✓" : "有雷？"}</button> : null}
-                {r.cut ? <span class="lb-sub" style="align-self:center">原文太長，只留前 {noteMax()} 字</span> : null}
+                {r.cut ? <span class="lb-sub" style="align-self:center">原文太長，只留前 {LBX_NOTE_MAX} 字</span> : null}
               </div>
             </>
           ) : null}

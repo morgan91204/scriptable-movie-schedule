@@ -38,6 +38,7 @@ const okDevice = (d) => typeof d === "string" && /^[A-Za-z0-9_-]{16,64}$/.test(d
 const isAccountDev = (d) => typeof d === "string" && d.indexOf("u_") === 0;
 const okAccountDev = (d) => typeof d === "string" && /^u_[0-9a-f]{40}$/.test(d);
 const NOTE_MAX_ACCOUNT = 140; // 有帳號的人短評可以寫長一點
+const NOTE_MAX_IMPORT = 500; // 從 Letterboxd 匯入的影評可以再長一點（原本就寫好的，不硬截成 140 字）
 const NOTES_PER_FILM = 5; // 同一部片一個人最多發幾則短評
 const REPLIES_PER_FILM = 30; // 同一部片一個人最多回覆幾則
 // 心得標籤：只收代號（小寫英文），有哪些標籤、叫什麼名字由 App 決定；不收任何自由輸入的文字
@@ -100,11 +101,11 @@ export class AccountRpc extends WorkerEntrypoint {
     return (await this.movie(m).setNote(dev, x, sp ? 1 : 0, m, true)) || { error: "vote first" };
   }
   /** 新增一則短評（一部片最多 5 則）、刪掉自己的某一則、推或噓別人的（by 可以是帳號或裝置） */
-  async noteAdd(m, dev, text, sp, parent = 0) {
-    if (!this.ok(m, dev) || typeof text !== "string" || text.length > 1200) return { error: "bad request" };
+  async noteAdd(m, dev, text, sp, parent = 0, imported = false) {
+    if (!this.ok(m, dev) || typeof text !== "string" || text.length > 2400) return { error: "bad request" };
     const x = cleanNote(text);
     if (!x) return { error: "bad request" };
-    if (Array.from(x).length > NOTE_MAX_ACCOUNT) return { error: "too long" };
+    if (Array.from(x).length > (imported ? NOTE_MAX_IMPORT : NOTE_MAX_ACCOUNT)) return { error: "too long" };
     if (noteHasContact(x)) return { error: "no links" };
     return (await this.movie(m).addNote(dev, x, sp ? 1 : 0, m, true, Number.isInteger(parent) && parent > 0 ? parent : 0)) || { error: "vote first" };
   }
@@ -559,7 +560,7 @@ export class Movie extends DurableObject {
     let added = 0;
     for (const n of list) {
       const x = cleanNote(n && n.x);
-      if (!x || Array.from(x).length > NOTE_MAX_ACCOUNT || this.sql.exec("SELECT 1 FROM notes WHERE x = ?", x).toArray().length) continue;
+      if (!x || Array.from(x).length > NOTE_MAX_IMPORT || this.sql.exec("SELECT 1 FROM notes WHERE x = ?", x).toArray().length) continue;
       const s = Number(n.s);
       this.sql.exec("INSERT INTO notes (dev, x, sp, at, rs) VALUES (?, ?, ?, ?, ?)", "restored:" + crypto.randomUUID(), x, n.sp ? 1 : 0, Number(n.at) || Date.now(), Number.isInteger(s) && s >= 1 && s <= 10 ? s : 0);
       added++;

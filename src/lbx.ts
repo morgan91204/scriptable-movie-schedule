@@ -121,6 +121,8 @@ export async function readLetterboxd(files: { name: string; data: ArrayBuffer }[
     .map(({ at: _at, ...it }) => it);
 }
 
+/** 匯入的影評最多留幾個字（比一般短評的 140 字寬，伺服器也是這個數字） */
+export const LBX_NOTE_MAX = 500;
 /** 影評放進片刻的短評：換行併成空白；超過上限就截掉、結尾加「…」。回傳 { x, cut } （cut = 有沒有被截） */
 export function lbxNote(review: string, max: number): { x: string; cut: boolean } {
   const flat = String(review || "").replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim(); // Letterboxd 的影評可以有 <i>、<b> 這類標記：拿掉

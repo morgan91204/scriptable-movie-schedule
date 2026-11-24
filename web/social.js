@@ -382,9 +382,9 @@ export async function social(hub, path, b) {
       let x = "", sp = 0, note = "";
       try {
         if (s) { const r = await rate.vote(k, udev(uid), s); if (r && r.error) { out.push("fail"); continue; } }
-        const text = s ? String(it.x || "").replace(/[\u0000-\u001f\u007f-\u009f]/g, " ").replace(/\s+/g, " ").trim().slice(0, 400) : "";
+        const text = s ? String(it.x || "").replace(/[\u0000-\u001f\u007f-\u009f]/g, " ").replace(/\s+/g, " ").trim().slice(0, 1200) : "";
         if (text && !(old && old.x === text)) {
-          const r = await rate.noteAdd(k, udev(uid), text, it.sp ? 1 : 0, 0);
+          const r = await rate.noteAdd(k, udev(uid), text, it.sp ? 1 : 0, 0, true); // true = 匯入的影評，字數上限比較寬
           if (r && r.error) note = r.error; else { x = text; sp = it.sp ? 1 : 0; }
         } else if (old && old.x) { x = old.x; }
       } catch (_) { out.push("fail"); continue; }
