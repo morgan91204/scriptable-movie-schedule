@@ -1501,7 +1501,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     const job = (async () => {
       let disk = null;
       try {
-        disk = JSON.parse(cacheGet("meta.json") || "null");
+        disk = JSON.parse(cacheGet("meta2.json") || "null");
       } catch (_) {
       }
       if (disk && Date.now() - disk.at < 36e5) return fresh(disk.data);
@@ -1510,7 +1510,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
         if (r.status !== 200) return null;
         const data = JSON.parse(r.body);
         if (!data || typeof data.movies !== "object") return null;
-        cacheSet("meta.json", JSON.stringify({ at: Date.now(), data }));
+        cacheSet("meta2.json", JSON.stringify({ at: Date.now(), data }));
         return data;
       })().catch(() => null);
       const got = await Promise.race([net, delay(4e3).then(() => null)]);
@@ -2622,7 +2622,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     const job = (async () => {
       let disk = null;
       try {
-        disk = JSON.parse(cacheGet("ratings-years.json") || "null");
+        disk = JSON.parse(cacheGet("ratings-years2.json") || "null");
       } catch (_) {
       }
       if (disk && disk.data && Date.now() - disk.at < 6 * 36e5) return disk.data;
@@ -2632,7 +2632,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
         if (d && d.ratings && typeof d.ratings === "object") {
           const data = { total: Number(d.total) || 0, missed: Object.keys(d.miss || {}).length, ratings: d.ratings };
           try {
-            cacheSet("ratings-years.json", JSON.stringify({ at: Date.now(), data }));
+            cacheSet("ratings-years2.json", JSON.stringify({ at: Date.now(), data }));
           } catch (_) {
           }
           return data;
@@ -3308,7 +3308,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
       return r;
     })();
   }
-  var RATINGS_V = 2;
+  var RATINGS_V = 3;
   function tomatoTier(score, certified) {
     return score < 60 ? "bad" : certified ? "good" : "mid";
   }
@@ -3727,7 +3727,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   var extra = { boxOffice, filmList, soonList, nowShowing, nowShowingMulti, movieBoard: movieBoard2, festivalBoard, festivalFilm, nearby, patchSettings, fillMovie, formatList };
   var BRIDGE_LEVEL = 2;
   globalThis.MS = {
-    version: "2026.11.24-0823",
+    version: "2026.11.24-0837",
     level: BRIDGE_LEVEL,
     init(saved) {
       cache = saved || {};
