@@ -1,0 +1,45 @@
+# 資料備份：data、img 兩個分支為了不讓程式庫越長越大，每次更新都只留最新的一份（沒有歷史）。
+# 萬一哪天排程出錯、把檔案寫壞或寫空，上一份就找不回來了。所以每週替它們當時的內容打一個標籤留底：
+#   backup/weekly-YYYY-MM-DD   每週一份，留最近 8 週（更舊的自動刪掉）
+#   backup/monthly-YYYY-MM     每月一份，永久保留
+# 標籤指向的那一份內容 GitHub 會一直留著；沒變的檔案不會重複佔空間。
+# 要救回某個檔：git show backup/monthly-2026-11-data:ratings-years.json > ratings-years.json
+name: 備份資料分支
+on:
+  schedule:
+    - cron: "17 19 * * 0" # 每週一凌晨 3:17（台灣時間）
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: backup
+  cancel-in-progress: false
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: 打標籤留底
+        run: |
+          set -e
+          day=$(TZ=Asia/Taipei date +%Y-%m-%d)
+          month=$(TZ=Asia/Taipei date +%Y-%m)
+          git fetch -q origin 'refs/tags/backup/*:refs/tags/backup/*' || true
+          for b in data img; do
+            git fetch -q origin "$b" || { echo "沒有 $b 分支，略過"; continue; }
+            sha=$(git rev-parse FETCH_HEAD)
+            # 內容要看起來是完整的才留底（檔案太少多半是壞掉的那一份，不要拿它蓋掉好的備份）
+            n=$(git ls-tree -r --name-only "$sha" | wc -l)
+            if [ "$b" = data ] && [ "$n" -lt 10 ]; then echo "data 分支只有 $n 個檔，看起來不完整，這次不備份"; continue; fi
+            git tag -f "backup/weekly-$day-$b" "$sha"
+            git push -q -f origin "refs/tags/backup/weekly-$day-$b"
+            if ! git rev-parse -q --verify "refs/tags/backup/monthly-$month-$b" >/dev/null; then
+              git tag "backup/monthly-$month-$b" "$sha"
+              git push -q origin "refs/tags/backup/monthly-$month-$b"
+              echo "已留下 $month 的每月備份（$b，$n 個檔）"
+            fi
+            echo "已留下 $day 的每週備份（$b，$n 個檔）"
+            # 每週的只留最近 8 份
+            git tag -l "backup/weekly-*-$b" | sort | head -n -8 | while read -r t; do git push -q origin ":refs/tags/$t" && echo "刪掉舊的每週備份 $t"; done
+          done
