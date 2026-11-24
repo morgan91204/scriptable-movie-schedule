@@ -270,9 +270,7 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .fb-reply{margin-top:9px;padding:10px 12px;border-radius:10px;background:var(--chip);font-size:15px;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere}
 .fb-reply b{display:block;font-size:12px;color:var(--accent);margin-bottom:3px}
 .av{flex:none;display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;color:#fff;font-size:13px;font-weight:700;line-height:1}
-.av.big{width:56px;height:56px;font-size:26px}
 .av.emo{font-size:14px;font-weight:400}
-.av.big.emo{font-size:32px}
 .nt-by.inline .av.emo{font-size:11px}
 .pf-prev{display:flex;align-items:center;gap:14px;margin:8px 0 12px}
 .em{display:inline-flex;align-items:center;justify-content:center;padding:0;width:40px;height:40px;border-radius:10px;background:var(--chip);font-size:21px;line-height:1;color:var(--fg2)}
@@ -280,13 +278,28 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .sw-custom{display:flex;align-items:center;gap:10px;margin-top:10px;font-size:14px;color:var(--fg2)}
 .sw-custom.on{color:var(--fg);font-weight:600}
 .sw-custom input{width:44px;height:34px;padding:0;border:0;border-radius:8px;background:none}
-.pf{display:flex;align-items:center;gap:14px;padding:14px 16px}
+.pf{padding:16px 16px 12px}
+.pf-top{display:flex;align-items:center;gap:16px}
+.av.big{width:76px;height:76px;font-size:34px}
+.av.big.emo{font-size:42px}
 .pf-body{min-width:0;flex:1}
-.pf-name{font-size:20px;font-weight:700;overflow-wrap:anywhere}
-.pf-note{font-size:12px;color:var(--fg2);margin-top:2px}
-.pf-nums{display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:6px;font-size:13px;color:var(--fg2)}
-.pf-nums button{padding:2px 0;font-size:13px;color:var(--fg2);text-decoration:underline;text-decoration-color:var(--line);text-underline-offset:3px}
-.pf-nums b{color:var(--fg);font-variant-numeric:tabular-nums}
+.pf-name{font-size:19px;font-weight:700;overflow-wrap:anywhere}
+.pf-nums{display:flex;gap:4px;margin-top:8px}
+.pf-stat{flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:flex-start;padding:0;text-align:left;color:var(--fg)}
+.pf-stat b{font-size:18px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.15;color:var(--fg)}
+.pf-stat span{font-size:12.5px;color:var(--fg2);white-space:nowrap}
+.pf-bio{margin-top:12px;font-size:15px;line-height:1.45;overflow-wrap:anywhere}
+.pf-note{margin-top:8px;font-size:12px;color:var(--fg2);overflow-wrap:anywhere}
+.pf-mutual{display:flex;align-items:center;gap:9px;width:100%;margin-top:12px;padding:0;text-align:left;font-size:13px;color:var(--fg2);line-height:1.35}
+.pf-faces{flex:none;display:inline-flex}
+.pf-faces .av{width:26px;height:26px;font-size:13px;margin-left:-8px;box-shadow:0 0 0 2px var(--card)}
+.pf-faces .av:first-child{margin-left:0}
+.pf-faces .av.emo{font-size:15px}
+.pf-btns{display:flex;gap:8px;padding:0 16px 16px}
+.pf-btn{text-align:center;flex:1 1 0;min-width:0;height:36px;padding:0 10px;border-radius:10px;background:var(--chip);color:var(--fg);font-size:14.5px;font-weight:600;white-space:nowrap}
+.pf-btn.go{background:var(--accent);color:#fff}
+.pf-btn.icon{flex:none;width:40px;font-size:16px;font-weight:400}
+.pf-btn:active{opacity:.7}
 .us-main{display:flex;align-items:center;gap:10px;flex:1;min-width:0;text-align:left;color:var(--fg);padding:4px 0}
 .us-name{font-size:16px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .us-sub{flex:none;font-size:13px;color:var(--fg2)}

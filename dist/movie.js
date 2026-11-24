@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.24-2226
+// @movie-schedule-app 電影行程 v2026.11.24-2229
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/parsers.gen.ts
@@ -3494,7 +3494,8 @@ var SOCIAL_ERR = {
   "not found": "找不到這個帳號",
   "too many follows": "追蹤的人數到上限了",
   "bad date": "日期不對（不能是未來的日期）",
-  "bad emoji": "頭像只能放一個表情符號"
+  "bad emoji": "頭像只能放一個表情符號",
+  "bad bio": "自我介紹最多 80 個字，不能放連結或聯絡方式"
 };
 async function social(op, body = {}) {
   const r = await socialCall(op, body);
@@ -4322,9 +4323,7 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .fb-reply{margin-top:9px;padding:10px 12px;border-radius:10px;background:var(--chip);font-size:15px;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere}
 .fb-reply b{display:block;font-size:12px;color:var(--accent);margin-bottom:3px}
 .av{flex:none;display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;color:#fff;font-size:13px;font-weight:700;line-height:1}
-.av.big{width:56px;height:56px;font-size:26px}
 .av.emo{font-size:14px;font-weight:400}
-.av.big.emo{font-size:32px}
 .nt-by.inline .av.emo{font-size:11px}
 .pf-prev{display:flex;align-items:center;gap:14px;margin:8px 0 12px}
 .em{display:inline-flex;align-items:center;justify-content:center;padding:0;width:40px;height:40px;border-radius:10px;background:var(--chip);font-size:21px;line-height:1;color:var(--fg2)}
@@ -4332,13 +4331,28 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .sw-custom{display:flex;align-items:center;gap:10px;margin-top:10px;font-size:14px;color:var(--fg2)}
 .sw-custom.on{color:var(--fg);font-weight:600}
 .sw-custom input{width:44px;height:34px;padding:0;border:0;border-radius:8px;background:none}
-.pf{display:flex;align-items:center;gap:14px;padding:14px 16px}
+.pf{padding:16px 16px 12px}
+.pf-top{display:flex;align-items:center;gap:16px}
+.av.big{width:76px;height:76px;font-size:34px}
+.av.big.emo{font-size:42px}
 .pf-body{min-width:0;flex:1}
-.pf-name{font-size:20px;font-weight:700;overflow-wrap:anywhere}
-.pf-note{font-size:12px;color:var(--fg2);margin-top:2px}
-.pf-nums{display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:6px;font-size:13px;color:var(--fg2)}
-.pf-nums button{padding:2px 0;font-size:13px;color:var(--fg2);text-decoration:underline;text-decoration-color:var(--line);text-underline-offset:3px}
-.pf-nums b{color:var(--fg);font-variant-numeric:tabular-nums}
+.pf-name{font-size:19px;font-weight:700;overflow-wrap:anywhere}
+.pf-nums{display:flex;gap:4px;margin-top:8px}
+.pf-stat{flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:flex-start;padding:0;text-align:left;color:var(--fg)}
+.pf-stat b{font-size:18px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.15;color:var(--fg)}
+.pf-stat span{font-size:12.5px;color:var(--fg2);white-space:nowrap}
+.pf-bio{margin-top:12px;font-size:15px;line-height:1.45;overflow-wrap:anywhere}
+.pf-note{margin-top:8px;font-size:12px;color:var(--fg2);overflow-wrap:anywhere}
+.pf-mutual{display:flex;align-items:center;gap:9px;width:100%;margin-top:12px;padding:0;text-align:left;font-size:13px;color:var(--fg2);line-height:1.35}
+.pf-faces{flex:none;display:inline-flex}
+.pf-faces .av{width:26px;height:26px;font-size:13px;margin-left:-8px;box-shadow:0 0 0 2px var(--card)}
+.pf-faces .av:first-child{margin-left:0}
+.pf-faces .av.emo{font-size:15px}
+.pf-btns{display:flex;gap:8px;padding:0 16px 16px}
+.pf-btn{text-align:center;flex:1 1 0;min-width:0;height:36px;padding:0 10px;border-radius:10px;background:var(--chip);color:var(--fg);font-size:14.5px;font-weight:600;white-space:nowrap}
+.pf-btn.go{background:var(--accent);color:#fff}
+.pf-btn.icon{flex:none;width:40px;font-size:16px;font-weight:400}
+.pf-btn:active{opacity:.7}
 .us-main{display:flex;align-items:center;gap:10px;flex:1;min-width:0;text-align:left;color:var(--fg);padding:4px 0}
 .us-name{font-size:16px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .us-sub{flex:none;font-size:13px;color:var(--fg2)}
@@ -5043,7 +5057,7 @@ var App = class {
   }
   /** 最新版本是多少。網頁版問的是自己網站現在上線的版本（重新整理就會拿到的那一版），不是 GitHub 上的 */
   checkVersion() {
-    if (true) return checkLatest("2026.11.24-2226");
+    if (true) return checkLatest("2026.11.24-2229");
     return (async () => {
       try {
         let r = await globalThis.fetch("/version.json?t=" + Date.now(), { cache: "no-store" });
@@ -5051,7 +5065,7 @@ var App = class {
         const latest = String((await r.json()).version || "");
         if (!latest) return null;
         const num = (v) => Number(v.replace(/\D/g, "")) || 0;
-        return { latest, isLatest: num("2026.11.24-2226") >= num(latest) };
+        return { latest, isLatest: num("2026.11.24-2229") >= num(latest) };
       } catch (_) {
         return null;
       }
@@ -5517,7 +5531,7 @@ var App = class {
     };
     const u = me && me.user;
     const status = !me ? "讀取中…" : !u ? "還沒取暱稱" : u.hidden ? "個人頁被站長停用" : u.pub ? "個人頁公開中" : "個人頁不公開";
-    return /* @__PURE__ */ h(Section, { title: "帳號" }, /* @__PURE__ */ h("div", { role: "button", onTap: open }, this.profileCard({ name: u ? u.name : me ? "還沒取暱稱" : "已登入", color: u ? u.color : "gray", emoji: u ? u.emoji : "" }, me ? me.counts : null, [email, status].filter(Boolean).join("｜"), (kind) => this.go(() => this.profileListView("", kind), "讀取中…"))), /* @__PURE__ */ h(Item, { icon: "🎞", title: "我的片單", subtitle: u ? "看過的片、評分和短評；動態、找人" : "取暱稱、記錄看過的片、追蹤別人", onTap: open }), /* @__PURE__ */ h(Item, { icon: "🔄", title: "同步與登出", subtitle: "收藏和設定自動同步中", onTap: () => this.go(() => this.syncView()) }), me && me.admin ? /* @__PURE__ */ h(Item, { icon: "🛡", title: "管理員專區", subtitle: "意見回饋、短評、帳號、管理員名單", onTap: () => this.go(() => this.adminHomeView()) }) : null);
+    return /* @__PURE__ */ h(Section, { title: "帳號" }, /* @__PURE__ */ h("div", { role: "button", onTap: open }, this.profileCard({ name: u ? u.name : me ? "還沒取暱稱" : "已登入", color: u ? u.color : "gray", emoji: u ? u.emoji : "", bio: u ? u.bio : "" }, me ? me.counts : null, [email, status].filter(Boolean).join("｜"), (kind) => this.go(() => this.profileListView("", kind), "讀取中…"))), /* @__PURE__ */ h(Item, { icon: "🎞", title: "我的片單", subtitle: u ? "看過的片、評分和短評；動態、找人" : "取暱稱、記錄看過的片、追蹤別人", onTap: open }), /* @__PURE__ */ h(Item, { icon: "🔄", title: "同步與登出", subtitle: "收藏和設定自動同步中", onTap: () => this.go(() => this.syncView()) }), me && me.admin ? /* @__PURE__ */ h(Item, { icon: "🛡", title: "管理員專區", subtitle: "意見回饋、短評、帳號、管理員名單", onTap: () => this.go(() => this.adminHomeView()) }) : null);
   }
   syncLink() {
     const sy = this.sync();
@@ -5558,9 +5572,9 @@ var App = class {
     return /* @__PURE__ */ h(Page, { title: `${TITLE[kind]}（${r.total}）`, subtitle: who, onBack: () => this.back() }, kind === "films" || kind === "notes" ? /* @__PURE__ */ h(Section, { hint: r.total > entries.length ? `只列最近 ${entries.length} 筆。` : r.self ? "含你設成只有自己看得到的那幾筆。" : "" }, entries.length ? /* @__PURE__ */ h("div", { class: "nt-list" }, entries.map((e) => this.entryRow(e, () => r.self ? this.go(() => this.entryView(e.title, e)) : this.openTitle(e.title)))) : /* @__PURE__ */ h(Note, { text: kind === "notes" ? "還沒有寫過短評。" : "片單還是空的。" })) : /* @__PURE__ */ h(Section, { hint: r.unlisted ? `另外有 ${r.unlisted} 位沒有公開個人頁，不會列出來。` : "只會列出有公開個人頁的帳號。" }, people.length ? people.map((u) => u.me ? /* @__PURE__ */ h("div", { class: "item" }, /* @__PURE__ */ h("span", { class: "us-main" }, this.avatar(u), /* @__PURE__ */ h("span", { class: "us-name" }, esc(u.name)), /* @__PURE__ */ h("span", { class: "us-sub" }, "你自己"))) : this.userItem(u)) : /* @__PURE__ */ h(Note, { text: r.total ? "他們都沒有公開個人頁。" : kind === "followers" ? "還沒有粉絲。" : "還沒有追蹤任何人。" })));
   }
   /** onNum：有給的話，四個數字可以點（點了看清單） */
-  profileCard(u, c, note = "", onNum) {
-    const num = (kind, n, label) => onNum ? /* @__PURE__ */ h("button", { onTap: () => onNum(kind) }, /* @__PURE__ */ h("b", null, n), " ", label) : /* @__PURE__ */ h("span", null, /* @__PURE__ */ h("b", null, n), " ", label);
-    return /* @__PURE__ */ h("div", { class: "pf" }, this.avatar(u, true), /* @__PURE__ */ h("div", { class: "pf-body" }, /* @__PURE__ */ h("div", { class: "pf-name" }, esc(u.name)), note ? /* @__PURE__ */ h("div", { class: "pf-note" }, esc(note)) : null, c ? /* @__PURE__ */ h("div", { class: "pf-nums" }, num("films", c.films, "部片"), num("notes", c.notes, "則短評"), num("followers", c.followers, "粉絲"), num("following", c.following, "追蹤中")) : null));
+  profileCard(u, c, note = "", onNum, extra = "") {
+    const num = (kind, n, label) => onNum ? /* @__PURE__ */ h("button", { class: "pf-stat", onTap: () => onNum(kind) }, /* @__PURE__ */ h("b", null, n), /* @__PURE__ */ h("span", null, label)) : /* @__PURE__ */ h("span", { class: "pf-stat" }, /* @__PURE__ */ h("b", null, n), /* @__PURE__ */ h("span", null, label));
+    return /* @__PURE__ */ h("div", { class: "pf" }, /* @__PURE__ */ h("div", { class: "pf-top" }, this.avatar(u, true), /* @__PURE__ */ h("div", { class: "pf-body" }, /* @__PURE__ */ h("div", { class: "pf-name" }, esc(u.name)), c ? /* @__PURE__ */ h("div", { class: "pf-nums" }, num("films", c.films, "部片"), num("notes", c.notes, "短評"), num("followers", c.followers, "粉絲"), num("following", c.following, "追蹤中")) : null)), u.bio ? /* @__PURE__ */ h("div", { class: "pf-bio" }, esc(u.bio)) : null, note ? /* @__PURE__ */ h("div", { class: "pf-note" }, esc(note)) : null, extra);
   }
   /** 片單上的一筆：片名、分數、看過的日期、短評（有雷的摺疊）。by = 動態裡是誰的紀錄 */
   entryRow(e, onTap, onUser) {
@@ -5642,13 +5656,13 @@ var App = class {
   profileEditView(user, first = false, pushed = false) {
     const sy0 = this.sync();
     const suggest = !user && sy0 && sy0.gname ? Array.from(String(sy0.gname() || "").normalize("NFC").replace(/[^\p{L}\p{N}_]/gu, "")).slice(0, 16).join("") : "";
-    const d = this.profileDraft || { name: user ? user.name : suggest.length >= 2 ? suggest : "", color: user ? user.color : "blue", emoji: user && user.emoji || "", pub: user ? !!user.pub : first };
+    const d = this.profileDraft || { name: user ? user.name : suggest.length >= 2 ? suggest : "", color: user ? user.color : "blue", emoji: user && user.emoji || "", bio: user && user.bio || "", pub: user ? !!user.pub : first };
     const keep = (v) => {
       const picked = v && /^#[0-9a-f]{6}$/i.test(v.c || "") && v.c.toLowerCase() !== profileColor(d.color).toLowerCase() ? v.c.toLowerCase() : d.color;
-      this.profileDraft = { ...d, name: v && typeof v.n === "string" ? v.n : d.name, emoji: v && typeof v.e === "string" ? v.e.trim() : d.emoji, color: picked };
+      this.profileDraft = { ...d, name: v && typeof v.n === "string" ? v.n : d.name, emoji: v && typeof v.e === "string" ? v.e.trim() : d.emoji, bio: v && typeof v.b === "string" ? v.b : d.bio, color: picked };
     };
     const custom = /^#/.test(d.color);
-    return /* @__PURE__ */ h(Page, { title: user ? "編輯個人檔案" : first ? "先取一個暱稱" : "設定暱稱", onBack: () => this.back() }, first ? /* @__PURE__ */ h(Note, { text: (pushed ? "剛才的動作已經完成了。接下來，" : "歡迎使用「我的片單」。") + "取一個暱稱、公開個人頁，別人才找得到你、能追蹤你，你寫的短評旁邊也會顯示暱稱。只會問這一次，之後在「設定 → 我的片單」可以改。\n不想公開也沒關係：取消下面的「公開我的個人頁」，或按最下面的「稍後再說」，片單就只有你自己看得到（還是可以追蹤別人）。" }) : null, /* @__PURE__ */ h(Section, { title: "暱稱", hint: (!user && suggest.length >= 2 ? "已經先幫你填上 Google 帳號的名稱，可以直接改成你想要的；如果那是本名，建議換一個。" : "") + "2～16 個字，只能用中英文、數字和底線；不能跟別人重複。14 天內只能改一次。請不要冒用他人名義。" }, /* @__PURE__ */ h("div", { class: "nt-form" }, /* @__PURE__ */ h("input", { class: "field", name: "n", maxlength: "16", autocomplete: "off", autocapitalize: "off", value: d.name, placeholder: "例如：愛看片的小明" }))), /* @__PURE__ */ h(Section, { title: "頭像", hint: "頭像是底色加上一個表情符號；沒選表情符號就用暱稱的第一個字（不能上傳照片）。" }, /* @__PURE__ */ h("div", { class: "nt-form" }, /* @__PURE__ */ h("div", { class: "pf-prev" }, this.avatar({ name: d.name || "?", color: d.color, emoji: d.emoji }, true), /* @__PURE__ */ h("button", { class: "cm-tag", onTap: (v) => {
+    return /* @__PURE__ */ h(Page, { title: user ? "編輯個人檔案" : first ? "先取一個暱稱" : "設定暱稱", onBack: () => this.back() }, first ? /* @__PURE__ */ h(Note, { text: (pushed ? "剛才的動作已經完成了。接下來，" : "歡迎使用「我的片單」。") + "取一個暱稱、公開個人頁，別人才找得到你、能追蹤你，你寫的短評旁邊也會顯示暱稱。只會問這一次，之後在「設定 → 我的片單」可以改。\n不想公開也沒關係：取消下面的「公開我的個人頁」，或按最下面的「稍後再說」，片單就只有你自己看得到（還是可以追蹤別人）。" }) : null, /* @__PURE__ */ h(Section, { title: "暱稱", hint: (!user && suggest.length >= 2 ? "已經先幫你填上 Google 帳號的名稱，可以直接改成你想要的；如果那是本名，建議換一個。" : "") + "2～16 個字，只能用中英文、數字和底線；不能跟別人重複。14 天內只能改一次。請不要冒用他人名義。" }, /* @__PURE__ */ h("div", { class: "nt-form" }, /* @__PURE__ */ h("input", { class: "field", name: "n", maxlength: "16", autocomplete: "off", autocapitalize: "off", value: d.name, placeholder: "例如：愛看片的小明" }))), /* @__PURE__ */ h(Section, { title: "自我介紹", hint: "選填，最多 80 個字，會顯示在個人頁的暱稱下面。不能放連結或聯絡方式。" }, /* @__PURE__ */ h("div", { class: "nt-form" }, /* @__PURE__ */ h("input", { class: "field", name: "b", maxlength: "80", autocomplete: "off", value: d.bio, placeholder: "例如：恐怖片愛好者｜每週進戲院" }))), /* @__PURE__ */ h(Section, { title: "頭像", hint: "頭像是底色加上一個表情符號；沒選表情符號就用暱稱的第一個字（不能上傳照片）。" }, /* @__PURE__ */ h("div", { class: "nt-form" }, /* @__PURE__ */ h("div", { class: "pf-prev" }, this.avatar({ name: d.name || "?", color: d.color, emoji: d.emoji }, true), /* @__PURE__ */ h("button", { class: "cm-tag", onTap: (v) => {
       keep(v);
     } }, "更新預覽")), /* @__PURE__ */ h("span", { class: "cm-taghead" }, "表情符號"), /* @__PURE__ */ h("div", { class: "fb-cats" }, /* @__PURE__ */ h("button", { class: "em" + (!d.emoji ? " on" : ""), "aria-label": "不用表情符號", onTap: (v) => {
       keep(v);
@@ -5666,7 +5680,7 @@ var App = class {
       keep(v);
       const p = this.profileDraft;
       try {
-        await social("profile-set", { name: p.name.trim(), color: p.color, emoji: p.emoji, pub: p.pub });
+        await social("profile-set", { name: p.name.trim(), color: p.color, emoji: p.emoji, bio: p.bio, pub: p.pub });
         this.profileDraft = null;
         this.hasProfile = true;
         this.meMem = null;
@@ -5716,8 +5730,13 @@ var App = class {
     const u = p.user;
     if (p.private) return /* @__PURE__ */ h(Page, { title: u.name, onBack: () => this.back() }, /* @__PURE__ */ h(Section, null, this.profileCard(u, null), /* @__PURE__ */ h(Note, { text: "這個帳號沒有公開個人頁。" })));
     const dist = p.dist || [], max = Math.max(1, ...dist), rated = dist.reduce((a, b) => a + b, 0);
+    const mu = p.mutual;
+    const mutualLine = mu && mu.list.length ? /* @__PURE__ */ h("button", { class: "pf-mutual", onTap: () => this.go(() => this.profileListView(u.name, "followers"), "讀取中…") }, /* @__PURE__ */ h("span", { class: "pf-faces" }, mu.list.map((x) => this.avatar(x))), /* @__PURE__ */ h("span", null, esc(mu.list.map((x) => x.name).join("、")), mu.more ? ` 和另外 ${mu.more} 人` : "", mu.list.length + mu.more > 1 ? "都" : "也", "在追蹤")) : "";
     const list = p.list || [];
-    return /* @__PURE__ */ h(Page, { title: u.name, subtitle: "個人頁", onBack: () => this.back() }, /* @__PURE__ */ h(Section, null, this.profileCard(u, p.counts || null, p.self ? "這是你的個人頁（別人看到的不含你設成只有自己看得到的那幾筆）" : "", (kind) => this.go(() => this.profileListView(u.name, kind), "讀取中…")), p.self ? null : signedIn() ? /* @__PURE__ */ h("div", { class: "nt-form" }, /* @__PURE__ */ h(Button, { label: p.following ? "追蹤中（點一下取消）" : "追蹤", kind: p.following ? "secondary" : "primary", onTap: async () => {
+    return /* @__PURE__ */ h(Page, { title: u.name, subtitle: "個人頁", onBack: () => this.back() }, /* @__PURE__ */ h(Section, null, this.profileCard(u, p.counts || null, p.self ? "這是你的個人頁（別人看到的不含你設成只有自己看得到的那幾筆）" : "", (kind) => this.go(() => this.profileListView(u.name, kind), "讀取中…"), mutualLine), /* @__PURE__ */ h("div", { class: "pf-btns" }, p.self ? /* @__PURE__ */ h("button", { class: "pf-btn", onTap: () => {
+      this.profileDraft = null;
+      this.go(() => this.profileEditView(u));
+    } }, "編輯個人檔案") : signedIn() ? /* @__PURE__ */ h("button", { class: "pf-btn" + (p.following ? "" : " go"), onTap: async () => {
       try {
         await social("follow", { name: u.name, on: !p.following });
         this.meMem = null;
@@ -5726,14 +5745,17 @@ var App = class {
       } catch (e) {
         await this.ui.toast(String(e?.message || e));
       }
-    } })) : /* @__PURE__ */ h("div", { class: "nt-form" }, /* @__PURE__ */ h(Button, { label: "登入後追蹤", onTap: () => {
+    } }, p.following ? "追蹤中 ✓" : "追蹤") : /* @__PURE__ */ h("button", { class: "pf-btn go", onTap: () => {
       try {
         globalThis.sessionStorage.setItem("ms:follow-after-login", u.name);
       } catch (_) {
       }
       const sy = this.sync();
       if (sy) sy.login();
-    } }), /* @__PURE__ */ h("div", { class: "cm-tagnote" }, "用 Google 登入後會自動追蹤 ", esc(u.name), "，接著請你取一個暱稱（也可以稍後再說）。"))), rated ? /* @__PURE__ */ h(Section, { title: `評分分布（${rated} 部）` }, /* @__PURE__ */ h("div", { class: "cm" }, /* @__PURE__ */ h("div", { class: "cm-hist wide", "aria-hidden": "true" }, /* @__PURE__ */ h("div", { class: "bars" }, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((v) => /* @__PURE__ */ h("i", { class: dist[v - 1] ? "" : "zero", style: `height:${Math.max(8, Math.round((dist[v - 1] || 0) / max * 100))}%` }))), /* @__PURE__ */ h("div", { class: "axis" }, /* @__PURE__ */ h("span", null, "1 分"), /* @__PURE__ */ h("span", null, "10 分"))))) : null, /* @__PURE__ */ h(Section, { title: `片單（${p.counts ? p.counts.films : list.length}）`, hint: list.length >= 50 ? "只列最近 50 筆。" : "" }, list.length ? /* @__PURE__ */ h("div", { class: "nt-list" }, list.map((e) => this.entryRow(e, () => this.openTitle(e.title)))) : /* @__PURE__ */ h(Note, { text: "還沒有公開的紀錄。" })), p.self ? null : /* @__PURE__ */ h(Section, null, /* @__PURE__ */ h(Item, { icon: "⚑", title: "檢舉這個帳號", subtitle: "暱稱不雅、冒用他人名義，或其他不當行為", onTap: () => this.go(() => this.reportUserView(u.name)) })));
+    } }, "登入後追蹤"), /* @__PURE__ */ h("button", { class: "pf-btn", onTap: async () => {
+      Pasteboard.copy(`${SITE_URL}/?u=${encodeURIComponent(u.name)}`);
+      await this.ui.toast("已複製個人頁連結");
+    } }, "分享"), p.self ? null : /* @__PURE__ */ h("button", { class: "pf-btn icon", "aria-label": "檢舉這個帳號", onTap: () => this.go(() => this.reportUserView(u.name)) }, "⚑"))), rated ? /* @__PURE__ */ h(Section, { title: `評分分布（${rated} 部）` }, /* @__PURE__ */ h("div", { class: "cm" }, /* @__PURE__ */ h("div", { class: "cm-hist wide", "aria-hidden": "true" }, /* @__PURE__ */ h("div", { class: "bars" }, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((v) => /* @__PURE__ */ h("i", { class: dist[v - 1] ? "" : "zero", style: `height:${Math.max(8, Math.round((dist[v - 1] || 0) / max * 100))}%` }))), /* @__PURE__ */ h("div", { class: "axis" }, /* @__PURE__ */ h("span", null, "1 分"), /* @__PURE__ */ h("span", null, "10 分"))))) : null, /* @__PURE__ */ h(Section, { title: `片單（${p.counts ? p.counts.films : list.length}）`, hint: list.length >= 50 ? "只列最近 50 筆。" : "" }, list.length ? /* @__PURE__ */ h("div", { class: "nt-list" }, list.map((e) => this.entryRow(e, () => this.openTitle(e.title)))) : /* @__PURE__ */ h(Note, { text: "還沒有公開的紀錄。" })));
   }
   reportUserView(name) {
     const WHY = [{ id: "name", label: "暱稱不雅或不當" }, { id: "fake", label: "冒用他人名義" }, { id: "abuse", label: "騷擾或其他不當行為" }];
@@ -5841,7 +5863,7 @@ var App = class {
         return;
       }
       try {
-        await sendFeedback(cat.id, text, false ? this.isStandalone() ? "web-app" : "web" : "scriptable", "2026.11.24-2226");
+        await sendFeedback(cat.id, text, false ? this.isStandalone() ? "web-app" : "web" : "scriptable", "2026.11.24-2229");
         this.fbDraft = "";
         this.fbCat = "";
         await this.ui.toast("已送出，謝謝你的回饋");
@@ -6153,7 +6175,7 @@ var App = class {
       this.settings.seenLog = CHANGELOG_LATEST;
       saveSettings(this.settings);
     }
-    return /* @__PURE__ */ h(Page, { title: "更新內容", subtitle: `目前版本 ${"2026.11.24-2226"}`, onBack: () => this.back() }, CHANGELOG.map((e) => /* @__PURE__ */ h(Section, { title: e.date }, e.items.map((it) => /* @__PURE__ */ h(Item, { title: it.text, tag: { text: it.kind === "new" ? "新功能" : "改進", tone: it.kind === "new" ? "now" : "soon" }, chevron: false })))), /* @__PURE__ */ h(Note, { text: "只列出比較有感的變動；修小錯、調整文字這類不會寫在這裡。" }));
+    return /* @__PURE__ */ h(Page, { title: "更新內容", subtitle: `目前版本 ${"2026.11.24-2229"}`, onBack: () => this.back() }, CHANGELOG.map((e) => /* @__PURE__ */ h(Section, { title: e.date }, e.items.map((it) => /* @__PURE__ */ h(Item, { title: it.text, tag: { text: it.kind === "new" ? "新功能" : "改進", tone: it.kind === "new" ? "now" : "soon" }, chevron: false })))), /* @__PURE__ */ h(Note, { text: "只列出比較有感的變動；修小錯、調整文字這類不會寫在這裡。" }));
   }
   async aboutView() {
     return /* @__PURE__ */ h(Page, { title: "關於", onBack: () => this.back() }, /* @__PURE__ */ h(Section, { hint: "連鎖影城的場次來自場次通（twshowtimes.com），感謝場次通的整理；其他來自開眼電影網，以及誠品、光點、樂聲、內惟戲院官網。實際場次以影城公告為準。" }, /* @__PURE__ */ h(Item, { icon: "ℹ️", title: "關於與資料來源", accent: true, chevron: false, onTap: () => Safari.open(ABOUT_URL) }), /* @__PURE__ */ h(Item, { icon: "🔒", title: "隱私權政策", accent: true, chevron: false, onTap: () => Safari.open(PRIVACY_URL) }), /* @__PURE__ */ h(Item, { icon: "🙏", title: "前往場次通", subtitle: "比較各影城場次、看上映場數排行", accent: true, chevron: false, onTap: () => Safari.open("https://twshowtimes.com/") })));
@@ -6184,11 +6206,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.24-2226"}`);
+          Pasteboard.copy(`版本 ${"2026.11.24-2229"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.24-2226"}`,
+      `版本 ${"2026.11.24-2229"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -6802,7 +6824,7 @@ var App = class {
     if (false) {
       if (!r) return /* @__PURE__ */ h(Note, { text: "（無法確認是否為最新版：連不到網站）" });
       if (r.isLatest) return /* @__PURE__ */ h(Note, { text: "✅ 已是最新版" });
-      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.24-2226"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
+      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.24-2229"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
         globalThis.location.reload();
       } }));
     }

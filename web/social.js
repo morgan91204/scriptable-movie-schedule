@@ -39,6 +39,8 @@ export function socialInit(sql) {
   if (!sql.exec("SELECT 1 FROM pragma_table_info('entries') WHERE name = 'how'").toArray().length) sql.exec("ALTER TABLE entries ADD COLUMN how TEXT NOT NULL DEFAULT ''");
   // users.emoji = 頭像用的表情符號（後來才加的欄位）；沒有就用暱稱的第一個字
   if (!sql.exec("SELECT 1 FROM pragma_table_info('users') WHERE name = 'emoji'").toArray().length) sql.exec("ALTER TABLE users ADD COLUMN emoji TEXT NOT NULL DEFAULT ''");
+  // users.bio = 個人頁上的一行自我介紹（後來才加的欄位）
+  if (!sql.exec("SELECT 1 FROM pragma_table_info('users') WHERE name = 'bio'").toArray().length) sql.exec("ALTER TABLE users ADD COLUMN bio TEXT NOT NULL DEFAULT ''");
   sql.exec("CREATE INDEX IF NOT EXISTS entries_at ON entries (at)");
   sql.exec("CREATE INDEX IF NOT EXISTS entries_k ON entries (k)");
   sql.exec("CREATE TABLE IF NOT EXISTS follows (a TEXT NOT NULL, b TEXT NOT NULL, at INTEGER NOT NULL, PRIMARY KEY (a, b))");
@@ -56,6 +58,10 @@ const userOut = (u) => ({ name: u.name, color: u.color, ...(u.emoji ? { emoji: u
 const okColor = (c) => typeof c === "string" && (COLORS.indexOf(c) >= 0 || /^#[0-9a-f]{6}$/i.test(c));
 /** 頭像的表情符號：只收「一個」表情符號（含膚色、組合的家人／職業、國旗），不收文字 */
 const EMOJI_RE = /^(?:[\u{1F1E6}-\u{1F1FF}]{2}|(?:\p{Extended_Pictographic}(?:\uFE0F|[\u{1F3FB}-\u{1F3FF}])?)(?:\u200D\p{Extended_Pictographic}(?:\uFE0F|[\u{1F3FB}-\u{1F3FF}])?){0,6})$/u;
+const BIO_MAX = 80;
+/** 自我介紹：去掉控制字元、換行併成空白；不收連結和聯絡方式（跟短評同一套規則） */
+const cleanBio = (x) => String(x == null ? "" : x).normalize("NFC").replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u202a-\u202e\u2060-\u206f\ufeff]/g, " ").replace(/\s+/g, " ").trim();
+const bioHasContact = (x) => /https?:|www\.|[a-z0-9-]+\.(com|net|org|tw|cc|io|me|ly|gg|xyz|shop|top)\b|\d{8,}|(?:line|telegram|tg|賴)\s*(?:id)?\s*[:：@]/i.test(x);
 const okEmoji = (e) => e === "" || (typeof e === "string" && e.length <= 32 && EMOJI_RE.test(e));
 
 /** 這個帳號的數字：片單幾部、短評幾則、追蹤幾人、被幾人追蹤 */
@@ -139,7 +145,13 @@ export async function social(hub, path, b) {
     const list = all(sql, "SELECT * FROM entries WHERE uid = ?" + where + " ORDER BY at DESC LIMIT 50 OFFSET ?", u.uid, offset).map(entryOut);
     const dist = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
     for (const r of all(sql, "SELECT s, COUNT(*) AS c FROM entries WHERE uid = ? AND s > 0" + where + " GROUP BY s", u.uid)) if (r.s >= 1 && r.s <= 10) dist[r.s - 1] = r.c;
-    return json({ ok: true, user: userOut(u), self, since: u.at, counts: counts(sql, u.uid, !self), dist, list, following: !!(uid && one(sql, "SELECT 1 AS x FROM follows WHERE a = ? AND b = ?", uid, u.uid)) });
+    // 共同追蹤：我追蹤的人裡面，有誰也在追蹤他（列前三個，其餘只算人數；只算有公開個人頁的）
+    let mutual = null;
+    if (uid && !self) {
+      const rows = all(sql, "SELECT x.name, x.color, x.emoji FROM follows mine JOIN follows theirs ON theirs.a = mine.b AND theirs.b = ? JOIN users x ON x.uid = mine.b AND x.pub = 1 AND x.hidden = 0 WHERE mine.a = ? ORDER BY theirs.at DESC LIMIT 50", u.uid, uid);
+      if (rows.length) mutual = { list: rows.slice(0, 3).map(userOut), more: Math.max(0, rows.length - 3) };
+    }
+    return json({ ok: true, user: { ...userOut(u), bio: u.bio || "" }, self, since: u.at, counts: counts(sql, u.uid, !self), dist, list, following: !!(uid && one(sql, "SELECT 1 AS x FROM follows WHERE a = ? AND b = ?", uid, u.uid)), ...(mutual ? { mutual } : {}) });
   }
   if (op === "list") {
     // 個人卡片上四個數字點進去的清單：films 片單／notes 有寫短評的／followers 粉絲／following 追蹤中。
@@ -182,7 +194,7 @@ export async function social(hub, path, b) {
   // ── 以下都要登入 ──
   const no = need();
   if (no) return no;
-  if (op === "me") return json({ ok: true, ...(isAdmin ? { admin: true } : {}), user: me ? { ...userOut(me), pub: !!me.pub, hidden: !!me.hidden, canRename: Date.now() - me.named > RENAME_EVERY } : null, counts: counts(sql, uid, false) });
+  if (op === "me") return json({ ok: true, ...(isAdmin ? { admin: true } : {}), user: me ? { ...userOut(me), bio: me.bio || "", pub: !!me.pub, hidden: !!me.hidden, canRename: Date.now() - me.named > RENAME_EVERY } : null, counts: counts(sql, uid, false) });
   if (op === "mine") {
     const offset = Math.max(0, Number(b.offset) || 0);
     return json({ ok: true, list: all(sql, "SELECT * FROM entries WHERE uid = ? ORDER BY at DESC LIMIT 100 OFFSET ?", uid, offset).map(entryOut), total: counts(sql, uid, false).films });
@@ -209,13 +221,15 @@ export async function social(hub, path, b) {
     const color = okColor(b.color) ? String(b.color).toLowerCase() : me ? me.color : "blue";
     const emoji = b.emoji === undefined ? (me ? me.emoji || "" : "") : String(b.emoji || "").trim();
     if (!okEmoji(emoji)) return json({ error: "bad emoji" }, 400);
+    const bio = b.bio === undefined ? (me ? me.bio || "" : "") : cleanBio(b.bio);
+    if (Array.from(bio).length > BIO_MAX || bioHasContact(bio)) return json({ error: "bad bio" }, 400);
     const pub = b.pub ? 1 : 0;
     if (!NAME_RE.test(name) || RESERVED.test(name)) return json({ error: "bad name" }, 400);
     const taken = one(sql, "SELECT uid FROM users WHERE name = ?", name);
     if (taken && taken.uid !== uid) return json({ error: "name taken" }, 409);
     if (me && me.name !== name && Date.now() - me.named <= RENAME_EVERY) return json({ error: "rename later" }, 429);
-    if (me) sql.exec("UPDATE users SET name = ?, color = ?, emoji = ?, pub = ?, named = ? WHERE uid = ?", name, color, emoji, pub, me.name !== name ? Date.now() : me.named, uid);
-    else sql.exec("INSERT INTO users (uid, name, color, emoji, pub, at, named) VALUES (?, ?, ?, ?, ?, ?, 0)", uid, name, color, emoji, pub, Date.now());
+    if (me) sql.exec("UPDATE users SET name = ?, color = ?, emoji = ?, bio = ?, pub = ?, named = ? WHERE uid = ?", name, color, emoji, bio, pub, me.name !== name ? Date.now() : me.named, uid);
+    else sql.exec("INSERT INTO users (uid, name, color, emoji, bio, pub, at, named) VALUES (?, ?, ?, ?, ?, ?, ?, 0)", uid, name, color, emoji, bio, pub, Date.now());
     return json({ ok: true, user: { name, color, pub: !!pub, ...(emoji ? { emoji } : {}) } });
   }
   if (op === "follow") {

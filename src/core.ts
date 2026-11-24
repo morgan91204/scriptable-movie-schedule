@@ -3612,7 +3612,7 @@ async function socialCall(op: string, body: Record<string, unknown> = {}): Promi
 }
 const SOCIAL_ERR: Record<string, string> = {
   "not signed in": "登入已經失效，請重新登入", "too many": "操作太頻繁，請稍後再試", "bad name": "暱稱要 2～16 個字，只能用中英文、數字和底線", "name taken": "這個暱稱有人用了，換一個",
-  "rename later": "暱稱 14 天內只能改一次", "private": "對方沒有公開個人頁", "not found": "找不到這個帳號", "too many follows": "追蹤的人數到上限了", "bad date": "日期不對（不能是未來的日期）", "bad emoji": "頭像只能放一個表情符號",
+  "rename later": "暱稱 14 天內只能改一次", "private": "對方沒有公開個人頁", "not found": "找不到這個帳號", "too many follows": "追蹤的人數到上限了", "bad date": "日期不對（不能是未來的日期）", "bad emoji": "頭像只能放一個表情符號", "bad bio": "自我介紹最多 80 個字，不能放連結或聯絡方式",
 };
 /** 帳號功能：做不成就丟出看得懂的錯誤 */
 export async function social<T = any>(op: string, body: Record<string, unknown> = {}): Promise<T> {
@@ -3623,7 +3623,7 @@ export async function social<T = any>(op: string, body: Record<string, unknown> 
 /** 問過要不要取暱稱、使用者按了「稍後再說」：記在這台，之後評分、寫短評不再跳出來問（設定 → 我的片單 隨時可以設） */
 export const profileSkipped = (): boolean => cacheGet("profile-skip.txt") === "1";
 export const setProfileSkipped = (on: boolean): void => cacheSet("profile-skip.txt", on ? "1" : "");
-export interface Profile { name: string; color: string; emoji?: string; pub?: boolean; hidden?: boolean; canRename?: boolean }
+export interface Profile { name: string; color: string; emoji?: string; bio?: string; pub?: boolean; hidden?: boolean; canRename?: boolean }
 /** 觀影方式（可以複選） */
 export const WATCH_HOW: { id: string; label: string }[] = [{ id: "cinema", label: "電影院" }, { id: "second", label: "二輪電影院" }, { id: "stream", label: "串流" }];
 export const howLabel = (how?: string[]): string => WATCH_HOW.filter((h) => (how || []).indexOf(h.id) >= 0).map((h) => h.label).join("、");

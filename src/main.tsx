@@ -714,7 +714,7 @@ class App {
     return (
       <Section title="帳號">
         <div role="button" onTap={open}>
-          {this.profileCard({ name: u ? u.name : me ? "還沒取暱稱" : "已登入", color: u ? u.color : "gray", emoji: u ? u.emoji : "" }, me ? me.counts : null, [email, status].filter(Boolean).join("｜"), (kind) => this.go(() => this.profileListView("", kind), "讀取中…"))}
+          {this.profileCard({ name: u ? u.name : me ? "還沒取暱稱" : "已登入", color: u ? u.color : "gray", emoji: u ? u.emoji : "", bio: u ? u.bio : "" }, me ? me.counts : null, [email, status].filter(Boolean).join("｜"), (kind) => this.go(() => this.profileListView("", kind), "讀取中…"))}
         </div>
         <Item icon="🎞" title="我的片單" subtitle={u ? "看過的片、評分和短評；動態、找人" : "取暱稱、記錄看過的片、追蹤別人"} onTap={open} />
         <Item icon="🔄" title="同步與登出" subtitle="收藏和設定自動同步中" onTap={() => this.go(() => this.syncView())} />
@@ -738,7 +738,7 @@ class App {
   diaryTab = "mine"; // 片單頁看哪一塊：mine 我的片單／feed 動態／people 找人
   peopleQ = ""; // 找人的搜尋字
   diaryMem: { at: number; list: DiaryEntry[] } | null = null; // 自己的片單（一分鐘內不重讀）
-  profileDraft: { name: string; color: string; emoji: string; pub: boolean } | null = null; // 編輯個人檔案時還沒存的內容
+  profileDraft: { name: string; color: string; emoji: string; bio: string; pub: boolean } | null = null; // 編輯個人檔案時還沒存的內容
   async myDiary(force = false): Promise<DiaryEntry[]> {
     if (!force && this.diaryMem && Date.now() - this.diaryMem.at < 60e3) return this.diaryMem.list;
     const r = await social<{ list: DiaryEntry[] }>("mine");
@@ -780,16 +780,21 @@ class App {
     );
   }
   /** onNum：有給的話，四個數字可以點（點了看清單） */
-  profileCard(u: { name: string; color: string; emoji?: string }, c: SocialCounts | null, note = "", onNum?: (kind: "films" | "notes" | "followers" | "following") => void): string {
-    const num = (kind: "films" | "notes" | "followers" | "following", n: number, label: string) => (onNum ? <button onTap={() => onNum(kind)}><b>{n}</b> {label}</button> : <span><b>{n}</b> {label}</span>);
+  profileCard(u: { name: string; color: string; emoji?: string; bio?: string }, c: SocialCounts | null, note = "", onNum?: (kind: "films" | "notes" | "followers" | "following") => void, extra = ""): string {
+    // 四個數字排成一列：上面大大的數字、下面小字說明；有給 onNum 的話可以點進清單
+    const num = (kind: "films" | "notes" | "followers" | "following", n: number, label: string) => (onNum ? <button class="pf-stat" onTap={() => onNum(kind)}><b>{n}</b><span>{label}</span></button> : <span class="pf-stat"><b>{n}</b><span>{label}</span></span>);
     return (
       <div class="pf">
-        {this.avatar(u, true)}
-        <div class="pf-body">
-          <div class="pf-name">{esc(u.name)}</div>
-          {note ? <div class="pf-note">{esc(note)}</div> : null}
-          {c ? <div class="pf-nums">{num("films", c.films, "部片")}{num("notes", c.notes, "則短評")}{num("followers", c.followers, "粉絲")}{num("following", c.following, "追蹤中")}</div> : null}
+        <div class="pf-top">
+          {this.avatar(u, true)}
+          <div class="pf-body">
+            <div class="pf-name">{esc(u.name)}</div>
+            {c ? <div class="pf-nums">{num("films", c.films, "部片")}{num("notes", c.notes, "短評")}{num("followers", c.followers, "粉絲")}{num("following", c.following, "追蹤中")}</div> : null}
+          </div>
         </div>
+        {u.bio ? <div class="pf-bio">{esc(u.bio)}</div> : null}
+        {note ? <div class="pf-note">{esc(note)}</div> : null}
+        {extra}
       </div>
     );
   }
@@ -904,11 +909,11 @@ class App {
     // 第一次取暱稱：先填上 Google 帳號的名稱（去掉空白和符號、最多 16 個字），使用者可以改
     const sy0 = this.sync();
     const suggest = !user && sy0 && sy0.gname ? Array.from(String(sy0.gname() || "").normalize("NFC").replace(/[^\p{L}\p{N}_]/gu, "")).slice(0, 16).join("") : "";
-    const d = this.profileDraft || { name: user ? user.name : suggest.length >= 2 ? suggest : "", color: user ? user.color : "blue", emoji: (user && user.emoji) || "", pub: user ? !!user.pub : first };
+    const d = this.profileDraft || { name: user ? user.name : suggest.length >= 2 ? suggest : "", color: user ? user.color : "blue", emoji: (user && user.emoji) || "", bio: (user && user.bio) || "", pub: user ? !!user.pub : first };
     /** 每個按鈕都帶著輸入框目前的內容：暱稱、自己打的表情符號、色盤選的顏色（跟目前的不一樣才算有改） */
     const keep = (v?: Record<string, string>) => {
       const picked = v && /^#[0-9a-f]{6}$/i.test(v.c || "") && v.c.toLowerCase() !== profileColor(d.color).toLowerCase() ? v.c.toLowerCase() : d.color;
-      this.profileDraft = { ...d, name: v && typeof v.n === "string" ? v.n : d.name, emoji: v && typeof v.e === "string" ? v.e.trim() : d.emoji, color: picked };
+      this.profileDraft = { ...d, name: v && typeof v.n === "string" ? v.n : d.name, emoji: v && typeof v.e === "string" ? v.e.trim() : d.emoji, bio: v && typeof v.b === "string" ? v.b : d.bio, color: picked };
     };
     const custom = /^#/.test(d.color);
     return (
@@ -917,6 +922,11 @@ class App {
         <Section title="暱稱" hint={(!user && suggest.length >= 2 ? "已經先幫你填上 Google 帳號的名稱，可以直接改成你想要的；如果那是本名，建議換一個。" : "") + "2～16 個字，只能用中英文、數字和底線；不能跟別人重複。14 天內只能改一次。請不要冒用他人名義。"}>
           <div class="nt-form">
             <input class="field" name="n" maxlength="16" autocomplete="off" autocapitalize="off" value={d.name} placeholder="例如：愛看片的小明" />
+          </div>
+        </Section>
+        <Section title="自我介紹" hint="選填，最多 80 個字，會顯示在個人頁的暱稱下面。不能放連結或聯絡方式。">
+          <div class="nt-form">
+            <input class="field" name="b" maxlength="80" autocomplete="off" value={d.bio} placeholder="例如：恐怖片愛好者｜每週進戲院" />
           </div>
         </Section>
         <Section title="頭像" hint="頭像是底色加上一個表情符號；沒選表情符號就用暱稱的第一個字（不能上傳照片）。">
@@ -946,7 +956,7 @@ class App {
             <Button label="儲存" onTap={async (v) => {
               keep(v);
               const p = this.profileDraft!;
-              try { await social("profile-set", { name: p.name.trim(), color: p.color, emoji: p.emoji, pub: p.pub }); this.profileDraft = null; this.hasProfile = true; this.meMem = null; setProfileSkipped(false); await this.ui.toast(first ? "暱稱設定好了" : "已儲存"); if (!first || pushed) this.back(); } catch (e) { await this.ui.toast(String((e as Error)?.message || e)); }
+              try { await social("profile-set", { name: p.name.trim(), color: p.color, emoji: p.emoji, bio: p.bio, pub: p.pub }); this.profileDraft = null; this.hasProfile = true; this.meMem = null; setProfileSkipped(false); await this.ui.toast(first ? "暱稱設定好了" : "已儲存"); if (!first || pushed) this.back(); } catch (e) { await this.ui.toast(String((e as Error)?.message || e)); }
             }} />
             {first ? <Button label="稍後再說" kind="secondary" onTap={() => { setProfileSkipped(true); this.profileDraft = null; if (pushed) this.back(); }} /> : null}
           </div>
@@ -980,32 +990,43 @@ class App {
   }
   /** 某個人的公開個人頁 */
   async profileView(name: string): Promise<string> {
-    type P = { user: Profile; self?: boolean; private?: boolean; counts?: SocialCounts; dist?: number[]; list?: DiaryEntry[]; following?: boolean; since?: number };
+    type P = { user: Profile; self?: boolean; private?: boolean; counts?: SocialCounts; dist?: number[]; list?: DiaryEntry[]; following?: boolean; since?: number; mutual?: { list: { name: string; color: string; emoji?: string }[]; more: number } };
     let p: P | null = null, failed = "";
     try { p = await social<P>("profile", { name }); } catch (e) { failed = String((e as Error)?.message || e); }
     if (!p) return <Page title="個人頁" onBack={() => this.back()}><Note kind="warn" text={failed === "找不到這個帳號" ? "找不到這個帳號（可能改了暱稱，或已經刪除）。" : failed} /></Page>;
     const u = p.user;
     if (p.private) return <Page title={u.name} onBack={() => this.back()}><Section>{this.profileCard(u, null)}<Note text="這個帳號沒有公開個人頁。" /></Section></Page>;
     const dist = p.dist || [], max = Math.max(1, ...dist), rated = dist.reduce((a, b) => a + b, 0);
+    // 共同追蹤：「A、B 和另外 N 人都在追蹤」
+    const mu = p.mutual;
+    const mutualLine = mu && mu.list.length ? (
+      <button class="pf-mutual" onTap={() => this.go(() => this.profileListView(u.name, "followers"), "讀取中…")}>
+        <span class="pf-faces">{mu.list.map((x) => this.avatar(x))}</span>
+        <span>{esc(mu.list.map((x) => x.name).join("、"))}{mu.more ? ` 和另外 ${mu.more} 人` : ""}{mu.list.length + mu.more > 1 ? "都" : "也"}在追蹤</span>
+      </button>
+    ) : "";
     const list = p.list || [];
     return (
       <Page title={u.name} subtitle="個人頁" onBack={() => this.back()}>
         <Section>
-          {this.profileCard(u, p.counts || null, p.self ? "這是你的個人頁（別人看到的不含你設成只有自己看得到的那幾筆）" : "", (kind) => this.go(() => this.profileListView(u.name, kind), "讀取中…"))}
-          {p.self ? null : signedIn() ? (
-            <div class="nt-form"><Button label={p.following ? "追蹤中（點一下取消）" : "追蹤"} kind={p.following ? "secondary" : "primary"} onTap={async () => {
-              try { await social("follow", { name: u.name, on: !p!.following }); this.meMem = null; await this.ui.toast(p!.following ? "已取消追蹤" : `已追蹤 ${u.name}`); if (!p!.following) await this.askNickname(); } catch (e) { await this.ui.toast(String((e as Error)?.message || e)); }
-            }} /></div>
-          ) : (
-            <div class="nt-form">
-              <Button label="登入後追蹤" onTap={() => {
+          {this.profileCard(u, p.counts || null, p.self ? "這是你的個人頁（別人看到的不含你設成只有自己看得到的那幾筆）" : "", (kind) => this.go(() => this.profileListView(u.name, kind), "讀取中…"), mutualLine)}
+          <div class="pf-btns">
+            {p.self ? (
+              <button class="pf-btn" onTap={() => { this.profileDraft = null; this.go(() => this.profileEditView(u)); }}>編輯個人檔案</button>
+            ) : signedIn() ? (
+              <button class={"pf-btn" + (p.following ? "" : " go")} onTap={async () => {
+                try { await social("follow", { name: u.name, on: !p!.following }); this.meMem = null; await this.ui.toast(p!.following ? "已取消追蹤" : `已追蹤 ${u.name}`); if (!p!.following) await this.askNickname(); } catch (e) { await this.ui.toast(String((e as Error)?.message || e)); }
+              }}>{p.following ? "追蹤中 ✓" : "追蹤"}</button>
+            ) : (
+              <button class="pf-btn go" onTap={() => {
                 // 記下「登入後要追蹤誰」，從 Google 回來就自動追蹤、回到這一頁，再帶去取暱稱
                 try { (globalThis as any).sessionStorage.setItem("ms:follow-after-login", u.name); } catch (_) {}
                 const sy = this.sync(); if (sy) sy.login();
-              }} />
-              <div class="cm-tagnote">用 Google 登入後會自動追蹤 {esc(u.name)}，接著請你取一個暱稱（也可以稍後再說）。</div>
-            </div>
-          )}
+              }}>登入後追蹤</button>
+            )}
+            <button class="pf-btn" onTap={async () => { Pasteboard.copy(`${SITE_URL}/?u=${encodeURIComponent(u.name)}`); await this.ui.toast("已複製個人頁連結"); }}>分享</button>
+            {p.self ? null : <button class="pf-btn icon" aria-label="檢舉這個帳號" onTap={() => this.go(() => this.reportUserView(u.name))}>⚑</button>}
+          </div>
         </Section>
         {rated ? (
           <Section title={`評分分布（${rated} 部）`}>
@@ -1018,11 +1039,6 @@ class App {
         <Section title={`片單（${p.counts ? p.counts.films : list.length}）`} hint={list.length >= 50 ? "只列最近 50 筆。" : ""}>
           {list.length ? <div class="nt-list">{list.map((e) => this.entryRow(e, () => this.openTitle(e.title)))}</div> : <Note text="還沒有公開的紀錄。" />}
         </Section>
-        {p.self ? null : (
-          <Section>
-            <Item icon="⚑" title="檢舉這個帳號" subtitle="暱稱不雅、冒用他人名義，或其他不當行為" onTap={() => this.go(() => this.reportUserView(u.name))} />
-          </Section>
-        )}
       </Page>
     );
   }

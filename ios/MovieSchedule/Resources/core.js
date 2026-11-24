@@ -3862,7 +3862,8 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     "not found": "找不到這個帳號",
     "too many follows": "追蹤的人數到上限了",
     "bad date": "日期不對（不能是未來的日期）",
-    "bad emoji": "頭像只能放一個表情符號"
+    "bad emoji": "頭像只能放一個表情符號",
+    "bad bio": "自我介紹最多 80 個字，不能放連結或聯絡方式"
   };
   async function social(op, body = {}) {
     const r = await socialCall(op, body);
@@ -4423,7 +4424,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   var extra = { boxOffice, filmList, soonList, nowShowing, nowShowingMulti, movieBoard: movieBoard2, festivalBoard, festivalFilm, nearby, patchSettings, fillMovie, formatList };
   var BRIDGE_LEVEL = 2;
   globalThis.MS = {
-    version: "2026.11.24-2226",
+    version: "2026.11.24-2229",
     level: BRIDGE_LEVEL,
     init(saved) {
       cache = saved || {};
