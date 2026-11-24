@@ -133,6 +133,28 @@ export async function social(hub, path, b) {
     for (const r of all(sql, "SELECT s, COUNT(*) AS c FROM entries WHERE uid = ? AND s > 0" + where + " GROUP BY s", u.uid)) if (r.s >= 1 && r.s <= 10) dist[r.s - 1] = r.c;
     return json({ ok: true, user: userOut(u), self, since: u.at, counts: counts(sql, u.uid, !self), dist, list, following: !!(uid && one(sql, "SELECT 1 AS x FROM follows WHERE a = ? AND b = ?", uid, u.uid)) });
   }
+  if (op === "list") {
+    // 個人卡片上四個數字點進去的清單：films 片單／notes 有寫短評的／followers 粉絲／following 追蹤中。
+    // 不給暱稱 = 看自己的（要登入）。別人的要對方公開個人頁才看得到；粉絲、追蹤中只列出「有公開個人頁」的帳號，其餘只算人數
+    const u = b.name ? one(sql, "SELECT * FROM users WHERE name = ?", String(b.name)) : null;
+    const target = u ? u.uid : b.name ? "" : uid;
+    if (!target || (u && u.hidden && u.uid !== uid)) return json({ error: "not found" }, 404);
+    const self = target === uid;
+    if (!self && !(u && u.pub)) return json({ error: "private" }, 403);
+    const kind = String(b.kind || "");
+    if (kind === "films" || kind === "notes") {
+      const where = (self ? "" : " AND priv = 0") + (kind === "notes" ? " AND x != ''" : "");
+      return json({ ok: true, kind, user: u ? userOut(u) : null, self, entries: all(sql, "SELECT * FROM entries WHERE uid = ?" + where + " ORDER BY at DESC LIMIT 200", target).map(entryOut), total: one(sql, "SELECT COUNT(*) AS c FROM entries WHERE uid = ?" + where, target).c });
+    }
+    if (kind === "followers" || kind === "following") {
+      const [mine, other] = kind === "followers" ? ["b", "a"] : ["a", "b"];
+      const rows = all(sql, `SELECT u.*, (SELECT COUNT(*) FROM entries e WHERE e.uid = u.uid AND e.priv = 0) AS films FROM follows f JOIN users u ON u.uid = f.${other} AND u.pub = 1 AND u.hidden = 0 WHERE f.${mine} = ? ORDER BY f.at DESC LIMIT 200`, target);
+      const total = one(sql, `SELECT COUNT(*) AS c FROM follows WHERE ${mine} = ?`, target).c;
+      const follows = uid ? new Set(all(sql, "SELECT b FROM follows WHERE a = ?", uid).map((r) => r.b)) : new Set();
+      return json({ ok: true, kind, user: u ? userOut(u) : null, self, people: rows.map((r) => ({ ...userOut(r), films: r.films, following: follows.has(r.uid), ...(r.uid === uid ? { me: 1 } : {}) })), total, unlisted: Math.max(0, total - rows.length) });
+    }
+    return json({ error: "bad request" }, 400);
+  }
   if (op === "people") {
     const q = String(b.q || "").trim().slice(0, 16);
     const rows = q

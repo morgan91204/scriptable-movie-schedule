@@ -700,7 +700,7 @@ class App {
     return (
       <Section title="帳號">
         <div role="button" onTap={open}>
-          {this.profileCard({ name: u ? u.name : me ? "還沒取暱稱" : "已登入", color: u ? u.color : "gray", emoji: u ? u.emoji : "" }, me ? me.counts : null, [email, status].filter(Boolean).join("｜"))}
+          {this.profileCard({ name: u ? u.name : me ? "還沒取暱稱" : "已登入", color: u ? u.color : "gray", emoji: u ? u.emoji : "" }, me ? me.counts : null, [email, status].filter(Boolean).join("｜"), (kind) => this.go(() => this.profileListView("", kind), "讀取中…"))}
         </div>
         <Item icon="🎞" title="我的片單" subtitle={u ? "看過的片、評分和短評；動態、找人" : "取暱稱、記錄看過的片、追蹤別人"} onTap={open} />
         <Item icon="🔄" title="同步與登出" subtitle="收藏和設定自動同步中" onTap={() => this.go(() => this.syncView())} />
@@ -741,14 +741,39 @@ class App {
     return <span class={"av" + (big ? " big" : "") + (u.emoji ? " emo" : "")} style={`background:${profileColor(u.color)};color:${profileInk(u.color)}`} aria-hidden="true">{esc(u.emoji || Array.from(u.name)[0] || "?")}</span>;
   }
   /** 個人頁最上面那一塊：頭像（顏色＋暱稱第一個字）、暱稱、四個數字 */
-  profileCard(u: { name: string; color: string; emoji?: string }, c: SocialCounts | null, note = ""): string {
+  /** 個人卡片上的數字點進去：那個人的片單／有寫短評的／粉絲／追蹤中。name 空的 = 看自己的 */
+  async profileListView(name: string, kind: "films" | "notes" | "followers" | "following"): Promise<string> {
+    type R = { user: Profile | null; self: boolean; entries?: DiaryEntry[]; people?: { name: string; color: string; emoji?: string; films: number; following: boolean; me?: number }[]; total: number; unlisted?: number };
+    const TITLE = { films: "片單", notes: "短評", followers: "粉絲", following: "追蹤中" };
+    let r: R | null = null, failed = "";
+    try { r = await social<R>("list", { ...(name ? { name } : {}), kind }); } catch (e) { failed = String((e as Error)?.message || e); }
+    const who = name || (r && r.user ? r.user.name : "我");
+    if (!r) return <Page title={TITLE[kind]} subtitle={who} onBack={() => this.back()}><Section><Note kind="warn" text={failed} /></Section></Page>;
+    const people = r.people || [], entries = r.entries || [];
+    return (
+      <Page title={`${TITLE[kind]}（${r.total}）`} subtitle={who} onBack={() => this.back()}>
+        {kind === "films" || kind === "notes" ? (
+          <Section hint={r.total > entries.length ? `只列最近 ${entries.length} 筆。` : r.self ? "含你設成只有自己看得到的那幾筆。" : ""}>
+            {entries.length ? <div class="nt-list">{entries.map((e) => this.entryRow(e, () => (r!.self ? this.go(() => this.entryView(e.title, e)) : this.openTitle(e.title))))}</div> : <Note text={kind === "notes" ? "還沒有寫過短評。" : "片單還是空的。"} />}
+          </Section>
+        ) : (
+          <Section hint={r.unlisted ? `另外有 ${r.unlisted} 位沒有公開個人頁，不會列出來。` : "只會列出有公開個人頁的帳號。"}>
+            {people.length ? people.map((u) => (u.me ? <div class="item"><span class="us-main">{this.avatar(u)}<span class="us-name">{esc(u.name)}</span><span class="us-sub">你自己</span></span></div> : this.userItem(u))) : <Note text={r.total ? "他們都沒有公開個人頁。" : kind === "followers" ? "還沒有粉絲。" : "還沒有追蹤任何人。"} />}
+          </Section>
+        )}
+      </Page>
+    );
+  }
+  /** onNum：有給的話，四個數字可以點（點了看清單） */
+  profileCard(u: { name: string; color: string; emoji?: string }, c: SocialCounts | null, note = "", onNum?: (kind: "films" | "notes" | "followers" | "following") => void): string {
+    const num = (kind: "films" | "notes" | "followers" | "following", n: number, label: string) => (onNum ? <button onTap={() => onNum(kind)}><b>{n}</b> {label}</button> : <span><b>{n}</b> {label}</span>);
     return (
       <div class="pf">
         {this.avatar(u, true)}
         <div class="pf-body">
           <div class="pf-name">{esc(u.name)}</div>
           {note ? <div class="pf-note">{esc(note)}</div> : null}
-          {c ? <div class="pf-nums"><span><b>{c.films}</b> 部片</span><span><b>{c.notes}</b> 則短評</span><span><b>{c.followers}</b> 粉絲</span><span><b>{c.following}</b> 追蹤中</span></div> : null}
+          {c ? <div class="pf-nums">{num("films", c.films, "部片")}{num("notes", c.notes, "則短評")}{num("followers", c.followers, "粉絲")}{num("following", c.following, "追蹤中")}</div> : null}
         </div>
       </div>
     );
@@ -817,7 +842,7 @@ class App {
     return (
       <Page title="我的片單" onBack={() => this.back()}>
         <Section>
-          {user ? this.profileCard(user, me.counts, user.hidden ? "個人頁目前被站長停用" : user.pub ? "個人頁公開中" : "個人頁不公開（只有你看得到）") : <Note kind="warn" text="還沒有設定暱稱：別人找不到你、不能追蹤你，短評也是匿名。你還是可以追蹤別人。" />}
+          {user ? this.profileCard(user, me.counts, user.hidden ? "個人頁目前被站長停用" : user.pub ? "個人頁公開中" : "個人頁不公開（只有你看得到）", (kind) => this.go(() => this.profileListView("", kind), "讀取中…")) : <Note kind="warn" text="還沒有設定暱稱：別人找不到你、不能追蹤你，短評也是匿名。你還是可以追蹤別人。" />}
           <Item icon="✏️" title={user ? "編輯個人檔案" : "設定暱稱"} subtitle="暱稱、頭像、要不要公開" onTap={() => { this.profileDraft = null; this.go(() => this.profileEditView(user)); }} />
           {user && user.pub ? <Item icon="🔗" title="複製我的個人頁連結" chevron={false} onTap={async () => { Pasteboard.copy(`${SITE_URL}/?u=${encodeURIComponent(user.name)}`); await this.ui.toast("已複製連結"); }} /> : null}
         </Section>
@@ -948,7 +973,7 @@ class App {
     return (
       <Page title={u.name} subtitle="個人頁" onBack={() => this.back()}>
         <Section>
-          {this.profileCard(u, p.counts || null, p.self ? "這是你的個人頁（別人看到的不含你設成只有自己看得到的那幾筆）" : "")}
+          {this.profileCard(u, p.counts || null, p.self ? "這是你的個人頁（別人看到的不含你設成只有自己看得到的那幾筆）" : "", (kind) => this.go(() => this.profileListView(u.name, kind), "讀取中…"))}
           {p.self ? null : signedIn() ? (
             <div class="nt-form"><Button label={p.following ? "追蹤中（點一下取消）" : "追蹤"} kind={p.following ? "secondary" : "primary"} onTap={async () => {
               try { await social("follow", { name: u.name, on: !p!.following }); this.meMem = null; await this.ui.toast(p!.following ? "已取消追蹤" : `已追蹤 ${u.name}`); if (!p!.following) await this.askNickname(); } catch (e) { await this.ui.toast(String((e as Error)?.message || e)); }

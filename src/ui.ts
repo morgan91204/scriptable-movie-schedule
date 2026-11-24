@@ -285,6 +285,7 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .pf-name{font-size:20px;font-weight:700;overflow-wrap:anywhere}
 .pf-note{font-size:12px;color:var(--fg2);margin-top:2px}
 .pf-nums{display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:6px;font-size:13px;color:var(--fg2)}
+.pf-nums button{padding:2px 0;font-size:13px;color:var(--fg2);text-decoration:underline;text-decoration-color:var(--line);text-underline-offset:3px}
 .pf-nums b{color:var(--fg);font-variant-numeric:tabular-nums}
 .us-main{display:flex;align-items:center;gap:10px;flex:1;min-width:0;text-align:left;color:var(--fg);padding:4px 0}
 .us-name{font-size:16px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
