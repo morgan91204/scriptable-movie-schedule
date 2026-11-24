@@ -753,15 +753,15 @@ class App {
         {u && !u.hidden ? (Date.now() - this.pubAsk < 60e3 ? (
           <div class="nt-form">
             <Note kind="warn" text={u.pub
-              ? "確定要改成不公開嗎？改了之後：別人看不到你的個人頁和片單、不能追蹤你，你寫的短評會顯示成匿名，也不會出現在別人的動態裡。現有的粉絲不會被移除。"
-              : "確定要公開個人頁嗎？公開之後：別人看得到你的暱稱、頭像、片單（片名、分數、短評、看過的日期）、可以追蹤你，你寫的短評旁邊會顯示暱稱。設成只有自己看得到的那幾筆不會公開。"} />
+              ? "確定要改成不公開嗎？改了之後：別人還是看得到你的暱稱、頭像、自我介紹和四個數字，但片單、短評、粉絲和追蹤名單只有你同意追蹤的人看得到；想追蹤你的人要先送出要求、等你同意。你寫的短評在討論區會顯示成匿名。現有的粉絲不會被移除。"
+              : "確定要公開個人頁嗎？公開之後：任何人都看得到你的片單（片名、分數、短評、看過的日期）、粉絲和追蹤名單，不用你同意就能追蹤你，你寫的短評旁邊會顯示暱稱。還在等你同意的追蹤要求會全部直接通過。設成只有自己看得到的那幾筆不會公開。"} />
             <Button label={u.pub ? "確定改成不公開" : "確定公開"} kind={u.pub ? "danger" : "primary"} onTap={async () => {
               this.pubAsk = 0;
               try { await social("profile-set", { name: u.name, pub: !u.pub }); this.meMem = null; this.diaryMem = null; await this.ui.toast(u.pub ? "個人頁改成不公開了" : "個人頁公開了"); } catch (e) { await this.ui.toast(String((e as Error)?.message || e)); }
             }} />
             <Button label={u.pub ? "不要改，維持公開" : "不要改，維持不公開"} kind="secondary" onTap={() => { this.pubAsk = 0; }} />
           </div>
-        ) : <Item icon={u.pub ? "✅" : "⬜️"} title="公開個人頁" subtitle={u.pub ? "別人可以看你的片單、追蹤你；短評旁邊顯示暱稱" : "目前只有你看得到片單，短評匿名"} chevron={false} onTap={() => { this.pubAsk = Date.now(); }} />) : null}
+        ) : <Item icon={u.pub ? "✅" : "⬜️"} title="公開個人頁" subtitle={u.pub ? "任何人都可以看你的片單、追蹤你；短評旁邊顯示暱稱" : "不公開：片單和短評只有你同意追蹤的人看得到"} chevron={false} onTap={() => { this.pubAsk = Date.now(); }} />) : null}
         <Item icon="🔄" title="同步與登出" subtitle="收藏和設定自動同步中" onTap={() => this.go(() => this.syncView())} />
         {me && me.admin ? <Item icon="🛡" title="管理員專區" subtitle="意見回饋、短評、帳號、管理員名單" onTap={() => this.go(() => this.adminHomeView())} /> : null}
       </Section>
@@ -1120,17 +1120,20 @@ class App {
     );
   }
   /** 清單裡的一個帳號：點名字看個人頁，右邊追蹤／取消追蹤 */
-  userItem(u: { name: string; color: string; emoji?: string; films?: number; following?: boolean }): string {
+  userItem(u: { name: string; color: string; emoji?: string; films?: number; following?: boolean; priv?: number; requested?: number }): string {
+    // 不公開帳號：按的是「要求追蹤」，對方同意前顯示「已要求」（再按一下收回）
+    const state = u.following ? "on" : u.requested ? "asked" : "";
     return (
       <div class="item">
         <button class="us-main" onTap={() => this.go(() => this.profileView(u.name), "讀取個人頁…")}>
           {this.avatar(u)}
-          <span class="us-name">{esc(u.name)}</span>
+          <span class="us-name">{esc(u.name)}{u.priv ? <i class="us-lock" aria-label="不公開帳號">🔒</i> : null}</span>
           {u.films !== undefined ? <span class="us-sub">{u.films} 部片</span> : null}
         </button>
-        {signedIn() ? <button class={"us-follow" + (u.following ? " on" : "")} onTap={async () => {
-          try { await social("follow", { name: u.name, on: !u.following }); this.meMem = null; await this.ui.toast(u.following ? "已取消追蹤" : `已追蹤 ${u.name}`); if (!u.following) await this.askNickname(); } catch (e) { await this.ui.toast(String((e as Error)?.message || e)); }
-        }}>{u.following ? "追蹤中" : "追蹤"}</button> : null}
+        {signedIn() ? <button class={"us-follow" + (state ? " on" : "")} onTap={async () => {
+          const on = !state;
+          try { const r = await social<{ requested: boolean }>("follow", { name: u.name, on }); this.meMem = null; await this.ui.toast(!on ? (state === "asked" ? "已收回追蹤要求" : "已取消追蹤") : r.requested ? "已送出追蹤要求，等對方同意" : `已追蹤 ${u.name}`); if (on) await this.askNickname(); } catch (e) { await this.ui.toast(String((e as Error)?.message || e)); }
+        }}>{state === "on" ? "追蹤中" : state === "asked" ? "已要求" : u.priv ? "要求追蹤" : "追蹤"}</button> : null}
       </div>
     );
   }
@@ -1271,7 +1274,7 @@ class App {
           </div>
         </Section>
         {first ? (
-          <Section title="公開" hint="公開後：別人可以看到你的個人頁（片單、評分、短評）、可以追蹤你，你寫的短評旁邊會顯示暱稱。不公開：片單只有你看得到，短評照樣匿名。之後在設定的帳號那一區可以隨時切換。">
+          <Section title="公開" hint="公開：任何人都看得到你的片單、評分、短評，可以直接追蹤你，你寫的短評旁邊會顯示暱稱。不公開：別人看得到你的暱稱、頭像和自我介紹，但片單和短評要你同意追蹤後才看得到，討論區的短評顯示成匿名。之後在設定的帳號那一區可以隨時切換。">
             <div class="nt-form">
               <button class={"nt-check" + (d.pub ? " on" : "")} aria-pressed={d.pub ? "true" : "false"} onTap={(v: Record<string, string>) => { keep(v); this.profileDraft = { ...this.profileDraft!, pub: !d.pub }; }}>
                 <i>{d.pub ? "✓" : ""}</i><span>公開我的個人頁</span>
@@ -1305,12 +1308,37 @@ class App {
   }
   /** 某個人的公開個人頁 */
   async profileView(name: string): Promise<string> {
-    type P = { user: Profile; self?: boolean; private?: boolean; counts?: SocialCounts; dist?: number[]; list?: DiaryEntry[]; following?: boolean; since?: number; mutual?: { list: { name: string; color: string; emoji?: string }[]; more: number } };
+    type P = { user: Profile; self?: boolean; private?: boolean; locked?: boolean; requested?: boolean; counts?: SocialCounts; dist?: number[]; list?: DiaryEntry[]; following?: boolean; since?: number; mutual?: { list: { name: string; color: string; emoji?: string }[]; more: number } };
     let p: P | null = null, failed = "";
     try { p = await social<P>("profile", { name }); } catch (e) { failed = String((e as Error)?.message || e); }
     if (!p) return <Page title="個人頁" onBack={() => this.back()}><Note kind="warn" text={failed === "找不到這個帳號" ? "找不到這個帳號（可能改了暱稱，或已經刪除）。" : failed} /></Page>;
     const u = p.user;
-    if (p.private) return <Page title={u.name} onBack={() => this.back()}><Section>{this.profileCard(u, null)}<Note text="這個帳號沒有公開個人頁。" /></Section></Page>;
+    if (p.locked) {
+      // 不公開帳號：看得到暱稱、頭像、自我介紹和四個數字，其他要對方同意追蹤才看得到
+      const ask = async (on: boolean) => {
+        try { const r = await social<{ following: boolean; requested: boolean }>("follow", { name: u.name, on }); this.meMem = null; await this.ui.toast(!on ? "已收回追蹤要求" : r.requested ? "已送出追蹤要求，等對方同意" : `已追蹤 ${u.name}`); if (on) await this.askNickname(); } catch (e) { await this.ui.toast(String((e as Error)?.message || e)); }
+      };
+      return (
+        <Page title={u.name} subtitle="個人頁" onBack={() => this.back()}>
+          <Section>
+            {this.profileCard(u, p.counts || null, "", undefined, "", { text: "不公開", tone: "" })}
+            <div class="pf-btns">
+              {!signedIn() ? (
+                <button class="pf-btn go" onTap={() => { try { (globalThis as any).sessionStorage.setItem("ms:follow-after-login", u.name); } catch (_) {} const sy = this.sync(); if (sy) sy.login(); }}>登入後要求追蹤</button>
+              ) : p.requested ? (
+                <button class="pf-btn" onTap={() => ask(false)}>已送出要求（點一下收回）</button>
+              ) : (
+                <button class="pf-btn go" onTap={() => ask(true)}>要求追蹤</button>
+              )}
+              <button class="pf-btn icon" aria-label="檢舉這個帳號" onTap={() => this.go(() => this.reportUserView(u.name))}>⚑</button>
+            </div>
+          </Section>
+          <Section>
+            <div class="pf-lock"><div aria-hidden="true">🔒</div><b>這是不公開帳號</b><p>對方同意你的追蹤要求之後，才看得到片單、短評、粉絲和追蹤名單。</p></div>
+          </Section>
+        </Page>
+      );
+    }
     const dist = p.dist || [], max = Math.max(1, ...dist), rated = dist.reduce((a, b) => a + b, 0);
     // 共同追蹤：「A、B 和另外 N 人都在追蹤」
     const mu = p.mutual;
@@ -1551,12 +1579,17 @@ class App {
         : a.kind === "down" ? `噓了你在《${a.title}》的短評${quote(a.px)}`
         : a.kind === "reply" ? `在《${a.title}》回覆你：${a.x || ""}`
         : a.kind === "mention" ? `在《${a.title}》提到你：${a.x || ""}`
+        : a.kind === "request" ? "想追蹤你"
+        : a.kind === "accepted" ? "接受了你的追蹤要求。"
         : a.returned ? "也回追你了" : "開始追蹤你";
-      const open = a.kind === "follow"
+      const answer = (ok: boolean) => async () => {
+        try { await social("follow-answer", { name: names[0], ok }); this.meMem = null; await this.ui.toast(ok ? `已同意，${names[0]} 開始追蹤你了` : "已拒絕"); } catch (e) { await this.ui.toast(String((e as Error)?.message || e)); }
+      };
+      const open = a.kind === "follow" || a.kind === "request" || a.kind === "accepted"
         ? (names.length ? () => this.go(() => this.profileView(names[0]), "讀取個人頁…") : undefined)
         : () => { this.noteReset(); if (a.px) this.noteFocus = { x: a.px, at: Date.now(), head: true }; this.go(() => this.notesView(a.title || ""), "讀取短評…"); };
       const first = a.who[0];
-      const mark = a.kind === "up" ? "▲" : a.kind === "down" ? "▼" : a.kind === "reply" ? "↩" : a.kind === "mention" ? "@" : "＋";
+      const mark = a.kind === "up" ? "▲" : a.kind === "down" ? "▼" : a.kind === "reply" ? "↩" : a.kind === "mention" ? "@" : a.kind === "accepted" ? "✓" : a.kind === "request" ? "?" : "＋";
       return (
         <div class={"ac" + (a.fresh ? " fresh" : "")}>
           <button class="ac-main" onTap={open}>
@@ -1570,6 +1603,7 @@ class App {
           {a.kind === "follow" && names.length === 1 && !a.back ? <button class="ac-btn go" onTap={async () => {
             try { await social("follow", { name: names[0], on: true }); this.meMem = null; await this.ui.toast(`已追蹤 ${names[0]}`); } catch (e) { await this.ui.toast(String((e as Error)?.message || e)); }
           }}>回追</button> : a.kind === "follow" && a.back ? <span class="ac-btn">互相追蹤</span> : null}
+          {a.kind === "request" && names.length === 1 ? <><button class="ac-btn go" onTap={answer(true)}>接受</button><button class="ac-btn" aria-label={`拒絕 ${names[0]} 的追蹤要求`} onTap={answer(false)}>拒絕</button></> : null}
         </div>
       );
     };
@@ -1585,7 +1619,7 @@ class App {
             {fresh.length ? <Section title="新的"><div class="ac-list">{fresh.map(row)}</div></Section> : null}
             {recent.length ? <Section title="過去 7 天"><div class="ac-list">{recent.map(row)}</div></Section> : null}
             {older.length ? <Section title="更早"><div class="ac-list">{older.map(row)}</div></Section> : null}
-            <p class="hint">噓只會顯示人數，不會顯示是誰。沒有公開個人頁的人會顯示成「有人」。</p>
+            <p class="hint">噓只會顯示人數，不會顯示是誰。不公開的帳號推或回覆你的短評時，會顯示成「有人」。</p>
           </>
         )}
       </Page>

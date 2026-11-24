@@ -48,6 +48,8 @@ export function socialInit(sql) {
   sql.exec("CREATE INDEX IF NOT EXISTS entries_at ON entries (at)");
   sql.exec("CREATE INDEX IF NOT EXISTS entries_k ON entries (k)");
   sql.exec("CREATE TABLE IF NOT EXISTS follows (a TEXT NOT NULL, b TEXT NOT NULL, at INTEGER NOT NULL, PRIMARY KEY (a, b))");
+  // 追蹤要求：a 想追蹤 b（b 是不公開帳號，要 b 同意才會變成 follows 裡的一筆）
+  sql.exec("CREATE TABLE IF NOT EXISTS follow_reqs (a TEXT NOT NULL, b TEXT NOT NULL, at INTEGER NOT NULL, PRIMARY KEY (a, b))");
   sql.exec("CREATE INDEX IF NOT EXISTS follows_b ON follows (b)");
   sql.exec("CREATE TABLE IF NOT EXISTS user_reports (uid TEXT NOT NULL, by TEXT NOT NULL, why TEXT NOT NULL, at INTEGER NOT NULL, PRIMARY KEY (uid, by))");
   // 通知頁的紀錄：to = 收通知的帳號（識別碼的前 40 個字，跟評分伺服器用的代號一樣）；kind = up 推／down 噓／reply 回覆／follow 追蹤；
@@ -60,10 +62,11 @@ export function socialInit(sql) {
 
 /** 主動推一則（只有回覆、追蹤會推；推噓只記在通知頁）。對方沒開通知、沒登入裝置就什麼都不會發；推不出去不影響原本的操作。
  *  名字只有公開個人頁的人才帶，其他一律「有人」 */
-async function pushTo(hub, sql, to, kind, actor, make) {
+async function pushTo(hub, sql, to, kind, actor, make, named = false) {
   try {
     const a = actor ? sql.exec("SELECT name, pub, hidden FROM users WHERE uid = ?", actor).toArray()[0] : null;
-    const who = a && a.pub && !a.hidden && a.name ? a.name + " " : "有人";
+    // named = 追蹤、追蹤要求這類：不公開的帳號也帶名字（暱稱和個人頁本來就看得到）；短評相關的只有公開的人才帶
+    const who = a && (a.pub || named) && !a.hidden && a.name ? a.name + " " : "有人";
     // badge = 對方還沒看的通知數（顯示在主畫面圖示上）
     const seen = (sql.exec('SELECT at FROM activity_seen WHERE "to" = ?', to).toArray()[0] || { at: 0 }).at;
     const badge = sql.exec('SELECT COUNT(*) AS c FROM activity WHERE "to" = ? AND at > ?', to, seen).toArray()[0].c;
@@ -98,12 +101,22 @@ async function lbxMatch(env, sql, token, name, year) {
   sql.exec("INSERT INTO lbx_map (k, zh, imdb, y, at) VALUES (?, ?, ?, ?, ?) ON CONFLICT(k) DO UPDATE SET zh = excluded.zh, imdb = excluded.imdb, y = excluded.y, at = excluded.at", k, out ? out.zh : "", out ? out.imdb : "", out ? out.y : 0, Date.now());
   return out && out.zh ? out : null;
 }
+/** 處理一筆追蹤要求（from 想追蹤 me）：ok = 同意。同意的話 me 的通知裡會變成「from 開始追蹤你」，from 會收到「me 接受了你的追蹤要求」 */
+function acceptReq(sql, from, me, ok) {
+  sql.exec("DELETE FROM follow_reqs WHERE a = ? AND b = ?", from, me);
+  sql.exec('DELETE FROM activity WHERE "to" = ? AND actor = ? AND kind = \'request\'', me.slice(0, 40), from);
+  if (!ok) return;
+  sql.exec("INSERT OR IGNORE INTO follows (a, b, at) VALUES (?, ?, ?)", from, me, Date.now());
+  notify(sql, me.slice(0, 40), "follow", from);
+  notify(sql, from.slice(0, 40), "accepted", me);
+}
 const ACT_KEEP = 300; // 一個人最多留幾筆通知
 /** 記一筆通知。自己對自己的不記；同一個人對同一則的推噓只留最新的一筆（改來改去不會洗版） */
 function notify(sql, to, kind, actor, more = {}) {
   if (!to || !actor || actor.slice(0, 40) === to) return;
   if (kind === "up" || kind === "down" || kind === "unvote") sql.exec('DELETE FROM activity WHERE "to" = ? AND actor = ? AND note = ? AND kind IN (\'up\', \'down\')', to, actor, more.note || 0);
-  if (kind === "follow" || kind === "unfollow") sql.exec('DELETE FROM activity WHERE "to" = ? AND actor = ? AND kind = \'follow\'', to, actor);
+  if (kind === "follow" || kind === "unfollow") sql.exec('DELETE FROM activity WHERE "to" = ? AND actor = ? AND kind IN (\'follow\', \'request\')', to, actor);
+  if (kind === "request" || kind === "accepted") sql.exec('DELETE FROM activity WHERE "to" = ? AND actor = ? AND kind = ?', to, actor, kind);
   if (kind === "unvote" || kind === "unfollow") return;
   sql.exec('INSERT INTO activity ("to", kind, actor, k, title, note, x, px, at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', to, kind, actor, more.k || "", cleanTitle(more.title) || more.k || "", more.note || 0, String(more.x || "").slice(0, 200), String(more.px || "").slice(0, 80), Date.now());
   // 太多了就把最舊的清掉
@@ -152,6 +165,8 @@ async function notifyMentions(hub, sql, text, uid, more, skip) {
 const okEmoji = (e) => e === "" || (typeof e === "string" && e.length <= 32 && EMOJI_RE.test(e));
 
 /** 這個帳號的數字：片單幾部、短評幾則、追蹤幾人、被幾人追蹤 */
+/** viewer 看得到 u 的片單、短評、粉絲和追蹤名單嗎：公開帳號誰都可以；不公開的只有本人和他同意追蹤的人 */
+const canSee = (sql, viewer, u) => !!u.pub || u.uid === viewer || !!(viewer && one(sql, "SELECT 1 AS x FROM follows WHERE a = ? AND b = ?", viewer, u.uid));
 function counts(sql, uid, onlyPublic) {
   const w = onlyPublic ? " AND priv = 0" : "";
   return {
@@ -249,7 +264,8 @@ export async function social(hub, path, b) {
     const u = one(sql, "SELECT * FROM users WHERE name = ?", String(b.name || ""));
     if (!u || (u.hidden && u.uid !== uid)) return json({ error: "not found" }, 404);
     const self = u.uid === uid;
-    if (!u.pub && !self) return json({ ok: true, user: userOut(u), private: true });
+    // 不公開帳號：個人頁看得到（暱稱、頭像、自我介紹、四個數字），但片單、短評、粉絲和追蹤名單要他同意追蹤後才看得到
+    if (!canSee(sql, uid, u)) return json({ ok: true, user: { ...userOut(u), bio: u.bio || "" }, private: true, locked: true, since: u.at, counts: counts(sql, u.uid, true), following: false, requested: !!(uid && one(sql, "SELECT 1 AS x FROM follow_reqs WHERE a = ? AND b = ?", uid, u.uid)) });
     const where = self ? "" : " AND priv = 0";
     const offset = Math.max(0, Number(b.offset) || 0);
     const list = all(sql, "SELECT * FROM entries WHERE uid = ?" + where + " ORDER BY at DESC LIMIT 50 OFFSET ?", u.uid, offset).map(entryOut);
@@ -261,7 +277,7 @@ export async function social(hub, path, b) {
       const rows = all(sql, "SELECT x.name, x.color, x.emoji FROM follows mine JOIN follows theirs ON theirs.a = mine.b AND theirs.b = ? JOIN users x ON x.uid = mine.b AND x.pub = 1 AND x.hidden = 0 WHERE mine.a = ? ORDER BY theirs.at DESC LIMIT 50", u.uid, uid);
       if (rows.length) mutual = { list: rows.slice(0, 3).map(userOut), more: Math.max(0, rows.length - 3) };
     }
-    return json({ ok: true, user: { ...userOut(u), bio: u.bio || "", ...linksOut(u) }, self, since: u.at, counts: counts(sql, u.uid, !self), dist, list, following: !!(uid && one(sql, "SELECT 1 AS x FROM follows WHERE a = ? AND b = ?", uid, u.uid)), ...(mutual ? { mutual } : {}) });
+    return json({ ok: true, user: { ...userOut(u), bio: u.bio || "", ...linksOut(u) }, self, since: u.at, counts: counts(sql, u.uid, !self), dist, list, following: !!(uid && one(sql, "SELECT 1 AS x FROM follows WHERE a = ? AND b = ?", uid, u.uid)), ...(u.pub ? {} : { private: true }), ...(mutual ? { mutual } : {}) });
   }
   if (op === "list") {
     // 個人卡片上四個數字點進去的清單：films 片單／notes 有寫短評的／followers 粉絲／following 追蹤中。
@@ -270,7 +286,7 @@ export async function social(hub, path, b) {
     const target = u ? u.uid : b.name ? "" : uid;
     if (!target || (u && u.hidden && u.uid !== uid)) return json({ error: "not found" }, 404);
     const self = target === uid;
-    if (!self && !(u && u.pub)) return json({ error: "private" }, 403);
+    if (!self && !(u && canSee(sql, uid, u))) return json({ error: "private" }, 403);
     const kind = String(b.kind || "");
     if (kind === "films" || kind === "notes") {
       const where = (self ? "" : " AND priv = 0") + (kind === "notes" ? " AND x != ''" : "");
@@ -288,10 +304,11 @@ export async function social(hub, path, b) {
   if (op === "people") {
     const q = String(b.q || "").trim().slice(0, 16);
     const rows = q
-      ? all(sql, "SELECT u.*, (SELECT COUNT(*) FROM entries e WHERE e.uid = u.uid AND e.priv = 0) AS films FROM users u WHERE u.pub = 1 AND u.hidden = 0 AND u.name LIKE ? ESCAPE '\\' ORDER BY films DESC LIMIT 30", q.replace(/[\\%_]/g, "\\$&") + "%")
+      ? all(sql, "SELECT u.*, (SELECT COUNT(*) FROM entries e WHERE e.uid = u.uid AND e.priv = 0) AS films FROM users u WHERE u.hidden = 0 AND u.name LIKE ? ESCAPE '\\' ORDER BY films DESC LIMIT 30", q.replace(/[\\%_]/g, "\\$&") + "%")
       : all(sql, "SELECT u.*, COUNT(e.k) AS films, MAX(e.at) AS last FROM users u JOIN entries e ON e.uid = u.uid AND e.priv = 0 WHERE u.pub = 1 AND u.hidden = 0 GROUP BY u.uid ORDER BY last DESC LIMIT 30");
     const mine = uid ? new Set(all(sql, "SELECT b FROM follows WHERE a = ?", uid).map((r) => r.b)) : new Set();
-    return json({ ok: true, list: rows.filter((u) => u.uid !== uid).map((u) => ({ ...userOut(u), films: u.films, following: mine.has(u.uid) })) });
+    const asked = uid ? new Set(all(sql, "SELECT b FROM follow_reqs WHERE a = ?", uid).map((r) => r.b)) : new Set();
+    return json({ ok: true, list: rows.filter((u) => u.uid !== uid).map((u) => ({ ...userOut(u), ...(u.pub || mine.has(u.uid) ? { films: u.films } : {}), following: mine.has(u.uid), ...(u.pub ? {} : { priv: 1 }), ...(asked.has(u.uid) ? { requested: 1 } : {}) })) });
   }
   if (op === "report-user") {
     const by = uid || (okDev(b.d) ? "d:" + b.d : "");
@@ -313,9 +330,11 @@ export async function social(hub, path, b) {
     const who = {};
     const actorOf = (a) => {
       if (a.indexOf("d:") === 0) return null; // 沒登入的人
-      if (!(a in who)) { const u = one(sql, "SELECT name, color, emoji, pub, hidden FROM users WHERE uid = ?", a); who[a] = u && u.pub && !u.hidden ? userOut(u) : null; }
-      return who[a];
+      if (!(a in who)) { const u = one(sql, "SELECT name, color, emoji, pub, hidden FROM users WHERE uid = ?", a); who[a] = u && !u.hidden ? { ...userOut(u), pub: u.pub } : null; }
+      return who[a] && who[a].pub ? userOut(who[a]) : null;
     };
+    // 追蹤、追蹤要求：不公開的帳號也顯示名字（個人頁本來就看得到）
+    const personOf = (a) => { actorOf(a); return who[a] ? userOut(who[a]) : null; };
     const iFollow = new Set(all(sql, "SELECT b FROM follows WHERE a = ?", uid).map((r) => r.b));
     const items = [], votes = {};
     for (const r of rows) {
@@ -330,8 +349,10 @@ export async function social(hub, path, b) {
         items.push({ kind: "reply", k: r.k, title: r.title, x: r.x, px: r.px, at: r.at, who: [actorOf(r.actor)].filter(Boolean), n: 1, ...(r.at > seen ? { fresh: 1 } : {}) });
       } else if (r.kind === "mention") {
         items.push({ kind: "mention", k: r.k, title: r.title, x: r.x, px: r.px, at: r.at, who: [actorOf(r.actor)].filter(Boolean), n: 1, ...(r.at > seen ? { fresh: 1 } : {}) });
+      } else if (r.kind === "request" || r.kind === "accepted") {
+        items.push({ kind: r.kind, at: r.at, who: [personOf(r.actor)].filter(Boolean), n: 1, ...(r.at > seen ? { fresh: 1 } : {}) });
       } else if (r.kind === "follow") {
-        const a = actorOf(r.actor);
+        const a = personOf(r.actor);
         // back = 我也有追蹤他；先追蹤他、他才追蹤我的話就是「回追」
         const mine = one(sql, "SELECT at FROM follows WHERE a = ? AND b = ?", uid, r.actor);
         items.push({ kind: "follow", at: r.at, who: [a].filter(Boolean), n: 1, ...(iFollow.has(r.actor) ? { back: 1 } : {}), ...(mine && mine.at < r.at ? { returned: 1 } : {}), ...(r.at > seen ? { fresh: 1 } : {}) });
@@ -345,12 +366,12 @@ export async function social(hub, path, b) {
     return json({ ok: true, list: all(sql, "SELECT * FROM entries WHERE uid = ? ORDER BY at DESC LIMIT 100 OFFSET ?", uid, offset).map(entryOut), total: counts(sql, uid, false).films });
   }
   if (op === "feed") {
-    const rows = all(sql, "SELECT e.*, u.name, u.color, u.emoji FROM follows f JOIN users u ON u.uid = f.b AND u.pub = 1 AND u.hidden = 0 JOIN entries e ON e.uid = f.b AND e.priv = 0 WHERE f.a = ? ORDER BY e.at DESC LIMIT 60", uid);
+    const rows = all(sql, "SELECT e.*, u.name, u.color, u.emoji FROM follows f JOIN users u ON u.uid = f.b AND u.hidden = 0 JOIN entries e ON e.uid = f.b AND e.priv = 0 WHERE f.a = ? ORDER BY e.at DESC LIMIT 60", uid);
     return json({ ok: true, list: rows.map((r) => ({ ...entryOut(r), by: userOut(r) })), following: counts(sql, uid, false).following });
   }
   if (op === "friends") {
     if (!okKey(m)) return json({ error: "bad request" }, 400);
-    const rows = all(sql, "SELECT e.*, u.name, u.color, u.emoji FROM follows f JOIN users u ON u.uid = f.b AND u.pub = 1 AND u.hidden = 0 JOIN entries e ON e.uid = f.b AND e.priv = 0 AND e.k = ? WHERE f.a = ? ORDER BY e.at DESC LIMIT 30", m, uid);
+    const rows = all(sql, "SELECT e.*, u.name, u.color, u.emoji FROM follows f JOIN users u ON u.uid = f.b AND u.hidden = 0 JOIN entries e ON e.uid = f.b AND e.priv = 0 AND e.k = ? WHERE f.a = ? ORDER BY e.at DESC LIMIT 30", m, uid);
     return json({ ok: true, list: rows.map((r) => ({ ...entryOut(r), by: userOut(r) })) });
   }
   if (op === "stats") {
@@ -415,6 +436,7 @@ export async function social(hub, path, b) {
     const taken = one(sql, "SELECT uid FROM users WHERE name = ?", name);
     if (taken && taken.uid !== uid) return json({ error: "name taken" }, 409);
     if (me && me.name !== name && Date.now() - me.named <= RENAME_EVERY) return json({ error: "rename later" }, 429);
+    if (me && !me.pub && pub) for (const r of all(sql, "SELECT a FROM follow_reqs WHERE b = ?", uid)) acceptReq(sql, r.a, uid, true); // 從不公開改成公開：還在等的追蹤要求直接算同意
     if (me) sql.exec("UPDATE users SET name = ?, color = ?, emoji = ?, bio = ?, th = ?, ig = ?, tw = ?, pub = ?, named = ? WHERE uid = ?", name, color, emoji, bio, th, ig, tw, pub, me.name !== name ? Date.now() : me.named, uid);
     else sql.exec("INSERT INTO users (uid, name, color, emoji, bio, th, ig, tw, pub, at, named) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)", uid, name, color, emoji, bio, th, ig, tw, pub, Date.now());
     return json({ ok: true, user: { name, color, pub: !!pub, ...(emoji ? { emoji } : {}) } });
@@ -422,21 +444,42 @@ export async function social(hub, path, b) {
   if (op === "follow") {
     const u = one(sql, "SELECT uid, pub, hidden FROM users WHERE name = ?", String(b.name || ""));
     if (!u || u.uid === uid) return json({ error: "not found" }, 404);
+    const to = u.uid.slice(0, 40);
+    let requested = false;
     if (b.on) {
-      if (!u.pub || u.hidden) return json({ error: "private" }, 403);
-      if (one(sql, "SELECT COUNT(*) AS c FROM follows WHERE a = ?", uid).c >= 500) return json({ error: "too many follows" }, 400);
-      const fresh = !one(sql, "SELECT 1 AS x FROM follows WHERE a = ? AND b = ?", uid, u.uid);
-      sql.exec("INSERT OR IGNORE INTO follows (a, b, at) VALUES (?, ?, ?)", uid, u.uid, Date.now());
-      if (fresh) {
-        notify(sql, u.uid.slice(0, 40), "follow", uid);
+      if (u.hidden) return json({ error: "private" }, 403);
+      const has = !!one(sql, "SELECT 1 AS x FROM follows WHERE a = ? AND b = ?", uid, u.uid);
+      if (!has && one(sql, "SELECT (SELECT COUNT(*) FROM follows WHERE a = ?) + (SELECT COUNT(*) FROM follow_reqs WHERE a = ?) AS c", uid, uid).c >= 500) return json({ error: "too many follows" }, 400);
+      if (!has && !u.pub) {
+        // 不公開帳號：先送出追蹤要求，等對方同意
+        const fresh = !one(sql, "SELECT 1 AS x FROM follow_reqs WHERE a = ? AND b = ?", uid, u.uid);
+        sql.exec("INSERT OR IGNORE INTO follow_reqs (a, b, at) VALUES (?, ?, ?)", uid, u.uid, Date.now());
+        requested = true;
+        if (fresh) {
+          notify(sql, to, "request", uid);
+          await pushTo(hub, sql, to, "follow", uid, (who) => ({ title: `${who}想追蹤你`, body: "點這裡決定要不要同意。", tag: "request:" + uid.slice(0, 12) }), true);
+        }
+      } else if (!has) {
+        sql.exec("INSERT OR IGNORE INTO follows (a, b, at) VALUES (?, ?, ?)", uid, u.uid, Date.now());
+        notify(sql, to, "follow", uid);
         const back = !!one(sql, "SELECT 1 AS x FROM follows WHERE a = ? AND b = ?", u.uid, uid);
-        await pushTo(hub, sql, u.uid.slice(0, 40), "follow", uid, (who) => ({ title: back ? `${who}也回追你了` : `${who}開始追蹤你`, body: back ? "你們現在互相追蹤。" : "點這裡看看對方的片單。", tag: "follow:" + uid.slice(0, 12) }));
+        await pushTo(hub, sql, to, "follow", uid, (who) => ({ title: back ? `${who}也回追你了` : `${who}開始追蹤你`, body: back ? "你們現在互相追蹤。" : "點這裡看看對方的片單。", tag: "follow:" + uid.slice(0, 12) }), true);
       }
     } else {
+      // 取消追蹤，或收回還沒被同意的追蹤要求
       sql.exec("DELETE FROM follows WHERE a = ? AND b = ?", uid, u.uid);
-      notify(sql, u.uid.slice(0, 40), "unfollow", uid);
+      sql.exec("DELETE FROM follow_reqs WHERE a = ? AND b = ?", uid, u.uid);
+      notify(sql, to, "unfollow", uid);
     }
-    return json({ ok: true, following: !!b.on, followers: counts(sql, u.uid, true).followers });
+    return json({ ok: true, following: !!b.on && !requested, requested, followers: counts(sql, u.uid, true).followers });
+  }
+  if (op === "follow-answer") {
+    // 同意或拒絕別人的追蹤要求。同意：對方開始追蹤我，並通知他「接受了你的追蹤要求」；拒絕：要求刪掉，不通知對方
+    const u = one(sql, "SELECT uid FROM users WHERE name = ?", String(b.name || ""));
+    if (!u || !one(sql, "SELECT 1 AS x FROM follow_reqs WHERE a = ? AND b = ?", u.uid, uid)) return json({ error: "not found" }, 404);
+    acceptReq(sql, u.uid, uid, !!b.ok);
+    if (b.ok) await pushTo(hub, sql, u.uid.slice(0, 40), "follow", uid, (who) => ({ title: `${who}接受了你的追蹤要求`, body: "現在可以看對方的片單和短評了。", tag: "accepted:" + uid.slice(0, 12) }), true);
+    return json({ ok: true, followers: counts(sql, uid, false).followers });
   }
   if (op === "wipe") {
     // 一次處理 20 部：評分伺服器那邊的票和短評拿掉，這邊的片單刪掉；全部清完才刪個人檔案和追蹤關係
@@ -448,6 +491,7 @@ export async function social(hub, path, b) {
     const left = one(sql, "SELECT COUNT(*) AS c FROM entries WHERE uid = ?", uid).c;
     if (!left) {
       sql.exec("DELETE FROM follows WHERE a = ? OR b = ?", uid, uid);
+      sql.exec("DELETE FROM follow_reqs WHERE a = ? OR b = ?", uid, uid);
       sql.exec('DELETE FROM activity WHERE "to" = ? OR actor = ?', uid.slice(0, 40), uid);
       sql.exec('DELETE FROM activity_seen WHERE "to" = ?', uid.slice(0, 40));
       sql.exec("DELETE FROM user_reports WHERE uid = ? OR by = ?", uid, uid);

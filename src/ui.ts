@@ -323,6 +323,14 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .pf-handle input{flex:1;min-width:0;height:100%;border:0;background:none;color:var(--fg);font-size:16px;outline:none}
 .at{display:inline;padding:0;font:inherit;color:var(--accent);font-weight:600}
 .ac-mark.mention{background:#8e5cf7}
+.ac-mark.request{background:#ff9f0a}
+.ac-mark.accepted{background:#30b158}
+.ac-btn+.ac-btn{margin-left:-2px}
+.us-lock{margin-left:5px;font-style:normal;font-size:11px}
+.pf-lock{padding:26px 22px;text-align:center}
+.pf-lock div{font-size:34px;line-height:1}
+.pf-lock b{display:block;margin-top:10px;font-size:17px}
+.pf-lock p{margin:8px 0 0;font-size:14px;line-height:1.5;color:var(--fg2)}
 .pf-btn:active{opacity:.7}
 .us-main{display:flex;align-items:center;gap:10px;flex:1;min-width:0;text-align:left;color:var(--fg);padding:4px 0}
 .us-name{font-size:16px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

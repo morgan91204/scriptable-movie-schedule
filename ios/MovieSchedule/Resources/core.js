@@ -903,7 +903,7 @@ function parseTwMovieDay(doc) {
     { id: "week", label: "每週新片", note: "每週四早上一則：這一週上映哪些片", group: "all" },
     { id: "flist", label: "影展片單公布時", note: "有影展公布了片單", group: "all" },
     { id: "reply", label: "有人回覆或提到我時", note: "回覆你的短評，或在短評裡 @你；推和噓不會跳通知，只列在「通知」頁籤裡", group: "social" },
-    { id: "follow", label: "有人追蹤我時", note: "包含對方回追你", group: "social" }
+    { id: "follow", label: "有人追蹤我時", note: "包含對方回追你、有人送出追蹤要求、對方接受了你的追蹤要求", group: "social" }
   ];
   var NOTIFY_PRE_STEPS = [1, 3, 7];
   var notifyPrefs = (s) => ({ open: true, rel: true, end: true, fest: true, favc: true, fmt: false, pre: true, rate: false, week: false, flist: false, cweek: false, reply: true, follow: true, ...s.notify || {} });
@@ -4460,7 +4460,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   var extra = { boxOffice, filmList, soonList, nowShowing, nowShowingMulti, movieBoard: movieBoard2, festivalBoard, festivalFilm, nearby, patchSettings, fillMovie, formatList };
   var BRIDGE_LEVEL = 2;
   globalThis.MS = {
-    version: "2026.11.25-0055",
+    version: "2026.11.25-0103",
     level: BRIDGE_LEVEL,
     init(saved) {
       cache = saved || {};

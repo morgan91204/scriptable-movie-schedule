@@ -99,7 +99,7 @@ export const NOTIFY_KINDS: { id: NotifyKind; label: string; note: string; group:
   { id: "week", label: "每週新片", note: "每週四早上一則：這一週上映哪些片", group: "all" },
   { id: "flist", label: "影展片單公布時", note: "有影展公布了片單", group: "all" },
   { id: "reply", label: "有人回覆或提到我時", note: "回覆你的短評，或在短評裡 @你；推和噓不會跳通知，只列在「通知」頁籤裡", group: "social" },
-  { id: "follow", label: "有人追蹤我時", note: "包含對方回追你", group: "social" },
+  { id: "follow", label: "有人追蹤我時", note: "包含對方回追你、有人送出追蹤要求、對方接受了你的追蹤要求", group: "social" },
 ];
 /** 「上映前提醒」可以選幾天前 */
 export const NOTIFY_PRE_STEPS = [1, 3, 7];
@@ -3644,7 +3644,7 @@ export const WATCH_HOW: { id: string; label: string }[] = [{ id: "cinema", label
 export const howLabel = (how?: string[]): string => WATCH_HOW.filter((h) => (how || []).indexOf(h.id) >= 0).map((h) => h.label).join("、");
 export interface DiaryEntry { k: string; title: string; s: number; x: string; sp: number; seen: string; at: number; priv?: number; how?: string[]; by?: { name: string; color: string; emoji?: string } }
 /** 通知頁的一列：up 有人推我的短評／down 有人噓／reply 有人回覆我／follow 有人追蹤我。who = 是誰（最多列兩個有公開個人頁的人），n = 總共幾個人 */
-export interface Activity { kind: "up" | "down" | "reply" | "mention" | "follow"; at: number; n: number; who: { name: string; color: string; emoji?: string }[]; k?: string; title?: string; x?: string; px?: string; back?: number; returned?: number; fresh?: number }
+export interface Activity { kind: "up" | "down" | "reply" | "mention" | "follow" | "request" | "accepted"; at: number; n: number; who: { name: string; color: string; emoji?: string }[]; k?: string; title?: string; x?: string; px?: string; back?: number; returned?: number; fresh?: number }
 /** 通知上的時間：剛剛、幾分鐘、幾小時、幾天，再久就寫日期 */
 export function agoLabel(at: number): string {
   const m = Math.floor((Date.now() - at) / 60000);
