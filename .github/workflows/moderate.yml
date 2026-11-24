@@ -1,0 +1,66 @@
+# 短評管理（只能手動執行）：列出被檢舉的短評、隱藏／還原／刪除，或從備份匯回。
+# 平常不用管：被 2 人檢舉劇透的會自動摺疊、被 3 人檢舉的會自動隱藏。這裡是讓站長複查（誤檢舉的還原、真的不當的刪除）。
+# 管理金鑰：每次執行臨時產生一把、設到評分伺服器上，做完再換成另一把沒人知道的——金鑰不存在任何地方，
+# 能管理的只有能執行這個排程的人（程式庫的擁有者）。
+# 結果寫在這次執行的摘要頁。注意：這個程式庫是公開的，摘要頁別人也看得到（裡面只有短評內容，沒有任何人的身分）。
+name: 短評管理
+on:
+  workflow_dispatch:
+    inputs:
+      op:
+        description: 動作：flagged 列出被檢舉的／hide 隱藏／restore 還原／delete 刪除／import 從備份匯回
+        type: choice
+        default: flagged
+        options: [flagged, hide, restore, delete, import]
+      movie:
+        description: 片名鍵（flagged 列出來的第一欄；import 時留空 = 全部的片）
+        required: false
+      id:
+        description: 短評編號（hide／restore／delete 要填）
+        required: false
+      backup:
+        description: import 用哪一份備份：留空 = data 分支目前的 notes.json；或填標籤，例如 backup/monthly-2026-11-data
+        required: false
+permissions:
+  contents: read
+concurrency:
+  group: moderate
+  cancel-in-progress: false
+jobs:
+  moderate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: 817e94b26f15cb4cedfde46021b6f0fe
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: 產生這一次用的管理金鑰
+        working-directory: worker
+        run: |
+          KEY=$(openssl rand -hex 32)
+          echo "::add-mask::$KEY"
+          echo "ADMIN_KEY=$KEY" >> "$GITHUB_ENV"
+          printf '%s' "$KEY" | npx wrangler@4 secret put ADMIN_KEY > /dev/null
+      - name: 取備份檔（只有 import 需要）
+        if: inputs.op == 'import'
+        env:
+          BACKUP: ${{ inputs.backup }}
+        run: |
+          REF="${BACKUP:-data}"
+          case "$REF" in *[!A-Za-z0-9/_.-]*) echo "備份名稱不對"; exit 1;; esac
+          if [ "$REF" = data ]; then git fetch -q origin data; else git fetch -q origin "refs/tags/$REF"; fi
+          git show FETCH_HEAD:notes.json > "$RUNNER_TEMP/notes.json"
+      - name: 執行
+        env:
+          OP: ${{ inputs.op }}
+          MOVIE: ${{ inputs.movie }}
+          NOTE_ID: ${{ inputs.id }}
+        run: node tools/moderate.mjs "$OP" "$MOVIE" "$NOTE_ID" "$RUNNER_TEMP/notes.json"
+      - name: 把金鑰換掉（不管上面成功或失敗都做）
+        if: always()
+        working-directory: worker
+        run: openssl rand -hex 32 | tr -d '\n' | npx wrangler@4 secret put ADMIN_KEY > /dev/null

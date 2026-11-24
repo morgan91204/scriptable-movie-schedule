@@ -12,9 +12,9 @@ import {
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
   loadSettings, saveSettings, settingsStored, setSettingsSavedHook, syncPick, syncApply, syncMerge, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, communityKey, globalSearch, issuerRecent, favSnapGet, favSnapSet, boxIsRerun, boxHasLaterRun, boxRunRows, boxRunsName, loadIntro, rerunDataReady, SITE_URL, TW,
   FORMATS, formatsOf, filterVersions, filterVersionsAny, movieRows, movieDays, nearest, kmLabel, WINDOWS, findShowtimes, findShowtimesMulti, multiLabel, multiDetail, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText,
-  hallOf, tmdbTest, movieExtras, moviePoster, movieRuntime, posterSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxCountries, boxByCountry, boxInfo, boxInfoRows, boxCountryText, BOX_COUNTRY_NOTE, boxCountryTag, boxCountriesPicked, loadMovieBoard, loadSoonBoard, notifyPrefs, notifyPayload, notifyEndScope, notifyEndPick, notifyQuiet, NOTIFY_PRE_STEPS, NOTIFY_KINDS, boxStatus, STATUS_LABEL, boxInfoBy, isFavMovie, toggleFavMovie, favMovieRows, favMovieBox, soonGroups, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityCached, communityVote, communityTags, reviewTagsToggle, REVIEW_TAGS, REVIEW_TAGS_MAX, reviewTagLabel, topReviewTags, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalsReady, festivalNote, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, festivalDefaultDate, festivalStateLabel, festivalState, festivalFooter, linkMovies, nowGroupLine, nowFilter, festivalPick, movieAbout, festivalSearch, festivalSearchLines, festivalTrailer, festivalYears, festivalsAny, festivalGroups, festivalChipNote, festivalStatusLine, movieRatings, ratingTier, tomatoTier, popcornTier, popcornCount,
+  hallOf, tmdbTest, movieExtras, moviePoster, movieRuntime, posterSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxCountries, boxByCountry, boxInfo, boxInfoRows, boxCountryText, BOX_COUNTRY_NOTE, boxCountryTag, boxCountriesPicked, loadMovieBoard, loadSoonBoard, notifyPrefs, notifyPayload, notifyEndScope, notifyEndPick, notifyQuiet, NOTIFY_PRE_STEPS, NOTIFY_KINDS, boxStatus, STATUS_LABEL, boxInfoBy, isFavMovie, toggleFavMovie, favMovieRows, favMovieBox, soonGroups, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityCached, communityVote, communityTags, loadNotes, notesCached, saveNote, reportNote, noteLooksSpoiler, noteDate, NOTE_MAX, NOTE_PLACEHOLDER, NOTE_RULES, REPORT_REASONS, reviewTagsToggle, REVIEW_TAGS, REVIEW_TAGS_MAX, reviewTagLabel, topReviewTags, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalsReady, festivalNote, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, festivalDefaultDate, festivalStateLabel, festivalState, festivalFooter, linkMovies, nowGroupLine, nowFilter, festivalPick, movieAbout, festivalSearch, festivalSearchLines, festivalTrailer, festivalYears, festivalsAny, festivalGroups, festivalChipNote, festivalStatusLine, movieRatings, ratingTier, tomatoTier, popcornTier, popcornCount,
 } from "./core";
-import type { MovieExtras, Ratings, Community, BoxOfficeItem, BoxSort, MovieEntry, SoonEntry, UpcomingFilm, FavMovie, FavRow, NotifyPrefs, NotifyKind, SyncData, GlobalHits, Festival, FestivalFilm, FestivalSession } from "./core";
+import type { ReviewNote, MovieExtras, Ratings, Community, BoxOfficeItem, BoxSort, MovieEntry, SoonEntry, UpcomingFilm, FavMovie, FavRow, NotifyPrefs, NotifyKind, SyncData, GlobalHits, Festival, FestivalFilm, FestivalSession } from "./core";
 import { setTabBar, setBackGuard, esc } from "./jsx";
 import { CHANGELOG, CHANGELOG_LATEST } from "./changelog";
 import type { TwMovie, TwMovieCinema, Format, LatLng, Hit } from "./core";
@@ -1132,6 +1132,107 @@ class App {
     return { x: x ?? null, r: r ?? null, p: p || "", px, loading, c: c === undefined ? communityCached(title) || undefined : c };
   }
 
+  noteDraft: string | null = null; // 短評頁輸入框裡還沒送出的字（null = 用已經送出的那一則）
+  noteSpoil: boolean | null = null; // 「可能有雷」有沒有勾（null = 跟已經送出的那一則一樣）
+  noteAsk = ""; // 偵測到可能有雷、正在問要不要標記的那句話
+  noteShown: number[] = []; // 已經點開的「可能有雷」短評
+  noteReset() { this.noteDraft = null; this.noteSpoil = null; this.noteAsk = ""; this.noteShown = []; }
+  /** 短評頁：上面寫（或改）自己的一句話，下面是大家的。另開一頁，不擠在電影頁。
+   *  防雷：輸入框提醒不提劇情、可以自己標「可能有雷」、偵測到劇透字眼送出前問一次；有雷的預設摺疊，點了才顯示。
+   *  每則可以檢舉（劇透／不當內容／廣告），被多人檢舉的由伺服器自動摺疊或隱藏 */
+  async notesView(title: string): Promise<string> {
+    let list = notesCached(title);
+    let failed = "";
+    try { list = await loadNotes(title); } catch (e) { if (!list) failed = String((e as Error)?.message || e); }
+    const c = communityCached(title) || (await communityStats(title).catch(() => null));
+    const voted = c ? c.mine : 0;
+    const notes = list ? list.notes : [];
+    const my = notes.find((n) => n.mine) || null;
+    const draft = this.noteDraft === null ? (my ? my.x : "") : this.noteDraft;
+    const spoil = this.noteSpoil === null ? !!(my && my.sp) : this.noteSpoil;
+    /** 每個按鈕都會帶著輸入框目前的字：先記下來，畫面重畫才不會把打到一半的字清掉 */
+    const keep = (v?: Record<string, string>) => { if (v && typeof v.x === "string") this.noteDraft = v.x; };
+    const send = async (text: string, sp: boolean) => {
+      try {
+        await saveNote(title, text, sp);
+        this.noteReset();
+        await this.ui.toast(text ? "短評已送出" : "已刪除你的短評");
+      } catch (e) {
+        await this.ui.toast(String((e as Error)?.message || e));
+      }
+    };
+    const submit = async (v?: Record<string, string>) => {
+      keep(v);
+      const text = String(this.noteDraft === null ? draft : this.noteDraft).replace(/\s+/g, " ").trim();
+      if (!text) { await this.ui.toast("先寫一句再送出"); return; }
+      if (Array.from(text).length > NOTE_MAX) { await this.ui.toast(`短評最多 ${NOTE_MAX} 個字`); return; }
+      if (!spoil && noteLooksSpoiler(text) && this.noteAsk !== text) { this.noteAsk = text; return; } // 先問一次要不要標記
+      await send(text, spoil);
+    };
+    const others = notes.filter((n) => !n.mine);
+    const row = (n: ReviewNote) => {
+      const open = !n.sp || this.noteShown.indexOf(n.id) >= 0;
+      const reported = !!list && list.reported.indexOf(n.id) >= 0;
+      return (
+        <div class="nt">
+          <div class="nt-head">
+            {n.s ? <span class={"nt-score " + ratingTier("imdb", n.s)}>{n.s} 分</span> : null}
+            {n.sp ? <span class="nt-sp">可能有雷</span> : null}
+            <span class="nt-date">{esc(noteDate(n.at))}</span>
+            {n.mine ? null : reported ? <span class="nt-rep done">已檢舉</span> : <button class="nt-rep" aria-label="檢舉這則短評" onTap={(v: Record<string, string>) => { keep(v); this.go(() => this.reportView(title, n)); }}>檢舉</button>}
+          </div>
+          {open ? <div class="nt-text">{esc(n.x)}</div> : <button class="nt-cover" onTap={(v: Record<string, string>) => { keep(v); this.noteShown = [...this.noteShown, n.id]; }}>這則可能有雷，點一下顯示</button>}
+        </div>
+      );
+    };
+    return (
+      <Page title="短評" subtitle={`《${title}》`} onBack={() => this.back()}>
+        <Section title="我的短評" hint={NOTE_RULES}>
+          {!voted ? <Note text="先替這部片評分，就可以寫一句短評。" /> : (
+            <div class="nt-form">
+              {my && my.hidden ? <Note kind="warn" text="你的短評被多人檢舉，目前別人看不到。可以修改後重新送出。" /> : null}
+              <input class="field" name="x" maxlength={String(NOTE_MAX)} enterkeyhint="done" autocomplete="off" value={draft} placeholder={`${NOTE_PLACEHOLDER}（最多 ${NOTE_MAX} 字）`} />
+              <button class={"nt-check" + (spoil ? " on" : "")} aria-pressed={spoil ? "true" : "false"} onTap={(v: Record<string, string>) => { keep(v); this.noteSpoil = !spoil; this.noteAsk = ""; }}>
+                <i>{spoil ? "✓" : ""}</i><span>可能有雷</span><em>勾了以後預設摺疊，點了才會顯示</em>
+              </button>
+              {this.noteAsk ? (
+                <>
+                  <Note kind="warn" text="這句看起來可能有雷。要標記「可能有雷」再送出嗎？" />
+                  <Button label="標記後送出" onTap={async (v) => { keep(v); await send(this.noteAsk, true); }} />
+                  <Button label="沒有雷，直接送出" kind="secondary" onTap={async (v) => { keep(v); await send(this.noteAsk, false); }} />
+                </>
+              ) : (
+                <Button label={my ? "更新短評" : "送出短評"} onTap={submit} />
+              )}
+              {my ? <Button label="刪除我的短評" kind="danger" onTap={() => send("", false)} /> : null}
+            </div>
+          )}
+        </Section>
+        <Section title={`大家的短評（${others.length}）`} hint={others.length ? "看到劇透、不當內容或廣告可以點「檢舉」。" : ""}>
+          {failed ? <Note kind="warn" text={failed} /> : null}
+          {others.length ? <div class="nt-list">{others.map(row)}</div> : failed ? null : <Note text={my ? "目前只有你寫了短評。" : "還沒有人寫短評。"} />}
+        </Section>
+      </Page>
+    );
+  }
+  /** 檢舉一則短評：選原因就送出 */
+  reportView(title: string, n: ReviewNote): string {
+    return (
+      <Page title="檢舉短評" onBack={() => this.back()}>
+        <Section title="要檢舉的短評">
+          <div class="nt-list"><div class="nt"><div class="nt-text">{esc(n.x)}</div></div></div>
+        </Section>
+        <Section title="原因" hint="同一則被 2 個人檢舉劇透會自動摺疊，被 3 個人檢舉會自動隱藏。檢舉是匿名的。">
+          {REPORT_REASONS.map((r) => (
+            <Item title={r.label} subtitle={r.note} onTap={async () => {
+              try { await reportNote(title, n.id, r.id); await this.ui.toast("已送出檢舉，謝謝"); } catch (e) { await this.ui.toast(String((e as Error)?.message || e)); }
+              this.back();
+            }} />
+          ))}
+        </Section>
+      </Page>
+    );
+  }
   tagsOpenFor = ""; // 哪一部片的心得標籤選單是展開的
   /** 片刻評分卡片：平均、人數、分布，以及「你的評分」一排 1～10 的格子（點已選的那一格可以取消）。
    *  評過分以後多一列「心得標籤」：點開是固定的選項（不能打字，所以不會暴雷），最多選 5 個；大家選最多的幾個列在平均分數下面 */
@@ -1217,6 +1318,13 @@ class App {
                 </div>
               ) : null}
             </>
+          ) : null}
+          {c && (mine || c.notes) ? (
+            <button class="cm-tagbar" onTap={() => { this.noteReset(); this.go(() => this.notesView(title), "讀取短評…"); }}>
+              <span>短評</span>
+              <em>{c.notes ? `${c.notes} 則` : "還沒有人寫"}</em>
+              <i>{mine ? (c.notes ? "看全部／寫一句 ▸" : "寫一句 ▸") : "看全部 ▸"}</i>
+            </button>
           ) : null}
         </div>
       </Section>

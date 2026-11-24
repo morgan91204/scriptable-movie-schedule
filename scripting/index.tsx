@@ -14,10 +14,10 @@ import {
   Cinema, Movie, Settings, Version, TwMovie, TwMovieCinema, CITY_ORDER, TW,
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
   loadSettings, saveSettings, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, cinemaAddress,
-  FORMATS, formatsOf, filterVersions, filterVersionsAny, movieRows, movieDays, nearest, kmLabel, WINDOWS, findShowtimes, findShowtimesMulti, multiLabel, multiDetail, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText, hallOf, tmdbTest, movieExtras, moviePoster, posterReady, posterTint, POSTER_TINTS, normImageUrl, movieRuntime, posterSrc, isLocalSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxCountries, boxByCountry, boxInfo, boxInfoRows, boxCountryText, BOX_COUNTRY_NOTE, boxCountryTag, boxCountriesPicked, movieBoard, loadBoxFor, loadCommunitySummary, loadYearRatings, loadUpcoming, soonBoard, isFavMovie, toggleFavMovie, favMovieRows, favMovieBox, boxStatus, STATUS_LABEL, boxInfoBy, soonGroups, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityVote, communityTags, reviewTagsToggle, REVIEW_TAGS, REVIEW_TAGS_MAX, reviewTagLabel, topReviewTags, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, SCRIPTING_IMPORT_URL, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, festivalDefaultDate, festivalStateLabel, festivalState, festivalFooter, linkMovies, nowGroupLine, nowFilter, festivalPick, movieAbout, festivalSearch, festivalSearchLines, festivalTrailer, festivalYears, festivalGroups, festivalChipNote, festivalStatusLine, movieRatings, ratingTier, tomatoTier, popcornTier, dropStaleCaches, rerunDataReady, boxRunRows, boxRunsName, loadIntro, globalSearch, boxIsRerun, boxHasLaterRun, settingsStored, SITE_URL,
+  FORMATS, formatsOf, filterVersions, filterVersionsAny, movieRows, movieDays, nearest, kmLabel, WINDOWS, findShowtimes, findShowtimesMulti, multiLabel, multiDetail, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText, hallOf, tmdbTest, movieExtras, moviePoster, posterReady, posterTint, POSTER_TINTS, normImageUrl, movieRuntime, posterSrc, isLocalSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxCountries, boxByCountry, boxInfo, boxInfoRows, boxCountryText, BOX_COUNTRY_NOTE, boxCountryTag, boxCountriesPicked, movieBoard, loadBoxFor, loadCommunitySummary, loadYearRatings, loadUpcoming, soonBoard, isFavMovie, toggleFavMovie, favMovieRows, favMovieBox, boxStatus, STATUS_LABEL, boxInfoBy, soonGroups, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityVote, communityTags, loadNotes, saveNote, reportNote, noteLooksSpoiler, noteDate, NOTE_MAX, NOTE_PLACEHOLDER, NOTE_RULES, REPORT_REASONS, reviewTagsToggle, REVIEW_TAGS, REVIEW_TAGS_MAX, reviewTagLabel, topReviewTags, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, SCRIPTING_IMPORT_URL, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, festivalDefaultDate, festivalStateLabel, festivalState, festivalFooter, linkMovies, nowGroupLine, nowFilter, festivalPick, movieAbout, festivalSearch, festivalSearchLines, festivalTrailer, festivalYears, festivalGroups, festivalChipNote, festivalStatusLine, movieRatings, ratingTier, tomatoTier, popcornTier, dropStaleCaches, rerunDataReady, boxRunRows, boxRunsName, loadIntro, globalSearch, boxIsRerun, boxHasLaterRun, settingsStored, SITE_URL,
 } from "./core"
 import { CHANGELOG, CHANGELOG_LATEST } from "./changelog"
-import type { GlobalHits } from "./core"
+import type { GlobalHits, ReviewNote, ReviewNotes } from "./core"
 import type { Ratings, FavMovie, FavRow, EntryHi, Format, LatLng, Hit, Community, BoxOfficeItem, BoxSort, BoxOffice, MovieEntry, SoonEntry, UpcomingFilm, Festival, FestivalFilm, FestivalSession } from "./core"
 
 declare const Safari: any
@@ -536,8 +536,95 @@ function CommunitySection({ title }: { title: string }) {
       </VStack>
     ) : null}
     {mine && tagsOpen ? <Text font={"caption2"} foregroundStyle={"secondaryLabel"}>{`已選 ${myTags.length}／${REVIEW_TAGS_MAX}。只有這些選項，不會有劇透。`}</Text> : null}
+    {c && (mine || c.notes) ? <NavigationLink destination={<NotesPage title={title} voted={!!mine} />}>
+      <HStack spacing={8}>
+        <Text fontWeight={"semibold"}>短評</Text>
+        <Text font={"footnote"} foregroundStyle={"secondaryLabel"}>{c.notes ? `${c.notes} 則` : mine ? "寫一句看完的感覺" : ""}</Text>
+      </HStack>
+    </NavigationLink> : null}
     {msg ? <Text font={"caption"} foregroundStyle={"systemRed"}>{msg}</Text> : null}
   </Section>
+}
+
+/** 短評頁：上面寫（或改）自己的一句話，下面是大家的。有雷的預設摺疊；每則可以檢舉 */
+function NotesPage({ title, voted }: { title: string; voted: boolean }) {
+  const load = useLoad(() => loadNotes(title), [title])
+  const [fresh, setFresh] = useState<ReviewNotes | null>(null)
+  const list = fresh || load.data
+  const notes = list ? list.notes : []
+  const my = notes.find((n) => n.mine) || null
+  const [draft, setDraft] = useState<string | null>(null)
+  const [spoilPick, setSpoilPick] = useState<boolean | null>(null)
+  const [shown, setShown] = useState<number[]>([])
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState("")
+  const text = draft === null ? (my ? my.x : "") : draft
+  const spoil = spoilPick === null ? !!(my && my.sp) : spoilPick
+  const send = async (x: string, sp: boolean) => {
+    setBusy(true)
+    setMsg("")
+    try {
+      setFresh(await saveNote(title, x, sp))
+      setDraft(null)
+      setSpoilPick(null)
+      try { HapticFeedback.selection() } catch (_) {}
+    } catch (e) {
+      setMsg(String((e as Error)?.message || e))
+    }
+    setBusy(false)
+  }
+  const submit = async () => {
+    const x = text.replace(/\s+/g, " ").trim()
+    if (!x) { setMsg("先寫一句再送出"); return }
+    if (Array.from(x).length > NOTE_MAX) { setMsg(`短評最多 ${NOTE_MAX} 個字（現在 ${Array.from(x).length} 個）`); return }
+    let sp = spoil
+    // 看起來可能有雷：送出前問一次要不要標記
+    if (!sp && noteLooksSpoiler(x)) sp = await Dialog.confirm({ title: "這句看起來可能有雷", message: "要標記「可能有雷」再送出嗎？標記後預設摺疊，點了才會顯示。", cancelLabel: "沒有雷，直接送出", confirmLabel: "標記後送出" })
+    await send(x, sp)
+  }
+  const report = async (n: ReviewNote) => {
+    const i = await Dialog.actionSheet({ title: "檢舉這則短評", message: "同一則被 2 個人檢舉劇透會自動摺疊，被 3 個人檢舉會自動隱藏。檢舉是匿名的。", actions: REPORT_REASONS.map((r) => ({ label: r.label })) })
+    if (i == null || i < 0 || !REPORT_REASONS[i]) return
+    try {
+      setFresh(await reportNote(title, n.id, REPORT_REASONS[i].id))
+    } catch (e) {
+      setMsg(String((e as Error)?.message || e))
+    }
+  }
+  const others = notes.filter((n) => !n.mine)
+  return <List navigationTitle={"短評"} navigationBarTitleDisplayMode={"inline"}>
+    <Section header={<Text>我的短評</Text>} footer={<Text>{NOTE_RULES}</Text>}>
+      {!voted ? <Text foregroundStyle={"secondaryLabel"}>先替這部片評分，就可以寫一句短評。</Text> : <Group>
+        {my && my.hidden ? <Text font={"footnote"} foregroundStyle={"systemOrange"}>你的短評被多人檢舉，目前別人看不到。可以修改後重新送出。</Text> : null}
+        <TextField title={"短評"} value={text} onChanged={setDraft} prompt={`${NOTE_PLACEHOLDER}（最多 ${NOTE_MAX} 字）`} />
+        <Toggle title={"可能有雷（預設摺疊，點了才會顯示）"} value={spoil} onChanged={setSpoilPick} />
+        <Button title={my ? "更新短評" : "送出短評"} action={submit} disabled={busy} />
+        {my ? <Button title={"刪除我的短評"} role={"destructive"} action={() => send("", false)} disabled={busy} /> : null}
+      </Group>}
+      {msg ? <Text font={"caption"} foregroundStyle={"systemRed"}>{msg}</Text> : null}
+    </Section>
+    <Section header={<Text>{`大家的短評（${others.length}）`}</Text>} footer={others.length ? <Text>看到劇透、不當內容或廣告可以點「檢舉」。</Text> : undefined}>
+      {!list && load.error ? <Text foregroundStyle={"secondaryLabel"}>短評暫時讀不到</Text> : null}
+      {!list && !load.error ? <ProgressView /> : null}
+      {list && !others.length ? <Text foregroundStyle={"secondaryLabel"}>{my ? "目前只有你寫了短評。" : "還沒有人寫短評。"}</Text> : null}
+      {others.map((n) => {
+        const open = !n.sp || shown.indexOf(n.id) >= 0
+        const reported = !!list && list.reported.indexOf(n.id) >= 0
+        return <VStack key={n.id} alignment={"leading"} spacing={6}>
+          <HStack spacing={8}>
+            {n.s ? <Text font={"caption"} fontWeight={"bold"} monospacedDigit foregroundStyle={TIER[ratingTier("imdb", n.s) as Tier].fg}>{`${n.s} 分`}</Text> : null}
+            {n.sp ? <Text font={"caption"} fontWeight={"semibold"} foregroundStyle={"systemOrange"}>可能有雷</Text> : null}
+            <Text font={"caption"} foregroundStyle={"secondaryLabel"}>{noteDate(n.at)}</Text>
+            <Spacer />
+            {reported ? <Text font={"caption"} foregroundStyle={"tertiaryLabel"}>已檢舉</Text>
+              : <Button action={() => report(n)} buttonStyle={"plain"}><Text font={"caption"} foregroundStyle={"secondaryLabel"}>檢舉</Text></Button>}
+          </HStack>
+          {open ? <Text>{n.x}</Text>
+            : <Button action={() => setShown([...shown, n.id])} buttonStyle={"plain"}><Text font={"subheadline"} foregroundStyle={"secondaryLabel"}>這則可能有雷，點一下顯示</Text></Button>}
+        </VStack>
+      })}
+    </Section>
+  </List>
 }
 
 /** 海報圖：快取有的同步拿到（切換頁面回來立刻有圖），沒有的自己下載縮圖。

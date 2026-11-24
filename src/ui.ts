@@ -217,6 +217,29 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .cm-tag.on{background:var(--accent);color:#fff;font-weight:600}
 .cm-tag:active{transform:scale(.94)}
 .cm-tagnote{margin-top:9px;font-size:11.5px;color:var(--fg2)}
+.nt-form{padding:4px 16px 14px}
+.nt-form .field{background:var(--chip)}
+.nt-form .btn{margin-top:10px}
+.nt-check{display:flex;align-items:center;gap:9px;width:100%;margin-top:10px;padding:4px 0;text-align:left;font-size:15px;color:var(--fg)}
+.nt-check i{flex:none;width:22px;height:22px;border-radius:6px;border:1.5px solid var(--fg2);font-style:normal;font-size:14px;font-weight:800;line-height:19px;text-align:center;color:#fff}
+.nt-check.on i{background:var(--accent);border-color:var(--accent)}
+.nt-check em{flex:1;min-width:0;font-style:normal;font-size:12px;color:var(--fg2)}
+.nt-list{padding:0 16px}
+.nt{padding:12px 0;border-top:1px solid var(--line)}
+.nt:first-child{border-top:0}
+.nt-head{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--fg2)}
+.nt-score{font-weight:700;font-variant-numeric:tabular-nums;padding:1px 7px;border-radius:6px;background:var(--chip);color:var(--fg)}
+.nt-score.good{background:rgba(48,209,88,.18);color:#1f9d45}
+.nt-score.mid{background:rgba(255,159,10,.2);color:#c77700}
+.nt-score.bad{background:rgba(255,69,58,.18);color:#d63a31}
+@media(prefers-color-scheme:dark){.nt-score.good{color:#30d158}.nt-score.mid{color:#ffb340}.nt-score.bad{color:#ff6961}}
+.nt-sp{padding:1px 7px;border-radius:6px;background:rgba(255,159,10,.2);color:#c77700;font-weight:600}
+@media(prefers-color-scheme:dark){.nt-sp{color:#ffb340}}
+.nt-date{flex:1}
+.nt-rep{flex:none;font-size:12px;color:var(--fg2);padding:4px 0 4px 10px}
+.nt-rep.done{opacity:.6}
+.nt-text{margin-top:6px;font-size:15.5px;line-height:1.5;overflow-wrap:anywhere}
+.nt-cover{display:block;width:100%;margin-top:6px;padding:9px 12px;border-radius:10px;background:var(--chip);color:var(--fg2);font-size:14px;text-align:left}
 .cm-star{font-size:28px;line-height:1;padding:2px 3px;color:var(--line)}
 @media(prefers-color-scheme:dark){.cm-star{color:#48484a}}
 .cm-star.on{color:#ff9f0a}

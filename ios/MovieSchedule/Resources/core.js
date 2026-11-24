@@ -30,6 +30,9 @@
     FORMATS: () => FORMATS,
     MAPS_LABEL: () => MAPS_LABEL,
     META_URL: () => META_URL,
+    NOTE_MAX: () => NOTE_MAX,
+    NOTE_PLACEHOLDER: () => NOTE_PLACEHOLDER,
+    NOTE_RULES: () => NOTE_RULES,
     NOTIFY_KINDS: () => NOTIFY_KINDS,
     NOTIFY_PRE_STEPS: () => NOTIFY_PRE_STEPS,
     OFFICIAL_URL: () => OFFICIAL_URL,
@@ -37,6 +40,7 @@
     POSTER_TINTS: () => POSTER_TINTS,
     PRIVACY_URL: () => PRIVACY_URL,
     RATE_SOURCES: () => RATE_SOURCES,
+    REPORT_REASONS: () => REPORT_REASONS,
     REVIEW_TAGS: () => REVIEW_TAGS,
     REVIEW_TAGS_MAX: () => REVIEW_TAGS_MAX,
     SCRIPTING_IMPORT_URL: () => SCRIPTING_IMPORT_URL,
@@ -162,6 +166,7 @@
     loadIntro: () => loadIntro,
     loadMovieBoard: () => loadMovieBoard,
     loadMovies: () => loadMovies,
+    loadNotes: () => loadNotes,
     loadSettings: () => loadSettings,
     loadSoonBoard: () => loadSoonBoard,
     loadUpcoming: () => loadUpcoming,
@@ -189,6 +194,9 @@
     nearest: () => nearest,
     normImageUrl: () => normImageUrl,
     normTitle: () => normTitle,
+    noteDate: () => noteDate,
+    noteLooksSpoiler: () => noteLooksSpoiler,
+    notesCached: () => notesCached,
     notifyEndPick: () => notifyEndPick,
     notifyEndScope: () => notifyEndScope,
     notifyFavs: () => notifyFavs,
@@ -211,10 +219,12 @@
     ratingsOfIdent: () => ratingsOfIdent,
     releaseLabel: () => releaseLabel,
     releaseOf: () => releaseOf,
+    reportNote: () => reportNote,
     rerunByName: () => rerunByName,
     rerunDataReady: () => rerunDataReady,
     reviewTagLabel: () => reviewTagLabel,
     reviewTagsToggle: () => reviewTagsToggle,
+    saveNote: () => saveNote,
     saveSettings: () => saveSettings,
     searchTitles: () => searchTitles,
     setMetaEnabled: () => setMetaEnabled,
@@ -3685,6 +3695,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   }
   var COMMUNITY_SUMMARY_URL = "https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/data/community10.json";
   var summaryMem = null;
+  var summaryNotes = {};
   var summaryTags = {};
   function loadSummary() {
     if (summaryMem && Date.now() - summaryMem.at < 3e5) return summaryMem.job;
@@ -3695,6 +3706,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
         const data = JSON.parse(r.body);
         const m = data?.movies;
         if (m && typeof m === "object" && data.tags && typeof data.tags === "object") summaryTags = data.tags;
+        if (m && typeof m === "object" && data.notes && typeof data.notes === "object") summaryNotes = data.notes;
         return m && typeof m === "object" ? m : null;
       } catch (_) {
         return null;
@@ -3715,7 +3727,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     const all = readMyVotes();
     for (const [key, v] of Object.entries(all)) if (!v.s && Date.now() - v.at > 60 * 864e5) delete all[key];
     const t = c.myTags && c.myTags.length ? c.myTags : void 0;
-    all[k] = fresh ? { s: c.mine, at: Date.now(), dist: c.dist, dat: Date.now(), t, tags: c.tags } : { s: c.mine, at: Date.now(), t };
+    all[k] = fresh ? { s: c.mine, at: Date.now(), dist: c.dist, dat: Date.now(), t, tags: c.tags, nn: c.notes, nat: Date.now() } : { s: c.mine, at: Date.now(), t };
     cacheSet("my-votes10b.json", JSON.stringify(all));
   }
   var fromDist = (dist, mine) => {
@@ -3727,13 +3739,13 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   async function communityStats(title) {
     const k = communityKey(title);
     const hit = communityMem[k];
-    if (hit && Date.now() - hit.at < 5e3) return { n: hit.n, avg: hit.avg, dist: hit.dist, mine: hit.mine, tags: hit.tags, myTags: hit.myTags };
+    if (hit && Date.now() - hit.at < 5e3) return { n: hit.n, avg: hit.avg, dist: hit.dist, mine: hit.mine, tags: hit.tags, myTags: hit.myTags, notes: hit.notes };
     const mine = readMyVotes()[k];
     if (mine && Date.now() - mine.at < 30 * 864e5) {
       const summary = await loadSummary();
       if (summary) {
         const recent = !!(mine.dist && mine.dat && Date.now() - mine.dat < 45 * 6e4);
-        const c2 = { ...fromDist(recent ? mine.dist : summary[k] || [], mine.s), tags: recent && mine.tags || summaryTags[k] || {}, myTags: mine.t || [] };
+        const c2 = { ...fromDist(recent ? mine.dist : summary[k] || [], mine.s), tags: recent && mine.tags || summaryTags[k] || {}, myTags: mine.t || [], notes: typeof mine.nn === "number" && mine.nat && Date.now() - mine.nat < 45 * 6e4 ? mine.nn : summaryNotes[k] || 0 };
         communityMem[k] = { ...c2, at: Date.now() };
         return c2;
       }
@@ -3774,6 +3786,58 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     saveMyVote(k, c, true);
     return c;
   }
+  var NOTE_MAX = 60;
+  var NOTE_PLACEHOLDER = "不提劇情，說說看完的感覺";
+  var NOTE_RULES = "請不要劇透、人身攻擊或貼廣告、連結。被多人檢舉的短評會自動摺疊或隱藏。";
+  var REPORT_REASONS = [
+    { id: "spoiler", label: "有劇透", note: "講到結局、反轉、誰死了這類看了會破哏的內容" },
+    { id: "abuse", label: "不當內容", note: "人身攻擊、歧視、色情或其他讓人不舒服的內容" },
+    { id: "spam", label: "廣告或無關內容", note: "廣告、洗版，或跟這部片無關" }
+  ];
+  var SPOILER_RE = /結局|兇手|凶手|真相|死了|死掉|沒死|復活|反轉|爆雷|劇透|幕後黑手|最後.{0,8}(死|活|在一起|分手|贏|輸|是|變成|發現)|原來.{0,8}(是|就是)|其實.{0,8}(是|就是)|彩蛋.{0,6}(是|出現|登場)/;
+  var noteLooksSpoiler = (text) => SPOILER_RE.test(String(text || ""));
+  function noteDate(at) {
+    const day = (t) => new Date(t + 8 * 36e5).toISOString().slice(0, 10);
+    const d = day(at), today = todayTPE();
+    const diff = Math.round((Date.parse(today) - Date.parse(d)) / 864e5);
+    if (diff <= 0) return "今天";
+    if (diff === 1) return "昨天";
+    if (diff < 7) return `${diff} 天前`;
+    return d.slice(0, 4) === today.slice(0, 4) ? `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}` : d.replace(/-/g, "/");
+  }
+  var notesMem = {};
+  function keepNotes(k, data) {
+    notesMem[k] = { at: Date.now(), data };
+    const n = data.notes.filter((x) => !x.hidden).length;
+    if (communityMem[k]) communityMem[k] = { ...communityMem[k], notes: n };
+    const all = readMyVotes();
+    if (all[k]) {
+      all[k].nn = n;
+      all[k].nat = Date.now();
+      cacheSet("my-votes10b.json", JSON.stringify(all));
+    }
+    return data;
+  }
+  var notesCached = (title) => notesMem[communityKey(title)]?.data || null;
+  async function loadNotes(title) {
+    const k = communityKey(title);
+    const hit = notesMem[k];
+    if (hit && Date.now() - hit.at < 6e4) return hit.data;
+    const r = await platform().fetchText(`${COMMUNITY_API}/v2/notes?m=${encodeURIComponent(k)}&d=${encodeURIComponent(deviceId())}`, { accept: "application/json" });
+    if (r.status !== 200) throw new Error("短評暫時讀不到");
+    return keepNotes(k, JSON.parse(r.body));
+  }
+  async function notePost(path, title, body, fail) {
+    const k = communityKey(title);
+    const r = await platform().fetchText(`${COMMUNITY_API}/v2/${path}`, { accept: "application/json", "content-type": "application/json" }, { method: "POST", body: JSON.stringify({ m: k, d: deviceId(), ...body }) });
+    if (r.status === 429) throw new Error("操作太頻繁，請稍後再試");
+    if (r.status === 409) throw new Error("要先評分才能寫短評");
+    if (r.status === 422) throw new Error(/too long/.test(r.body) ? `短評最多 ${NOTE_MAX} 個字` : "短評不能放連結或聯絡方式");
+    if (r.status !== 200) throw new Error(fail);
+    return keepNotes(k, JSON.parse(r.body));
+  }
+  var saveNote = (title, text, spoiler) => notePost("note", title, { x: String(text || "").trim(), sp: spoiler ? 1 : 0 }, "短評沒有送出，請稍後再試");
+  var reportNote = (title, id, why) => notePost("report", title, { id, why }, "檢舉沒有送出，請稍後再試");
   var BOXOFFICE_URL = "https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/main/dist/boxoffice.json";
   var boxMem = null;
   var boxData = null;
@@ -4091,7 +4155,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   var extra = { boxOffice, filmList, soonList, nowShowing, nowShowingMulti, movieBoard: movieBoard2, festivalBoard, festivalFilm, nearby, patchSettings, fillMovie, formatList };
   var BRIDGE_LEVEL = 2;
   globalThis.MS = {
-    version: "2026.11.24-1653",
+    version: "2026.11.24-1703",
     level: BRIDGE_LEVEL,
     init(saved) {
       cache = saved || {};

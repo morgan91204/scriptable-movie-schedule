@@ -3435,6 +3435,7 @@ export interface Community {
   mine: number; // 這支手機給的分數（0 = 還沒評）
   tags?: Record<string, number>; // 心得標籤：代號 → 幾人選
   myTags?: string[]; // 這支手機選的心得標籤
+  notes?: number; // 看得到的短評有幾則
 }
 /** 心得標籤：評完分可以點選的看片心得（最多 5 個）。只有固定的選項、不能打字，所以不會暴雷。
  *  代號送到伺服器統計，名稱只在 App 裡；要改名稱直接改這裡，代號不要動（動了舊的統計就對不上） */
@@ -3488,6 +3489,7 @@ export function communityCached(title: string): Community | null {
 export const COMMUNITY_SUMMARY_URL = "https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/data/community10.json"; // 10 分制的總表（舊版 App 讀的 5 星制是 community.json）
 type Summary = Record<string, number[]>;
 let summaryMem: { at: number; job: Promise<Summary | null> } | null = null;
+let summaryNotes: Record<string, number> = {}; // 同一份檔裡每部片的短評則數
 let summaryTags: Record<string, Record<string, number>> = {}; // 同一份檔裡的心得標籤統計（片名鍵 → 代號 → 人數）
 /** 靜態總表（記 5 分鐘）；還沒有這個檔或讀不到回傳 null，改用伺服器 */
 function loadSummary(): Promise<Summary | null> {
@@ -3499,6 +3501,7 @@ function loadSummary(): Promise<Summary | null> {
       const data = JSON.parse(r.body);
       const m = data?.movies;
       if (m && typeof m === "object" && data.tags && typeof data.tags === "object") summaryTags = data.tags;
+      if (m && typeof m === "object" && data.notes && typeof data.notes === "object") summaryNotes = data.notes;
       return m && typeof m === "object" ? (m as Summary) : null;
     } catch (_) {
       return null;
@@ -3510,7 +3513,7 @@ function loadSummary(): Promise<Summary | null> {
 /** 所有片的片刻評分總表（片名鍵 → 1～10 分各幾人）；讀不到回傳 null */
 export const loadCommunitySummary = (): Promise<Record<string, number[]> | null> => loadSummary();
 /** 這支手機的投票紀錄：s = 我給的分數，at = 上次跟伺服器確認的時間；dist／dat = 伺服器最近回的統計（剛投完票時比靜態檔新） */
-interface MyVote { s: number; at: number; dist?: number[]; dat?: number; t?: string[]; tags?: Record<string, number> }
+interface MyVote { s: number; at: number; dist?: number[]; dat?: number; t?: string[]; tags?: Record<string, number>; nn?: number; nat?: number }
 const readMyVotes = (): Record<string, MyVote> => {
   try {
     return JSON.parse(cacheGet("my-votes10b.json") || "{}") || {}; // 10 分制換了檔名：舊檔記的是 5 星制的分數，不能沿用（再換一次：改制時舊評分全部清掉了）
@@ -3522,7 +3525,7 @@ function saveMyVote(k: string, c: Community, fresh: boolean) {
   const all = readMyVotes();
   for (const [key, v] of Object.entries(all)) if (!v.s && Date.now() - v.at > 60 * 86400e3) delete all[key]; // 沒投票的舊紀錄清掉
   const t = c.myTags && c.myTags.length ? c.myTags : undefined;
-  all[k] = fresh ? { s: c.mine, at: Date.now(), dist: c.dist, dat: Date.now(), t, tags: c.tags } : { s: c.mine, at: Date.now(), t };
+  all[k] = fresh ? { s: c.mine, at: Date.now(), dist: c.dist, dat: Date.now(), t, tags: c.tags, nn: c.notes, nat: Date.now() } : { s: c.mine, at: Date.now(), t };
   cacheSet("my-votes10b.json", JSON.stringify(all));
 }
 const fromDist = (dist: number[], mine: number): Community => {
@@ -3535,14 +3538,14 @@ const fromDist = (dist: number[], mine: number): Community => {
 export async function communityStats(title: string): Promise<Community> {
   const k = communityKey(title);
   const hit = communityMem[k];
-  if (hit && Date.now() - hit.at < 5000) return { n: hit.n, avg: hit.avg, dist: hit.dist, mine: hit.mine, tags: hit.tags, myTags: hit.myTags };
+  if (hit && Date.now() - hit.at < 5000) return { n: hit.n, avg: hit.avg, dist: hit.dist, mine: hit.mine, tags: hit.tags, myTags: hit.myTags, notes: hit.notes };
   const mine = readMyVotes()[k];
   if (mine && Date.now() - mine.at < 30 * 86400e3) {
     const summary = await loadSummary();
     if (summary) {
       // 剛投完票的 45 分鐘內用伺服器當時回的統計（靜態檔還沒更新）
       const recent = !!(mine.dist && mine.dat && Date.now() - mine.dat < 45 * 60e3);
-      const c: Community = { ...fromDist(recent ? mine.dist! : summary[k] || [], mine.s), tags: (recent && mine.tags) || summaryTags[k] || {}, myTags: mine.t || [] };
+      const c: Community = { ...fromDist(recent ? mine.dist! : summary[k] || [], mine.s), tags: (recent && mine.tags) || summaryTags[k] || {}, myTags: mine.t || [], notes: typeof mine.nn === "number" && mine.nat && Date.now() - mine.nat < 45 * 60e3 ? mine.nn : summaryNotes[k] || 0 };
       communityMem[k] = { ...c, at: Date.now() };
       return c;
     }
@@ -3586,6 +3589,65 @@ export async function communityTags(title: string, tags: string[]): Promise<Comm
   saveMyVote(k, c, true);
   return c;
 }
+
+// ── 短評：評完分可以寫一句話（最多 60 字）。防雷：輸入框提醒不提劇情、作者可以自己標「可能有雷」（預設摺疊）、
+//    送出前偵測常見的劇透字眼提醒一次、其他人可以檢舉（2 人檢舉劇透自動摺疊，3 人檢舉自動隱藏）。
+export interface ReviewNote { id: number; x: string; sp: number; s: number; at: number; mine?: number; hidden?: number }
+export interface ReviewNotes { notes: ReviewNote[]; reported: number[] }
+export const NOTE_MAX = 60;
+export const NOTE_PLACEHOLDER = "不提劇情，說說看完的感覺";
+export const NOTE_RULES = "請不要劇透、人身攻擊或貼廣告、連結。被多人檢舉的短評會自動摺疊或隱藏。";
+export const REPORT_REASONS: { id: string; label: string; note: string }[] = [
+  { id: "spoiler", label: "有劇透", note: "講到結局、反轉、誰死了這類看了會破哏的內容" },
+  { id: "abuse", label: "不當內容", note: "人身攻擊、歧視、色情或其他讓人不舒服的內容" },
+  { id: "spam", label: "廣告或無關內容", note: "廣告、洗版，或跟這部片無關" },
+];
+const SPOILER_RE = /結局|兇手|凶手|真相|死了|死掉|沒死|復活|反轉|爆雷|劇透|幕後黑手|最後.{0,8}(死|活|在一起|分手|贏|輸|是|變成|發現)|原來.{0,8}(是|就是)|其實.{0,8}(是|就是)|彩蛋.{0,6}(是|出現|登場)/;
+/** 這句短評看起來像不像有雷（只是提醒用，不擋） */
+export const noteLooksSpoiler = (text: string): boolean => SPOILER_RE.test(String(text || ""));
+/** 短評的日期：今天、昨天、N 天前，再早就寫月／日（跨年加年份） */
+export function noteDate(at: number): string {
+  const day = (t: number) => new Date(t + 8 * 3600e3).toISOString().slice(0, 10);
+  const d = day(at), today = todayTPE();
+  const diff = Math.round((Date.parse(today) - Date.parse(d)) / 86400e3);
+  if (diff <= 0) return "今天";
+  if (diff === 1) return "昨天";
+  if (diff < 7) return `${diff} 天前`;
+  return d.slice(0, 4) === today.slice(0, 4) ? `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}` : d.replace(/-/g, "/");
+}
+const notesMem: Record<string, { at: number; data: ReviewNotes }> = {};
+function keepNotes(k: string, data: ReviewNotes): ReviewNotes {
+  notesMem[k] = { at: Date.now(), data };
+  const n = data.notes.filter((x) => !x.hidden).length;
+  if (communityMem[k]) communityMem[k] = { ...communityMem[k], notes: n };
+  const all = readMyVotes();
+  if (all[k]) { all[k].nn = n; all[k].nat = Date.now(); cacheSet("my-votes10b.json", JSON.stringify(all)); }
+  return data;
+}
+/** 已經讀過的短評（畫面重畫時用） */
+export const notesCached = (title: string): ReviewNotes | null => notesMem[communityKey(title)]?.data || null;
+/** 讀一部片的短評（一分鐘內讀過就直接用） */
+export async function loadNotes(title: string): Promise<ReviewNotes> {
+  const k = communityKey(title);
+  const hit = notesMem[k];
+  if (hit && Date.now() - hit.at < 60e3) return hit.data;
+  const r = await platform().fetchText(`${COMMUNITY_API}/v2/notes?m=${encodeURIComponent(k)}&d=${encodeURIComponent(deviceId())}`, { accept: "application/json" });
+  if (r.status !== 200) throw new Error("短評暫時讀不到");
+  return keepNotes(k, JSON.parse(r.body) as ReviewNotes);
+}
+async function notePost(path: string, title: string, body: Record<string, unknown>, fail: string): Promise<ReviewNotes> {
+  const k = communityKey(title);
+  const r = await platform().fetchText(`${COMMUNITY_API}/v2/${path}`, { accept: "application/json", "content-type": "application/json" }, { method: "POST", body: JSON.stringify({ m: k, d: deviceId(), ...body }) });
+  if (r.status === 429) throw new Error("操作太頻繁，請稍後再試");
+  if (r.status === 409) throw new Error("要先評分才能寫短評");
+  if (r.status === 422) throw new Error(/too long/.test(r.body) ? `短評最多 ${NOTE_MAX} 個字` : "短評不能放連結或聯絡方式");
+  if (r.status !== 200) throw new Error(fail);
+  return keepNotes(k, JSON.parse(r.body) as ReviewNotes);
+}
+/** 送出（或修改）自己的短評；text 空的 = 刪掉 */
+export const saveNote = (title: string, text: string, spoiler: boolean): Promise<ReviewNotes> => notePost("note", title, { x: String(text || "").trim(), sp: spoiler ? 1 : 0 }, "短評沒有送出，請稍後再試");
+/** 檢舉一則短評（why：REPORT_REASONS 的 id） */
+export const reportNote = (title: string, id: number, why: string): Promise<ReviewNotes> => notePost("report", title, { id, why }, "檢舉沒有送出，請稍後再試");
 
 // ───────────────────────── 全台票房排行 ─────────────────────────
 // 來源：國家電影及視聽文化中心「全國電影票房統計」開放資料（政府資料開放授權條款第 1 版）。

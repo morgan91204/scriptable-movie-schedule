@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.24-1653
+// @movie-schedule-app 電影行程 v2026.11.24-1703
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/parsers.gen.ts
@@ -3359,6 +3359,7 @@ function communityCached(title) {
 }
 var COMMUNITY_SUMMARY_URL = "https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/data/community10.json";
 var summaryMem = null;
+var summaryNotes = {};
 var summaryTags = {};
 function loadSummary() {
   if (summaryMem && Date.now() - summaryMem.at < 3e5) return summaryMem.job;
@@ -3369,6 +3370,7 @@ function loadSummary() {
       const data = JSON.parse(r.body);
       const m = data?.movies;
       if (m && typeof m === "object" && data.tags && typeof data.tags === "object") summaryTags = data.tags;
+      if (m && typeof m === "object" && data.notes && typeof data.notes === "object") summaryNotes = data.notes;
       return m && typeof m === "object" ? m : null;
     } catch (_) {
       return null;
@@ -3389,7 +3391,7 @@ function saveMyVote(k, c, fresh) {
   const all = readMyVotes();
   for (const [key, v] of Object.entries(all)) if (!v.s && Date.now() - v.at > 60 * 864e5) delete all[key];
   const t = c.myTags && c.myTags.length ? c.myTags : void 0;
-  all[k] = fresh ? { s: c.mine, at: Date.now(), dist: c.dist, dat: Date.now(), t, tags: c.tags } : { s: c.mine, at: Date.now(), t };
+  all[k] = fresh ? { s: c.mine, at: Date.now(), dist: c.dist, dat: Date.now(), t, tags: c.tags, nn: c.notes, nat: Date.now() } : { s: c.mine, at: Date.now(), t };
   cacheSet("my-votes10b.json", JSON.stringify(all));
 }
 var fromDist = (dist, mine) => {
@@ -3401,13 +3403,13 @@ var fromDist = (dist, mine) => {
 async function communityStats(title) {
   const k = communityKey(title);
   const hit = communityMem[k];
-  if (hit && Date.now() - hit.at < 5e3) return { n: hit.n, avg: hit.avg, dist: hit.dist, mine: hit.mine, tags: hit.tags, myTags: hit.myTags };
+  if (hit && Date.now() - hit.at < 5e3) return { n: hit.n, avg: hit.avg, dist: hit.dist, mine: hit.mine, tags: hit.tags, myTags: hit.myTags, notes: hit.notes };
   const mine = readMyVotes()[k];
   if (mine && Date.now() - mine.at < 30 * 864e5) {
     const summary = await loadSummary();
     if (summary) {
       const recent = !!(mine.dist && mine.dat && Date.now() - mine.dat < 45 * 6e4);
-      const c2 = { ...fromDist(recent ? mine.dist : summary[k] || [], mine.s), tags: recent && mine.tags || summaryTags[k] || {}, myTags: mine.t || [] };
+      const c2 = { ...fromDist(recent ? mine.dist : summary[k] || [], mine.s), tags: recent && mine.tags || summaryTags[k] || {}, myTags: mine.t || [], notes: typeof mine.nn === "number" && mine.nat && Date.now() - mine.nat < 45 * 6e4 ? mine.nn : summaryNotes[k] || 0 };
       communityMem[k] = { ...c2, at: Date.now() };
       return c2;
     }
@@ -3448,6 +3450,58 @@ async function communityTags(title, tags) {
   saveMyVote(k, c, true);
   return c;
 }
+var NOTE_MAX = 60;
+var NOTE_PLACEHOLDER = "不提劇情，說說看完的感覺";
+var NOTE_RULES = "請不要劇透、人身攻擊或貼廣告、連結。被多人檢舉的短評會自動摺疊或隱藏。";
+var REPORT_REASONS = [
+  { id: "spoiler", label: "有劇透", note: "講到結局、反轉、誰死了這類看了會破哏的內容" },
+  { id: "abuse", label: "不當內容", note: "人身攻擊、歧視、色情或其他讓人不舒服的內容" },
+  { id: "spam", label: "廣告或無關內容", note: "廣告、洗版，或跟這部片無關" }
+];
+var SPOILER_RE = /結局|兇手|凶手|真相|死了|死掉|沒死|復活|反轉|爆雷|劇透|幕後黑手|最後.{0,8}(死|活|在一起|分手|贏|輸|是|變成|發現)|原來.{0,8}(是|就是)|其實.{0,8}(是|就是)|彩蛋.{0,6}(是|出現|登場)/;
+var noteLooksSpoiler = (text) => SPOILER_RE.test(String(text || ""));
+function noteDate(at) {
+  const day = (t) => new Date(t + 8 * 36e5).toISOString().slice(0, 10);
+  const d = day(at), today = todayTPE();
+  const diff = Math.round((Date.parse(today) - Date.parse(d)) / 864e5);
+  if (diff <= 0) return "今天";
+  if (diff === 1) return "昨天";
+  if (diff < 7) return `${diff} 天前`;
+  return d.slice(0, 4) === today.slice(0, 4) ? `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}` : d.replace(/-/g, "/");
+}
+var notesMem = {};
+function keepNotes(k, data) {
+  notesMem[k] = { at: Date.now(), data };
+  const n = data.notes.filter((x) => !x.hidden).length;
+  if (communityMem[k]) communityMem[k] = { ...communityMem[k], notes: n };
+  const all = readMyVotes();
+  if (all[k]) {
+    all[k].nn = n;
+    all[k].nat = Date.now();
+    cacheSet("my-votes10b.json", JSON.stringify(all));
+  }
+  return data;
+}
+var notesCached = (title) => notesMem[communityKey(title)]?.data || null;
+async function loadNotes(title) {
+  const k = communityKey(title);
+  const hit = notesMem[k];
+  if (hit && Date.now() - hit.at < 6e4) return hit.data;
+  const r = await platform().fetchText(`${COMMUNITY_API}/v2/notes?m=${encodeURIComponent(k)}&d=${encodeURIComponent(deviceId())}`, { accept: "application/json" });
+  if (r.status !== 200) throw new Error("短評暫時讀不到");
+  return keepNotes(k, JSON.parse(r.body));
+}
+async function notePost(path, title, body, fail) {
+  const k = communityKey(title);
+  const r = await platform().fetchText(`${COMMUNITY_API}/v2/${path}`, { accept: "application/json", "content-type": "application/json" }, { method: "POST", body: JSON.stringify({ m: k, d: deviceId(), ...body }) });
+  if (r.status === 429) throw new Error("操作太頻繁，請稍後再試");
+  if (r.status === 409) throw new Error("要先評分才能寫短評");
+  if (r.status === 422) throw new Error(/too long/.test(r.body) ? `短評最多 ${NOTE_MAX} 個字` : "短評不能放連結或聯絡方式");
+  if (r.status !== 200) throw new Error(fail);
+  return keepNotes(k, JSON.parse(r.body));
+}
+var saveNote = (title, text, spoiler) => notePost("note", title, { x: String(text || "").trim(), sp: spoiler ? 1 : 0 }, "短評沒有送出，請稍後再試");
+var reportNote = (title, id, why) => notePost("report", title, { id, why }, "檢舉沒有送出，請稍後再試");
 var BOXOFFICE_URL = "https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/main/dist/boxoffice.json";
 var boxMem = null;
 var boxData = null;
@@ -3980,6 +4034,29 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .cm-tag.on{background:var(--accent);color:#fff;font-weight:600}
 .cm-tag:active{transform:scale(.94)}
 .cm-tagnote{margin-top:9px;font-size:11.5px;color:var(--fg2)}
+.nt-form{padding:4px 16px 14px}
+.nt-form .field{background:var(--chip)}
+.nt-form .btn{margin-top:10px}
+.nt-check{display:flex;align-items:center;gap:9px;width:100%;margin-top:10px;padding:4px 0;text-align:left;font-size:15px;color:var(--fg)}
+.nt-check i{flex:none;width:22px;height:22px;border-radius:6px;border:1.5px solid var(--fg2);font-style:normal;font-size:14px;font-weight:800;line-height:19px;text-align:center;color:#fff}
+.nt-check.on i{background:var(--accent);border-color:var(--accent)}
+.nt-check em{flex:1;min-width:0;font-style:normal;font-size:12px;color:var(--fg2)}
+.nt-list{padding:0 16px}
+.nt{padding:12px 0;border-top:1px solid var(--line)}
+.nt:first-child{border-top:0}
+.nt-head{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--fg2)}
+.nt-score{font-weight:700;font-variant-numeric:tabular-nums;padding:1px 7px;border-radius:6px;background:var(--chip);color:var(--fg)}
+.nt-score.good{background:rgba(48,209,88,.18);color:#1f9d45}
+.nt-score.mid{background:rgba(255,159,10,.2);color:#c77700}
+.nt-score.bad{background:rgba(255,69,58,.18);color:#d63a31}
+@media(prefers-color-scheme:dark){.nt-score.good{color:#30d158}.nt-score.mid{color:#ffb340}.nt-score.bad{color:#ff6961}}
+.nt-sp{padding:1px 7px;border-radius:6px;background:rgba(255,159,10,.2);color:#c77700;font-weight:600}
+@media(prefers-color-scheme:dark){.nt-sp{color:#ffb340}}
+.nt-date{flex:1}
+.nt-rep{flex:none;font-size:12px;color:var(--fg2);padding:4px 0 4px 10px}
+.nt-rep.done{opacity:.6}
+.nt-text{margin-top:6px;font-size:15.5px;line-height:1.5;overflow-wrap:anywhere}
+.nt-cover{display:block;width:100%;margin-top:6px;padding:9px 12px;border-radius:10px;background:var(--chip);color:var(--fg2);font-size:14px;text-align:left}
 .cm-star{font-size:28px;line-height:1;padding:2px 3px;color:var(--line)}
 @media(prefers-color-scheme:dark){.cm-star{color:#48484a}}
 .cm-star.on{color:#ff9f0a}
@@ -4289,6 +4366,7 @@ var CHANGELOG = [
     id: "2026-11-24",
     date: "2026/11/24",
     items: [
+      { kind: "new", text: "評完分可以寫一句短評（最多 60 字），也能看大家寫的；有雷的會摺疊起來，看到劇透或不當內容可以檢舉" },
       { kind: "new", text: "片刻評分多了心得標籤：評完分可以點選看完的感覺（催淚、配樂、有片尾彩蛋…），不用打字、不會暴雷" },
       { kind: "new", text: "秀泰影城的預售日期和特別場也查得到了（直接讀秀泰官網的完整場次，補上場次通還沒列出的）" },
       { kind: "new", text: "首頁可以直接搜尋：影城、現正上映、即將上映、歷年電影、影展片一起找；可以用空白隔開好幾個字（例如「威秀 台中」），最符合的排最前面" },
@@ -4393,6 +4471,13 @@ var App = class {
     this.late = [];
     /** 正在補畫：只用已經讀好的資料，不再等 */
     this.rerendering = false;
+    this.noteDraft = null;
+    // 短評頁輸入框裡還沒送出的字（null = 用已經送出的那一則）
+    this.noteSpoil = null;
+    // 「可能有雷」有沒有勾（null = 跟已經送出的那一則一樣）
+    this.noteAsk = "";
+    // 偵測到可能有雷、正在問要不要標記的那句話
+    this.noteShown = [];
     this.tagsOpenFor = "";
     // ── 依電影找 ──
     this.movieQuery = "";
@@ -4500,7 +4585,7 @@ var App = class {
   }
   /** 最新版本是多少。網頁版問的是自己網站現在上線的版本（重新整理就會拿到的那一版），不是 GitHub 上的 */
   checkVersion() {
-    if (true) return checkLatest("2026.11.24-1653");
+    if (true) return checkLatest("2026.11.24-1703");
     return (async () => {
       try {
         let r = await globalThis.fetch("/version.json?t=" + Date.now(), { cache: "no-store" });
@@ -4508,7 +4593,7 @@ var App = class {
         const latest = String((await r.json()).version || "");
         if (!latest) return null;
         const num = (v) => Number(v.replace(/\D/g, "")) || 0;
-        return { latest, isLatest: num("2026.11.24-1653") >= num(latest) };
+        return { latest, isLatest: num("2026.11.24-1703") >= num(latest) };
       } catch (_) {
         return null;
       }
@@ -5078,7 +5163,7 @@ var App = class {
       this.settings.seenLog = CHANGELOG_LATEST;
       saveSettings(this.settings);
     }
-    return /* @__PURE__ */ h(Page, { title: "更新內容", subtitle: `目前版本 ${"2026.11.24-1653"}`, onBack: () => this.back() }, CHANGELOG.map((e) => /* @__PURE__ */ h(Section, { title: e.date }, e.items.map((it) => /* @__PURE__ */ h(Item, { title: it.text, tag: { text: it.kind === "new" ? "新功能" : "改進", tone: it.kind === "new" ? "now" : "soon" }, chevron: false })))), /* @__PURE__ */ h(Note, { text: "只列出比較有感的變動；修小錯、調整文字這類不會寫在這裡。" }));
+    return /* @__PURE__ */ h(Page, { title: "更新內容", subtitle: `目前版本 ${"2026.11.24-1703"}`, onBack: () => this.back() }, CHANGELOG.map((e) => /* @__PURE__ */ h(Section, { title: e.date }, e.items.map((it) => /* @__PURE__ */ h(Item, { title: it.text, tag: { text: it.kind === "new" ? "新功能" : "改進", tone: it.kind === "new" ? "now" : "soon" }, chevron: false })))), /* @__PURE__ */ h(Note, { text: "只列出比較有感的變動；修小錯、調整文字這類不會寫在這裡。" }));
   }
   async aboutView() {
     return /* @__PURE__ */ h(Page, { title: "關於", onBack: () => this.back() }, /* @__PURE__ */ h(Section, { hint: "連鎖影城的場次來自場次通（twshowtimes.com），感謝場次通的整理；其他來自開眼電影網，以及誠品、光點、樂聲、內惟戲院官網。實際場次以影城公告為準。" }, /* @__PURE__ */ h(Item, { icon: "ℹ️", title: "關於與資料來源", accent: true, chevron: false, onTap: () => Safari.open(ABOUT_URL) }), /* @__PURE__ */ h(Item, { icon: "🔒", title: "隱私權政策", accent: true, chevron: false, onTap: () => Safari.open(PRIVACY_URL) }), /* @__PURE__ */ h(Item, { icon: "🙏", title: "前往場次通", subtitle: "比較各影城場次、看上映場數排行", accent: true, chevron: false, onTap: () => Safari.open("https://twshowtimes.com/") })));
@@ -5102,11 +5187,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.24-1653"}`);
+          Pasteboard.copy(`版本 ${"2026.11.24-1703"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.24-1653"}`,
+      `版本 ${"2026.11.24-1703"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -5242,6 +5327,95 @@ var App = class {
     if (late.length) this.late = late;
     return { x: x ?? null, r: r ?? null, p: p || "", px, loading, c: c === void 0 ? communityCached(title) || void 0 : c };
   }
+  // 已經點開的「可能有雷」短評
+  noteReset() {
+    this.noteDraft = null;
+    this.noteSpoil = null;
+    this.noteAsk = "";
+    this.noteShown = [];
+  }
+  /** 短評頁：上面寫（或改）自己的一句話，下面是大家的。另開一頁，不擠在電影頁。
+   *  防雷：輸入框提醒不提劇情、可以自己標「可能有雷」、偵測到劇透字眼送出前問一次；有雷的預設摺疊，點了才顯示。
+   *  每則可以檢舉（劇透／不當內容／廣告），被多人檢舉的由伺服器自動摺疊或隱藏 */
+  async notesView(title) {
+    let list = notesCached(title);
+    let failed = "";
+    try {
+      list = await loadNotes(title);
+    } catch (e) {
+      if (!list) failed = String(e?.message || e);
+    }
+    const c = communityCached(title) || await communityStats(title).catch(() => null);
+    const voted = c ? c.mine : 0;
+    const notes = list ? list.notes : [];
+    const my = notes.find((n) => n.mine) || null;
+    const draft = this.noteDraft === null ? my ? my.x : "" : this.noteDraft;
+    const spoil = this.noteSpoil === null ? !!(my && my.sp) : this.noteSpoil;
+    const keep = (v) => {
+      if (v && typeof v.x === "string") this.noteDraft = v.x;
+    };
+    const send = async (text, sp) => {
+      try {
+        await saveNote(title, text, sp);
+        this.noteReset();
+        await this.ui.toast(text ? "短評已送出" : "已刪除你的短評");
+      } catch (e) {
+        await this.ui.toast(String(e?.message || e));
+      }
+    };
+    const submit = async (v) => {
+      keep(v);
+      const text = String(this.noteDraft === null ? draft : this.noteDraft).replace(/\s+/g, " ").trim();
+      if (!text) {
+        await this.ui.toast("先寫一句再送出");
+        return;
+      }
+      if (Array.from(text).length > NOTE_MAX) {
+        await this.ui.toast(`短評最多 ${NOTE_MAX} 個字`);
+        return;
+      }
+      if (!spoil && noteLooksSpoiler(text) && this.noteAsk !== text) {
+        this.noteAsk = text;
+        return;
+      }
+      await send(text, spoil);
+    };
+    const others = notes.filter((n) => !n.mine);
+    const row = (n) => {
+      const open = !n.sp || this.noteShown.indexOf(n.id) >= 0;
+      const reported = !!list && list.reported.indexOf(n.id) >= 0;
+      return /* @__PURE__ */ h("div", { class: "nt" }, /* @__PURE__ */ h("div", { class: "nt-head" }, n.s ? /* @__PURE__ */ h("span", { class: "nt-score " + ratingTier("imdb", n.s) }, n.s, " 分") : null, n.sp ? /* @__PURE__ */ h("span", { class: "nt-sp" }, "可能有雷") : null, /* @__PURE__ */ h("span", { class: "nt-date" }, esc(noteDate(n.at))), n.mine ? null : reported ? /* @__PURE__ */ h("span", { class: "nt-rep done" }, "已檢舉") : /* @__PURE__ */ h("button", { class: "nt-rep", "aria-label": "檢舉這則短評", onTap: (v) => {
+        keep(v);
+        this.go(() => this.reportView(title, n));
+      } }, "檢舉")), open ? /* @__PURE__ */ h("div", { class: "nt-text" }, esc(n.x)) : /* @__PURE__ */ h("button", { class: "nt-cover", onTap: (v) => {
+        keep(v);
+        this.noteShown = [...this.noteShown, n.id];
+      } }, "這則可能有雷，點一下顯示"));
+    };
+    return /* @__PURE__ */ h(Page, { title: "短評", subtitle: `《${title}》`, onBack: () => this.back() }, /* @__PURE__ */ h(Section, { title: "我的短評", hint: NOTE_RULES }, !voted ? /* @__PURE__ */ h(Note, { text: "先替這部片評分，就可以寫一句短評。" }) : /* @__PURE__ */ h("div", { class: "nt-form" }, my && my.hidden ? /* @__PURE__ */ h(Note, { kind: "warn", text: "你的短評被多人檢舉，目前別人看不到。可以修改後重新送出。" }) : null, /* @__PURE__ */ h("input", { class: "field", name: "x", maxlength: String(NOTE_MAX), enterkeyhint: "done", autocomplete: "off", value: draft, placeholder: `${NOTE_PLACEHOLDER}（最多 ${NOTE_MAX} 字）` }), /* @__PURE__ */ h("button", { class: "nt-check" + (spoil ? " on" : ""), "aria-pressed": spoil ? "true" : "false", onTap: (v) => {
+      keep(v);
+      this.noteSpoil = !spoil;
+      this.noteAsk = "";
+    } }, /* @__PURE__ */ h("i", null, spoil ? "✓" : ""), /* @__PURE__ */ h("span", null, "可能有雷"), /* @__PURE__ */ h("em", null, "勾了以後預設摺疊，點了才會顯示")), this.noteAsk ? /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: "這句看起來可能有雷。要標記「可能有雷」再送出嗎？" }), /* @__PURE__ */ h(Button, { label: "標記後送出", onTap: async (v) => {
+      keep(v);
+      await send(this.noteAsk, true);
+    } }), /* @__PURE__ */ h(Button, { label: "沒有雷，直接送出", kind: "secondary", onTap: async (v) => {
+      keep(v);
+      await send(this.noteAsk, false);
+    } })) : /* @__PURE__ */ h(Button, { label: my ? "更新短評" : "送出短評", onTap: submit }), my ? /* @__PURE__ */ h(Button, { label: "刪除我的短評", kind: "danger", onTap: () => send("", false) }) : null)), /* @__PURE__ */ h(Section, { title: `大家的短評（${others.length}）`, hint: others.length ? "看到劇透、不當內容或廣告可以點「檢舉」。" : "" }, failed ? /* @__PURE__ */ h(Note, { kind: "warn", text: failed }) : null, others.length ? /* @__PURE__ */ h("div", { class: "nt-list" }, others.map(row)) : failed ? null : /* @__PURE__ */ h(Note, { text: my ? "目前只有你寫了短評。" : "還沒有人寫短評。" })));
+  }
+  /** 檢舉一則短評：選原因就送出 */
+  reportView(title, n) {
+    return /* @__PURE__ */ h(Page, { title: "檢舉短評", onBack: () => this.back() }, /* @__PURE__ */ h(Section, { title: "要檢舉的短評" }, /* @__PURE__ */ h("div", { class: "nt-list" }, /* @__PURE__ */ h("div", { class: "nt" }, /* @__PURE__ */ h("div", { class: "nt-text" }, esc(n.x))))), /* @__PURE__ */ h(Section, { title: "原因", hint: "同一則被 2 個人檢舉劇透會自動摺疊，被 3 個人檢舉會自動隱藏。檢舉是匿名的。" }, REPORT_REASONS.map((r) => /* @__PURE__ */ h(Item, { title: r.label, subtitle: r.note, onTap: async () => {
+      try {
+        await reportNote(title, n.id, r.id);
+        await this.ui.toast("已送出檢舉，謝謝");
+      } catch (e) {
+        await this.ui.toast(String(e?.message || e));
+      }
+      this.back();
+    } }))));
+  }
   // 哪一部片的心得標籤選單是展開的
   /** 片刻評分卡片：平均、人數、分布，以及「你的評分」一排 1～10 的格子（點已選的那一格可以取消）。
    *  評過分以後多一列「心得標籤」：點開是固定的選項（不能打字，所以不會暴雷），最多選 5 個；大家選最多的幾個列在平均分數下面 */
@@ -5277,7 +5451,10 @@ var App = class {
     const tier = n ? ratingTier("imdb", avg) : "none";
     return /* @__PURE__ */ h(Section, { title: "片刻評分", hint: "匿名評分，一台裝置一票，可以隨時更改；再點一次已選的分數可以取消。評分後可以再選心得標籤。各版本的評分會一起統計。" }, /* @__PURE__ */ h("div", { class: "cm" }, n ? /* @__PURE__ */ h("div", { class: "cm-top" }, /* @__PURE__ */ h("div", { class: "cm-avg " + tier, "aria-label": `平均 ${avg.toFixed(1)} 分，滿分 10 分` }, avg.toFixed(1), /* @__PURE__ */ h("small", null, "／10")), /* @__PURE__ */ h("div", { class: "cm-meta" }, /* @__PURE__ */ h("span", { class: "cm-n" }, esc(status)), /* @__PURE__ */ h("span", { class: "cm-by" }, "片刻使用者的評分")), c ? /* @__PURE__ */ h("div", { class: "cm-hist", "aria-hidden": "true" }, /* @__PURE__ */ h("div", { class: "bars" }, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((v) => /* @__PURE__ */ h("i", { class: c.dist[v - 1] ? "" : "zero", style: `height:${Math.max(8, Math.round((c.dist[v - 1] || 0) / max * 100))}%` }))), /* @__PURE__ */ h("div", { class: "axis" }, /* @__PURE__ */ h("span", null, "1"), /* @__PURE__ */ h("span", null, "10"))) : null) : /* @__PURE__ */ h("div", { class: "cm-empty" }, esc(status)), top.length ? /* @__PURE__ */ h("div", { class: "cm-toptags", "aria-label": "大家選最多的心得標籤" }, top.map((t) => /* @__PURE__ */ h("span", null, esc(t.label), " ", /* @__PURE__ */ h("b", null, t.pct, "%")))) : null, /* @__PURE__ */ h("div", { class: "cm-mine" + (n ? " line" : "") }, /* @__PURE__ */ h("span", null, "你的評分"), mine ? /* @__PURE__ */ h("b", null, mine, " 分") : /* @__PURE__ */ h("em", null, "點一個分數")), /* @__PURE__ */ h("div", { class: "cm-pick" }, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((v) => /* @__PURE__ */ h("button", { class: "cm-num" + (v <= mine ? " on" : ""), "aria-label": `${v} 分`, "aria-pressed": v === mine ? "true" : "false", onTap: () => vote(v) }, v))), /* @__PURE__ */ h("div", { class: "cm-ends" }, /* @__PURE__ */ h("span", null, "不推薦"), /* @__PURE__ */ h("span", null, "必看")), mine ? /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h("button", { class: "cm-tagbar", "aria-expanded": tagsOpen ? "true" : "false", onTap: () => {
       this.tagsOpenFor = tagsOpen ? "" : communityKey(title);
-    } }, /* @__PURE__ */ h("span", null, "心得標籤"), /* @__PURE__ */ h("em", null, myTags.length ? esc(myTags.map(reviewTagLabel).join("、")) : "點選幾個看完的感覺（不用打字）"), /* @__PURE__ */ h("i", null, tagsOpen ? "收合 ▾" : myTags.length ? "修改 ▸" : "選擇 ▸")), tagsOpen ? /* @__PURE__ */ h("div", { class: "cm-tags" }, REVIEW_TAGS.map((g) => /* @__PURE__ */ h("div", { class: "cm-tagrow" }, /* @__PURE__ */ h("span", { class: "cm-taghead" }, esc(g.group), g.single ? "（選一個）" : ""), /* @__PURE__ */ h("div", { class: "cm-tagset" }, g.tags.map((t) => /* @__PURE__ */ h("button", { class: "cm-tag" + (myTags.indexOf(t.id) >= 0 ? " on" : ""), "aria-pressed": myTags.indexOf(t.id) >= 0 ? "true" : "false", onTap: () => pickTag(t.id) }, esc(t.label)))))), /* @__PURE__ */ h("div", { class: "cm-tagnote" }, "已選 ", myTags.length, "／", REVIEW_TAGS_MAX, "。只有這些選項，不會有劇透。")) : null) : null));
+    } }, /* @__PURE__ */ h("span", null, "心得標籤"), /* @__PURE__ */ h("em", null, myTags.length ? esc(myTags.map(reviewTagLabel).join("、")) : "點選幾個看完的感覺（不用打字）"), /* @__PURE__ */ h("i", null, tagsOpen ? "收合 ▾" : myTags.length ? "修改 ▸" : "選擇 ▸")), tagsOpen ? /* @__PURE__ */ h("div", { class: "cm-tags" }, REVIEW_TAGS.map((g) => /* @__PURE__ */ h("div", { class: "cm-tagrow" }, /* @__PURE__ */ h("span", { class: "cm-taghead" }, esc(g.group), g.single ? "（選一個）" : ""), /* @__PURE__ */ h("div", { class: "cm-tagset" }, g.tags.map((t) => /* @__PURE__ */ h("button", { class: "cm-tag" + (myTags.indexOf(t.id) >= 0 ? " on" : ""), "aria-pressed": myTags.indexOf(t.id) >= 0 ? "true" : "false", onTap: () => pickTag(t.id) }, esc(t.label)))))), /* @__PURE__ */ h("div", { class: "cm-tagnote" }, "已選 ", myTags.length, "／", REVIEW_TAGS_MAX, "。只有這些選項，不會有劇透。")) : null) : null, c && (mine || c.notes) ? /* @__PURE__ */ h("button", { class: "cm-tagbar", onTap: () => {
+      this.noteReset();
+      this.go(() => this.notesView(title), "讀取短評…");
+    } }, /* @__PURE__ */ h("span", null, "短評"), /* @__PURE__ */ h("em", null, c.notes ? `${c.notes} 則` : "還沒有人寫"), /* @__PURE__ */ h("i", null, mine ? c.notes ? "看全部／寫一句 ▸" : "寫一句 ▸" : "看全部 ▸")) : null));
   }
   /** 海報旁邊那顆收藏的愛心：電影頁、影展片、即將上映、已下檔的片都用同一顆 */
   favOf(m) {
@@ -5469,7 +5646,7 @@ var App = class {
     if (false) {
       if (!r) return /* @__PURE__ */ h(Note, { text: "（無法確認是否為最新版：連不到網站）" });
       if (r.isLatest) return /* @__PURE__ */ h(Note, { text: "✅ 已是最新版" });
-      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.24-1653"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
+      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.24-1703"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
         globalThis.location.reload();
       } }));
     }

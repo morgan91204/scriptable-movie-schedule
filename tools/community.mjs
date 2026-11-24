@@ -18,5 +18,18 @@ if (!movies || typeof movies !== "object") throw new Error("評分總表格式�
 const sorted = Object.fromEntries(Object.keys(movies).sort().map((k) => [k, movies[k]]));
 // 心得標籤（只有 10 分制那份有）：片名鍵 → { 標籤代號: 人數 }
 const tags = VER === "v2" && data.tags && typeof data.tags === "object" ? Object.fromEntries(Object.keys(data.tags).sort().map((k) => [k, data.tags[k]])) : null;
-fs.writeFileSync(out, JSON.stringify(tags ? { movies: sorted, tags } : { movies: sorted }) + "\n");
+const notes = VER === "v2" && data.notes && typeof data.notes === "object" ? Object.fromEntries(Object.keys(data.notes).sort().map((k) => [k, data.notes[k]])) : null; // 每部片的短評則數
+fs.writeFileSync(out, JSON.stringify(tags ? { movies: sorted, tags, ...(notes ? { notes } : {}) } : { movies: sorted }) + "\n");
+// 短評全文（第三個參數給了輸出檔才匯出）：App 不讀這個檔，是留底用的——data 分支每週、每月會打標籤備份，
+// 萬一評分伺服器的資料出事，可以用「短評管理」的 import 從這份匯回。只有看得到的短評，沒有裝置代號。
+if (VER === "v2" && data.pending > 0) console.log(`::warning::有 ${data.pending} 則短評被檢舉或被自動隱藏，還沒複查。到 Actions 執行「短評管理」（動作選 flagged）可以看內容並處理。`);
+const notesOut = process.argv[4];
+if (VER === "v2" && notesOut) {
+  const r = await fetch(API.replace(/\/all$/, "/notes-all"), { headers: { accept: "application/json" } });
+  const all = r.ok ? (await r.json()).movies : null;
+  if (all && typeof all === "object") {
+    fs.writeFileSync(notesOut, JSON.stringify({ movies: Object.fromEntries(Object.keys(all).sort().map((k) => [k, all[k]])) }) + "\n");
+    console.log("已匯出", Object.values(all).reduce((a, l) => a + l.length, 0), "則短評");
+  } else console.log("短評這次沒有匯出（" + r.status + "）");
+}
 console.log("已匯出", Object.keys(sorted).length, "部片的評分");
