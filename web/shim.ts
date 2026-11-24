@@ -204,7 +204,9 @@ async function autoUpdate() {
   if (Date.now() - lastVersionCheck < 60e3) return;
   lastVersionCheck = Date.now();
   try {
-    const r = await fetch("/api/version?t=" + Date.now(), { cache: "no-store" });
+    // version.json 是靜態檔（不經過 Worker、不算請求額度）；舊的部署沒有這個檔時退回 /api/version
+    let r = await fetch("/version.json?t=" + Date.now(), { cache: "no-store" });
+    if (!r.ok) r = await fetch("/api/version?t=" + Date.now(), { cache: "no-store" });
     const latest = String((await r.json()).version || "");
     const num = (v: string) => Number(v.replace(/\D/g, "")) || 0;
     if (!latest || num(latest) <= num(APP_VERSION)) return;

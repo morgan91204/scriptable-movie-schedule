@@ -5,6 +5,9 @@ test/shots/
 *.log
 .DS_Store
 
+# 網頁版的靜態檔（build.sh 每次重建，部署時上傳）
+web/site/
+
 # Cloudflare wrangler 本機暫存
 .wrangler/
 worker/.wrangler/

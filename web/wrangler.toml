@@ -4,7 +4,12 @@ main = "worker.js"
 compatibility_date = "2025-09-01"
 workers_dev = true
 
-# 所有檔案都打包進 Worker（見 worker.js），不走靜態檔上傳：每次發佈只要上傳這支 Worker
+# 靜態檔（首頁、程式本體、圖示、關於頁…）放在 site/（build.sh 產生），由 Cloudflare 直接送出：
+# 不經過 Worker、不算每天的請求額度。只有 /api/* 這些要運算的才會進 Worker。
+[assets]
+directory = "./site"
+
+# 同樣的檔案也打包進 Worker 當備援（見 worker.js）：靜態資源那邊找不到時才會用到
 [[rules]]
 type = "Text"
 globs = ["**/*.js.txt", "**/*.html.txt", "**/*.html", "**/*.webmanifest"]

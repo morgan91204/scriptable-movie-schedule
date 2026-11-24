@@ -100,7 +100,9 @@ class App {
     if (!IS_WEB) return checkLatest(APP_VERSION);
     return (async () => {
       try {
-        const r = await (globalThis as any).fetch("/api/version?t=" + Date.now(), { cache: "no-store" });
+        // version.json 是靜態檔（不經過 Worker、不算請求額度）；沒有這個檔時退回 /api/version
+        let r = await (globalThis as any).fetch("/version.json?t=" + Date.now(), { cache: "no-store" });
+        if (!r.ok) r = await (globalThis as any).fetch("/api/version?t=" + Date.now(), { cache: "no-store" });
         const latest = String((await r.json()).version || "");
         if (!latest) return null;
         const num = (v: string) => Number(v.replace(/\D/g, "")) || 0;
