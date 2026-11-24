@@ -142,6 +142,7 @@
     isLate: () => isLate,
     isLocalSrc: () => isLocalSrc,
     isReissue: () => isReissue,
+    issuerRecent: () => issuerRecent,
     issuerTag: () => issuerTag,
     kmLabel: () => kmLabel,
     lateIsTonight: () => lateIsTonight,
@@ -830,8 +831,8 @@ function parseTwMovieDay(doc) {
     const scope = pick.fav && pick.cities.length ? "mix" : pick.fav ? "fav" : pick.cities.length ? "city" : "all";
     return {
       prefs: Object.fromEntries(NOTIFY_KINDS.map((k) => [k.id, !!p[k.id]])),
-      // 收藏影城只有開了「收藏影城開始放映時」才傳
-      opt: { fmts: (p.fmts || []).filter((f) => FORMATS.indexOf(f) >= 0), preDays: p.preDays || 3, quiet: notifyQuiet(p), cinemas: p.favc ? s.favorites.slice(0, 80) : [] },
+      // 收藏影城只有開了「收藏影城開始放映時」或「收藏影城每週新片」才傳
+      opt: { fmts: (p.fmts || []).filter((f) => FORMATS.indexOf(f) >= 0), preDays: p.preDays || 3, quiet: notifyQuiet(p), cinemas: p.favc || p.cweek ? s.favorites.slice(0, 80) : [] },
       endCfg: { max: Math.min(30, Math.max(1, p.endMax || 3)), scope, cities: pick.cities, cinemas: pick.fav ? s.favorites.slice(0, 80) : [] },
       favs: notifyFavs(s)
     };
@@ -845,11 +846,12 @@ function parseTwMovieDay(doc) {
     { id: "rate", label: "評分出爐時", note: "有了 IMDb 或番茄指數", group: "fav" },
     { id: "end", label: "快下檔時", note: "放映的影城變少到你設定的間數以下", group: "fav" },
     { id: "fest", label: "影展開始時", note: "收藏的影展片所屬的影展開始了", group: "fav" },
+    { id: "cweek", label: "收藏影城每週新片", note: "每週四早上一則：你收藏的影城這一週新上哪些片", group: "all" },
     { id: "week", label: "每週新片", note: "每週四早上一則：這一週上映哪些片", group: "all" },
     { id: "flist", label: "影展片單公布時", note: "有影展公布了片單", group: "all" }
   ];
   var NOTIFY_PRE_STEPS = [1, 3, 7];
-  var notifyPrefs = (s) => ({ open: true, rel: true, end: true, fest: true, favc: true, fmt: false, pre: true, rate: false, week: false, flist: false, ...s.notify || {} });
+  var notifyPrefs = (s) => ({ open: true, rel: true, end: true, fest: true, favc: true, fmt: false, pre: true, rate: false, week: false, flist: false, cweek: false, ...s.notify || {} });
   var notifyQuiet = (p) => ({ on: p.quietOn !== false, from: p.quietFrom ?? 22, to: p.quietTo ?? 9 });
   var notifyFavs = (s) => (s.favMovies || []).map((f) => ({ key: f.key, title: f.title, ...f.fest ? { fest: { id: f.fest.id, name: f.fest.name } } : {} }));
   var MAPS_LABEL = { apple: "Apple 地圖", google: "Google 地圖" };
@@ -2255,6 +2257,21 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
       if (c) n[c] = (n[c] || 0) + 1;
     }
     return Object.keys(n).map((id) => ({ id, count: n[id] })).sort((a, b) => b.count - a.count || a.id.localeCompare(b.id));
+  }
+  function issuerRecent(b, ids, days = 30) {
+    const out = {};
+    for (const id of ids) out[id] = [];
+    if (!b || !b.years || !ids.length) return out;
+    const since = addDays(todayTPE(), -days);
+    for (const y of Object.keys(b.years).sort().reverse().slice(0, 2)) {
+      for (const x of b.years[y]) {
+        if (!x.release || x.release < since) continue;
+        const id = boxMainIssuer(x.issue);
+        if (out[id]) out[id].push(x);
+      }
+    }
+    for (const id of ids) out[id].sort((a, c) => c.release.localeCompare(a.release));
+    return out;
   }
   function boxByIssuer(list, picked) {
     if (!picked.length) return list;
@@ -3991,7 +4008,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   var extra = { boxOffice, filmList, soonList, nowShowing, nowShowingMulti, movieBoard: movieBoard2, festivalBoard, festivalFilm, nearby, patchSettings, fillMovie, formatList };
   var BRIDGE_LEVEL = 2;
   globalThis.MS = {
-    version: "2026.11.24-1320",
+    version: "2026.11.24-1329",
     level: BRIDGE_LEVEL,
     init(saved) {
       cache = saved || {};

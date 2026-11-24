@@ -51,12 +51,12 @@ for (const m of list) {
 // 今天沒場次但還在上映的片（noShowToday）c 會是 0：不能因此判成「快下檔」，所以 c 是 0 的沿用上一次的數字
 for (const k of Object.keys(movies)) if (movies[k].s === 1 && movies[k].c === 0) movies[k].c = Math.max(((prev.movies || {})[k] || {}).c || 0, 4);
 // 各影城今天的片單（場次通的 66 間連鎖，加上讀官網的幾間）→ 每部片今天在哪些影城放映
-const cs = [], cc = [];
+const cs = [], cc = [], cn = []; // cn = 影城名稱（「收藏影城每週新片」的通知文字要用）
 try {
   const today = core.todayTPE();
-  const cityOf = {};
-  for (const c of await core.loadCinemas()) cityOf[c.id] = c.city;
-  const idxOf = (cinemaId) => { let idx = cs.indexOf(cinemaId); if (idx < 0) { idx = cs.push(cinemaId) - 1; cc.push(cityOf[cinemaId] || ""); } return idx; };
+  const cityOf = {}, nameOf = {};
+  for (const c of await core.loadCinemas()) { cityOf[c.id] = c.city; nameOf[c.id] = c.name; }
+  const idxOf = (cinemaId) => { let idx = cs.indexOf(cinemaId); if (idx < 0) { idx = cs.push(cinemaId) - 1; cc.push(cityOf[cinemaId] || ""); cn.push(nameOf[cinemaId] || ""); } return idx; };
   /** 一間影城某一天的片單：isToday 的記進 i（今天有場次，只算已上映的片）；每一天都記進 j（這幾天有場次）和 f（特殊廳） */
   const add = (cinemaId, list, isToday, withFormats) => {
     for (const x of list) {
@@ -85,5 +85,5 @@ for (const f of ((read(upcomingPath) || {}).films) || []) {
   if (!k || movies[k] || up[k] || !/^\d{4}-\d{2}-\d{2}$/.test(f.release || "") || f.release <= todayISO) continue;
   up[k] = { t: f.title, r: f.release, ...(f.approx ? { a: 1 } : {}) };
 }
-fs.writeFileSync(outPath, JSON.stringify({ updated: Date.now(), cs, cc, movies, up, fests }) + "\n");
+fs.writeFileSync(outPath, JSON.stringify({ updated: Date.now(), cs, cc, cn, movies, up, fests }) + "\n");
 console.log(`通知資料：${Object.keys(movies).length} 部片（已上映 ${Object.values(movies).filter((m) => m.s).length}）、${Object.keys(fests).length} 個影展、${cs.length} 間影城有明細；檔案 ${Math.round(fs.statSync(outPath).size / 1024)}KB`);

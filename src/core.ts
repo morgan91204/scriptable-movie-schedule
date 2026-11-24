@@ -47,7 +47,7 @@ export interface Settings {
 /** 收藏電影通知種類：open 開放場次了、rel 上映了、end 快下檔了、fest 影展開始了 */
 export interface NotifyPrefs {
   open: boolean; rel: boolean; end: boolean; fest: boolean;
-  favc?: boolean; fmt?: boolean; pre?: boolean; rate?: boolean; week?: boolean; flist?: boolean;
+  favc?: boolean; fmt?: boolean; pre?: boolean; rate?: boolean; week?: boolean; flist?: boolean; cweek?: boolean;
   fmts?: string[]; // 特殊廳有場次時：要哪幾種廳（IMAX、杜比…）
   preDays?: number; // 上映前幾天提醒（預設 3）
   quietOn?: boolean; quietFrom?: number; quietTo?: number; // 勿擾時段（預設開，22 點到 9 點）
@@ -75,13 +75,13 @@ export function notifyPayload(s: Settings): { prefs: Record<string, boolean>; op
   const scope = pick.fav && pick.cities.length ? "mix" : pick.fav ? "fav" : pick.cities.length ? "city" : "all";
   return {
     prefs: Object.fromEntries(NOTIFY_KINDS.map((k) => [k.id, !!p[k.id]])),
-    // 收藏影城只有開了「收藏影城開始放映時」才傳
-    opt: { fmts: (p.fmts || []).filter((f) => (FORMATS as readonly string[]).indexOf(f) >= 0), preDays: p.preDays || 3, quiet: notifyQuiet(p), cinemas: p.favc ? s.favorites.slice(0, 80) : [] },
+    // 收藏影城只有開了「收藏影城開始放映時」或「收藏影城每週新片」才傳
+    opt: { fmts: (p.fmts || []).filter((f) => (FORMATS as readonly string[]).indexOf(f) >= 0), preDays: p.preDays || 3, quiet: notifyQuiet(p), cinemas: p.favc || p.cweek ? s.favorites.slice(0, 80) : [] },
     endCfg: { max: Math.min(30, Math.max(1, p.endMax || 3)), scope, cities: pick.cities, cinemas: pick.fav ? s.favorites.slice(0, 80) : [] },
     favs: notifyFavs(s),
   };
 }
-export type NotifyKind = "open" | "rel" | "end" | "fest" | "favc" | "fmt" | "pre" | "rate" | "week" | "flist";
+export type NotifyKind = "open" | "rel" | "end" | "fest" | "favc" | "fmt" | "pre" | "rate" | "week" | "flist" | "cweek";
 /** 通知種類。group：fav = 跟著收藏的電影走；all = 不用收藏也會發（預設關） */
 export const NOTIFY_KINDS: { id: NotifyKind; label: string; note: string; group: "fav" | "all" }[] = [
   { id: "open", label: "開放場次時", note: "還沒排片的片，戲院開始排場次、可以訂票了", group: "fav" },
@@ -92,12 +92,13 @@ export const NOTIFY_KINDS: { id: NotifyKind; label: string; note: string; group:
   { id: "rate", label: "評分出爐時", note: "有了 IMDb 或番茄指數", group: "fav" },
   { id: "end", label: "快下檔時", note: "放映的影城變少到你設定的間數以下", group: "fav" },
   { id: "fest", label: "影展開始時", note: "收藏的影展片所屬的影展開始了", group: "fav" },
+  { id: "cweek", label: "收藏影城每週新片", note: "每週四早上一則：你收藏的影城這一週新上哪些片", group: "all" },
   { id: "week", label: "每週新片", note: "每週四早上一則：這一週上映哪些片", group: "all" },
   { id: "flist", label: "影展片單公布時", note: "有影展公布了片單", group: "all" },
 ];
 /** 「上映前提醒」可以選幾天前 */
 export const NOTIFY_PRE_STEPS = [1, 3, 7];
-export const notifyPrefs = (s: Settings): NotifyPrefs => ({ open: true, rel: true, end: true, fest: true, favc: true, fmt: false, pre: true, rate: false, week: false, flist: false, ...(s.notify || {}) });
+export const notifyPrefs = (s: Settings): NotifyPrefs => ({ open: true, rel: true, end: true, fest: true, favc: true, fmt: false, pre: true, rate: false, week: false, flist: false, cweek: false, ...(s.notify || {}) });
 /** 勿擾時段（幾點到幾點不發；預設晚上十點到早上九點） */
 export const notifyQuiet = (p: NotifyPrefs): { on: boolean; from: number; to: number } => ({ on: p.quietOn !== false, from: p.quietFrom ?? 22, to: p.quietTo ?? 9 });
 /** 交給通知伺服器的收藏清單：只有片名鍵、片名、影展代碼（海報、收藏時間這些不傳） */
@@ -1748,6 +1749,23 @@ export function boxIssuers(list: BoxOfficeItem[]): { id: string; count: number }
   const n: Record<string, number> = {};
   for (const x of list) { const c = boxMainIssuer(x.issue); if (c) n[c] = (n[c] || 0) + 1; }
   return Object.keys(n).map((id) => ({ id, count: n[id] })).sort((a, b) => b.count - a.count || a.id.localeCompare(b.id));
+}
+/** 收藏的發行商最近幾天（預設 30 天）上映的片：發行商 → 那幾部（新的在前）。
+ *  發行商的資料只有官方票房統計有，官方又慢一到兩週，所以這個不拿來發通知，只在畫面上標「近期新片」 */
+export function issuerRecent(b: BoxOffice | null, ids: string[], days = 30): Record<string, BoxOfficeItem[]> {
+  const out: Record<string, BoxOfficeItem[]> = {};
+  for (const id of ids) out[id] = [];
+  if (!b || !b.years || !ids.length) return out;
+  const since = addDays(todayTPE(), -days);
+  for (const y of Object.keys(b.years).sort().reverse().slice(0, 2)) {
+    for (const x of b.years[y]) {
+      if (!x.release || x.release < since) continue;
+      const id = boxMainIssuer(x.issue);
+      if (out[id]) out[id].push(x);
+    }
+  }
+  for (const id of ids) out[id].sort((a, c) => c.release.localeCompare(a.release));
+  return out;
 }
 /** 只留選中的那幾家發行商的片（可以複選），名次在篩出來的片裡重排；沒選 = 全部 */
 export function boxByIssuer(list: BoxOfficeItem[], picked: string[]): BoxOfficeItem[] {

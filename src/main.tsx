@@ -10,7 +10,7 @@ import { scriptablePlatform } from "./platform-scriptable";
 import {
   Cinema, Settings, Movie, Version, EXTRA, CITY_ORDER, AD_STEPS,
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
-  loadSettings, saveSettings, settingsStored, setSettingsSavedHook, syncPick, syncApply, syncMerge, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, communityKey, globalSearch, favSnapGet, favSnapSet, boxIsRerun, boxHasLaterRun, boxRunRows, boxRunsName, loadIntro, rerunDataReady, SITE_URL, TW,
+  loadSettings, saveSettings, settingsStored, setSettingsSavedHook, syncPick, syncApply, syncMerge, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, communityKey, globalSearch, issuerRecent, favSnapGet, favSnapSet, boxIsRerun, boxHasLaterRun, boxRunRows, boxRunsName, loadIntro, rerunDataReady, SITE_URL, TW,
   FORMATS, formatsOf, filterVersions, filterVersionsAny, movieRows, movieDays, nearest, kmLabel, WINDOWS, findShowtimes, findShowtimesMulti, multiLabel, multiDetail, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText,
   hallOf, tmdbTest, movieExtras, moviePoster, movieRuntime, posterSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxCountries, boxByCountry, boxInfo, boxInfoRows, boxCountryText, BOX_COUNTRY_NOTE, boxCountryTag, boxCountriesPicked, loadMovieBoard, loadSoonBoard, notifyPrefs, notifyPayload, notifyEndScope, notifyEndPick, notifyQuiet, NOTIFY_PRE_STEPS, NOTIFY_KINDS, boxStatus, STATUS_LABEL, boxInfoBy, isFavMovie, toggleFavMovie, favMovieRows, favMovieBox, soonGroups, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityCached, communityVote, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalsReady, festivalNote, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, festivalDefaultDate, festivalStateLabel, festivalState, festivalFooter, linkMovies, nowGroupLine, nowFilter, festivalPick, movieAbout, festivalSearch, festivalSearchLines, festivalTrailer, festivalYears, festivalsAny, festivalGroups, festivalChipNote, festivalStatusLine, movieRatings, ratingTier, tomatoTier, popcornTier, popcornCount,
 } from "./core";
@@ -451,7 +451,8 @@ class App {
     const list = board.issuers.filter((c) => !k || c.id.toLowerCase().includes(k)).sort((a, b) => b.count - a.count);
     const MAX = 60; // 沒搜尋時先列片數最多的 60 家，其餘用搜尋找（全部有好幾百家）
     const shown = k ? list : list.slice(0, MAX);
-    const row = (id: string) => <Item icon="🏢" title={id} subtitle={count[id] ? `2016 年至今發行 ${count[id]} 部` : "目前的資料裡沒有它發行的片"} onTap={() => this.openIssuer(id)} action={{ label: isFav(id) ? "★" : "☆", hint: isFav(id) ? "取消收藏這家發行商" : "收藏這家發行商", onTap: () => toggle(id) }} />;
+    const recent = issuerRecent(await loadBoxOfficeFull().catch(() => null), board.issuers.map((c) => c.id));
+    const row = (id: string) => <Item icon="🏢" title={id} subtitle={[count[id] ? `2016 年至今發行 ${count[id]} 部` : "目前的資料裡沒有它發行的片", (recent[id] || []).length ? `近 30 天新片 ${recent[id].length} 部` : ""].filter(Boolean).join("｜")} onTap={() => this.openIssuer(id)} action={{ label: isFav(id) ? "★" : "☆", hint: isFav(id) ? "取消收藏這家發行商" : "收藏這家發行商", onTap: () => toggle(id) }} />;
     return (
       <Page title="收藏發行商" subtitle={favs.length ? `已收藏 ${favs.length} 家` : `共 ${board.issuers.length} 家發行商`} onBack={() => this.back()}>
         <Search value={this.issuerQuery} placeholder={`搜尋發行商（共 ${board.issuers.length} 家）`} onInput={(t) => { this.issuerQuery = t; }} />
@@ -493,6 +494,11 @@ class App {
     if (favJob && !favGot) this.late = [...(this.late || []), favJob];
     const favRows: FavRow[] = favGot || [];
     const openFav = (r: FavRow) => this.openFavRow(r);
+    // 收藏發行商近 30 天的新片（展開那一組才讀票房資料；讀太久就先不標，讀好再補上）
+    const issJob = this.favIssOpen && favIssuers.length ? loadBoxOfficeFull().catch(() => null) : null;
+    const issBox = issJob ? await Promise.race([issJob, sleep(this.rerendering ? 0 : 300).then(() => undefined)]) : null;
+    if (issJob && issBox === undefined) this.late = [...(this.late || []), issJob];
+    const issRecent = issuerRecent(issBox || null, favIssuers);
     const favThumb = await this.listThumbs(favRows.map((r) => ({ key: r.fav.key, job: this.posterJobOf.fav(r) })), 200);
     // 最新的狀態和海報都有了：記成下一次的快照
     if (favGot && favRows.length) favSnapSet(this.favSig(), favRows.map((r) => ({ key: r.fav.key, kind: r.kind, line: r.line, poster: (favThumb(r.fav.key) || {}).url || r.fav.poster || "" })));
@@ -581,7 +587,7 @@ class App {
           <Section hint={this.favIssOpen && favIssuers.length ? "點發行商看它歷年發行的片（新的在前）。要增減收藏：到「歷年電影」的發行商選單點星號。" : ""}>
             <Item head icon="★" title={favIssuers.length ? `收藏發行商（${favIssuers.length} 家）` : "收藏發行商（還沒有）"} subtitle={this.favIssOpen ? "點一下收合" : "點一下展開"} chevron={false} onTap={() => { this.favIssOpen = !this.favIssOpen; }} />
             {this.favIssOpen ? favIssuers.map((id) => (
-              <Item icon="🏢" title={id} onTap={() => this.openIssuer(id)} />
+              <Item icon="🏢" title={id} subtitle={(issRecent[id] || []).length ? `近 30 天上映：${issRecent[id].slice(0, 2).map((x) => x.name).join("、")}${issRecent[id].length > 2 ? `等 ${issRecent[id].length} 部` : ""}` : ""} right={(issRecent[id] || []).length ? `新片 ${issRecent[id].length}` : ""} onTap={() => this.openIssuer(id)} />
             )) : null}
             {this.favIssOpen ? <Item icon={favIssuers.length ? "⚙️" : "👉"} title={favIssuers.length ? "管理收藏發行商" : "去選發行商來收藏"} subtitle={favIssuers.length ? "增加、取消收藏，或搜尋其他發行商" : "搜尋或從清單裡點星號（☆ 變 ★）。收藏後可以從這裡看它歷年發行的片。"} accent onTap={() => { this.issuerQuery = ""; this.go(() => this.issuerManageView(), "讀取發行商…"); }} /> : null}
           </Section>
@@ -846,7 +852,7 @@ class App {
             ) : null}
           </Section>
         ) : null}
-        <Section title="不用收藏也會通知" hint="預設關閉，想要再打開。">
+        <Section title="每週摘要與公告" hint="不用收藏電影也會發；預設關閉，想要再打開。「收藏影城每週新片」要先有收藏影城。">
           {NOTIFY_KINDS.filter((k) => k.group === "all").map(row)}
         </Section>
         <Section title="勿擾時段" hint={quiet.on ? `${hh(quiet.from)} 到${quiet.from > quiet.to ? "隔天" : ""} ${hh(quiet.to)} 不發通知，這段時間的通知留到之後再發。` : "任何時間都可能發通知。"}>

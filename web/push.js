@@ -13,7 +13,7 @@ const SUBJECT = "https://app.twmovietime.workers.dev/about/"; // 推送服務出
 const NOTIFY_URL = "https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/data/notify.json";
 // 只接受各家瀏覽器的推送服務，其他網址一律不送（不讓這個端點被拿去打別的網站）
 const PUSH_HOSTS = [/\.push\.apple\.com$/, /^fcm\.googleapis\.com$/, /^updates\.push\.services\.mozilla\.com$/, /\.notify\.windows\.com$/, /^android\.googleapis\.com$/];
-const KINDS = ["open", "rel", "end", "fest", "favc", "fmt", "pre", "rate", "week", "flist"];
+const KINDS = ["open", "rel", "end", "fest", "favc", "fmt", "pre", "rate", "week", "flist", "cweek"];
 // 跟著收藏的片走的通知（依序判斷）；week、flist 是不用收藏也會發的
 const FAV_KINDS = ["open", "rel", "favc", "fmt", "pre", "rate", "end", "fest"];
 const FORMATS = ["IMAX", "杜比", "4DX", "MX4D", "ScreenX", "巨幕", "LED", "頂級廳", "3D"];
@@ -182,6 +182,16 @@ export async function verifyGoogle(idToken, nonce, fetchKeys) {
   if (!body.sub) throw new Error("no subject");
   return String(body.sub);
 }
+/** 你收藏的影城這一週（週一到週日）新上的片：片名（排的影城多的在前），以及是哪幾間影城有新片 */
+function cinemaWeekFilms(data, cinemas) {
+  const from = weekId(), to = addDays(from, 6);
+  const mineIdx = (data.cs || []).map((id, i) => (cinemas.indexOf(id) >= 0 ? i : -1)).filter((i) => i >= 0);
+  if (!mineIdx.length) return { titles: [], names: [] };
+  const hit = Object.values(data.movies || {}).filter((m) => m.r && m.r >= from && m.r <= to && Array.isArray(m.j) && m.j.some((x) => mineIdx.indexOf(x) >= 0));
+  hit.sort((a, b) => (b.p || 0) - (a.p || 0));
+  const names = mineIdx.filter((i) => hit.some((m) => m.j.indexOf(i) >= 0)).map((i) => (data.cn || [])[i] || "").filter(Boolean);
+  return { titles: Array.from(new Set(hit.map((m) => m.t))), names };
+}
 /** 所有訂閱都存在這一個 Durable Object 裡（人數不多；每筆一個鍵） */
 export class PushHub {
   constructor(state, env) { this.state = state; this.env = env; this.data = null; this.dataAt = 0; }
@@ -242,7 +252,7 @@ export class PushHub {
       sent[f.key] = mk;
     }
     // 不用收藏的通知：現在已經公布片單的影展、這一週的新片摘要都算處理過
-    const bc = old.bc || { week: weekId(), fl: Object.fromEntries(Object.keys((data && data.fests) || {}).filter((k) => data.fests[k].n > 0).map((k) => [k, 1])) };
+    const bc = old.bc || { week: weekId(), cweek: weekId(), fl: Object.fromEntries(Object.keys((data && data.fests) || {}).filter((k) => data.fests[k].n > 0).map((k) => [k, 1])) };
     await this.state.storage.put(id, { endpoint, keys: { p256dh: keys.p256dh, auth: keys.auth }, prefs, endCfg, opt, favs, sent, bc, at: Date.now() });
     return json({ ok: true, count: favs.length });
   }
@@ -286,12 +296,25 @@ export class PushHub {
     const data = await this.notifyData();
     if (!data || !data.movies || Date.now() - (data.updated || 0) > 6 * 3600e3) return { skipped: "stale data" }; // 資料太舊（排程停了）就不判斷，免得誤報
     const subs = await this.state.storage.list({ prefix: "s:" });
-    let sentCount = 0, gone = 0;
-    for (const [id, sub] of subs) {
-      let changed = false, budget = 4; // 一個人一次最多四則
+    let sentCount = 0, gone = 0, held = 0;
+    // 一輪最多送幾則：免費方案一次執行只能對外連 50 次（扣掉讀資料的），超過的會整批失敗。
+    // 到上限就先停，沒送的不記成送過，下一個小時接著送。付費方案可以在環境變數 PUSH_MAX 調高
+    let quota = Math.max(1, Number(this.env.PUSH_MAX) || 40);
+    const push = async (sub, payload) => { if (quota <= 0) { held++; return -1; } quota--; return send(sub, payload, this.env).catch(() => 0); };
+    // 每一輪從不同的人開始（照小時輪流），到上限時才不會永遠是排前面的人先收到
+    const all = Array.from(subs);
+    const start = all.length ? Math.floor(Date.now() / 3600e3) % all.length : 0;
+    const order = all.slice(start).concat(all.slice(0, start));
+    const dead = new Set();
+    // 分兩趟：第一趟是跟著收藏電影走的（開放場次、特殊廳、快下檔…有時效）；第二趟才是每週摘要和影展片單（晚幾個小時沒關係）。
+    // 額度不夠時，先顧有時效的
+    for (const pass of [1, 2])
+    for (const [id, sub] of order) {
+      if (dead.has(id)) continue;
+      let changed = false, budget = 4; // 一個人一趟最多四則
       const cfg = endConfig(sub.endCfg), opt = optConfig(sub.opt);
       if (!this.env.PUSH_ANY_HOUR && inQuiet(opt.quiet, h)) continue; // 這個人的勿擾時段：留到之後再發（PUSH_ANY_HOUR 只有測試時設）
-      for (const fav of sub.favs || []) {
+      for (const fav of pass === 1 ? sub.favs || [] : []) {
         const mark = (sub.sent[fav.key] ||= { open: false, rel: false, end: false, fest: false, hi: 0 });
         const c = conditions(fav, data, cfg, mark, opt);
         // 舊的紀錄沒有新種類的欄位：以現在的狀況為準，不補發
@@ -311,40 +334,54 @@ export class PushHub {
           if (!sub.prefs[kind]) { done(true); continue; } // 沒開這一種：記成處理過，之後才開也不會補發舊的
           if (budget <= 0) continue;
           const msg = message(kind, fav, c, cfg);
-          const status = await send(sub, { ...msg, tag: `${kind}:${fav.key}`, url: "/?fav=1" }, this.env).catch(() => 0);
+          const status = await push(sub, { ...msg, tag: `${kind}:${fav.key}`, url: "/?fav=1" });
           if (status === 404 || status === 410) { await this.state.storage.delete(id); gone++; budget = -1; changed = false; break; }
           if (status >= 200 && status < 300) { done(true); budget--; sentCount++; }
         }
         if (budget < 0) break;
       }
       // ── 不用收藏的通知 ──
-      if (budget >= 0) {
-        const bc = (sub.bc ||= { week: weekId(), fl: Object.fromEntries(Object.keys(data.fests || {}).filter((k) => data.fests[k].n > 0).map((k) => [k, 1])) });
+      if (pass === 2 && budget >= 0) {
+        const bc = (sub.bc ||= { week: weekId(), cweek: weekId(), fl: Object.fromEntries(Object.keys(data.fests || {}).filter((k) => data.fests[k].n > 0).map((k) => [k, 1])) });
         bc.fl ||= {};
+        if (bc.cweek === undefined) { bc.cweek = weekId(); changed = true; } // 舊的紀錄沒有這一欄：從下一週開始
         // 影展片單公布：這個影展第一次有片單（還沒結束的）
         for (const [fid, f] of Object.entries(data.fests || {})) {
           if (!(f.n > 0) || bc.fl[fid] || f.end < today) continue;
           if (!sub.prefs.flist || budget <= 0) { if (!sub.prefs.flist) { bc.fl[fid] = 1; changed = true; } continue; }
-          const status = await send(sub, { title: `${f.name}的片單公布了`, body: `共 ${f.n} 部，${md(f.start)}–${md(f.end)}。點這裡看片單。`, tag: `flist:${fid}`, url: "/?tab=fest" }, this.env).catch(() => 0);
+          const status = await push(sub, { title: `${f.name}的片單公布了`, body: `共 ${f.n} 部，${md(f.start)}–${md(f.end)}。點這裡看片單。`, tag: `flist:${fid}`, url: "/?tab=fest" });
           if (status === 404 || status === 410) { await this.state.storage.delete(id); gone++; budget = -1; changed = false; break; }
           if (status >= 200 && status < 300) { bc.fl[fid] = 1; changed = true; budget--; sentCount++; }
         }
         for (const k of Object.keys(bc.fl)) if (!(data.fests || {})[k]) { delete bc.fl[k]; changed = true; }
         // 每週新片：星期四發一次，列出這一週（週一到週日）上映的片
         const wk = weekId();
-        if (budget >= 0 && bc.week !== wk && new Date(Date.now() + 8 * 3600e3).getUTCDay() === 4) {
+        const wd = new Date(Date.now() + 8 * 3600e3).getUTCDay(), digestDay = wd === 4 || wd === 5; // 星期四發；人多、一個小時送不完的，到星期五都還會補送
+        // 收藏影城每週新片：同樣星期四發一次，只列「你收藏的影城」這一週新上、而且已經排了場次的片
+        if (budget >= 0 && bc.cweek !== wk && digestDay) {
+          const mine = cinemaWeekFilms(data, opt.cinemas);
+          if (!sub.prefs.cweek || !mine.titles.length) { bc.cweek = wk; changed = true; }
+          else if (budget > 0) {
+            const where = mine.names.length > 1 ? `${mine.names[0]}等 ${mine.names.length} 間影城` : mine.names[0] || "你收藏的影城";
+            const status = await push(sub, { title: `收藏影城本週新上 ${mine.titles.length} 部`, body: `${where}：${mine.titles.slice(0, 5).join("、")}${mine.titles.length > 5 ? "…" : ""}`, tag: `cweek:${wk}`, url: "/" });
+            if (status === 404 || status === 410) { await this.state.storage.delete(id); gone++; budget = -1; changed = false; }
+            else if (status >= 200 && status < 300) { bc.cweek = wk; changed = true; budget--; sentCount++; }
+          }
+        }
+        if (budget >= 0 && bc.week !== wk && digestDay) {
           const list = weekFilms(data, today);
           if (!sub.prefs.week || !list.length) { bc.week = wk; changed = true; }
           else if (budget > 0) {
-            const status = await send(sub, { title: `本週上映 ${list.length} 部新片`, body: list.slice(0, 5).join("、") + (list.length > 5 ? "…" : ""), tag: `week:${wk}`, url: "/?tab=soon" }, this.env).catch(() => 0);
-            if (status === 404 || status === 410) { await this.state.storage.delete(id); gone++; changed = false; }
+            const status = await push(sub, { title: `本週上映 ${list.length} 部新片`, body: list.slice(0, 5).join("、") + (list.length > 5 ? "…" : ""), tag: `week:${wk}`, url: "/?tab=soon" });
+            if (status === 404 || status === 410) { await this.state.storage.delete(id); gone++; budget = -1; changed = false; }
             else if (status >= 200 && status < 300) { bc.week = wk; changed = true; sentCount++; }
           }
         }
       }
-      if (changed) await this.state.storage.put(id, sub);
+      if (budget < 0) dead.add(id); // 這個人的推送位址失效、已經刪掉：第二趟不用再看
+      else if (changed) await this.state.storage.put(id, sub);
     }
-    return { subs: subs.size, sent: sentCount, gone };
+    return { subs: subs.size, sent: sentCount, gone, ...(held ? { held } : {}) }; // held = 這一輪到上限、留到下一個小時的
   }
 }
 
