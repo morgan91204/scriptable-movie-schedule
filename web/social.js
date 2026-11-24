@@ -40,7 +40,7 @@ export function socialInit(sql) {
   // users.emoji = 頭像用的表情符號（後來才加的欄位）；沒有就用暱稱的第一個字
   if (!sql.exec("SELECT 1 FROM pragma_table_info('users') WHERE name = 'emoji'").toArray().length) sql.exec("ALTER TABLE users ADD COLUMN emoji TEXT NOT NULL DEFAULT ''");
   // users.th、users.ig = 個人頁上的 Threads、Instagram 帳號（只存帳號名稱，不存網址）
-  for (const c of ["th", "ig"]) if (!sql.exec("SELECT 1 FROM pragma_table_info('users') WHERE name = ?", c).toArray().length) sql.exec(`ALTER TABLE users ADD COLUMN ${c} TEXT NOT NULL DEFAULT ''`);
+  for (const c of ["th", "ig", "tw"]) if (!sql.exec("SELECT 1 FROM pragma_table_info('users') WHERE name = ?", c).toArray().length) sql.exec(`ALTER TABLE users ADD COLUMN ${c} TEXT NOT NULL DEFAULT ''`);
   // users.bio = 個人頁上的一行自我介紹（後來才加的欄位）
   if (!sql.exec("SELECT 1 FROM pragma_table_info('users') WHERE name = 'bio'").toArray().length) sql.exec("ALTER TABLE users ADD COLUMN bio TEXT NOT NULL DEFAULT ''");
   sql.exec("CREATE INDEX IF NOT EXISTS entries_at ON entries (at)");
@@ -95,10 +95,10 @@ const cleanBio = (x) => String(x == null ? "" : x).normalize("NFC").replace(/[\u
 const bioHasContact = (x) => /https?:|www\.|[a-z0-9-]+\.(com|net|org|tw|cc|io|me|ly|gg|xyz|shop|top)\b|\d{8,}|(?:line|telegram|tg|賴)\s*(?:id)?\s*[:：@]/i.test(x);
 /** 社群帳號：只收帳號名稱（貼整個網址或前面有 @ 會自動去掉）；格式不對回 null */
 const cleanHandle = (x) => {
-  const v = String(x == null ? "" : x).trim().replace(/^https?:\/\/(www\.)?(threads\.(net|com)|instagram\.com)\//i, "").replace(/[/?#].*$/, "").replace(/^@/, "");
+  const v = String(x == null ? "" : x).trim().replace(/^https?:\/\/(www\.|mobile\.)?(threads\.(net|com)|instagram\.com|x\.com|twitter\.com)\//i, "").replace(/[/?#].*$/, "").replace(/^@/, "");
   return v === "" ? "" : /^[A-Za-z0-9._]{1,30}$/.test(v) ? v : null;
 };
-const linksOut = (u) => ({ ...(u.th ? { th: u.th } : {}), ...(u.ig ? { ig: u.ig } : {}) });
+const linksOut = (u) => ({ ...(u.th ? { th: u.th } : {}), ...(u.ig ? { ig: u.ig } : {}), ...(u.tw ? { tw: u.tw } : {}) });
 /** 短評或回覆裡的 @暱稱：通知被提到的人（最多 3 個；只有公開個人頁的人收得到，自己和 skip 裡的人不算）。回傳被通知的帳號 */
 function mentioned(sql, text, uid, skip = []) {
   const out = [];
@@ -339,14 +339,16 @@ export async function social(hub, path, b) {
     const bio = b.bio === undefined ? (me ? me.bio || "" : "") : cleanBio(b.bio);
     if (Array.from(bio).length > BIO_MAX || bioHasContact(bio)) return json({ error: "bad bio" }, 400);
     const th = b.th === undefined ? (me ? me.th || "" : "") : cleanHandle(b.th), ig = b.ig === undefined ? (me ? me.ig || "" : "") : cleanHandle(b.ig);
+    const tw = b.tw === undefined ? (me ? me.tw || "" : "") : cleanHandle(b.tw);
+    if (tw === null || (tw && !/^[A-Za-z0-9_]{1,15}$/.test(tw))) return json({ error: "bad handle" }, 400);
     if (th === null || ig === null) return json({ error: "bad handle" }, 400);
     const pub = b.pub ? 1 : 0;
     if (!NAME_RE.test(name) || RESERVED.test(name)) return json({ error: "bad name" }, 400);
     const taken = one(sql, "SELECT uid FROM users WHERE name = ?", name);
     if (taken && taken.uid !== uid) return json({ error: "name taken" }, 409);
     if (me && me.name !== name && Date.now() - me.named <= RENAME_EVERY) return json({ error: "rename later" }, 429);
-    if (me) sql.exec("UPDATE users SET name = ?, color = ?, emoji = ?, bio = ?, th = ?, ig = ?, pub = ?, named = ? WHERE uid = ?", name, color, emoji, bio, th, ig, pub, me.name !== name ? Date.now() : me.named, uid);
-    else sql.exec("INSERT INTO users (uid, name, color, emoji, bio, th, ig, pub, at, named) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)", uid, name, color, emoji, bio, th, ig, pub, Date.now());
+    if (me) sql.exec("UPDATE users SET name = ?, color = ?, emoji = ?, bio = ?, th = ?, ig = ?, tw = ?, pub = ?, named = ? WHERE uid = ?", name, color, emoji, bio, th, ig, tw, pub, me.name !== name ? Date.now() : me.named, uid);
+    else sql.exec("INSERT INTO users (uid, name, color, emoji, bio, th, ig, tw, pub, at, named) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)", uid, name, color, emoji, bio, th, ig, tw, pub, Date.now());
     return json({ ok: true, user: { name, color, pub: !!pub, ...(emoji ? { emoji } : {}) } });
   }
   if (op === "follow") {
