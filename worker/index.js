@@ -12,6 +12,9 @@
 //   POST /v2/note   { m, d, x, sp }          → 同上（x 空字串 = 刪掉自己的短評；sp = 作者自己標「可能有雷」）
 //   POST /v2/report { m, d, id, why }        → 同上（why：spoiler 劇透／abuse 不當內容／spam 廣告）
 //     檢舉規則：同一則被 2 台不同裝置檢舉劇透 → 自動標成「可能有雷」（摺疊）；被 3 台不同裝置檢舉 → 自動隱藏。站長可以還原（還原後不再被自動隱藏）
+//   POST /v2/note-add  { m, d, x, sp }       → 同上。新增一則（同一部片一個人最多 5 則）；/v2/note 是舊版 App 用的「換掉我最新的那一則」
+//   POST /v2/note-del  { m, d, id }          → 同上。刪掉自己的某一則
+//   POST /v2/note-vote { m, d, id, v }       → 同上。推（1）、噓（-1）、收回（0）；清單裡每則的 p = 推減噓，my = 我的表態
 //   GET  /v2/notes-all                       → { movies: { <片名鍵>: [{ id, x, sp, s, at }] } }（所有看得到的短評；每 30 分鐘匯出成靜態檔，也是備份）
 //   POST /admin { op, m, id, notes }         → 站長管理（要帶 x-admin-key；金鑰只由 GitHub Actions 的「短評管理」臨時產生、用完就換掉）
 //     op：flagged 列出被檢舉的／hide 隱藏／restore 還原／delete 刪除／import 從備份匯回
@@ -35,6 +38,7 @@ const okDevice = (d) => typeof d === "string" && /^[A-Za-z0-9_-]{16,64}$/.test(d
 const isAccountDev = (d) => typeof d === "string" && d.indexOf("u_") === 0;
 const okAccountDev = (d) => typeof d === "string" && /^u_[0-9a-f]{40}$/.test(d);
 const NOTE_MAX_ACCOUNT = 140; // 有帳號的人短評可以寫長一點
+const NOTES_PER_FILM = 5; // 同一部片一個人最多發幾則短評
 // 心得標籤：只收代號（小寫英文），有哪些標籤、叫什麼名字由 App 決定；不收任何自由輸入的文字
 const TAGS_MAX = 5;
 // 短評
@@ -93,6 +97,20 @@ export class AccountRpc extends WorkerEntrypoint {
     if (Array.from(x).length > NOTE_MAX_ACCOUNT) return { error: "too long" };
     if (x && noteHasContact(x)) return { error: "no links" };
     return (await this.movie(m).setNote(dev, x, sp ? 1 : 0, m, true)) || { error: "vote first" };
+  }
+  /** 新增一則短評（一部片最多 5 則）、刪掉自己的某一則、推或噓別人的（by 可以是帳號或裝置） */
+  async noteAdd(m, dev, text, sp) {
+    if (!this.ok(m, dev) || typeof text !== "string" || text.length > 1200) return { error: "bad request" };
+    const x = cleanNote(text);
+    if (!x) return { error: "bad request" };
+    if (Array.from(x).length > NOTE_MAX_ACCOUNT) return { error: "too long" };
+    if (noteHasContact(x)) return { error: "no links" };
+    return (await this.movie(m).addNote(dev, x, sp ? 1 : 0, m, true)) || { error: "vote first" };
+  }
+  async noteDel(m, dev, id) { return this.ok(m, dev) && Number.isInteger(id) ? this.movie(m).delNote(dev, id, m, true) : { error: "bad request" }; }
+  async noteVote(m, by, id, v) {
+    if (!okMovie(m) || !(okAccountDev(by) || okDevice(by)) || !Number.isInteger(id) || [1, 0, -1].indexOf(v) < 0) return { error: "bad request" };
+    return this.movie(m).voteNote(by, id, v, m, true);
   }
   /** 這部片的短評。viewer = 看的人的代號（帳號或裝置；用來標「我的」「已檢舉」）。帳號寫的短評會帶 a = 作者的帳號代號，給網頁版伺服器換成暱稱 */
   async notes(m, viewer) { return okMovie(m) ? this.movie(m).listNotes(typeof viewer === "string" ? viewer : "", true) : { error: "bad request" }; }
@@ -215,6 +233,35 @@ export default {
 
       if (v === "2" && path === "/notes-all" && req.method === "GET") return json({ movies: await env.INDEX.get(env.INDEX.idFromName("all")).allNotes() });
 
+      if (v === "2" && (path === "/note-add" || path === "/note-del" || path === "/note-vote") && req.method === "POST") {
+        let b;
+        try {
+          b = await req.json();
+        } catch (_) {
+          return json({ error: "bad json" }, 400);
+        }
+        const m = b && b.m, d = b && b.d;
+        if (!okMovie(m) || !okDevice(d)) return json({ error: "bad request" }, 400);
+        const ip = req.headers.get("cf-connecting-ip") || "unknown";
+        if (!(await env.LIMIT.get(env.LIMIT.idFromName(ip)).hit(LIMIT_MAX, LIMIT_WINDOW))) return json({ error: "too many requests, try later" }, 429);
+        const movie = env.MOVIE.get(env.MOVIE.idFromName(m));
+        if (path === "/note-add") {
+          if (typeof b.x !== "string" || b.x.length > 600) return json({ error: "bad request" }, 400);
+          const x = cleanNote(b.x);
+          if (!x) return json({ error: "bad request" }, 400);
+          if (Array.from(x).length > NOTE_MAX) return json({ error: "too long" }, 422);
+          if (noteHasContact(x)) return json({ error: "no links" }, 422);
+          const out = await movie.addNote(d, x, b.sp ? 1 : 0, m);
+          return !out ? json({ error: "vote first" }, 409) : out.error ? json(out, 422) : json(out);
+        }
+        const id = Number(b.id);
+        if (!Number.isInteger(id) || id < 1) return json({ error: "bad request" }, 400);
+        if (path === "/note-del") return json(await movie.delNote(d, id, m));
+        const vv = Number(b.v);
+        if ([1, 0, -1].indexOf(vv) < 0) return json({ error: "bad request" }, 400);
+        return json(await movie.voteNote(d, id, vv, m));
+      }
+
       if (v === "2" && (path === "/note" || path === "/report") && req.method === "POST") {
         let b;
         try {
@@ -288,6 +335,19 @@ export class Movie extends DurableObject {
     // 短評：一台裝置一則。keep = 站長還原過（不再被自動隱藏）；rs = 從備份匯回時記的分數（平常分數直接對評分表）
     this.sql.exec("CREATE TABLE IF NOT EXISTS notes (id INTEGER PRIMARY KEY AUTOINCREMENT, dev TEXT UNIQUE NOT NULL, x TEXT NOT NULL, sp INTEGER NOT NULL DEFAULT 0, at INTEGER NOT NULL, hidden INTEGER NOT NULL DEFAULT 0, keep INTEGER NOT NULL DEFAULT 0, rs INTEGER)");
     this.sql.exec("CREATE TABLE IF NOT EXISTS note_reports (id INTEGER NOT NULL, dev TEXT NOT NULL, why TEXT NOT NULL, at INTEGER NOT NULL, PRIMARY KEY (id, dev))");
+    // 短評改成一個人可以發好幾則（像留言區）：原本的表規定「一個人一則」，換成沒有這個限制的新表，舊資料原封不動搬過去（編號不變）
+    if (!this.sql.exec("SELECT v FROM meta WHERE k = 'notes_multi'").toArray().length) {
+      ctx.storage.transactionSync(() => {
+        this.sql.exec("CREATE TABLE notes_new (id INTEGER PRIMARY KEY AUTOINCREMENT, dev TEXT NOT NULL, x TEXT NOT NULL, sp INTEGER NOT NULL DEFAULT 0, at INTEGER NOT NULL, hidden INTEGER NOT NULL DEFAULT 0, keep INTEGER NOT NULL DEFAULT 0, rs INTEGER)");
+        this.sql.exec("INSERT INTO notes_new (id, dev, x, sp, at, hidden, keep, rs) SELECT id, dev, x, sp, at, hidden, keep, rs FROM notes");
+        this.sql.exec("DROP TABLE notes");
+        this.sql.exec("ALTER TABLE notes_new RENAME TO notes");
+        this.sql.exec("CREATE INDEX notes_dev ON notes (dev)");
+        this.sql.exec("INSERT INTO meta (k, v) VALUES ('notes_multi', '1')");
+      });
+    }
+    // 推和噓：一個人對一則只有一筆，v = 1 推、-1 噓
+    this.sql.exec("CREATE TABLE IF NOT EXISTS note_votes (id INTEGER NOT NULL, dev TEXT NOT NULL, v INTEGER NOT NULL, PRIMARY KEY (id, dev))");
   }
   /** 心得標籤的欄位（後來才加的）：第一次用到時補上 */
   ensureTags() {
@@ -335,40 +395,72 @@ export class Movie extends DurableObject {
   }
 
   // ── 短評 ──
-  dropNote(dev) {
-    const row = this.sql.exec("SELECT id FROM notes WHERE dev = ?", dev).toArray()[0];
-    if (!row) return;
-    this.sql.exec("DELETE FROM note_reports WHERE id = ?", row.id);
-    this.sql.exec("DELETE FROM notes WHERE id = ?", row.id);
+  /** 刪掉幾則短評（連同它們收到的推噓、檢舉） */
+  dropNotes(ids) {
+    for (const id of ids) {
+      this.sql.exec("DELETE FROM note_reports WHERE id = ?", id);
+      this.sql.exec("DELETE FROM note_votes WHERE id = ?", id);
+      this.sql.exec("DELETE FROM notes WHERE id = ?", id);
+    }
   }
-  /** 這部片的短評（新的在前）。被隱藏的只有作者自己看得到（會標 hidden，讓他知道別人看不到了） */
+  /** 這個人在這部片的所有短評都刪掉（取消評分時） */
+  dropNote(dev) { this.dropNotes(this.sql.exec("SELECT id FROM notes WHERE dev = ?", dev).toArray().map((r) => r.id)); }
+  /** 這部片的短評（新的在前，最多 200 則；怎麼排由 App 決定）。p = 推減噓，my = 我推（1）或噓（-1）過。
+   *  被隱藏的只有作者自己看得到（會標 hidden，讓他知道別人看不到了） */
   listNotes(dev, withAuthor = false) {
     const notes = [];
-    for (const r of this.sql.exec("SELECT n.id, n.x, n.sp, n.at, n.hidden, n.dev, COALESCE(v.score, n.rs, 0) AS s FROM notes n LEFT JOIN votes v ON v.dev = n.dev WHERE n.hidden = 0 OR n.dev = ? ORDER BY n.at DESC, n.id DESC LIMIT 100", dev || "")) {
+    const mineVotes = {};
+    if (dev) for (const r of this.sql.exec("SELECT id, v FROM note_votes WHERE dev = ?", dev)) mineVotes[r.id] = r.v;
+    for (const r of this.sql.exec("SELECT n.id, n.x, n.sp, n.at, n.hidden, n.dev, COALESCE(v.score, n.rs, 0) AS s, (SELECT COALESCE(SUM(nv.v), 0) FROM note_votes nv WHERE nv.id = n.id) AS p FROM notes n LEFT JOIN votes v ON v.dev = n.dev WHERE n.hidden = 0 OR n.dev = ? ORDER BY n.at DESC, n.id DESC LIMIT 200", dev || "")) {
       const mine = !!dev && r.dev === dev;
-      notes.push({ id: r.id, x: r.x, sp: r.sp ? 1 : 0, s: r.s, at: r.at, ...(mine ? { mine: 1 } : {}), ...(r.hidden ? { hidden: 1 } : {}), ...(withAuthor && isAccountDev(r.dev) ? { a: r.dev.slice(2) } : {}) });
+      notes.push({ id: r.id, x: r.x, sp: r.sp ? 1 : 0, s: r.s, at: r.at, p: r.p, ...(mineVotes[r.id] ? { my: mineVotes[r.id] } : {}), ...(mine ? { mine: 1 } : {}), ...(r.hidden ? { hidden: 1 } : {}), ...(withAuthor && isAccountDev(r.dev) ? { a: r.dev.slice(2) } : {}) });
     }
     const reported = dev ? this.sql.exec("SELECT id FROM note_reports WHERE dev = ?", dev).toArray().map((r) => r.id) : [];
-    return { notes, reported };
+    return { notes, reported, max: NOTES_PER_FILM };
   }
-  /** 寫／改／刪自己的短評。要先評過分；回傳 null = 還沒評分。改內容等於換一則新的（流水號換新、之前的檢舉不算） */
+  hasVoted(dev) { return this.sql.exec("SELECT 1 FROM votes WHERE dev = ?", dev).toArray().length > 0; }
+  /** 舊版 App 的做法（一個人只有一則，可以改）：換掉他最新的那一則；x 空的 = 刪掉最新的那一則。要先評過分；回傳 null = 還沒評分 */
   async setNote(dev, x, sp, key, withAuthor = false) {
-    if (!this.sql.exec("SELECT 1 FROM votes WHERE dev = ?", dev).toArray().length) return null;
-    const old = this.sql.exec("SELECT id, x FROM notes WHERE dev = ?", dev).toArray()[0];
+    if (!this.hasVoted(dev)) return null;
+    const old = this.sql.exec("SELECT id, x FROM notes WHERE dev = ? ORDER BY at DESC, id DESC LIMIT 1", dev).toArray()[0];
     if (old && x && old.x === x) this.sql.exec("UPDATE notes SET sp = MAX(sp, ?) WHERE id = ?", sp, old.id); // 只改「可能有雷」：可以自己加上，不能把被檢舉標上的拿掉
     else {
-      this.dropNote(dev);
+      if (old) this.dropNotes([old.id]);
       if (x) this.sql.exec("INSERT INTO notes (dev, x, sp, at) VALUES (?, ?, ?, ?)", dev, x, sp, Date.now());
     }
     await this.syncNotes(key);
     return this.listNotes(dev, withAuthor);
   }
-  /** 把匿名裝置在這部片的紀錄併進帳號。回傳帳號現在的 { s 分數, t 標籤, x 短評, sp, at }（沒有評分就是 s = 0） */
+  /** 新增一則短評（同一部片一個人最多 NOTES_PER_FILM 則；內容跟自己之前的一樣不重複加）。回傳 null = 還沒評分；{ error } = 滿了 */
+  async addNote(dev, x, sp, key, withAuthor = false) {
+    if (!this.hasVoted(dev)) return null;
+    const mine = this.sql.exec("SELECT x FROM notes WHERE dev = ?", dev).toArray();
+    if (mine.some((r) => r.x === x)) return { error: "duplicate" };
+    if (mine.length >= NOTES_PER_FILM) return { error: "too many notes" };
+    this.sql.exec("INSERT INTO notes (dev, x, sp, at) VALUES (?, ?, ?, ?)", dev, x, sp, Date.now());
+    await this.syncNotes(key);
+    return this.listNotes(dev, withAuthor);
+  }
+  /** 刪掉自己的某一則 */
+  async delNote(dev, id, key, withAuthor = false) {
+    if (this.sql.exec("SELECT 1 FROM notes WHERE id = ? AND dev = ?", id, dev).toArray().length) { this.dropNotes([id]); await this.syncNotes(key); }
+    return this.listNotes(dev, withAuthor);
+  }
+  /** 推或噓一則短評：v = 1 推、-1 噓、0 收回。一個人對一則只算一次，不能推噓自己的 */
+  async voteNote(dev, id, v, key, withAuthor = false) {
+    const note = this.sql.exec("SELECT dev FROM notes WHERE id = ? AND hidden = 0", id).toArray()[0];
+    if (note && note.dev !== dev) {
+      if (v) this.sql.exec("INSERT INTO note_votes (id, dev, v) VALUES (?, ?, ?) ON CONFLICT(id, dev) DO UPDATE SET v = excluded.v", id, dev, v);
+      else this.sql.exec("DELETE FROM note_votes WHERE id = ? AND dev = ?", id, dev);
+      await this.syncNotes(key);
+    }
+    return this.listNotes(dev, withAuthor);
+  }
+  /** 把匿名裝置在這部片的紀錄併進帳號。回傳帳號現在的 { s 分數, t 標籤, x 最新一則短評, sp, at }（沒有評分就是 s = 0） */
   async adopt(from, to, key) {
-    const has = (dev) => this.sql.exec("SELECT 1 FROM votes WHERE dev = ?", dev).toArray().length > 0;
-    if (has(from)) {
+    if (this.hasVoted(from)) {
       this.ctx.storage.transactionSync(() => {
-        if (has(to)) {
+        if (this.hasVoted(to)) {
           // 帳號已經評過：裝置那一份拿掉（一個人不算兩票）
           this.dropNote(from);
           this.sql.exec("DELETE FROM votes WHERE dev = ?", from);
@@ -376,13 +468,17 @@ export class Movie extends DurableObject {
           this.sql.exec("UPDATE votes SET dev = ? WHERE dev = ?", to, from);
           this.sql.exec("UPDATE notes SET dev = ? WHERE dev = ?", to, from);
         }
+        // 裝置推噓過的也算到帳號上（帳號已經對同一則表過態的，以帳號的為準）；自己推自己的不算
+        this.sql.exec("UPDATE OR IGNORE note_votes SET dev = ? WHERE dev = ?", to, from);
+        this.sql.exec("DELETE FROM note_votes WHERE dev = ?", from);
+        this.sql.exec("DELETE FROM note_votes WHERE dev = ? AND id IN (SELECT id FROM notes WHERE dev = ?)", to, to);
       });
       const out = this.count(to);
       await this.sync(key, out.dist, out.tags);
       await this.syncNotes(key);
     }
     const v = this.sql.exec("SELECT score, tags, at FROM votes WHERE dev = ?", to).toArray()[0];
-    const n = this.sql.exec("SELECT x, sp FROM notes WHERE dev = ?", to).toArray()[0];
+    const n = this.sql.exec("SELECT x, sp FROM notes WHERE dev = ? ORDER BY at DESC, id DESC LIMIT 1", to).toArray()[0];
     return { s: v ? v.score : 0, t: v && v.tags ? String(v.tags).split(",").filter(Boolean) : [], x: n ? n.x : "", sp: n && n.sp ? 1 : 0, at: v ? v.at : 0 };
   }
   /** 檢舉：一台裝置對一則只算一次，不能檢舉自己的 */
@@ -404,10 +500,7 @@ export class Movie extends DurableObject {
   async moderate(op, id, key) {
     if (op === "hide") this.sql.exec("UPDATE notes SET hidden = 1, keep = 0 WHERE id = ?", id);
     if (op === "restore") this.sql.exec("UPDATE notes SET hidden = 0, keep = 1 WHERE id = ?", id);
-    if (op === "delete") {
-      this.sql.exec("DELETE FROM note_reports WHERE id = ?", id);
-      this.sql.exec("DELETE FROM notes WHERE id = ?", id);
-    }
+    if (op === "delete") this.dropNotes([id]);
     await this.syncNotes(key, true);
     return { ok: true, left: this.sql.exec("SELECT COUNT(*) AS c FROM notes").toArray()[0].c };
   }
@@ -428,11 +521,11 @@ export class Movie extends DurableObject {
   async syncNotes(key, must = false) {
     if (!key) return;
     const visible = [], flagged = [];
-    for (const r of this.sql.exec("SELECT n.id, n.x, n.sp, n.at, n.hidden, n.keep, COALESCE(v.score, n.rs, 0) AS s FROM notes n LEFT JOIN votes v ON v.dev = n.dev ORDER BY n.at DESC, n.id DESC LIMIT 500")) {
-      if (!r.hidden) visible.push({ id: r.id, x: r.x, sp: r.sp ? 1 : 0, s: r.s, at: r.at });
+    for (const r of this.sql.exec("SELECT n.id, n.x, n.sp, n.at, n.hidden, n.keep, COALESCE(v.score, n.rs, 0) AS s, (SELECT COALESCE(SUM(nv.v), 0) FROM note_votes nv WHERE nv.id = n.id) AS p FROM notes n LEFT JOIN votes v ON v.dev = n.dev ORDER BY n.at DESC, n.id DESC LIMIT 500")) {
+      if (!r.hidden) visible.push({ id: r.id, x: r.x, sp: r.sp ? 1 : 0, s: r.s, at: r.at, ...(r.p ? { p: r.p } : {}) });
       const why = {};
       for (const w of this.sql.exec("SELECT why, COUNT(*) AS c FROM note_reports WHERE id = ? GROUP BY why", r.id)) why[w.why] = w.c;
-      if (r.hidden || Object.keys(why).length) flagged.push({ id: r.id, x: r.x, sp: r.sp ? 1 : 0, hidden: r.hidden ? 1 : 0, keep: r.keep ? 1 : 0, why, at: r.at });
+      if (r.hidden || Object.keys(why).length) flagged.push({ id: r.id, x: r.x, sp: r.sp ? 1 : 0, hidden: r.hidden ? 1 : 0, keep: r.keep ? 1 : 0, why, p: r.p, at: r.at });
     }
     try {
       await this.env.INDEX.get(this.env.INDEX.idFromName("all")).putNotes(key, visible, flagged);

@@ -105,7 +105,7 @@ export async function social(hub, path, b) {
   const me = uid ? one(sql, "SELECT * FROM users WHERE uid = ?", uid) : null;
   const need = () => (uid ? null : json({ error: "not signed in" }, 401));
   const m = b.m;
-  const fail = (r) => (r && r.error ? json({ error: r.error }, r.error === "vote first" ? 409 : r.error === "too long" || r.error === "no links" ? 422 : 400) : null);
+  const fail = (r) => (r && r.error ? json({ error: r.error }, r.error === "vote first" ? 409 : ["too long", "no links", "too many notes", "duplicate"].indexOf(r.error) >= 0 ? 422 : 400) : null);
 
   // ── 不用登入也能做的 ──
   if (op === "notes") {
@@ -120,6 +120,13 @@ export async function social(hub, path, b) {
     if (!okKey(m) || !by || !rate) return json({ error: "bad request" }, 400);
     if (uid && !quotaOk(sql, uid)) return json({ error: "too many" }, 429);
     const r = await rate.report(m, by, Number(b.id), String(b.why || ""));
+    return fail(r) || json(withAuthors(sql, r, uid, m));
+  }
+  if (op === "note-vote") {
+    const by = uid ? udev(uid) : okDev(b.d) ? b.d : "";
+    if (!okKey(m) || !by || !rate) return json({ error: "bad request" }, 400);
+    if (uid && !quotaOk(sql, uid)) return json({ error: "too many" }, 429);
+    const r = await rate.noteVote(m, by, Number(b.id), Number(b.v));
     return fail(r) || json(withAuthors(sql, r, uid, m));
   }
   if (op === "profile") {
@@ -277,6 +284,15 @@ export async function social(hub, path, b) {
   if (op === "tags") {
     const r = await rate.tags(m, udev(uid), b.t);
     return fail(r) || json(r);
+  }
+  if (op === "note-add" || op === "note-del") {
+    // 新增一則／刪掉自己的某一則。片單上那一筆記的是「最新的一則」
+    const r = op === "note-add" ? await rate.noteAdd(m, udev(uid), b.x, b.sp) : await rate.noteDel(m, udev(uid), Number(b.id));
+    const bad = fail(r);
+    if (bad) return bad;
+    const mine = (r.notes || []).filter((n) => n.mine).sort((x, y) => y.at - x.at)[0];
+    upsertEntry(sql, uid, m, b.title, { x: mine ? mine.x : "", sp: mine ? mine.sp : 0, ...(mine ? { s: mine.s } : {}), touch: op === "note-add" });
+    return json(withAuthors(sql, r, uid, m));
   }
   if (op === "note") {
     const r = await rate.note(m, udev(uid), b.x, b.sp);

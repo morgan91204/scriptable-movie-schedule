@@ -3791,13 +3791,17 @@ export async function communityTags(title: string, tags: string[]): Promise<Comm
 
 // ── 短評：評完分可以寫一句話（最多 60 字）。防雷：輸入框提醒不提劇情、作者可以自己標「可能有雷」（預設摺疊）、
 //    送出前偵測常見的劇透字眼提醒一次、其他人可以檢舉（2 人檢舉劇透自動摺疊，3 人檢舉自動隱藏）。
-export interface ReviewNote { id: number; x: string; sp: number; s: number; at: number; mine?: number; hidden?: number; by?: { name: string; color: string; emoji?: string; f?: number } }
+export interface ReviewNote { id: number; x: string; sp: number; s: number; at: number; p?: number; my?: number; mine?: number; hidden?: number; by?: { name: string; color: string; emoji?: string; f?: number } }
 /** 短評最多幾個字：有登入帳號的人可以寫長一點 */
 export const noteMax = (): number => (signedIn() ? 140 : NOTE_MAX);
 /** 網頁版一律經過自己的伺服器讀短評（才有作者的暱稱）；Scriptable／Scripting 版直接讀評分伺服器（都是匿名） */
 let notesViaSite = false;
 export function setNotesViaSite(on: boolean): void { notesViaSite = on; }
-export interface ReviewNotes { notes: ReviewNote[]; reported: number[] }
+export interface ReviewNotes { notes: ReviewNote[]; reported: number[]; max?: number }
+/** 被噓到這個分數以下的短評預設摺疊 */
+export const NOTE_FOLD_AT = -5;
+/** 「熱門」排序用的分數：推得多的往前，但新的也有機會（一則大約每 12 小時要多 10 倍的推才能維持在同樣的位置） */
+export const noteHot = (n: ReviewNote): number => { const p = n.p || 0; return Math.sign(p) * Math.log10(Math.max(Math.abs(p), 1)) + n.at / 1000 / 45000; };
 export const NOTE_MAX = 60;
 export const NOTE_PLACEHOLDER = "不提劇情，說說看完的感覺";
 export const NOTE_RULES = "請不要劇透、人身攻擊或貼廣告、連結。被多人檢舉的短評會自動摺疊或隱藏。";
@@ -3844,18 +3848,24 @@ export async function loadNotes(title: string): Promise<ReviewNotes> {
 async function notePost(path: string, title: string, body: Record<string, unknown>, fail: string): Promise<ReviewNotes> {
   const k = communityKey(title);
   // 登入的人用帳號身分送；檢舉在網頁版也走自己的伺服器（回來的清單才有暱稱）
-  const viaSite = signedIn() || (notesViaSite && path === "report");
+  const viaSite = signedIn() || (notesViaSite && (path === "report" || path === "note-vote"));
   const r = viaSite
     ? await socialCall(path, { m: k, title: baseTitle(title), ...body }).then((x) => ({ status: x.status, body: JSON.stringify(x.data) }))
     : await platform().fetchText(`${COMMUNITY_API}/v2/${path}`, { accept: "application/json", "content-type": "application/json" }, { method: "POST", body: JSON.stringify({ m: k, d: deviceId(), ...body }) });
   if (r.status === 429) throw new Error("操作太頻繁，請稍後再試");
   if (r.status === 409) throw new Error("要先評分才能寫短評");
-  if (r.status === 422) throw new Error(/too long/.test(r.body) ? `短評最多 ${noteMax()} 個字` : "短評不能放連結或聯絡方式");
+  if (r.status === 422) throw new Error(/too long/.test(r.body) ? `短評最多 ${noteMax()} 個字` : /too many notes/.test(r.body) ? "同一部片最多發 5 則短評，先刪掉一則再發" : /duplicate/.test(r.body) ? "這句你已經發過了" : "短評不能放連結或聯絡方式");
   if (r.status !== 200) throw new Error(fail);
   return keepNotes(k, JSON.parse(r.body) as ReviewNotes);
 }
 /** 送出（或修改）自己的短評；text 空的 = 刪掉 */
 export const saveNote = (title: string, text: string, spoiler: boolean): Promise<ReviewNotes> => notePost("note", title, { x: String(text || "").trim(), sp: spoiler ? 1 : 0 }, "短評沒有送出，請稍後再試");
+/** 新增一則短評（同一部片最多 5 則） */
+export const addNote = (title: string, text: string, spoiler: boolean): Promise<ReviewNotes> => notePost("note-add", title, { x: String(text || "").trim(), sp: spoiler ? 1 : 0 }, "短評沒有送出，請稍後再試");
+/** 刪掉自己的某一則短評 */
+export const deleteNote = (title: string, id: number): Promise<ReviewNotes> => notePost("note-del", title, { id }, "沒有刪掉，請稍後再試");
+/** 推（1）、噓（-1）或收回（0）一則短評 */
+export const voteNote = (title: string, id: number, v: number): Promise<ReviewNotes> => notePost("note-vote", title, { id, v }, "沒有送出，請稍後再試");
 /** 檢舉一則短評（why：REPORT_REASONS 的 id） */
 export const reportNote = (title: string, id: number, why: string): Promise<ReviewNotes> => notePost("report", title, { id, why }, "檢舉沒有送出，請稍後再試");
 
