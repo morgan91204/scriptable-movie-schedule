@@ -54,6 +54,15 @@ export function socialInit(sql) {
   sql.exec("CREATE TABLE IF NOT EXISTS write_quota (uid TEXT PRIMARY KEY, start INTEGER NOT NULL, n INTEGER NOT NULL)");
 }
 
+/** 主動推一則（只有回覆、追蹤會推；推噓只記在通知頁）。對方沒開通知、沒登入裝置就什麼都不會發；推不出去不影響原本的操作。
+ *  名字只有公開個人頁的人才帶，其他一律「有人」 */
+async function pushTo(hub, sql, to, kind, actor, make) {
+  try {
+    const a = actor ? sql.exec("SELECT name, pub, hidden FROM users WHERE uid = ?", actor).toArray()[0] : null;
+    const who = a && a.pub && !a.hidden && a.name ? a.name + " " : "有人";
+    await hub.socialPush(to, kind, { url: "/?tab=activity", ...make(who) });
+  } catch (_) {}
+}
 const ACT_KEEP = 300; // 一個人最多留幾筆通知
 /** 記一筆通知。自己對自己的不記；同一個人對同一則的推噓只留最新的一筆（改來改去不會洗版） */
 function notify(sql, to, kind, actor, more = {}) {
@@ -165,7 +174,11 @@ export async function social(hub, path, b) {
     const bad = fail(r);
     if (bad) return bad;
     if (r.t) {
-      if (r.t.a) notify(sql, r.t.a, "reply", uid || "d:" + by, { k: m, title: b.title, note: r.t.id, x: cleanTitle(b.x).slice(0, 140), px: r.t.x });
+      if (r.t.a && r.t.a !== (uid || "").slice(0, 40)) {
+        notify(sql, r.t.a, "reply", uid || "d:" + by, { k: m, title: b.title, note: r.t.id, x: cleanTitle(b.x).slice(0, 140), px: r.t.x });
+        const film = cleanTitle(b.title);
+        await pushTo(hub, sql, r.t.a, "reply", uid, (who) => ({ title: `${who}回覆了你${film ? `在《${film}》` : ""}的短評`, body: b.sp ? "（有雷，點進去看）" : cleanTitle(b.x).slice(0, 100), tag: "reply:" + m }));
+      }
       delete r.t;
     }
     return json(withAuthors(sql, r, uid, m));
@@ -308,7 +321,11 @@ export async function social(hub, path, b) {
       if (one(sql, "SELECT COUNT(*) AS c FROM follows WHERE a = ?", uid).c >= 500) return json({ error: "too many follows" }, 400);
       const fresh = !one(sql, "SELECT 1 AS x FROM follows WHERE a = ? AND b = ?", uid, u.uid);
       sql.exec("INSERT OR IGNORE INTO follows (a, b, at) VALUES (?, ?, ?)", uid, u.uid, Date.now());
-      if (fresh) notify(sql, u.uid.slice(0, 40), "follow", uid);
+      if (fresh) {
+        notify(sql, u.uid.slice(0, 40), "follow", uid);
+        const back = !!one(sql, "SELECT 1 AS x FROM follows WHERE a = ? AND b = ?", u.uid, uid);
+        await pushTo(hub, sql, u.uid.slice(0, 40), "follow", uid, (who) => ({ title: back ? `${who}也回追你了` : `${who}開始追蹤你`, body: back ? "你們現在互相追蹤。" : "點這裡看看對方的片單。", tag: "follow:" + uid.slice(0, 12) }));
+      }
     } else {
       sql.exec("DELETE FROM follows WHERE a = ? AND b = ?", uid, u.uid);
       notify(sql, u.uid.slice(0, 40), "unfollow", uid);

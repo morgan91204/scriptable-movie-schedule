@@ -4,9 +4,11 @@ export interface ChangeItem { kind: "new" | "better"; text: string }
 export interface ChangeEntry { id: string; date: string; items: ChangeItem[] }
 export const CHANGELOG: ChangeEntry[] = [
   {
-    id: "2026-11-24",
+    id: "2026-11-24b",
     date: "2026/11/24",
     items: [
+      { kind: "new", text: "多了「通知」頁籤（登入後出現）：有人推、回覆你的短評，或追蹤你、回追你，都會列在這裡；可以直接回追" },
+      { kind: "new", text: "有開通知的話，有人回覆你的短評或追蹤你時會即時通知（可以在通知設定的「社群」各別關掉；推和噓不會跳通知）" },
       { kind: "new", text: "短評變成討論區：同一部片可以發好幾則，可以回覆別人、推或噓，預設依熱門排序" },
       { kind: "better", text: "個人檔案的頭像可以選表情符號，底色可以自訂任何顏色" },
       { kind: "new", text: "我的片單（設定 → 我的片單，網頁版）：用 Google 登入後，評過分、寫過短評、標記看過的片會集中在一起，換裝置也在" },

@@ -347,7 +347,7 @@ g.__push = {
     await navigator.serviceWorker.ready;
     const { key } = await fetch("/api/push/key").then((r) => r.json());
     const sub = (await reg.pushManager.getSubscription()) || (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(key) }));
-    const r = await post("/api/push/subscribe", { ...payload, subscription: sub.toJSON() });
+    const r = await post("/api/push/subscribe", { ...payload, token: lsGet(SY.token) || "", subscription: sub.toJSON() });
     if (!r || !r.ok) throw new Error("伺服器沒有收到訂閱，請稍後再試");
     return (pushState = "on");
   },
@@ -355,7 +355,7 @@ g.__push = {
   async sync(payload: Record<string, unknown>): Promise<void> {
     if (!pushOK() || pushState !== "on") return;
     const sub = await currentSub();
-    if (sub) await post("/api/push/subscribe", { ...payload, subscription: sub.toJSON() }).catch(() => null);
+    if (sub) await post("/api/push/subscribe", { ...payload, token: lsGet(SY.token) || "", subscription: sub.toJSON() }).catch(() => null);
   },
   async disable(): Promise<string> {
     if (!pushOK()) return pushState;

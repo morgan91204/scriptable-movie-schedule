@@ -65,6 +65,7 @@
     addDays: () => addDays,
     addNote: () => addNote,
     adoptRatings: () => adoptRatings,
+    agoLabel: () => agoLabel,
     atDayLive: () => atDayLive,
     baseTitle: () => baseTitle,
     bookingUrl: () => bookingUrl,
@@ -897,10 +898,12 @@ function parseTwMovieDay(doc) {
     { id: "fest", label: "影展開始時", note: "收藏的影展片所屬的影展開始了", group: "fav" },
     { id: "cweek", label: "收藏影城每週新片", note: "每週四早上一則：你收藏的影城這一週新上哪些片", group: "all" },
     { id: "week", label: "每週新片", note: "每週四早上一則：這一週上映哪些片", group: "all" },
-    { id: "flist", label: "影展片單公布時", note: "有影展公布了片單", group: "all" }
+    { id: "flist", label: "影展片單公布時", note: "有影展公布了片單", group: "all" },
+    { id: "reply", label: "有人回覆我的短評時", note: "推和噓不會跳通知，只列在「通知」頁籤裡", group: "social" },
+    { id: "follow", label: "有人追蹤我時", note: "包含對方回追你", group: "social" }
   ];
   var NOTIFY_PRE_STEPS = [1, 3, 7];
-  var notifyPrefs = (s) => ({ open: true, rel: true, end: true, fest: true, favc: true, fmt: false, pre: true, rate: false, week: false, flist: false, cweek: false, ...s.notify || {} });
+  var notifyPrefs = (s) => ({ open: true, rel: true, end: true, fest: true, favc: true, fmt: false, pre: true, rate: false, week: false, flist: false, cweek: false, reply: true, follow: true, ...s.notify || {} });
   var notifyQuiet = (p) => ({ on: p.quietOn !== false, from: p.quietFrom ?? 22, to: p.quietTo ?? 9 });
   var notifyFavs = (s) => (s.favMovies || []).map((f) => ({ key: f.key, title: f.title, ...f.fest ? { fest: { id: f.fest.id, name: f.fest.name } } : {} }));
   var MAPS_LABEL = { apple: "Apple 地圖", google: "Google 地圖" };
@@ -3874,6 +3877,14 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   var setProfileSkipped = (on) => cacheSet("profile-skip.txt", on ? "1" : "");
   var WATCH_HOW = [{ id: "cinema", label: "電影院" }, { id: "second", label: "二輪電影院" }, { id: "stream", label: "串流" }];
   var howLabel = (how) => WATCH_HOW.filter((h) => (how || []).indexOf(h.id) >= 0).map((h) => h.label).join("、");
+  function agoLabel(at) {
+    const m = Math.floor((Date.now() - at) / 6e4);
+    if (m < 1) return "剛剛";
+    if (m < 60) return `${m} 分鐘`;
+    if (m < 60 * 24) return `${Math.floor(m / 60)} 小時`;
+    if (m < 60 * 24 * 30) return `${Math.floor(m / 1440)} 天`;
+    return noteDate(at);
+  }
   var PROFILE_COLORS = [
     { id: "blue", hex: "#0a84ff" },
     { id: "green", hex: "#30b158" },
@@ -4064,7 +4075,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   }
   async function notePost(path, title, body, fail) {
     const k = communityKey(title);
-    const viaSite = signedIn() || notesViaSite && (path === "report" || path === "note-vote");
+    const viaSite = signedIn() || notesViaSite && (path === "report" || path === "note-vote" || path === "note-reply");
     const r = viaSite ? await socialCall(path, { m: k, title: baseTitle(title), ...body }).then((x) => ({ status: x.status, body: JSON.stringify(x.data) })) : await platform().fetchText(`${COMMUNITY_API}/v2/${path}`, { accept: "application/json", "content-type": "application/json" }, { method: "POST", body: JSON.stringify({ m: k, d: deviceId(), ...body }) });
     if (r.status === 429) throw new Error("操作太頻繁，請稍後再試");
     if (r.status === 409) throw new Error("要先評分才能寫短評");
@@ -4073,7 +4084,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     return keepNotes(k, JSON.parse(r.body));
   }
   var saveNote = (title, text, spoiler) => notePost("note", title, { x: String(text || "").trim(), sp: spoiler ? 1 : 0 }, "短評沒有送出，請稍後再試");
-  var addNote = (title, text, spoiler, replyTo = 0) => notePost("note-add", title, { x: String(text || "").trim(), sp: spoiler ? 1 : 0, ...replyTo ? { r: replyTo } : {} }, "沒有送出，請稍後再試");
+  var addNote = (title, text, spoiler, replyTo = 0) => notePost(replyTo && (notesViaSite || signedIn()) ? "note-reply" : "note-add", title, { x: String(text || "").trim(), sp: spoiler ? 1 : 0, ...replyTo ? { r: replyTo } : {} }, "沒有送出，請稍後再試");
   var deleteNote = (title, id) => notePost("note-del", title, { id }, "沒有刪掉，請稍後再試");
   var voteNote = (title, id, v) => notePost("note-vote", title, { id, v }, "沒有送出，請稍後再試");
   var reportNote = (title, id, why) => notePost("report", title, { id, why }, "檢舉沒有送出，請稍後再試");
@@ -4424,7 +4435,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   var extra = { boxOffice, filmList, soonList, nowShowing, nowShowingMulti, movieBoard: movieBoard2, festivalBoard, festivalFilm, nearby, patchSettings, fillMovie, formatList };
   var BRIDGE_LEVEL = 2;
   globalThis.MS = {
-    version: "2026.11.24-2232",
+    version: "2026.11.24-2244",
     level: BRIDGE_LEVEL,
     init(saved) {
       cache = saved || {};

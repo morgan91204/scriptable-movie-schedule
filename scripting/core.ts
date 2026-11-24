@@ -47,7 +47,7 @@ export interface Settings {
 /** 收藏電影通知種類：open 開放場次了、rel 上映了、end 快下檔了、fest 影展開始了 */
 export interface NotifyPrefs {
   open: boolean; rel: boolean; end: boolean; fest: boolean;
-  favc?: boolean; fmt?: boolean; pre?: boolean; rate?: boolean; week?: boolean; flist?: boolean; cweek?: boolean;
+  favc?: boolean; fmt?: boolean; pre?: boolean; rate?: boolean; week?: boolean; flist?: boolean; cweek?: boolean; reply?: boolean; follow?: boolean;
   fmts?: string[]; // 特殊廳有場次時：要哪幾種廳（IMAX、杜比…）
   preDays?: number; // 上映前幾天提醒（預設 3）
   quietOn?: boolean; quietFrom?: number; quietTo?: number; // 勿擾時段（預設開，22 點到 9 點）
@@ -81,9 +81,9 @@ export function notifyPayload(s: Settings): { prefs: Record<string, boolean>; op
     favs: notifyFavs(s),
   };
 }
-export type NotifyKind = "open" | "rel" | "end" | "fest" | "favc" | "fmt" | "pre" | "rate" | "week" | "flist" | "cweek";
+export type NotifyKind = "open" | "rel" | "end" | "fest" | "favc" | "fmt" | "pre" | "rate" | "week" | "flist" | "cweek" | "reply" | "follow";
 /** 通知種類。group：fav = 跟著收藏的電影走；all = 不用收藏也會發（預設關） */
-export const NOTIFY_KINDS: { id: NotifyKind; label: string; note: string; group: "fav" | "all" }[] = [
+export const NOTIFY_KINDS: { id: NotifyKind; label: string; note: string; group: "fav" | "all" | "social" }[] = [
   { id: "open", label: "開放場次時", note: "還沒排片的片，戲院開始排場次、可以訂票了", group: "fav" },
   { id: "pre", label: "上映前提醒", note: "上映前幾天提醒一次", group: "fav" },
   { id: "rel", label: "上映時", note: "收藏的片正式上映的那一天", group: "fav" },
@@ -95,10 +95,12 @@ export const NOTIFY_KINDS: { id: NotifyKind; label: string; note: string; group:
   { id: "cweek", label: "收藏影城每週新片", note: "每週四早上一則：你收藏的影城這一週新上哪些片", group: "all" },
   { id: "week", label: "每週新片", note: "每週四早上一則：這一週上映哪些片", group: "all" },
   { id: "flist", label: "影展片單公布時", note: "有影展公布了片單", group: "all" },
+  { id: "reply", label: "有人回覆我的短評時", note: "推和噓不會跳通知，只列在「通知」頁籤裡", group: "social" },
+  { id: "follow", label: "有人追蹤我時", note: "包含對方回追你", group: "social" },
 ];
 /** 「上映前提醒」可以選幾天前 */
 export const NOTIFY_PRE_STEPS = [1, 3, 7];
-export const notifyPrefs = (s: Settings): NotifyPrefs => ({ open: true, rel: true, end: true, fest: true, favc: true, fmt: false, pre: true, rate: false, week: false, flist: false, cweek: false, ...(s.notify || {}) });
+export const notifyPrefs = (s: Settings): NotifyPrefs => ({ open: true, rel: true, end: true, fest: true, favc: true, fmt: false, pre: true, rate: false, week: false, flist: false, cweek: false, reply: true, follow: true, ...(s.notify || {}) });
 /** 勿擾時段（幾點到幾點不發；預設晚上十點到早上九點） */
 export const notifyQuiet = (p: NotifyPrefs): { on: boolean; from: number; to: number } => ({ on: p.quietOn !== false, from: p.quietFrom ?? 22, to: p.quietTo ?? 9 });
 /** 交給通知伺服器的收藏清單：只有片名鍵、片名、影展代碼（海報、收藏時間這些不傳） */
@@ -3628,6 +3630,17 @@ export interface Profile { name: string; color: string; emoji?: string; bio?: st
 export const WATCH_HOW: { id: string; label: string }[] = [{ id: "cinema", label: "電影院" }, { id: "second", label: "二輪電影院" }, { id: "stream", label: "串流" }];
 export const howLabel = (how?: string[]): string => WATCH_HOW.filter((h) => (how || []).indexOf(h.id) >= 0).map((h) => h.label).join("、");
 export interface DiaryEntry { k: string; title: string; s: number; x: string; sp: number; seen: string; at: number; priv?: number; how?: string[]; by?: { name: string; color: string; emoji?: string } }
+/** 通知頁的一列：up 有人推我的短評／down 有人噓／reply 有人回覆我／follow 有人追蹤我。who = 是誰（最多列兩個有公開個人頁的人），n = 總共幾個人 */
+export interface Activity { kind: "up" | "down" | "reply" | "follow"; at: number; n: number; who: { name: string; color: string; emoji?: string }[]; k?: string; title?: string; x?: string; px?: string; back?: number; returned?: number; fresh?: number }
+/** 通知上的時間：剛剛、幾分鐘、幾小時、幾天，再久就寫日期 */
+export function agoLabel(at: number): string {
+  const m = Math.floor((Date.now() - at) / 60000);
+  if (m < 1) return "剛剛";
+  if (m < 60) return `${m} 分鐘`;
+  if (m < 60 * 24) return `${Math.floor(m / 60)} 小時`;
+  if (m < 60 * 24 * 30) return `${Math.floor(m / 1440)} 天`;
+  return noteDate(at);
+}
 export interface SocialCounts { films: number; notes: number; following: number; followers: number }
 export const PROFILE_COLORS: { id: string; hex: string }[] = [
   { id: "blue", hex: "#0a84ff" }, { id: "green", hex: "#30b158" }, { id: "orange", hex: "#ff9f0a" }, { id: "red", hex: "#ff453a" },
@@ -3848,7 +3861,7 @@ export async function loadNotes(title: string): Promise<ReviewNotes> {
 async function notePost(path: string, title: string, body: Record<string, unknown>, fail: string): Promise<ReviewNotes> {
   const k = communityKey(title);
   // 登入的人用帳號身分送；檢舉在網頁版也走自己的伺服器（回來的清單才有暱稱）
-  const viaSite = signedIn() || (notesViaSite && (path === "report" || path === "note-vote"));
+  const viaSite = signedIn() || (notesViaSite && (path === "report" || path === "note-vote" || path === "note-reply"));
   const r = viaSite
     ? await socialCall(path, { m: k, title: baseTitle(title), ...body }).then((x) => ({ status: x.status, body: JSON.stringify(x.data) }))
     : await platform().fetchText(`${COMMUNITY_API}/v2/${path}`, { accept: "application/json", "content-type": "application/json" }, { method: "POST", body: JSON.stringify({ m: k, d: deviceId(), ...body }) });
@@ -3861,7 +3874,7 @@ async function notePost(path: string, title: string, body: Record<string, unknow
 /** 送出（或修改）自己的短評；text 空的 = 刪掉 */
 export const saveNote = (title: string, text: string, spoiler: boolean): Promise<ReviewNotes> => notePost("note", title, { x: String(text || "").trim(), sp: spoiler ? 1 : 0 }, "短評沒有送出，請稍後再試");
 /** 新增一則短評（同一部片最多 5 則） */
-export const addNote = (title: string, text: string, spoiler: boolean, replyTo = 0): Promise<ReviewNotes> => notePost("note-add", title, { x: String(text || "").trim(), sp: spoiler ? 1 : 0, ...(replyTo ? { r: replyTo } : {}) }, "沒有送出，請稍後再試");
+export const addNote = (title: string, text: string, spoiler: boolean, replyTo = 0): Promise<ReviewNotes> => notePost(replyTo && (notesViaSite || signedIn()) ? "note-reply" : "note-add", title, { x: String(text || "").trim(), sp: spoiler ? 1 : 0, ...(replyTo ? { r: replyTo } : {}) }, "沒有送出，請稍後再試");
 /** 刪掉自己的某一則短評 */
 export const deleteNote = (title: string, id: number): Promise<ReviewNotes> => notePost("note-del", title, { id }, "沒有刪掉，請稍後再試");
 /** 推（1）、噓（-1）或收回（0）一則短評 */

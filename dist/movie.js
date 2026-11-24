@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.24-2232
+// @movie-schedule-app 電影行程 v2026.11.24-2244
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/parsers.gen.ts
@@ -615,10 +615,12 @@ var NOTIFY_KINDS = [
   { id: "fest", label: "影展開始時", note: "收藏的影展片所屬的影展開始了", group: "fav" },
   { id: "cweek", label: "收藏影城每週新片", note: "每週四早上一則：你收藏的影城這一週新上哪些片", group: "all" },
   { id: "week", label: "每週新片", note: "每週四早上一則：這一週上映哪些片", group: "all" },
-  { id: "flist", label: "影展片單公布時", note: "有影展公布了片單", group: "all" }
+  { id: "flist", label: "影展片單公布時", note: "有影展公布了片單", group: "all" },
+  { id: "reply", label: "有人回覆我的短評時", note: "推和噓不會跳通知，只列在「通知」頁籤裡", group: "social" },
+  { id: "follow", label: "有人追蹤我時", note: "包含對方回追你", group: "social" }
 ];
 var NOTIFY_PRE_STEPS = [1, 3, 7];
-var notifyPrefs = (s) => ({ open: true, rel: true, end: true, fest: true, favc: true, fmt: false, pre: true, rate: false, week: false, flist: false, cweek: false, ...s.notify || {} });
+var notifyPrefs = (s) => ({ open: true, rel: true, end: true, fest: true, favc: true, fmt: false, pre: true, rate: false, week: false, flist: false, cweek: false, reply: true, follow: true, ...s.notify || {} });
 var notifyQuiet = (p) => ({ on: p.quietOn !== false, from: p.quietFrom ?? 22, to: p.quietTo ?? 9 });
 var notifyFavs = (s) => (s.favMovies || []).map((f) => ({ key: f.key, title: f.title, ...f.fest ? { fest: { id: f.fest.id, name: f.fest.name } } : {} }));
 var MAPS_LABEL = { apple: "Apple 地圖", google: "Google 地圖" };
@@ -3506,6 +3508,14 @@ var profileSkipped = () => cacheGet("profile-skip.txt") === "1";
 var setProfileSkipped = (on) => cacheSet("profile-skip.txt", on ? "1" : "");
 var WATCH_HOW = [{ id: "cinema", label: "電影院" }, { id: "second", label: "二輪電影院" }, { id: "stream", label: "串流" }];
 var howLabel = (how) => WATCH_HOW.filter((h2) => (how || []).indexOf(h2.id) >= 0).map((h2) => h2.label).join("、");
+function agoLabel(at) {
+  const m = Math.floor((Date.now() - at) / 6e4);
+  if (m < 1) return "剛剛";
+  if (m < 60) return `${m} 分鐘`;
+  if (m < 60 * 24) return `${Math.floor(m / 60)} 小時`;
+  if (m < 60 * 24 * 30) return `${Math.floor(m / 1440)} 天`;
+  return noteDate(at);
+}
 var PROFILE_COLORS = [
   { id: "blue", hex: "#0a84ff" },
   { id: "green", hex: "#30b158" },
@@ -3696,7 +3706,7 @@ async function loadNotes(title) {
 }
 async function notePost(path, title, body, fail) {
   const k = communityKey(title);
-  const viaSite = signedIn() || notesViaSite && (path === "report" || path === "note-vote");
+  const viaSite = signedIn() || notesViaSite && (path === "report" || path === "note-vote" || path === "note-reply");
   const r = viaSite ? await socialCall(path, { m: k, title: baseTitle(title), ...body }).then((x) => ({ status: x.status, body: JSON.stringify(x.data) })) : await platform().fetchText(`${COMMUNITY_API}/v2/${path}`, { accept: "application/json", "content-type": "application/json" }, { method: "POST", body: JSON.stringify({ m: k, d: deviceId(), ...body }) });
   if (r.status === 429) throw new Error("操作太頻繁，請稍後再試");
   if (r.status === 409) throw new Error("要先評分才能寫短評");
@@ -3704,7 +3714,7 @@ async function notePost(path, title, body, fail) {
   if (r.status !== 200) throw new Error(fail);
   return keepNotes(k, JSON.parse(r.body));
 }
-var addNote = (title, text, spoiler, replyTo = 0) => notePost("note-add", title, { x: String(text || "").trim(), sp: spoiler ? 1 : 0, ...replyTo ? { r: replyTo } : {} }, "沒有送出，請稍後再試");
+var addNote = (title, text, spoiler, replyTo = 0) => notePost(replyTo && (notesViaSite || signedIn()) ? "note-reply" : "note-add", title, { x: String(text || "").trim(), sp: spoiler ? 1 : 0, ...replyTo ? { r: replyTo } : {} }, "沒有送出，請稍後再試");
 var deleteNote = (title, id) => notePost("note-del", title, { id }, "沒有刪掉，請稍後再試");
 var voteNote = (title, id, v) => notePost("note-vote", title, { id, v }, "沒有送出，請稍後再試");
 var reportNote = (title, id, why) => notePost("report", title, { id, why }, "檢舉沒有送出，請稍後再試");
@@ -3970,6 +3980,7 @@ function setBackGuard(fn) {
 }
 var TAB_ICONS = {
   house: '<svg viewBox="0 0 24 24"><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v10h5v-6h4v6h5V10"/></svg>',
+  bell: '<svg viewBox="0 0 24 24"><path d="M6 16.5V11a6 6 0 1 1 12 0v5.5l1.6 2H4.4z"/><path d="M10 20.5a2.2 2.2 0 0 0 4 0"/></svg>',
   film: '<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 4v16M17 4v16M3 9h4M3 15h4M17 9h4M17 15h4"/></svg>',
   building: '<svg viewBox="0 0 24 24"><path d="M3 21h18"/><path d="M5 21V7l5-3v17"/><path d="M10 21V11l9-3v13"/><path d="M14 13h2M14 17h2"/></svg>',
   gear: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>'
@@ -4426,6 +4437,26 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 @media(prefers-color-scheme:dark){.pf-tag.good{color:#30d158}.pf-tag.warn{color:#ffb340}.pf-tag.bad{color:#ff6961}}
 .pf-sub{margin-top:2px;font-size:13px;color:var(--fg2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .th.focus{margin:8px -8px 0;padding:10px 8px 6px;border-radius:12px;background:rgba(10,132,255,.12);box-shadow:0 0 0 1.5px var(--accent) inset}
+.ac-list{padding:4px 16px 8px}
+.ac{display:flex;align-items:center;gap:10px;padding:10px 0}
+.ac.fresh{margin:0 -8px;padding:10px 8px;border-radius:12px;background:rgba(10,132,255,.1)}
+.ac-main{flex:1;min-width:0;display:flex;align-items:center;gap:12px;padding:0;text-align:left;color:var(--fg)}
+.ac-av{position:relative;flex:none;width:44px;height:44px}
+.ac-av>.av{width:44px;height:44px;font-size:20px}
+.ac-av>.av.emo{font-size:25px}
+.ac-av2{position:absolute;right:-6px;bottom:-4px}
+.ac-av2 .av{width:26px;height:26px;font-size:12px;box-shadow:0 0 0 2px var(--card)}
+.ac-mark{position:absolute;right:-4px;bottom:-3px;width:19px;height:19px;border-radius:50%;font-style:normal;font-size:10px;line-height:19px;text-align:center;color:#fff;background:var(--fg2);box-shadow:0 0 0 2px var(--card)}
+.ac-av2+.ac-mark{right:auto;left:-4px}
+.ac-mark.up{background:#ff6a00}
+.ac-mark.down{background:#5e7bff}
+.ac-mark.reply{background:var(--accent)}
+.ac-mark.follow{background:#30b158}
+.ac-text{flex:1;min-width:0;font-size:14.5px;line-height:1.4;overflow-wrap:anywhere}
+.ac-text b{font-weight:700}
+.ac-text em{font-style:normal;color:var(--fg2);white-space:nowrap}
+.ac-btn{flex:none;height:32px;padding:0 14px;border-radius:9px;background:var(--chip);color:var(--fg2);font-size:13.5px;font-weight:600;line-height:32px;white-space:nowrap}
+.ac-btn.go{background:var(--accent);color:#fff}
 .th-list{padding:6px 16px 12px}
 .th{padding-top:14px}
 .th-head{display:flex;flex-wrap:wrap;align-items:center;gap:4px 7px;font-size:12.5px;color:var(--fg2)}
@@ -4778,9 +4809,11 @@ var scriptablePlatform = {
 // src/changelog.ts
 var CHANGELOG = [
   {
-    id: "2026-11-24",
+    id: "2026-11-24b",
     date: "2026/11/24",
     items: [
+      { kind: "new", text: "多了「通知」頁籤（登入後出現）：有人推、回覆你的短評，或追蹤你、回追你，都會列在這裡；可以直接回追" },
+      { kind: "new", text: "有開通知的話，有人回覆你的短評或追蹤你時會即時通知（可以在通知設定的「社群」各別關掉；推和噓不會跳通知）" },
       { kind: "new", text: "短評變成討論區：同一部片可以發好幾則，可以回覆別人、推或噓，預設依熱門排序" },
       { kind: "better", text: "個人檔案的頭像可以選表情符號，底色可以自訂任何顏色" },
       { kind: "new", text: "我的片單（設定 → 我的片單，網頁版）：用 Google 登入後，評過分、寫過短評、標記看過的片會集中在一起，換裝置也在" },
@@ -4835,12 +4868,8 @@ var App = class {
     this.loadingText = "讀取中…";
     // ── 底部分頁：首頁／電影／影城／設定，各自是一個根畫面；點目前的分頁會回到該分頁的根
     this.tab = "home";
-    this.TABS = [
-      { id: "home", label: "首頁", icon: "house" },
-      { id: "movies", label: "電影", icon: "film" },
-      { id: "cinemas", label: "影城", icon: "building" },
-      { id: "settings", label: "設定", icon: "gear" }
-    ];
+    this.unread = 0;
+    // 還沒看過的通知有幾筆（頁籤上的紅點）
     this.lastTabTap = { id: "", at: 0 };
     // ── 事件迴圈 ──
     // 背景查 GitHub 上的最新版本（首頁顯示是否為最新版）
@@ -5036,6 +5065,16 @@ var App = class {
     this.loadingText = loading;
     this.stack.push(view);
   }
+  /** 網頁版多一個「通知」（有人推、噓、回覆你的短評，或追蹤你）；其他版本沒有帳號，不顯示 */
+  get TABS() {
+    return [
+      { id: "home", label: "首頁", icon: "house" },
+      { id: "movies", label: "電影", icon: "film" },
+      { id: "cinemas", label: "影城", icon: "building" },
+      ...this.sync() ? [{ id: "activity", label: "通知", icon: "bell" }] : [],
+      { id: "settings", label: "設定", icon: "gear" }
+    ];
+  }
   // 上一次點的是哪個頁籤、什麼時候（用來認「連點兩下」）
   /** 點下面的頁籤。連點同一個兩下（0.6 秒內）＝重新整理：整頁重新載入，資料重抓，有新版也會順便換上，並回到同一個頁籤 */
   tapTab(id) {
@@ -5060,7 +5099,8 @@ var App = class {
       home: [() => this.homeView(), "讀取中…"],
       movies: [() => this.movieListView(), "讀取電影清單…"],
       cinemas: [() => this.citiesView(), "讀取中…"],
-      settings: [() => this.settingsView(), "讀取中…"]
+      settings: [() => this.settingsView(), "讀取中…"],
+      activity: [() => this.activityView(), "讀取通知…"]
     };
     const [view, loading] = root[id] || root.home;
     this.loadingText = loading;
@@ -5074,7 +5114,7 @@ var App = class {
   }
   /** 最新版本是多少。網頁版問的是自己網站現在上線的版本（重新整理就會拿到的那一版），不是 GitHub 上的 */
   checkVersion() {
-    if (true) return checkLatest("2026.11.24-2232");
+    if (true) return checkLatest("2026.11.24-2244");
     return (async () => {
       try {
         let r = await globalThis.fetch("/version.json?t=" + Date.now(), { cache: "no-store" });
@@ -5082,7 +5122,7 @@ var App = class {
         const latest = String((await r.json()).version || "");
         if (!latest) return null;
         const num = (v) => Number(v.replace(/\D/g, "")) || 0;
-        return { latest, isLatest: num("2026.11.24-2232") >= num(latest) };
+        return { latest, isLatest: num("2026.11.24-2244") >= num(latest) };
       } catch (_) {
         return null;
       }
@@ -5092,11 +5132,13 @@ var App = class {
     this.settings = await loadSettings();
     await this.syncStart().catch(() => void 0);
     if (!settingsStored && this.settings.seenLog === void 0) this.settings.seenLog = CHANGELOG_LATEST;
-    setTabBar(() => ({ active: this.tab, items: this.TABS.map((t) => t.id === "settings" && this.logUnread() ? { ...t, dot: true } : t), onTap: (id) => this.tapTab(id) }));
+    setTabBar(() => ({ active: this.tab, items: this.TABS.map((t) => t.id === "settings" && this.logUnread() || t.id === "activity" && this.unread > 0 ? { ...t, dot: true } : t), onTap: (id) => this.tapTab(id) }));
     setBackGuard(() => this.stack.length > 1);
     this.go(() => this.homeView(), "讀取影城清單…");
-    const startTab = false ? (/[?&]tab=(soon|fest)\b/.exec(String(globalThis.location?.search || "")) || [])[1] : "";
-    if (startTab) {
+    const startTab = false ? (/[?&]tab=(soon|fest|activity)\b/.exec(String(globalThis.location?.search || "")) || [])[1] : "";
+    if (startTab === "activity") {
+      if (this.sync()) this.switchTab("activity");
+    } else if (startTab) {
       this.movieMode = startTab;
       this.switchTab("movies");
     }
@@ -5106,11 +5148,15 @@ var App = class {
         const t = G.sessionStorage.getItem("ms:reload-tab");
         if (t) {
           G.sessionStorage.removeItem("ms:reload-tab");
-          if (/^(movies|cinemas|settings)$/.test(t)) this.switchTab(t);
+          if (/^(movies|cinemas|settings|activity)$/.test(t)) this.switchTab(t);
         }
       } catch (_) {
       }
     }
+    if (signedIn()) this.pushSync();
+    if (signedIn()) social("me").then((d) => {
+      this.unread = d.unread || 0;
+    }, () => void 0);
     await this.openShared().catch(() => void 0);
     if (this.followedAfterLogin) {
       const who = this.followedAfterLogin;
@@ -5487,6 +5533,7 @@ var App = class {
       return;
     }
     if (fin === "ok") {
+      this.pushSync();
       const r2 = await sy.pull();
       if (r2 && r2.data) applyLocal(syncMerge(this.settings, r2.data));
       await sy.push(syncPick(this.settings));
@@ -5536,6 +5583,7 @@ var App = class {
     if (!this.meMem || Date.now() - this.meMem.at > 6e4) {
       const job = social("me").then((d) => {
         this.meMem = { at: Date.now(), data: d };
+        this.unread = d.unread || 0;
       }, () => void 0);
       await Promise.race([job, sleep(900)]);
     }
@@ -5859,6 +5907,46 @@ var App = class {
       }
     } }))));
   }
+  // ── 通知頁（網頁版最下面的頁籤）：有人推、噓、回覆你的短評，或追蹤你 ──
+  async activityView() {
+    const sy = this.sync();
+    if (!sy || !sy.on())
+      return /* @__PURE__ */ h(Page, { title: "通知" }, /* @__PURE__ */ h(Section, { hint: "登入後，有人推或回覆你的短評、追蹤你，都會列在這裡。" }, /* @__PURE__ */ h(Item, { icon: "👤", title: "用 Google 登入", subtitle: "登入後才收得到通知", accent: true, onTap: () => sy && sy.login() })));
+    let list = [], failed = "";
+    try {
+      list = (await social("activity")).list || [];
+      this.unread = 0;
+      if (this.meMem) this.meMem.data = { ...this.meMem.data, unread: 0 };
+    } catch (e) {
+      failed = String(e?.message || e);
+    }
+    const row = (a) => {
+      const names = a.who.map((w) => w.name);
+      const rest = a.n - names.length;
+      const whoText = names.length ? names.join("、") + (rest > 0 ? ` 和另外 ${rest} 人` : "") : a.n > 1 ? `${a.n} 個人` : "有人";
+      const quote = (t) => t ? `「${t}${Array.from(t).length >= 40 ? "…" : ""}」` : "";
+      const what = a.kind === "up" ? `推了你在《${a.title}》的短評${quote(a.px)}` : a.kind === "down" ? `噓了你在《${a.title}》的短評${quote(a.px)}` : a.kind === "reply" ? `在《${a.title}》回覆你：${a.x || ""}` : a.returned ? "也回追你了" : "開始追蹤你";
+      const open = a.kind === "follow" ? names.length ? () => this.go(() => this.profileView(names[0]), "讀取個人頁…") : void 0 : () => {
+        this.noteReset();
+        if (a.px) this.noteFocus = { x: a.px, at: Date.now(), head: true };
+        this.go(() => this.notesView(a.title || ""), "讀取短評…");
+      };
+      const first = a.who[0];
+      const mark = a.kind === "up" ? "▲" : a.kind === "down" ? "▼" : a.kind === "reply" ? "↩" : "＋";
+      return /* @__PURE__ */ h("div", { class: "ac" + (a.fresh ? " fresh" : "") }, /* @__PURE__ */ h("button", { class: "ac-main", onTap: open }, /* @__PURE__ */ h("span", { class: "ac-av" }, first ? this.avatar(first) : /* @__PURE__ */ h("span", { class: "av anon", "aria-hidden": "true" }, a.kind === "down" ? "？" : "匿"), a.who[1] ? /* @__PURE__ */ h("span", { class: "ac-av2" }, this.avatar(a.who[1])) : null, /* @__PURE__ */ h("i", { class: "ac-mark " + a.kind, "aria-hidden": "true" }, mark)), /* @__PURE__ */ h("span", { class: "ac-text" }, a.kind === "down" ? /* @__PURE__ */ h("b", null, a.n > 1 ? `${a.n} 個人` : "有人") : /* @__PURE__ */ h("b", null, esc(whoText)), " ", esc(what), /* @__PURE__ */ h("em", null, "・", esc(agoLabel(a.at))))), a.kind === "follow" && names.length === 1 && !a.back ? /* @__PURE__ */ h("button", { class: "ac-btn go", onTap: async () => {
+        try {
+          await social("follow", { name: names[0], on: true });
+          this.meMem = null;
+          await this.ui.toast(`已追蹤 ${names[0]}`);
+        } catch (e) {
+          await this.ui.toast(String(e?.message || e));
+        }
+      } }, "回追") : a.kind === "follow" && a.back ? /* @__PURE__ */ h("span", { class: "ac-btn" }, "互相追蹤") : null);
+    };
+    const week = Date.now() - 7 * 864e5;
+    const fresh = list.filter((a) => a.fresh), recent = list.filter((a) => !a.fresh && a.at >= week), older = list.filter((a) => !a.fresh && a.at < week);
+    return /* @__PURE__ */ h(Page, { title: "通知" }, failed ? /* @__PURE__ */ h(Section, null, /* @__PURE__ */ h(Note, { kind: "warn", text: failed })) : !list.length ? /* @__PURE__ */ h(Section, { hint: "噓只會顯示人數，不會顯示是誰。" }, /* @__PURE__ */ h(Note, { text: "還沒有通知。有人推、噓或回覆你的短評，或是追蹤你，會出現在這裡。" })) : /* @__PURE__ */ h(Fragment, null, fresh.length ? /* @__PURE__ */ h(Section, { title: "新的" }, /* @__PURE__ */ h("div", { class: "ac-list" }, fresh.map(row))) : null, recent.length ? /* @__PURE__ */ h(Section, { title: "過去 7 天" }, /* @__PURE__ */ h("div", { class: "ac-list" }, recent.map(row))) : null, older.length ? /* @__PURE__ */ h(Section, { title: "更早" }, /* @__PURE__ */ h("div", { class: "ac-list" }, older.map(row))) : null, /* @__PURE__ */ h("p", { class: "hint" }, "噓只會顯示人數，不會顯示是誰。沒有公開個人頁的人會顯示成「有人」。")));
+  }
   // 剛進回饋頁：跟伺服器要最新的（之後在這一頁裡點來點去不用每次重讀）
   /** 意見回饋頁：上面選分類、寫內容送出；下面是自己送過的，每一則有處理狀態和站長的回覆 */
   async feedbackView() {
@@ -5886,7 +5974,7 @@ var App = class {
         return;
       }
       try {
-        await sendFeedback(cat.id, text, false ? this.isStandalone() ? "web-app" : "web" : "scriptable", "2026.11.24-2232");
+        await sendFeedback(cat.id, text, false ? this.isStandalone() ? "web-app" : "web" : "scriptable", "2026.11.24-2244");
         this.fbDraft = "";
         this.fbCat = "";
         await this.ui.toast("已送出，謝謝你的回饋");
@@ -6052,12 +6140,14 @@ var App = class {
       this.meMem = null;
       this.hasProfile = null;
       this.syncNote = "";
+      this.pushSync();
       await this.ui.toast("已登出");
     } }), /* @__PURE__ */ h(Item, { icon: "🗑", title: "刪除帳號裡的資料並登出", subtitle: "伺服器上的設定、片單、暱稱和你用帳號評的分都會刪掉，所有裝置都會登出；這台的收藏會留著", chevron: false, onTap: async () => {
       await this.wipeSocial().catch(() => void 0);
       await sy.wipe();
       this.syncWho = null;
       this.syncNote = "";
+      this.pushSync();
       await this.ui.toast("已刪除並登出");
     } }));
   }
@@ -6181,7 +6271,7 @@ var App = class {
       set({ endMax: n2 });
     } }), /* @__PURE__ */ h(Item, { kv: true, title: "算哪些影城", right: `${notifyEndScope(prefs)} ${this.notifyOpen ? "▾" : "▸"}`, chevron: false, onTap: () => {
       this.notifyOpen = !this.notifyOpen;
-    } }), this.notifyOpen ? /* @__PURE__ */ h(Chips, { scroll: true }, /* @__PURE__ */ h(Chip, { label: "全台", muted: pick.fav || picked.length > 0, onTap: () => pickSet(false, []) }), /* @__PURE__ */ h(Chip, { label: "收藏影城", sub: `${this.settings.favorites.length} 間`, muted: !pick.fav, onTap: () => pickSet(!pick.fav, picked) }), cities.map((c) => /* @__PURE__ */ h(Chip, { label: c, muted: picked.indexOf(c) < 0, onTap: () => pickSet(pick.fav, picked.indexOf(c) < 0 ? [...picked, c] : picked.filter((z) => z !== c)) }))) : null) : null, /* @__PURE__ */ h(Section, { title: "每週摘要與公告", hint: "不用收藏電影也會發；預設關閉，想要再打開。「收藏影城每週新片」要先有收藏影城。" }, NOTIFY_KINDS.filter((k) => k.group === "all").map(row)), /* @__PURE__ */ h(Section, { title: "勿擾時段", hint: quiet.on ? `${hh(quiet.from)} 到${quiet.from > quiet.to ? "隔天" : ""} ${hh(quiet.to)} 不發通知，這段時間的通知留到之後再發。` : "任何時間都可能發通知。" }, /* @__PURE__ */ h(Item, { icon: quiet.on ? "✅" : "⬜️", title: "晚上不要通知我", chevron: false, onTap: () => set({ quietOn: !quiet.on }) }), quiet.on ? /* @__PURE__ */ h(PickRow, { title: "開始", name: "qfrom", value: String(quiet.from), options: hours, onPick: (v) => set({ quietFrom: Number(v) }) }) : null, quiet.on ? /* @__PURE__ */ h(PickRow, { title: "結束", name: "qto", value: String(quiet.to), options: hours, onPick: (v) => set({ quietTo: Number(v) }) }) : null), /* @__PURE__ */ h(Section, { hint: `已開啟${n ? `，目前收藏了 ${n} 部` : "；還沒有收藏的電影，到電影頁點愛心收藏"}。你收藏的片名存在我們的伺服器上，只用來判斷什麼時候通知；關閉通知時會一起刪掉。` }, /* @__PURE__ */ h(Item, { icon: "📨", title: "傳一則測試通知", subtitle: "確認這台裝置收得到", chevron: false, onTap: async () => {
+    } }), this.notifyOpen ? /* @__PURE__ */ h(Chips, { scroll: true }, /* @__PURE__ */ h(Chip, { label: "全台", muted: pick.fav || picked.length > 0, onTap: () => pickSet(false, []) }), /* @__PURE__ */ h(Chip, { label: "收藏影城", sub: `${this.settings.favorites.length} 間`, muted: !pick.fav, onTap: () => pickSet(!pick.fav, picked) }), cities.map((c) => /* @__PURE__ */ h(Chip, { label: c, muted: picked.indexOf(c) < 0, onTap: () => pickSet(pick.fav, picked.indexOf(c) < 0 ? [...picked, c] : picked.filter((z) => z !== c)) }))) : null) : null, /* @__PURE__ */ h(Section, { title: "每週摘要與公告", hint: "不用收藏電影也會發；預設關閉，想要再打開。「收藏影城每週新片」要先有收藏影城。" }, NOTIFY_KINDS.filter((k) => k.group === "all").map(row)), /* @__PURE__ */ h(Section, { title: "社群", hint: signedIn() ? "事情發生的當下就通知（勿擾時段裡的留到之後）。" : "要先用 Google 帳號登入，這兩種才會發。" }, NOTIFY_KINDS.filter((k) => k.group === "social").map(row)), /* @__PURE__ */ h(Section, { title: "勿擾時段", hint: quiet.on ? `${hh(quiet.from)} 到${quiet.from > quiet.to ? "隔天" : ""} ${hh(quiet.to)} 不發通知，這段時間的通知留到之後再發。` : "任何時間都可能發通知。" }, /* @__PURE__ */ h(Item, { icon: quiet.on ? "✅" : "⬜️", title: "晚上不要通知我", chevron: false, onTap: () => set({ quietOn: !quiet.on }) }), quiet.on ? /* @__PURE__ */ h(PickRow, { title: "開始", name: "qfrom", value: String(quiet.from), options: hours, onPick: (v) => set({ quietFrom: Number(v) }) }) : null, quiet.on ? /* @__PURE__ */ h(PickRow, { title: "結束", name: "qto", value: String(quiet.to), options: hours, onPick: (v) => set({ quietTo: Number(v) }) }) : null), /* @__PURE__ */ h(Section, { hint: `已開啟${n ? `，目前收藏了 ${n} 部` : "；還沒有收藏的電影，到電影頁點愛心收藏"}。你收藏的片名存在我們的伺服器上，只用來判斷什麼時候通知；關閉通知時會一起刪掉。` }, /* @__PURE__ */ h(Item, { icon: "📨", title: "傳一則測試通知", subtitle: "確認這台裝置收得到", chevron: false, onTap: async () => {
       await this.ui.toast(await p.test() ? "已送出，幾秒內應該會收到" : "送不出去，請關閉通知後重新開啟");
     } }), /* @__PURE__ */ h(Item, { icon: "🔕", title: "關閉通知", subtitle: "停止通知，並刪除伺服器上的資料", chevron: false, onTap: async () => {
       await p.disable();
@@ -6198,7 +6288,7 @@ var App = class {
       this.settings.seenLog = CHANGELOG_LATEST;
       saveSettings(this.settings);
     }
-    return /* @__PURE__ */ h(Page, { title: "更新內容", subtitle: `目前版本 ${"2026.11.24-2232"}`, onBack: () => this.back() }, CHANGELOG.map((e) => /* @__PURE__ */ h(Section, { title: e.date }, e.items.map((it) => /* @__PURE__ */ h(Item, { title: it.text, tag: { text: it.kind === "new" ? "新功能" : "改進", tone: it.kind === "new" ? "now" : "soon" }, chevron: false })))), /* @__PURE__ */ h(Note, { text: "只列出比較有感的變動；修小錯、調整文字這類不會寫在這裡。" }));
+    return /* @__PURE__ */ h(Page, { title: "更新內容", subtitle: `目前版本 ${"2026.11.24-2244"}`, onBack: () => this.back() }, CHANGELOG.map((e) => /* @__PURE__ */ h(Section, { title: e.date }, e.items.map((it) => /* @__PURE__ */ h(Item, { title: it.text, tag: { text: it.kind === "new" ? "新功能" : "改進", tone: it.kind === "new" ? "now" : "soon" }, chevron: false })))), /* @__PURE__ */ h(Note, { text: "只列出比較有感的變動；修小錯、調整文字這類不會寫在這裡。" }));
   }
   async aboutView() {
     return /* @__PURE__ */ h(Page, { title: "關於", onBack: () => this.back() }, /* @__PURE__ */ h(Section, { hint: "連鎖影城的場次來自場次通（twshowtimes.com），感謝場次通的整理；其他來自開眼電影網，以及誠品、光點、樂聲、內惟戲院官網。實際場次以影城公告為準。" }, /* @__PURE__ */ h(Item, { icon: "ℹ️", title: "關於與資料來源", accent: true, chevron: false, onTap: () => Safari.open(ABOUT_URL) }), /* @__PURE__ */ h(Item, { icon: "🔒", title: "隱私權政策", accent: true, chevron: false, onTap: () => Safari.open(PRIVACY_URL) }), /* @__PURE__ */ h(Item, { icon: "🙏", title: "前往場次通", subtitle: "比較各影城場次、看上映場數排行", accent: true, chevron: false, onTap: () => Safari.open("https://twshowtimes.com/") })));
@@ -6229,11 +6319,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.24-2232"}`);
+          Pasteboard.copy(`版本 ${"2026.11.24-2244"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.24-2232"}`,
+      `版本 ${"2026.11.24-2244"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -6467,8 +6557,9 @@ var App = class {
     const SORTS = [{ id: "hot", label: "熱門" }, { id: "new", label: "最新" }, { id: "top", label: "最多推" }, { id: "high", label: "評分高到低" }, { id: "low", label: "評分低到高" }];
     const editing = this.noteEdit || !!this.noteAsk;
     const unsent = !!draft.trim();
-    const focus = this.noteFocus ? tops.find((n) => n.x === this.noteFocus.x) || null : null;
-    if (focus && shown.indexOf(focus) < 0) {
+    const nf = this.noteFocus;
+    const focus = nf ? (nf.head ? notes.find((n) => !n.del && n.x.indexOf(nf.x) === 0) : tops.find((n) => n.x === nf.x)) || null : null;
+    if (focus && !focus.r && shown.indexOf(focus) < 0) {
       this.noteFilter = "all";
       shown.push(focus);
     }
@@ -6854,7 +6945,7 @@ var App = class {
     if (false) {
       if (!r) return /* @__PURE__ */ h(Note, { text: "（無法確認是否為最新版：連不到網站）" });
       if (r.isLatest) return /* @__PURE__ */ h(Note, { text: "✅ 已是最新版" });
-      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.24-2232"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
+      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.24-2244"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
         globalThis.location.reload();
       } }));
     }

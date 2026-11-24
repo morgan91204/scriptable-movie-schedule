@@ -14,7 +14,7 @@ const SUBJECT = "https://app.twmovietime.workers.dev/about/"; // 推送服務出
 const NOTIFY_URL = "https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/data/notify.json";
 // 只接受各家瀏覽器的推送服務，其他網址一律不送（不讓這個端點被拿去打別的網站）
 const PUSH_HOSTS = [/\.push\.apple\.com$/, /^fcm\.googleapis\.com$/, /^updates\.push\.services\.mozilla\.com$/, /\.notify\.windows\.com$/, /^android\.googleapis\.com$/];
-const KINDS = ["open", "rel", "end", "fest", "favc", "fmt", "pre", "rate", "week", "flist", "cweek"];
+const KINDS = ["open", "rel", "end", "fest", "favc", "fmt", "pre", "rate", "week", "flist", "cweek", "reply", "follow"]; // reply、follow = 有人回覆我的短評、有人追蹤我（事情發生當下就推，見 socialPush）
 // 跟著收藏的片走的通知（依序判斷）；week、flist 是不用收藏也會發的
 const FAV_KINDS = ["open", "rel", "favc", "fmt", "pre", "rate", "end", "fest"];
 const FORMATS = ["IMAX", "杜比", "4DX", "MX4D", "ScreenX", "巨幕", "LED", "頂級廳", "3D"];
@@ -274,7 +274,15 @@ export class PushHub {
     }
     // 不用收藏的通知：現在已經公布片單的影展、這一週的新片摘要都算處理過
     const bc = old.bc || { week: weekId(), cweek: weekId(), fl: Object.fromEntries(Object.keys((data && data.fests) || {}).filter((k) => data.fests[k].n > 0).map((k) => [k, 1])) };
-    await this.state.storage.put(id, { endpoint, keys: { p256dh: keys.p256dh, auth: keys.auth }, prefs, endCfg, opt, favs, sent, bc, at: Date.now() });
+    // 這台裝置現在登入的是哪個帳號（有帶登入憑證才有）：有人回覆、追蹤這個帳號時，要推到這台。
+    // 另外記一份「帳號 → 哪幾台裝置」的索引（pu:…），發的時候不用把所有訂閱翻一遍
+    let u = "";
+    if (/^[0-9a-f]{64}$/.test(String(b.token || ""))) { const sess = await this.state.storage.get("t:" + (await sha256hex(String(b.token)))); if (sess) u = String(sess.uid).slice(0, 40); }
+    if ((old.u || "") !== u) {
+      if (old.u) { const l = ((await this.state.storage.get("pu:" + old.u)) || []).filter((x) => x !== id); if (l.length) await this.state.storage.put("pu:" + old.u, l); else await this.state.storage.delete("pu:" + old.u); }
+      if (u) { const l = ((await this.state.storage.get("pu:" + u)) || []).filter((x) => x !== id); await this.state.storage.put("pu:" + u, [id, ...l].slice(0, 10)); }
+    }
+    await this.state.storage.put(id, { endpoint, keys: { p256dh: keys.p256dh, auth: keys.auth }, prefs, endCfg, opt, favs, sent, bc, ...(u ? { u } : {}), at: Date.now() });
     return json({ ok: true, count: favs.length });
   }
   /** 同步設定：login 用 Google 的身分憑證換一張登入憑證；get／put 讀寫設定；logout 登出這台；wipe 刪掉伺服器上的設定並登出所有裝置 */
@@ -326,6 +334,43 @@ export class PushHub {
       return json({ ok: true });
     }
     return json({ error: "not found" }, 404);
+  }
+  /** 有人回覆、追蹤某個帳號：對那個帳號登入的每一台裝置推一則（那台有開這種通知才推）。
+   *  在對方的勿擾時段就先記著（pq:…），等每小時的排程在勿擾時段過後一起送 */
+  async socialPush(to, kind, note) {
+    const ids = (await this.state.storage.get("pu:" + to)) || [];
+    const h = hourTPE();
+    for (const id of ids) {
+      const sub = await this.state.storage.get(id);
+      if (!sub || sub.u !== to) continue;
+      if (!sub.prefs || !sub.prefs[kind]) continue;
+      const opt = optConfig(sub.opt);
+      if (!this.env.PUSH_ANY_HOUR && inQuiet(opt.quiet, h)) {
+        const q = (await this.state.storage.get("pq:" + id)) || [];
+        await this.state.storage.put("pq:" + id, [...q, note].slice(-20));
+        continue;
+      }
+      const status = await send(sub, note, this.env).catch(() => 0);
+      if (status === 404 || status === 410) await this.state.storage.delete(id);
+    }
+  }
+  /** 每小時：把勿擾時段裡先記著的社交通知送出去（一台最多一則；累積好幾則就合成「你有 N 則新通知」） */
+  async flushSocial() {
+    const h = hourTPE();
+    const waiting = await this.state.storage.list({ prefix: "pq:", limit: 25 });
+    let sent = 0;
+    for (const [k, list] of waiting) {
+      const id = k.slice(3);
+      const sub = await this.state.storage.get(id);
+      if (!sub) { await this.state.storage.delete(k); continue; }
+      if (!this.env.PUSH_ANY_HOUR && inQuiet(optConfig(sub.opt).quiet, h)) continue;
+      const note = list.length === 1 ? list[0] : { title: `你有 ${list.length} 則新通知`, body: list.slice(-3).map((n) => n.title).join("\n"), tag: "social:digest", url: "/?tab=activity" };
+      const status = await send(sub, note, this.env).catch(() => 0);
+      if (status === 404 || status === 410) await this.state.storage.delete(id);
+      await this.state.storage.delete(k);
+      sent++;
+    }
+    return sent;
   }
   /** 根管理員（加密設定裡的，App 裡不能移除） */
   rootAdmins() { return String(this.env.ADMIN_EMAILS || "").split(/[\s,]+/).map(normEmail).filter(okEmail); }
@@ -410,6 +455,7 @@ export class PushHub {
   }
   /** 每小時跑一次：條件新成立、使用者有開那一種通知、還沒發過 → 推送。晚上十點到早上九點不吵人（留到早上再發） */
   async run() {
+    await this.flushSocial().catch(() => 0); // 勿擾時段裡先記著的「有人回覆／追蹤」
     const h = hourTPE(), today = todayTPE();
     const data = await this.notifyData();
     if (!data || !data.movies || Date.now() - (data.updated || 0) > 6 * 3600e3) return { skipped: "stale data" }; // 資料太舊（排程停了）就不判斷，免得誤報

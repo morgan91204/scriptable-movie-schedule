@@ -143,11 +143,13 @@ class App {
     setBackGuard(() => this.stack.length > 1);
     this.go(() => this.homeView(), "讀取影城清單…");
     // 從通知點進來（?tab=soon／?tab=fest）：直接開電影分頁的那一類
-    const startTab = IS_WEB ? (/[?&]tab=(soon|fest)\b/.exec(String((globalThis as any).location?.search || "")) || [])[1] : "";
-    if (startTab) { this.movieMode = startTab as "soon" | "fest"; this.switchTab("movies"); }
+    const startTab = IS_WEB ? (/[?&]tab=(soon|fest|activity)\b/.exec(String((globalThis as any).location?.search || "")) || [])[1] : "";
+    if (startTab === "activity") { if (this.sync()) this.switchTab("activity"); }
+    else if (startTab) { this.movieMode = startTab as "soon" | "fest"; this.switchTab("movies"); }
     // 連點頁籤重新整理之後：回到剛才那個頁籤
     if (IS_WEB) { try { const G = globalThis as any; const t = G.sessionStorage.getItem("ms:reload-tab"); if (t) { G.sessionStorage.removeItem("ms:reload-tab"); if (/^(movies|cinemas|settings|activity)$/.test(t)) this.switchTab(t); } } catch (_) {} }
     // 登入的人：開機時看一下有沒有新通知（頁籤上的紅點），不等它
+    if (signedIn()) this.pushSync(); // 讓通知伺服器知道這台登入的是誰（舊的訂閱沒有記）
     if (signedIn()) social<{ unread?: number }>("me").then((d) => { this.unread = d.unread || 0; }, () => undefined);
     await this.openShared().catch(() => undefined);
     if (this.followedAfterLogin) {
@@ -665,6 +667,7 @@ class App {
     const fin: string = await sy.finish();
     if (fin === "fail") { this.syncNote = "登入沒有完成，請再試一次。"; return; }
     if (fin === "ok") {
+      this.pushSync(); // 有開通知的話，讓伺服器知道這台現在登入的是誰（有人回覆、追蹤時才推得到這台）
       const r = await sy.pull();
       if (r && r.data) applyLocal(syncMerge(this.settings, r.data as Partial<SyncData>));
       await sy.push(syncPick(this.settings));
@@ -1442,8 +1445,8 @@ class App {
           if (r && r.data && r.at > sy.at()) { this.syncMute = true; this.settings = syncApply(this.settings, r.data as Partial<SyncData>); saveSettings(this.settings); this.syncMute = false; sy.setAt(r.at); this.pushSync(); await this.ui.toast("已帶入帳號裡比較新的設定"); }
           else await this.ui.toast((await sy.push(syncPick(this.settings))) ? "已同步" : "同步失敗，請稍後再試");
         }} />
-        <Item icon="🚪" title="登出" subtitle="這台的收藏會留著，只是不再同步" chevron={false} onTap={async () => { await sy.logout(); forgetMyVotes(); this.syncWho = null; this.diaryMem = null; this.meMem = null; this.hasProfile = null; this.syncNote = ""; await this.ui.toast("已登出"); }} />
-        <Item icon="🗑" title="刪除帳號裡的資料並登出" subtitle="伺服器上的設定、片單、暱稱和你用帳號評的分都會刪掉，所有裝置都會登出；這台的收藏會留著" chevron={false} onTap={async () => { await this.wipeSocial().catch(() => undefined); await sy.wipe(); this.syncWho = null; this.syncNote = ""; await this.ui.toast("已刪除並登出"); }} />
+        <Item icon="🚪" title="登出" subtitle="這台的收藏會留著，只是不再同步" chevron={false} onTap={async () => { await sy.logout(); forgetMyVotes(); this.syncWho = null; this.diaryMem = null; this.meMem = null; this.hasProfile = null; this.syncNote = ""; this.pushSync(); await this.ui.toast("已登出"); }} />
+        <Item icon="🗑" title="刪除帳號裡的資料並登出" subtitle="伺服器上的設定、片單、暱稱和你用帳號評的分都會刪掉，所有裝置都會登出；這台的收藏會留著" chevron={false} onTap={async () => { await this.wipeSocial().catch(() => undefined); await sy.wipe(); this.syncWho = null; this.syncNote = ""; this.pushSync(); await this.ui.toast("已刪除並登出"); }} />
       </Section>
     );
   }
@@ -1622,6 +1625,9 @@ class App {
         ) : null}
         <Section title="每週摘要與公告" hint="不用收藏電影也會發；預設關閉，想要再打開。「收藏影城每週新片」要先有收藏影城。">
           {NOTIFY_KINDS.filter((k) => k.group === "all").map(row)}
+        </Section>
+        <Section title="社群" hint={signedIn() ? "事情發生的當下就通知（勿擾時段裡的留到之後）。" : "要先用 Google 帳號登入，這兩種才會發。"}>
+          {NOTIFY_KINDS.filter((k) => k.group === "social").map(row)}
         </Section>
         <Section title="勿擾時段" hint={quiet.on ? `${hh(quiet.from)} 到${quiet.from > quiet.to ? "隔天" : ""} ${hh(quiet.to)} 不發通知，這段時間的通知留到之後再發。` : "任何時間都可能發通知。"}>
           <Item icon={quiet.on ? "✅" : "⬜️"} title="晚上不要通知我" chevron={false} onTap={() => set({ quietOn: !quiet.on })} />
