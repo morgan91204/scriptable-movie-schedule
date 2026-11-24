@@ -41,7 +41,7 @@ export interface Settings {
   maps?: MapsApp; // 導航用哪個地圖（預設 Apple 地圖）
   favMovies?: FavMovie[]; // 收藏電影（含影展片）
   favIssuers?: string[]; // 收藏發行商（官方票房資料裡的名稱）
-  notifyAsked?: boolean; // 已經問過「要不要開通知」（寫短評、追蹤別人之後問一次）
+  notifyAsked?: boolean | number; // 上次問「要不要開通知」的時間（寫短評、追蹤別人之後問；兩個禮拜內不重複問）
   notifyNudgeOff?: boolean; // 社群頁籤上「還沒開通知」的提醒按掉了
   myEmoji?: string[]; // 編輯個人檔案時自己加進清單的表情符號（只是方便再選，存在這台裝置）
   seenLog?: string; // 看過的最新一段更新內容（每台裝置各自記，不同步）

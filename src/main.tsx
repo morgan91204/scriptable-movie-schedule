@@ -1167,11 +1167,13 @@ class App {
   /** 寫了短評、回覆或追蹤別人之後：還沒開通知的話問一次要不要開（只問一次；之後社群頁籤上還是有一條提醒） */
   async askNotify(): Promise<void> {
     const p = this.push();
-    if (!p || !signedIn() || this.settings.notifyAsked) return;
+    // 問過之後兩個禮拜內不再問（選了「稍後再說」的人，之後追蹤別人、寫短評時還會再問一次）
+    const last = Number(this.settings.notifyAsked) || 0;
+    if (!p || !signedIn() || Date.now() - last < 14 * 864e5) return;
     const st: string = await p.refresh().catch(() => "");
     this.pushSt = st;
     if (st !== "off" && st !== "needs-install") return;
-    this.settings.notifyAsked = true; saveSettings(this.settings);
+    this.settings.notifyAsked = Date.now(); saveSettings(this.settings);
     this.go(() => (
       <Page title="要開通知嗎？" onBack={() => this.back()}>
         <Section>
@@ -1601,7 +1603,7 @@ class App {
             <span class="ac-text">{a.kind === "down" ? <b>{a.n > 1 ? `${a.n} 個人` : "有人"}</b> : <b>{esc(whoText)}</b>} {esc(what)}<em>・{esc(agoLabel(a.at))}</em></span>
           </button>
           {a.kind === "follow" && names.length === 1 && !a.back ? <button class="ac-btn go" onTap={async () => {
-            try { await social("follow", { name: names[0], on: true }); this.meMem = null; await this.ui.toast(`已追蹤 ${names[0]}`); } catch (e) { await this.ui.toast(String((e as Error)?.message || e)); }
+            try { const r = await social<{ requested: boolean }>("follow", { name: names[0], on: true }); this.meMem = null; await this.ui.toast(r.requested ? "對方是不公開帳號，已送出追蹤要求" : `已追蹤 ${names[0]}`); await this.askNickname(); } catch (e) { await this.ui.toast(String((e as Error)?.message || e)); }
           }}>回追</button> : a.kind === "follow" && a.back ? <span class="ac-btn">互相追蹤</span> : null}
           {a.kind === "request" && names.length === 1 ? <><button class="ac-btn go" onTap={answer(true)}>接受</button><button class="ac-btn" aria-label={`拒絕 ${names[0]} 的追蹤要求`} onTap={answer(false)}>拒絕</button></> : null}
         </div>
