@@ -3553,7 +3553,7 @@ export interface Community {
 /** 心得標籤：評完分可以點選的看片心得（最多 5 個）。只有固定的選項、不能打字，所以不會暴雷。
  *  代號送到伺服器統計，名稱只在 App 裡；要改名稱直接改這裡，代號不要動（動了舊的統計就對不上） */
 export const REVIEW_TAGS: { group: string; single?: boolean; tags: { id: string; label: string }[] }[] = [
-  { group: "推薦程度", single: true, tags: [{ id: "cinema", label: "值得進戲院" }, { id: "stream", label: "等串流就好" }, { id: "again", label: "想二刷" }] },
+  { group: "推薦程度", single: true, tags: [{ id: "stream", label: "等串流就好" }, { id: "cinema", label: "值得進戲院" }, { id: "again", label: "想二刷" }] },
   { group: "亮點", tags: [{ id: "story", label: "劇情" }, { id: "cast", label: "演員" }, { id: "visual", label: "畫面" }, { id: "music", label: "配樂" }, { id: "pace", label: "節奏" }, { id: "ending", label: "結局有力" }] },
   { group: "氛圍", tags: [{ id: "funny", label: "好笑" }, { id: "tears", label: "催淚" }, { id: "brainy", label: "燒腦" }, { id: "tense", label: "緊張" }, { id: "healing", label: "療癒" }, { id: "heavy", label: "沉重" }] },
   { group: "觀影提醒", tags: [{ id: "credits", label: "有片尾彩蛋" }, { id: "prequel", label: "建議先看前作" }, { id: "bigscreen", label: "適合大銀幕" }, { id: "nokids", label: "不適合小孩" }, { id: "long", label: "片長有感" }] },
