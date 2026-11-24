@@ -44,7 +44,7 @@ try {
   if (localStorage.getItem(verKey) !== APP_VERSION) {
     // 不丟的：使用者自己的（評分的裝置代號、投過的票），以及「一部片一部片查出來」的結果（預告、海報、評分、片長）：
     // 這些要重新查很花時間（每部片好幾個請求），而且各自有自己的有效期限和版本檢查，不需要跟著整批清
-    const keep = /cache:(device-id\.txt|my-votes|extras\.json|ratings\.json|posters\.json|runtimes\.json|fav-rows\.json)/;
+    const keep = /cache:(device-id\.txt|feedback-|my-votes|extras\.json|ratings\.json|posters\.json|runtimes\.json|fav-rows\.json)/;
     for (const k of Object.keys(localStorage)) if (k.startsWith(LS + "cache:") && !keep.test(k)) localStorage.removeItem(k);
     localStorage.setItem(verKey, APP_VERSION);
   }
@@ -237,11 +237,11 @@ g.__sync = {
   on: () => !!lsGet(SY.token),
   at: () => Number(lsGet(SY.at)) || 0,
   setAt: (at: number) => lsSet(SY.at, String(at || "")),
-  login() {
+  login(admin?: boolean) {
     const raw = new Uint8Array(16); crypto.getRandomValues(raw);
     const nonce = Array.from(raw).map((x) => x.toString(16).padStart(2, "0")).join("");
     lsSet(SY.nonce, nonce);
-    location.href = "https://accounts.google.com/o/oauth2/v2/auth?" + new URLSearchParams({ client_id: GOOGLE_CLIENT_ID, redirect_uri: location.origin + "/api/auth/google", response_type: "id_token", scope: "openid", nonce, prompt: "select_account" }).toString();
+    location.href = "https://accounts.google.com/o/oauth2/v2/auth?" + new URLSearchParams({ client_id: GOOGLE_CLIENT_ID, redirect_uri: location.origin + "/api/auth/google", response_type: "id_token", scope: admin ? "openid email" : "openid", nonce, prompt: "select_account" }).toString();
   },
   /** 剛從 Google 回來的話，把登入完成：回傳 "ok"／"fail"；不是剛回來回傳 "" */
   async finish(): Promise<string> {
@@ -271,11 +271,17 @@ g.__sync = {
     if (r && r.ok) lsSet(SY.at, String(r.at));
     return !!(r && r.ok);
   },
-  /** 這個帳號的代碼，以及是不是管理員 */
-  async who(): Promise<{ uid: string; admin: boolean } | null> {
+  /** 這張登入憑證是不是管理員的 */
+  async who(): Promise<{ admin: boolean } | null> {
     if (!lsGet(SY.token)) return null;
     const r = await syncPost("who", { token: lsGet(SY.token) }).catch(() => null);
-    return r && r.ok ? { uid: String(r.uid || ""), admin: !!r.admin } : null;
+    return r && r.ok ? { admin: !!r.admin } : null;
+  },
+  /** 管理員專區的其他動作：path = "fb"（意見回饋）／"admins"（管理員名單） */
+  async adm(path: string, body: Record<string, unknown>): Promise<any> {
+    const r = await syncPost(path, { token: lsGet(SY.token), body }).catch(() => null);
+    if (!r || !r.ok) throw new Error(r && r.error === "forbidden" ? "這個帳號不是管理員" : (r && r.error) || "管理功能暫時連不上");
+    return r;
   },
   /** 管理員專區的動作（不是管理員會被伺服器拒絕） */
   async admin(body: Record<string, unknown>): Promise<any> {

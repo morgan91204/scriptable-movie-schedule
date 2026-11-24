@@ -12,9 +12,9 @@ import {
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
   loadSettings, saveSettings, settingsStored, setSettingsSavedHook, syncPick, syncApply, syncMerge, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, communityKey, globalSearch, issuerRecent, favSnapGet, favSnapSet, boxIsRerun, boxHasLaterRun, boxRunRows, boxRunsName, loadIntro, rerunDataReady, SITE_URL, TW,
   FORMATS, formatsOf, filterVersions, filterVersionsAny, movieRows, movieDays, nearest, kmLabel, WINDOWS, findShowtimes, findShowtimesMulti, multiLabel, multiDetail, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText,
-  hallOf, tmdbTest, movieExtras, moviePoster, movieRuntime, posterSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxCountries, boxByCountry, boxInfo, boxInfoRows, boxCountryText, BOX_COUNTRY_NOTE, boxCountryTag, boxCountriesPicked, loadMovieBoard, loadSoonBoard, notifyPrefs, notifyPayload, notifyEndScope, notifyEndPick, notifyQuiet, NOTIFY_PRE_STEPS, NOTIFY_KINDS, boxStatus, STATUS_LABEL, boxInfoBy, isFavMovie, toggleFavMovie, favMovieRows, favMovieBox, soonGroups, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityCached, communityVote, communityTags, loadNotes, notesCached, saveNote, reportNote, noteLooksSpoiler, noteDate, NOTE_MAX, NOTE_PLACEHOLDER, NOTE_RULES, REPORT_REASONS, reviewTagsToggle, REVIEW_TAGS, REVIEW_TAGS_MAX, reviewTagLabel, topReviewTags, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalsReady, festivalNote, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, festivalDefaultDate, festivalStateLabel, festivalState, festivalFooter, linkMovies, nowGroupLine, nowFilter, festivalPick, movieAbout, festivalSearch, festivalSearchLines, festivalTrailer, festivalYears, festivalsAny, festivalGroups, festivalChipNote, festivalStatusLine, movieRatings, ratingTier, tomatoTier, popcornTier, popcornCount,
+  hallOf, tmdbTest, movieExtras, moviePoster, movieRuntime, posterSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxCountries, boxByCountry, boxInfo, boxInfoRows, boxCountryText, BOX_COUNTRY_NOTE, boxCountryTag, boxCountriesPicked, loadMovieBoard, loadSoonBoard, notifyPrefs, notifyPayload, notifyEndScope, notifyEndPick, notifyQuiet, NOTIFY_PRE_STEPS, NOTIFY_KINDS, boxStatus, STATUS_LABEL, boxInfoBy, isFavMovie, toggleFavMovie, favMovieRows, favMovieBox, soonGroups, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityCached, communityVote, communityTags, sendFeedback, loadMyFeedback, feedbackSent, feedbackUnread, feedbackMarkSeen, feedbackCat, FEEDBACK_CATS, FEEDBACK_STATUS, FEEDBACK_MAX, loadNotes, notesCached, saveNote, reportNote, noteLooksSpoiler, noteDate, NOTE_MAX, NOTE_PLACEHOLDER, NOTE_RULES, REPORT_REASONS, reviewTagsToggle, REVIEW_TAGS, REVIEW_TAGS_MAX, reviewTagLabel, topReviewTags, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalsReady, festivalNote, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, festivalDefaultDate, festivalStateLabel, festivalState, festivalFooter, linkMovies, nowGroupLine, nowFilter, festivalPick, movieAbout, festivalSearch, festivalSearchLines, festivalTrailer, festivalYears, festivalsAny, festivalGroups, festivalChipNote, festivalStatusLine, movieRatings, ratingTier, tomatoTier, popcornTier, popcornCount,
 } from "./core";
-import type { ReviewNote, MovieExtras, Ratings, Community, BoxOfficeItem, BoxSort, MovieEntry, SoonEntry, UpcomingFilm, FavMovie, FavRow, NotifyPrefs, NotifyKind, SyncData, GlobalHits, Festival, FestivalFilm, FestivalSession } from "./core";
+import type { Feedback, ReviewNote, MovieExtras, Ratings, Community, BoxOfficeItem, BoxSort, MovieEntry, SoonEntry, UpcomingFilm, FavMovie, FavRow, NotifyPrefs, NotifyKind, SyncData, GlobalHits, Festival, FestivalFilm, FestivalSession } from "./core";
 import { setTabBar, setBackGuard, esc } from "./jsx";
 import { CHANGELOG, CHANGELOG_LATEST } from "./changelog";
 import type { TwMovie, TwMovieCinema, Format, LatLng, Hit } from "./core";
@@ -651,7 +651,146 @@ class App {
       </Section>
     );
   }
-  syncWho: { uid: string; admin: boolean } | null = null; // 登入的帳號代碼、是不是管理員（這次開啟問過一次就記著）
+  syncWho: { admin: boolean } | null = null; // 這次登入是不是管理員（這次開啟問過一次就記著）
+
+  // ── 意見回饋（使用者）──
+  fbCat = ""; // 回饋頁選的分類
+  fbDraft = ""; // 回饋頁打到一半的內容
+  fbForce = false; // 剛進回饋頁：跟伺服器要最新的（之後在這一頁裡點來點去不用每次重讀）
+  /** 意見回饋頁：上面選分類、寫內容送出；下面是自己送過的，每一則有處理狀態和站長的回覆 */
+  async feedbackView(): Promise<string> {
+    let list: Feedback[] = [], failed = "";
+    try { list = feedbackSent() ? await loadMyFeedback(this.fbForce) : []; this.fbForce = false; } catch (e) { failed = String((e as Error)?.message || e); }
+    if (list.some((f) => f.reply)) feedbackMarkSeen(); // 看過了：設定頁的「新回覆」記號拿掉
+    const cat = FEEDBACK_CATS.find((c) => c.id === this.fbCat) || null;
+    const keep = (v?: Record<string, string>) => { if (v && typeof v.t === "string") this.fbDraft = v.t; };
+    const submit = async (v?: Record<string, string>) => {
+      keep(v);
+      const text = this.fbDraft.trim();
+      if (!cat) { await this.ui.toast("先選一個分類"); return; }
+      if (Array.from(text).length < 5) { await this.ui.toast("內容再多寫一點（至少 5 個字）"); return; }
+      try {
+        await sendFeedback(cat.id, text, IS_WEB ? (this.isStandalone() ? "web-app" : "web") : "scriptable", APP_VERSION);
+        this.fbDraft = ""; this.fbCat = "";
+        await this.ui.toast("已送出，謝謝你的回饋");
+      } catch (e) {
+        await this.ui.toast(String((e as Error)?.message || e));
+      }
+    };
+    return (
+      <Page title="意見回饋" onBack={() => this.back()}>
+        <Section title="寫給站長" hint="不用留聯絡方式：站長的回覆和處理狀態會顯示在這一頁下面（這台裝置才看得到）。請不要寫個人資料。">
+          <div class="nt-form">
+            <div class="fb-cats">
+              {FEEDBACK_CATS.map((c) => <button class={"cm-tag" + (c.id === this.fbCat ? " on" : "")} aria-pressed={c.id === this.fbCat ? "true" : "false"} onTap={(v: Record<string, string>) => { keep(v); this.fbCat = c.id; }}>{esc(c.label)}</button>)}
+            </div>
+            <textarea class="fb-area" name="t" maxlength={String(FEEDBACK_MAX)} placeholder={cat ? cat.hint : "先選上面的分類，再寫內容"}>{esc(this.fbDraft)}</textarea>
+            <Button label="送出" onTap={submit} />
+          </div>
+        </Section>
+        <Section title={`我的回饋（${list.length}）`}>
+          {failed ? <Note kind="warn" text={failed} /> : null}
+          {list.length ? <div class="nt-list">{list.map((f) => this.feedbackRow(f))}</div> : failed ? null : <Note text="還沒有送過回饋。" />}
+        </Section>
+      </Page>
+    );
+  }
+  /** 一則回饋：分類、處理狀態、日期、內容、站長的回覆。使用者那一頁和管理員那一頁共用 */
+  feedbackRow(f: Feedback, onTap?: () => void): string {
+    const body = (
+      <>
+        <div class="nt-head">
+          <span class="fb-tag">{esc(feedbackCat(f.cat))}</span>
+          <span class={"fb-tag " + f.status}>{esc(FEEDBACK_STATUS[f.status] || f.status)}</span>
+          <span class="nt-date">{esc(noteDate(f.at))}{f.plat ? `｜${f.plat} ${f.ver || ""}` : ""}</span>
+          {onTap ? <span class="nt-rep">處理 ›</span> : null}
+        </div>
+        <div class="fb-text">{esc(f.text)}</div>
+        {f.reply ? <div class="fb-reply"><b>站長的回覆｜{esc(noteDate(f.rat))}</b>{esc(f.reply)}</div> : null}
+      </>
+    );
+    return onTap ? <div class="nt" role="button" onTap={onTap}>{body}</div> : <div class="nt">{body}</div>;
+  }
+
+  // ── 管理員專區：意見回饋、管理員名單 ──
+  adminFbTab = "open"; // open 還沒處理完的／all 全部
+  adminFbStatus = ""; // 處理某一則時選的狀態
+  adminFbReply: string | null = null; // 處理某一則時打到一半的回覆
+  async adminFeedbackView(): Promise<string> {
+    const sy = this.sync();
+    let list: Feedback[] = [], open = 0, failed = "";
+    try { const r = await sy.adm("fb", { op: "list" }); list = r.list || []; open = r.open || 0; } catch (e) { failed = String((e as Error)?.message || e); }
+    const shown = this.adminFbTab === "open" ? list.filter((f) => f.status === "new" || f.status === "doing") : list;
+    return (
+      <Page title="意見回饋" subtitle="管理員專區" onBack={() => this.back()}>
+        <Chips tabs>
+          <Chip label={`待處理（${open}）`} muted={this.adminFbTab !== "open"} onTap={() => { this.adminFbTab = "open"; }} />
+          <Chip label={`全部（${list.length}）`} muted={this.adminFbTab !== "all"} onTap={() => { this.adminFbTab = "all"; }} />
+        </Chips>
+        {failed ? <Note kind="warn" text={failed} /> : (
+          <Section hint="點一則進去回覆、改處理狀態。使用者會在他的「設定 → 意見回饋」看到狀態和回覆。">
+            {shown.length ? <div class="nt-list">{shown.map((f) => this.feedbackRow(f, () => { this.adminFbStatus = f.status; this.adminFbReply = null; this.go(() => this.adminFeedbackItemView(f)); }))}</div> : <Note text={this.adminFbTab === "open" ? "目前沒有待處理的回饋。" : "還沒有人送回饋。"} />}
+          </Section>
+        )}
+      </Page>
+    );
+  }
+  adminFeedbackItemView(f: Feedback): string {
+    const sy = this.sync();
+    const reply = this.adminFbReply === null ? f.reply : this.adminFbReply;
+    const keep = (v?: Record<string, string>) => { if (v && typeof v.r === "string") this.adminFbReply = v.r; };
+    return (
+      <Page title="處理回饋" onBack={() => this.back()}>
+        <Section title="使用者寫的">
+          <div class="nt-list">{this.feedbackRow({ ...f, reply: "" })}</div>
+        </Section>
+        <Section title="處理狀態">
+          <div class="nt-form"><div class="fb-cats">
+            {Object.keys(FEEDBACK_STATUS).map((s) => <button class={"cm-tag" + (s === this.adminFbStatus ? " on" : "")} aria-pressed={s === this.adminFbStatus ? "true" : "false"} onTap={(v: Record<string, string>) => { keep(v); this.adminFbStatus = s; }}>{esc(FEEDBACK_STATUS[s])}</button>)}
+          </div></div>
+        </Section>
+        <Section title="回覆" hint="可以留空（只改狀態）。回覆只有送這則回饋的那台裝置看得到；清空再儲存 = 收回回覆。">
+          <div class="nt-form">
+            <textarea class="fb-area" name="r" maxlength={String(FEEDBACK_MAX)} placeholder="寫給這位使用者的回覆">{esc(reply)}</textarea>
+            <Button label="儲存" onTap={async (v) => {
+              keep(v);
+              try { await sy.adm("fb", { op: "update", id: f.id, status: this.adminFbStatus, reply: String(this.adminFbReply === null ? f.reply : this.adminFbReply) }); await this.ui.toast("已儲存"); this.back(); } catch (e) { await this.ui.toast(String((e as Error)?.message || e)); }
+            }} />
+            <Button label="刪除這則回饋" kind="danger" onTap={async () => {
+              try { await sy.adm("fb", { op: "delete", id: f.id }); await this.ui.toast("已刪除"); this.back(); } catch (e) { await this.ui.toast(String((e as Error)?.message || e)); }
+            }} />
+          </div>
+        </Section>
+      </Page>
+    );
+  }
+  /** 管理員名單：站長本人（根管理員）存在伺服器的加密設定裡，這裡改不到；其他管理員可以在這裡新增、移除 */
+  async adminListView(): Promise<string> {
+    const sy = this.sync();
+    let root: string[] = [], extra: string[] = [], failed = "";
+    try { const r = await sy.adm("admins", { op: "list" }); root = r.root || []; extra = r.extra || []; } catch (e) { failed = String((e as Error)?.message || e); }
+    const change = (op: string, email: string, done: string) => async () => {
+      try { await sy.adm("admins", { op, email }); await this.ui.toast(done); } catch (e) { await this.ui.toast(String((e as Error)?.message || e)); }
+    };
+    return (
+      <Page title="管理員名單" onBack={() => this.back()}>
+        {failed ? <Note kind="warn" text={failed} /> : (
+          <>
+            <Section title="站長" hint="存在伺服器的加密設定裡，任何人都讀不出來、這裡也改不到（避免被誤刪而進不來）。要換的話到 Cloudflare 後台改。">
+              {root.map((e) => <Item icon="👑" title={e} chevron={false} />)}
+            </Section>
+            <Section title={`其他管理員（${extra.length}）`} hint="新增後，對方要在「設定 → 同步」用「管理員登入」登入那個 Google 帳號。移除後立刻失效。">
+              {extra.map((e) => <Item icon="👤" title={e} chevron={false} action={{ label: "移除", hint: "移除這位管理員", onTap: change("remove", e, "已移除") }} />)}
+              <div class="nt-form">
+                <input class="field" name="e" type="email" autocomplete="off" autocapitalize="off" placeholder="要新增的 Google 帳號（email）" />
+                <Button label="新增管理員" onTap={async (v) => { const e = String(v.e || "").trim(); if (!e) { await this.ui.toast("先填 email"); return; } await change("add", e, "已新增")(); }} />
+              </div>
+            </Section>
+          </>
+        )}
+      </Page>
+    );
+  }
   async syncView(): Promise<string> {
     const sy = this.sync();
     if (sy && sy.on() && !this.syncWho && sy.who) this.syncWho = await sy.who().catch(() => null);
@@ -661,13 +800,10 @@ class App {
       <Page title="用 Google 帳號同步" onBack={() => this.back()}>
         {this.syncSection()}
         {who && who.admin ? (
-          <Section title="管理員">
+          <Section title="管理員專區" hint="只有管理員名單裡的 Google 帳號、用「管理員登入」登入後才看得到這一區。">
+            <Item icon="💬" title="意見回饋" subtitle="看使用者的回饋、回覆、標處理狀態" onTap={() => { this.adminFbTab = "open"; this.go(() => this.adminFeedbackView(), "讀取回饋…"); }} />
             <Item icon="🛡" title="短評管理" subtitle="複查被檢舉的短評，或巡一遍最近的短評" onTap={() => { this.adminTab = "flagged"; this.go(() => this.adminNotesView(), "讀取短評…"); }} />
-          </Section>
-        ) : null}
-        {who && who.uid ? (
-          <Section hint="這是你的帳號在片刻裡的代號（由 Google 帳號的識別碼雜湊而來，不是 email）。一般用不到；設定管理員時才需要。">
-            <Item kv title="帳號代碼" right="複製" chevron={false} onTap={async () => { Pasteboard.copy(who.uid); await this.ui.toast("已複製帳號代碼"); }} />
+            <Item icon="👥" title="管理員名單" subtitle="新增或移除其他管理員" onTap={() => this.go(() => this.adminListView(), "讀取名單…")} />
           </Section>
         ) : null}
       </Page>
@@ -734,6 +870,7 @@ class App {
       return (
         <Section hint={this.syncNote || "登入後，收藏影城、收藏電影、收藏發行商和各項設定會存到你的帳號，在別的裝置或瀏覽器登入同一個帳號就會帶過來。我們只存帳號的識別碼（經過雜湊）和設定，不存 email 和姓名。不登入也能照常使用。"}>
           <Item icon="🔄" title="用 Google 登入來同步" subtitle="例如讓主畫面的 App 和 Safari 用同一份收藏" accent onTap={() => sy.login()} />
+          <Item icon="🛡" title="管理員登入" subtitle="站長用；一般使用者不需要。會向 Google 確認你的 email 是不是管理員" onTap={() => sy.login(true)} />
         </Section>
       );
     return (
@@ -964,6 +1101,9 @@ class App {
     );
   }
   async settingsView(): Promise<string> {
+    // 送過回饋的人：看看有沒有還沒看過的回覆（最多等 0.6 秒，不拖慢設定頁；沒送過的不問伺服器）
+    const fbList = feedbackSent() ? await Promise.race([loadMyFeedback().catch(() => null), sleep(600).then(() => null)]) : null;
+    const fbNew = fbList ? feedbackUnread(fbList) : 0;
     this.calendarName = (await currentCalendar(this.settings)).title;
     return (
       <Page title="設定">
@@ -985,6 +1125,7 @@ class App {
         <Section title="關於">
           {IS_WEB && !this.isStandalone() ? <Item icon="📲" title="加到主畫面" subtitle="像 App 一樣從主畫面開啟，看圖示教學" onTap={() => this.go(() => this.installView())} /> : null}
           <Item icon="ℹ️" title="關於" subtitle="資料來源、隱私權政策、場次通" onTap={() => this.go(() => this.aboutView())} />
+          <Item icon="💬" title="意見回饋" subtitle={fbNew ? "站長回覆你了，點進來看" : "回報問題、資料有誤，或建議新功能"} right={fbNew ? "● 新回覆" : ""} onTap={() => { this.fbCat = ""; this.fbDraft = ""; this.fbForce = true; this.go(() => this.feedbackView(), "讀取中…"); }} />
           <Item icon="📝" title="更新內容" subtitle={this.logUnread() ? "有新的更新，點進來看看" : "最近改了什麼、多了什麼"} right={this.logUnread() ? "● 新" : ""} onTap={() => this.go(() => this.changelogView())} />
         </Section>
         <p

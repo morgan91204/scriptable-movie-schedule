@@ -36,10 +36,9 @@ binding = "RATINGS"
 service = "movie-ratings"
 entrypoint = "AdminRpc"
 
-# 管理員名單：Google 帳號的「帳號代碼」（設定 → 同步 頁面最下面可以複製；是識別碼的雜湊，不是 email），多個用逗號分開。
-# 只有名單裡的帳號登入後，同步頁才會多出「短評管理」
-[vars]
-ADMIN_USERS = ""
+# 管理員名單不寫在這裡（這個程式庫是公開的）：
+#   站長本人放在這個 Worker 的加密設定 ADMIN_EMAILS（Cloudflare 後台 → Workers → app → 設定 → 變數與機密；只能寫入、讀不出來），
+#   其他管理員在 App 的「設定 → 同步 → 管理員名單」新增、移除。
 
 [triggers]
 crons = ["41 * * * *"]

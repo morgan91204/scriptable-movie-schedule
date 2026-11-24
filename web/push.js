@@ -163,7 +163,7 @@ const b64uBytes = (s) => Uint8Array.from(atob(String(s).replace(/-/g, "+").repla
 const sha256hex = async (s) => Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s)))).map((b) => b.toString(16).padStart(2, "0")).join("");
 let googleKeys = null, googleKeysAt = 0;
 /** 驗證 Google 給的身分憑證（ID token）：簽章、發給誰（aud）、誰發的（iss）、有沒有過期、nonce；通過就回傳帳號識別碼（sub） */
-export async function verifyGoogle(idToken, nonce, fetchKeys) {
+export async function verifyGoogle(idToken, nonce, fetchKeys, wantClaims = false) {
   const parts = String(idToken || "").split(".");
   if (parts.length !== 3) throw new Error("bad token");
   const dec = (x) => JSON.parse(new TextDecoder().decode(b64uBytes(x)));
@@ -180,8 +180,23 @@ export async function verifyGoogle(idToken, nonce, fetchKeys) {
   if (!(Number(body.exp) * 1000 > Date.now())) throw new Error("expired");
   if (!nonce || body.nonce !== nonce) throw new Error("bad nonce");
   if (!body.sub) throw new Error("no subject");
-  return String(body.sub);
+  return wantClaims ? body : String(body.sub);
 }
+
+// ── 管理員、意見回饋 ──
+// 管理員名單不放在程式庫裡（程式庫是公開的）：
+//   站長本人（根管理員）寫在這個 Worker 的加密設定 ADMIN_EMAILS（Cloudflare 的 secret：只能寫入、任何人都讀不出來，連後台也看不到內容）；
+//   其他管理員由管理員在 App 的「管理員名單」新增、移除，存在這個 Durable Object 裡，只有管理員登入後讀得到。
+// 一般的「用 Google 登入來同步」不會跟 Google 要 email；只有按「管理員登入」才要，而且只在登入那一刻拿來比對名單——
+// 不在名單裡的 email 不會被存下來。
+const okEmail = (e) => typeof e === "string" && e.length <= 120 && /^[^\s@,]+@[^\s@,]+\.[^\s@,]+$/.test(e);
+const normEmail = (e) => String(e || "").trim().toLowerCase();
+const FB_CATS = ["bug", "data", "idea", "other"];
+const FB_STATUS = ["new", "doing", "done", "wont"];
+const FB_TEXT_MAX = 500, FB_PER_DAY = 5, FB_ALL_PER_DAY = 300, FB_KEEP = 2000;
+/** 整理使用者打的字：去掉控制字元和看不見的字元（換行留著），連續三行以上的空行併成一行 */
+const cleanText = (x) => String(x == null ? "" : x).normalize("NFC").replace(/\r\n?/g, "\n").replace(/[\u0000-\u0009\u000b-\u001f\u007f-\u009f\u200b-\u200f\u202a-\u202e\u2060-\u206f\ufeff]/g, "").replace(/\n{3,}/g, "\n\n").trim();
+const okDev = (d) => typeof d === "string" && /^[A-Za-z0-9_-]{16,64}$/.test(d);
 /** 你收藏的影城這一週（週一到週日）新上的片：片名（排的影城多的在前），以及是哪幾間影城有新片 */
 function cinemaWeekFilms(data, cinemas) {
   const from = weekId(), to = addDays(from, 6);
@@ -209,6 +224,7 @@ export class PushHub {
     let b;
     try { b = await req.json(); } catch (_) { return json({ error: "bad json" }, 400); }
     if (path.startsWith("/sync/")) return this.sync(path, b || {});
+    if (path.startsWith("/feedback/")) return this.feedback(path, b || {});
     const endpoint = String((b.subscription && b.subscription.endpoint) || b.endpoint || "");
     if (!okEndpoint(endpoint) || endpoint.length > 1000) return json({ error: "bad endpoint" }, 400);
     const id = "s:" + (await idOf(endpoint));
@@ -259,13 +275,16 @@ export class PushHub {
   /** 同步設定：login 用 Google 的身分憑證換一張登入憑證；get／put 讀寫設定；logout 登出這台；wipe 刪掉伺服器上的設定並登出所有裝置 */
   async sync(path, b) {
     if (path === "/sync/login") {
-      let sub;
-      try { sub = await verifyGoogle(b.id_token, String(b.nonce || ""), this.env.GOOGLE_KEYS_TEST ? () => JSON.parse(this.env.GOOGLE_KEYS_TEST) : null); } catch (e) { return json({ error: "登入沒有通過驗證" }, 401); }
-      const uid = await sha256hex("片刻|" + sub);
+      let claims;
+      try { claims = await verifyGoogle(b.id_token, String(b.nonce || ""), this.env.GOOGLE_KEYS_TEST ? () => JSON.parse(this.env.GOOGLE_KEYS_TEST) : null, true); } catch (e) { return json({ error: "登入沒有通過驗證" }, 401); }
+      const uid = await sha256hex("片刻|" + claims.sub);
+      // 管理員登入才會帶 email（Google 驗證過的）：在名單裡才記在這張登入憑證上，不在名單裡的不存
+      const email = claims.email && (claims.email_verified === true || claims.email_verified === "true") ? normEmail(claims.email) : "";
+      const adm = email && (await this.isAdmin(email)) ? email : "";
       const raw = new Uint8Array(32); crypto.getRandomValues(raw);
       const token = Array.from(raw).map((x) => x.toString(16).padStart(2, "0")).join("");
-      await this.state.storage.put("t:" + (await sha256hex(token)), { uid, at: Date.now() });
-      return json({ ok: true, token });
+      await this.state.storage.put("t:" + (await sha256hex(token)), adm ? { uid, at: Date.now(), adm } : { uid, at: Date.now() });
+      return json({ ok: true, token, admin: !!adm });
     }
     const token = String(b.token || "");
     if (!/^[0-9a-f]{64}$/.test(token)) return json({ error: "not signed in" }, 401);
@@ -281,9 +300,13 @@ export class PushHub {
       await this.state.storage.put(ukey, { data: JSON.parse(text), at });
       return json({ ok: true, at });
     }
-    // 這個帳號的代碼（識別碼的雜湊，不是 email），以及是不是管理員（代碼在 wrangler.toml 的 ADMIN_USERS 名單裡）
-    const admin = String(this.env.ADMIN_USERS || "").split(/[\s,]+/).indexOf(sess.uid) >= 0;
-    if (path === "/sync/who") return json({ ok: true, uid: sess.uid, admin });
+    // 是不是管理員：這張登入憑證是用「管理員登入」拿到的，而且那個 email 現在還在名單裡（被移除就立刻失效）
+    const admin = !!sess.adm && (await this.isAdmin(sess.adm));
+    if (path === "/sync/who") return json({ ok: true, admin });
+    if (path === "/sync/admins" || path === "/sync/fb") {
+      if (!admin) return json({ error: "forbidden" }, 403);
+      return path === "/sync/admins" ? this.adminList(b.body || {}, sess.adm) : this.adminFeedback(b.body || {});
+    }
     // 管理員專區：短評的人工審核。轉給評分伺服器的管理入口（服務綁定，外面連不到）
     if (path === "/sync/admin") {
       if (!admin || !this.env.RATINGS) return json({ error: "forbidden" }, 403);
@@ -297,6 +320,87 @@ export class PushHub {
       return json({ ok: true });
     }
     return json({ error: "not found" }, 404);
+  }
+  /** 根管理員（加密設定裡的，App 裡不能移除） */
+  rootAdmins() { return String(this.env.ADMIN_EMAILS || "").split(/[\s,]+/).map(normEmail).filter(okEmail); }
+  async isAdmin(email) {
+    if (this.rootAdmins().indexOf(email) >= 0) return true;
+    return ((await this.state.storage.get("admins")) || []).indexOf(email) >= 0;
+  }
+  /** 管理員名單：list 列出／add 新增／remove 移除（只能動 App 裡加的；根管理員要到 Cloudflare 的設定改） */
+  async adminList(b, me) {
+    let extra = (await this.state.storage.get("admins")) || [];
+    const email = normEmail(b.email);
+    if (b.op === "add") {
+      if (!okEmail(email)) return json({ error: "email 格式不對" }, 400);
+      if (extra.length >= 20) return json({ error: "名單最多 20 個" }, 400);
+      if (extra.indexOf(email) < 0 && this.rootAdmins().indexOf(email) < 0) extra = [...extra, email];
+      await this.state.storage.put("admins", extra);
+    } else if (b.op === "remove") {
+      extra = extra.filter((x) => x !== email);
+      await this.state.storage.put("admins", extra);
+    }
+    return json({ ok: true, root: this.rootAdmins(), extra, me });
+  }
+  /** 意見回饋（使用者這一邊）：send 送出／mine 看自己送過的和回覆。用裝置的匿名代號認人（跟評分同一組），不用登入 */
+  async feedback(path, b) {
+    const d = b.d;
+    if (!okDev(d)) return json({ error: "bad request" }, 400);
+    const ids = (await this.state.storage.get("fd:" + d)) || [];
+    if (path === "/feedback/send") {
+      const text = cleanText(b.text);
+      if (FB_CATS.indexOf(b.cat) < 0 || Array.from(text).length < 5 || Array.from(text).length > FB_TEXT_MAX) return json({ error: "bad request" }, 400);
+      // 擋洗版：一台裝置一天 5 則，全部加起來一天 300 則
+      const day = new Date().toISOString().slice(0, 10);
+      const quota = (await this.state.storage.get("fq")) || {};
+      const q = quota.day === day ? quota : { day, all: 0, by: {} };
+      if ((q.by[d] || 0) >= FB_PER_DAY || q.all >= FB_ALL_PER_DAY) return json({ error: "too many" }, 429);
+      q.by[d] = (q.by[d] || 0) + 1; q.all++;
+      const at = Date.now();
+      const id = String(at) + "-" + Math.random().toString(36).slice(2, 8);
+      const clip = (x, n) => String(x || "").replace(/[^\w .:+-]/g, "").slice(0, n);
+      await this.state.storage.put({ ["f:" + id]: { id, d, cat: b.cat, text, ver: clip(b.ver, 24), plat: clip(b.plat, 16), at, status: "new", reply: "", rat: 0 }, ["fd:" + d]: [id, ...ids].slice(0, 30), fq: q });
+      // 太多了就清掉最舊、已經處理完的
+      const n = ((await this.state.storage.get("fn")) || 0) + 1;
+      await this.state.storage.put("fn", n);
+      if (n > FB_KEEP) {
+        const old = await this.state.storage.list({ prefix: "f:", limit: 200 });
+        let cut = 0;
+        for (const [k, v] of old) if (v && (v.status === "done" || v.status === "wont")) { await this.state.storage.delete(k); cut++; }
+        await this.state.storage.put("fn", n - cut);
+      }
+    } else if (path !== "/feedback/mine") return json({ error: "not found" }, 404);
+    const now = (await this.state.storage.get("fd:" + d)) || [];
+    const got = now.length ? await this.state.storage.get(now.map((id) => "f:" + id)) : new Map();
+    const list = now.map((id) => got.get("f:" + id)).filter(Boolean).map((f) => ({ id: f.id, cat: f.cat, text: f.text, at: f.at, status: f.status, reply: f.reply || "", rat: f.rat || 0 }));
+    return json({ ok: true, list });
+  }
+  /** 意見回饋（管理員這一邊）：list 列出（新的在前）／update 回覆、改狀態／delete 刪除。不會回傳裝置代號 */
+  async adminFeedback(b) {
+    if (b.op === "update" || b.op === "delete") {
+      const key = "f:" + String(b.id || "");
+      const f = await this.state.storage.get(key);
+      if (!f) return json({ error: "找不到這一則" }, 404);
+      if (b.op === "delete") {
+        await this.state.storage.delete(key);
+        const ids = (await this.state.storage.get("fd:" + f.d)) || [];
+        await this.state.storage.put("fd:" + f.d, ids.filter((x) => x !== f.id));
+        await this.state.storage.put("fn", Math.max(0, ((await this.state.storage.get("fn")) || 1) - 1));
+      } else {
+        if (FB_STATUS.indexOf(b.status) >= 0) f.status = b.status;
+        if (typeof b.reply === "string") {
+          const reply = cleanText(b.reply);
+          if (Array.from(reply).length > FB_TEXT_MAX) return json({ error: "回覆最多 500 字" }, 400);
+          if (reply !== (f.reply || "")) { f.reply = reply; f.rat = reply ? Date.now() : 0; }
+        }
+        await this.state.storage.put(key, f);
+      }
+    }
+    const all = await this.state.storage.list({ prefix: "f:", reverse: true, limit: 300 });
+    const list = [];
+    let open = 0;
+    for (const [, f] of all) { list.push({ id: f.id, cat: f.cat, text: f.text, ver: f.ver, plat: f.plat, at: f.at, status: f.status, reply: f.reply || "", rat: f.rat || 0 }); if (f.status === "new" || f.status === "doing") open++; }
+    return json({ ok: true, list, open });
   }
   /** 每小時跑一次：條件新成立、使用者有開那一種通知、還沒發過 → 推送。晚上十點到早上九點不吵人（留到早上再發） */
   async run() {
@@ -400,6 +504,13 @@ export async function handlePush(req, env, path) {
   if (Number(req.headers.get("content-length") || 0) > 60000) return json({ error: "too large" }, 413);
   const hub = env.PUSH.get(env.PUSH.idFromName("hub"));
   return hub.fetch(new Request("https://hub" + path.replace("/api/push", ""), { method: "POST", body: await req.text(), headers: { "content-type": "application/json" } }));
+}
+/** worker.js 把 /api/feedback/* 交給這裡（意見回饋；跟通知用同一個儲存空間） */
+export async function handleFeedback(req, env, path) {
+  if (req.method !== "POST") return json({ error: "method" }, 405);
+  if (Number(req.headers.get("content-length") || 0) > 8000) return json({ error: "too large" }, 413);
+  const hub = env.PUSH.get(env.PUSH.idFromName("hub"));
+  return hub.fetch(new Request("https://hub" + path.replace("/api/feedback", "/feedback"), { method: "POST", body: await req.text(), headers: { "content-type": "application/json" } }));
 }
 /** worker.js 把 /api/sync/* 交給這裡（跟通知用同一個儲存空間） */
 export async function handleSync(req, env, path) {

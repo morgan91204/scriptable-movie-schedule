@@ -3649,6 +3649,44 @@ export const saveNote = (title: string, text: string, spoiler: boolean): Promise
 /** 檢舉一則短評（why：REPORT_REASONS 的 id） */
 export const reportNote = (title: string, id: number, why: string): Promise<ReviewNotes> => notePost("report", title, { id, why }, "檢舉沒有送出，請稍後再試");
 
+// ── 意見回饋：設定裡寫給站長（分類＋內容），站長在管理員專區回覆、標處理狀態；回覆顯示在同一頁。
+//    用裝置的匿名代號認人（跟評分同一組），不用登入、不用留聯絡方式。存在網頁版的伺服器，只有管理員看得到內容。
+export interface Feedback { id: string; cat: string; text: string; at: number; status: string; reply: string; rat: number; ver?: string; plat?: string }
+export const FEEDBACK_CATS: { id: string; label: string; hint: string }[] = [
+  { id: "bug", label: "問題回報", hint: "哪一頁、做了什麼、看到什麼（例如：某間影城的場次打不開）" },
+  { id: "data", label: "資料有誤", hint: "哪部片或哪間影城、哪裡不對（例如：場次時間、片名、片長、評分）" },
+  { id: "idea", label: "功能建議", hint: "希望多什麼功能，或哪裡可以更好用" },
+  { id: "other", label: "其他", hint: "想說的都可以寫" },
+];
+export const FEEDBACK_STATUS: Record<string, string> = { new: "已收到", doing: "處理中", done: "已處理", wont: "暫不處理" };
+export const FEEDBACK_MAX = 500;
+export const feedbackCat = (id: string): string => FEEDBACK_CATS.find((c) => c.id === id)?.label || "其他";
+let feedbackMem: { at: number; list: Feedback[] } | null = null;
+async function feedbackPost(path: string, body: Record<string, unknown>): Promise<Feedback[]> {
+  const r = await platform().fetchText(`${SITE_URL}/api/feedback/${path}`, { accept: "application/json", "content-type": "application/json" }, { method: "POST", body: JSON.stringify({ d: deviceId(), ...body }) });
+  if (r.status === 429) throw new Error("今天送出的回饋已經到上限，明天再試");
+  if (r.status !== 200) throw new Error(path === "send" ? "回饋沒有送出，請稍後再試" : "回饋暫時讀不到");
+  const list = (JSON.parse(r.body).list || []) as Feedback[];
+  feedbackMem = { at: Date.now(), list };
+  if (list.length) cacheSet("feedback-mine.txt", "1");
+  return list;
+}
+/** 送出一則回饋；回傳這台裝置送過的全部（新的在前） */
+export const sendFeedback = (cat: string, text: string, plat: string, ver: string): Promise<Feedback[]> => feedbackPost("send", { cat, text, plat, ver });
+/** 這台裝置送過的回饋和回覆（十分鐘內讀過就直接用；force = 一定重讀） */
+export async function loadMyFeedback(force = false): Promise<Feedback[]> {
+  if (!force && feedbackMem && Date.now() - feedbackMem.at < 600e3) return feedbackMem.list;
+  return feedbackPost("mine", {});
+}
+/** 送過回饋的人才需要去問有沒有新回覆（沒送過的不打伺服器） */
+export const feedbackSent = (): boolean => cacheGet("feedback-mine.txt") === "1";
+/** 有幾則還沒看過的回覆（回覆時間比上次打開回饋頁晚） */
+export function feedbackUnread(list: Feedback[]): number {
+  const seen = Number(cacheGet("feedback-seen.txt")) || 0;
+  return list.filter((f) => f.reply && f.rat > seen).length;
+}
+export const feedbackMarkSeen = (): void => cacheSet("feedback-seen.txt", String(Date.now()));
+
 // ───────────────────────── 全台票房排行 ─────────────────────────
 // 來源：國家電影及視聽文化中心「全國電影票房統計」開放資料（政府資料開放授權條款第 1 版）。
 // 官方只給累計票房，所以由 GitHub Actions 每週存快照算出週票房（tools/boxoffice.mjs），App 只讀算好的小檔。

@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.24-1713
+// @movie-schedule-app 電影行程 v2026.11.24-1722
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/parsers.gen.ts
@@ -3502,6 +3502,36 @@ async function notePost(path, title, body, fail) {
 }
 var saveNote = (title, text, spoiler) => notePost("note", title, { x: String(text || "").trim(), sp: spoiler ? 1 : 0 }, "短評沒有送出，請稍後再試");
 var reportNote = (title, id, why) => notePost("report", title, { id, why }, "檢舉沒有送出，請稍後再試");
+var FEEDBACK_CATS = [
+  { id: "bug", label: "問題回報", hint: "哪一頁、做了什麼、看到什麼（例如：某間影城的場次打不開）" },
+  { id: "data", label: "資料有誤", hint: "哪部片或哪間影城、哪裡不對（例如：場次時間、片名、片長、評分）" },
+  { id: "idea", label: "功能建議", hint: "希望多什麼功能，或哪裡可以更好用" },
+  { id: "other", label: "其他", hint: "想說的都可以寫" }
+];
+var FEEDBACK_STATUS = { new: "已收到", doing: "處理中", done: "已處理", wont: "暫不處理" };
+var FEEDBACK_MAX = 500;
+var feedbackCat = (id) => FEEDBACK_CATS.find((c) => c.id === id)?.label || "其他";
+var feedbackMem = null;
+async function feedbackPost(path, body) {
+  const r = await platform().fetchText(`${SITE_URL}/api/feedback/${path}`, { accept: "application/json", "content-type": "application/json" }, { method: "POST", body: JSON.stringify({ d: deviceId(), ...body }) });
+  if (r.status === 429) throw new Error("今天送出的回饋已經到上限，明天再試");
+  if (r.status !== 200) throw new Error(path === "send" ? "回饋沒有送出，請稍後再試" : "回饋暫時讀不到");
+  const list = JSON.parse(r.body).list || [];
+  feedbackMem = { at: Date.now(), list };
+  if (list.length) cacheSet("feedback-mine.txt", "1");
+  return list;
+}
+var sendFeedback = (cat, text, plat, ver) => feedbackPost("send", { cat, text, plat, ver });
+async function loadMyFeedback(force = false) {
+  if (!force && feedbackMem && Date.now() - feedbackMem.at < 6e5) return feedbackMem.list;
+  return feedbackPost("mine", {});
+}
+var feedbackSent = () => cacheGet("feedback-mine.txt") === "1";
+function feedbackUnread(list) {
+  const seen = Number(cacheGet("feedback-seen.txt")) || 0;
+  return list.filter((f) => f.reply && f.rat > seen).length;
+}
+var feedbackMarkSeen = () => cacheSet("feedback-seen.txt", String(Date.now()));
 var BOXOFFICE_URL = "https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/main/dist/boxoffice.json";
 var boxMem = null;
 var boxData = null;
@@ -4060,6 +4090,16 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .nt-acts{display:flex;gap:8px;margin-top:9px}
 .nt-acts button{padding:7px 14px;border-radius:9px;background:var(--chip);color:var(--accent);font-size:14px;font-weight:600}
 .nt-acts button.danger{color:#ff3b30;margin-left:auto}
+.fb-area{display:block;width:100%;min-height:120px;padding:12px 14px;border:0;border-radius:12px;background:var(--chip);color:var(--fg);font:inherit;font-size:16px;line-height:1.5;margin-top:10px;outline:none;resize:vertical;-webkit-appearance:none;appearance:none}
+.fb-cats{display:flex;flex-wrap:wrap;gap:6px}
+.fb-tag{font-size:12px;font-weight:600;padding:1px 7px;border-radius:6px;background:var(--chip);color:var(--fg)}
+.fb-tag.new{background:rgba(10,132,255,.16);color:var(--accent)}
+.fb-tag.doing{background:rgba(255,159,10,.2);color:#c77700}
+.fb-tag.done{background:rgba(48,209,88,.18);color:#1f9d45}
+@media(prefers-color-scheme:dark){.fb-tag.doing{color:#ffb340}.fb-tag.done{color:#30d158}}
+.fb-text{margin-top:6px;font-size:15.5px;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere}
+.fb-reply{margin-top:9px;padding:10px 12px;border-radius:10px;background:var(--chip);font-size:15px;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere}
+.fb-reply b{display:block;font-size:12px;color:var(--accent);margin-bottom:3px}
 .nt-cover{display:block;width:100%;margin-top:6px;padding:9px 12px;border-radius:10px;background:var(--chip);color:var(--fg2);font-size:14px;text-align:left}
 .cm-star{font-size:28px;line-height:1;padding:2px 3px;color:var(--line)}
 @media(prefers-color-scheme:dark){.cm-star{color:#48484a}}
@@ -4081,7 +4121,7 @@ var SHELL = `<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8">
 <script>
 window.__pending=null;
 function send(id){var vals={};
-  document.querySelectorAll('input[name],select[name]').forEach(function(i){vals[i.name]=i.value;});
+  document.querySelectorAll('input[name],select[name],textarea[name]').forEach(function(i){vals[i.name]=i.value;});
   if(window.__pending){var f=window.__pending;window.__pending=null;f(JSON.stringify({id:id,vals:vals,y:window.scrollY}));}}
 // 長按 0.5 秒：觸發 data-long，並取消接下來的點擊
 var lp=null,lpFired=false,lx=0,ly=0;
@@ -4096,7 +4136,7 @@ document.addEventListener('click',function(e){
   if(lpFired){lpFired=false;e.preventDefault();return;}
   var el=e.target.closest('[data-act]');if(!el)return;
   var id=el.getAttribute('data-act');var vals={};
-  document.querySelectorAll('input[name],select[name]').forEach(function(i){vals[i.name]=i.value;});
+  document.querySelectorAll('input[name],select[name],textarea[name]').forEach(function(i){vals[i.name]=i.value;});
   if(window.__pending){var f=window.__pending;window.__pending=null;f(JSON.stringify({id:id,vals:vals,y:window.scrollY}));}
 });
 // 捲到指定位置：畫完馬上捲一次，下一個畫面更新時再確認一次（手勢剛結束、或瀏覽器自己想還原位置時，第一次可能被蓋掉）
@@ -4370,6 +4410,7 @@ var CHANGELOG = [
     id: "2026-11-24",
     date: "2026/11/24",
     items: [
+      { kind: "new", text: "設定裡多了「意見回饋」：選分類、寫內容就能回報問題或建議功能，站長的回覆和處理狀態會顯示在同一頁" },
       { kind: "new", text: "評完分可以寫一句短評（最多 60 字），也能看大家寫的；有雷的會摺疊起來，看到劇透或不當內容可以檢舉" },
       { kind: "new", text: "片刻評分多了心得標籤：評完分可以點選看完的感覺（催淚、配樂、有片尾彩蛋…），不用打字、不會暴雷" },
       { kind: "new", text: "秀泰影城的預售日期和特別場也查得到了（直接讀秀泰官網的完整場次，補上場次通還沒列出的）" },
@@ -4468,6 +4509,19 @@ var App = class {
     // 正在套用伺服器的設定：這次存檔不要再傳回去
     this.syncTimer = null;
     this.syncWho = null;
+    // 這次登入是不是管理員（這次開啟問過一次就記著）
+    // ── 意見回饋（使用者）──
+    this.fbCat = "";
+    // 回饋頁選的分類
+    this.fbDraft = "";
+    // 回饋頁打到一半的內容
+    this.fbForce = false;
+    // ── 管理員專區：意見回饋、管理員名單 ──
+    this.adminFbTab = "open";
+    // open 還沒處理完的／all 全部
+    this.adminFbStatus = "";
+    // 處理某一則時選的狀態
+    this.adminFbReply = null;
     this.adminTab = "flagged";
     this.notifyOpen = false;
     // ── 依縣市找影院 ──
@@ -4591,7 +4645,7 @@ var App = class {
   }
   /** 最新版本是多少。網頁版問的是自己網站現在上線的版本（重新整理就會拿到的那一版），不是 GitHub 上的 */
   checkVersion() {
-    if (true) return checkLatest("2026.11.24-1713");
+    if (true) return checkLatest("2026.11.24-1722");
     return (async () => {
       try {
         let r = await globalThis.fetch("/version.json?t=" + Date.now(), { cache: "no-store" });
@@ -4599,7 +4653,7 @@ var App = class {
         const latest = String((await r.json()).version || "");
         if (!latest) return null;
         const num = (v) => Number(v.replace(/\D/g, "")) || 0;
-        return { latest, isLatest: num("2026.11.24-1713") >= num(latest) };
+        return { latest, isLatest: num("2026.11.24-1722") >= num(latest) };
       } catch (_) {
         return null;
       }
@@ -5003,19 +5057,141 @@ var App = class {
     if (!sy) return "";
     return /* @__PURE__ */ h(Section, { title: "同步" }, /* @__PURE__ */ h(Item, { icon: "🔄", title: "用 Google 帳號同步", subtitle: sy.on() ? "收藏和設定有變動會自動同步" : "讓主畫面的 App 和瀏覽器用同一份收藏", right: sy.on() ? "已登入" : "未登入", onTap: () => this.go(() => this.syncView()) }));
   }
-  // 登入的帳號代碼、是不是管理員（這次開啟問過一次就記著）
+  // 剛進回饋頁：跟伺服器要最新的（之後在這一頁裡點來點去不用每次重讀）
+  /** 意見回饋頁：上面選分類、寫內容送出；下面是自己送過的，每一則有處理狀態和站長的回覆 */
+  async feedbackView() {
+    let list = [], failed = "";
+    try {
+      list = feedbackSent() ? await loadMyFeedback(this.fbForce) : [];
+      this.fbForce = false;
+    } catch (e) {
+      failed = String(e?.message || e);
+    }
+    if (list.some((f) => f.reply)) feedbackMarkSeen();
+    const cat = FEEDBACK_CATS.find((c) => c.id === this.fbCat) || null;
+    const keep = (v) => {
+      if (v && typeof v.t === "string") this.fbDraft = v.t;
+    };
+    const submit = async (v) => {
+      keep(v);
+      const text = this.fbDraft.trim();
+      if (!cat) {
+        await this.ui.toast("先選一個分類");
+        return;
+      }
+      if (Array.from(text).length < 5) {
+        await this.ui.toast("內容再多寫一點（至少 5 個字）");
+        return;
+      }
+      try {
+        await sendFeedback(cat.id, text, false ? this.isStandalone() ? "web-app" : "web" : "scriptable", "2026.11.24-1722");
+        this.fbDraft = "";
+        this.fbCat = "";
+        await this.ui.toast("已送出，謝謝你的回饋");
+      } catch (e) {
+        await this.ui.toast(String(e?.message || e));
+      }
+    };
+    return /* @__PURE__ */ h(Page, { title: "意見回饋", onBack: () => this.back() }, /* @__PURE__ */ h(Section, { title: "寫給站長", hint: "不用留聯絡方式：站長的回覆和處理狀態會顯示在這一頁下面（這台裝置才看得到）。請不要寫個人資料。" }, /* @__PURE__ */ h("div", { class: "nt-form" }, /* @__PURE__ */ h("div", { class: "fb-cats" }, FEEDBACK_CATS.map((c) => /* @__PURE__ */ h("button", { class: "cm-tag" + (c.id === this.fbCat ? " on" : ""), "aria-pressed": c.id === this.fbCat ? "true" : "false", onTap: (v) => {
+      keep(v);
+      this.fbCat = c.id;
+    } }, esc(c.label)))), /* @__PURE__ */ h("textarea", { class: "fb-area", name: "t", maxlength: String(FEEDBACK_MAX), placeholder: cat ? cat.hint : "先選上面的分類，再寫內容" }, esc(this.fbDraft)), /* @__PURE__ */ h(Button, { label: "送出", onTap: submit }))), /* @__PURE__ */ h(Section, { title: `我的回饋（${list.length}）` }, failed ? /* @__PURE__ */ h(Note, { kind: "warn", text: failed }) : null, list.length ? /* @__PURE__ */ h("div", { class: "nt-list" }, list.map((f) => this.feedbackRow(f))) : failed ? null : /* @__PURE__ */ h(Note, { text: "還沒有送過回饋。" })));
+  }
+  /** 一則回饋：分類、處理狀態、日期、內容、站長的回覆。使用者那一頁和管理員那一頁共用 */
+  feedbackRow(f, onTap) {
+    const body = /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h("div", { class: "nt-head" }, /* @__PURE__ */ h("span", { class: "fb-tag" }, esc(feedbackCat(f.cat))), /* @__PURE__ */ h("span", { class: "fb-tag " + f.status }, esc(FEEDBACK_STATUS[f.status] || f.status)), /* @__PURE__ */ h("span", { class: "nt-date" }, esc(noteDate(f.at)), f.plat ? `｜${f.plat} ${f.ver || ""}` : ""), onTap ? /* @__PURE__ */ h("span", { class: "nt-rep" }, "處理 ›") : null), /* @__PURE__ */ h("div", { class: "fb-text" }, esc(f.text)), f.reply ? /* @__PURE__ */ h("div", { class: "fb-reply" }, /* @__PURE__ */ h("b", null, "站長的回覆｜", esc(noteDate(f.rat))), esc(f.reply)) : null);
+    return onTap ? /* @__PURE__ */ h("div", { class: "nt", role: "button", onTap }, body) : /* @__PURE__ */ h("div", { class: "nt" }, body);
+  }
+  // 處理某一則時打到一半的回覆
+  async adminFeedbackView() {
+    const sy = this.sync();
+    let list = [], open = 0, failed = "";
+    try {
+      const r = await sy.adm("fb", { op: "list" });
+      list = r.list || [];
+      open = r.open || 0;
+    } catch (e) {
+      failed = String(e?.message || e);
+    }
+    const shown = this.adminFbTab === "open" ? list.filter((f) => f.status === "new" || f.status === "doing") : list;
+    return /* @__PURE__ */ h(Page, { title: "意見回饋", subtitle: "管理員專區", onBack: () => this.back() }, /* @__PURE__ */ h(Chips, { tabs: true }, /* @__PURE__ */ h(Chip, { label: `待處理（${open}）`, muted: this.adminFbTab !== "open", onTap: () => {
+      this.adminFbTab = "open";
+    } }), /* @__PURE__ */ h(Chip, { label: `全部（${list.length}）`, muted: this.adminFbTab !== "all", onTap: () => {
+      this.adminFbTab = "all";
+    } })), failed ? /* @__PURE__ */ h(Note, { kind: "warn", text: failed }) : /* @__PURE__ */ h(Section, { hint: "點一則進去回覆、改處理狀態。使用者會在他的「設定 → 意見回饋」看到狀態和回覆。" }, shown.length ? /* @__PURE__ */ h("div", { class: "nt-list" }, shown.map((f) => this.feedbackRow(f, () => {
+      this.adminFbStatus = f.status;
+      this.adminFbReply = null;
+      this.go(() => this.adminFeedbackItemView(f));
+    }))) : /* @__PURE__ */ h(Note, { text: this.adminFbTab === "open" ? "目前沒有待處理的回饋。" : "還沒有人送回饋。" })));
+  }
+  adminFeedbackItemView(f) {
+    const sy = this.sync();
+    const reply = this.adminFbReply === null ? f.reply : this.adminFbReply;
+    const keep = (v) => {
+      if (v && typeof v.r === "string") this.adminFbReply = v.r;
+    };
+    return /* @__PURE__ */ h(Page, { title: "處理回饋", onBack: () => this.back() }, /* @__PURE__ */ h(Section, { title: "使用者寫的" }, /* @__PURE__ */ h("div", { class: "nt-list" }, this.feedbackRow({ ...f, reply: "" }))), /* @__PURE__ */ h(Section, { title: "處理狀態" }, /* @__PURE__ */ h("div", { class: "nt-form" }, /* @__PURE__ */ h("div", { class: "fb-cats" }, Object.keys(FEEDBACK_STATUS).map((s) => /* @__PURE__ */ h("button", { class: "cm-tag" + (s === this.adminFbStatus ? " on" : ""), "aria-pressed": s === this.adminFbStatus ? "true" : "false", onTap: (v) => {
+      keep(v);
+      this.adminFbStatus = s;
+    } }, esc(FEEDBACK_STATUS[s])))))), /* @__PURE__ */ h(Section, { title: "回覆", hint: "可以留空（只改狀態）。回覆只有送這則回饋的那台裝置看得到；清空再儲存 = 收回回覆。" }, /* @__PURE__ */ h("div", { class: "nt-form" }, /* @__PURE__ */ h("textarea", { class: "fb-area", name: "r", maxlength: String(FEEDBACK_MAX), placeholder: "寫給這位使用者的回覆" }, esc(reply)), /* @__PURE__ */ h(Button, { label: "儲存", onTap: async (v) => {
+      keep(v);
+      try {
+        await sy.adm("fb", { op: "update", id: f.id, status: this.adminFbStatus, reply: String(this.adminFbReply === null ? f.reply : this.adminFbReply) });
+        await this.ui.toast("已儲存");
+        this.back();
+      } catch (e) {
+        await this.ui.toast(String(e?.message || e));
+      }
+    } }), /* @__PURE__ */ h(Button, { label: "刪除這則回饋", kind: "danger", onTap: async () => {
+      try {
+        await sy.adm("fb", { op: "delete", id: f.id });
+        await this.ui.toast("已刪除");
+        this.back();
+      } catch (e) {
+        await this.ui.toast(String(e?.message || e));
+      }
+    } }))));
+  }
+  /** 管理員名單：站長本人（根管理員）存在伺服器的加密設定裡，這裡改不到；其他管理員可以在這裡新增、移除 */
+  async adminListView() {
+    const sy = this.sync();
+    let root = [], extra = [], failed = "";
+    try {
+      const r = await sy.adm("admins", { op: "list" });
+      root = r.root || [];
+      extra = r.extra || [];
+    } catch (e) {
+      failed = String(e?.message || e);
+    }
+    const change = (op, email, done) => async () => {
+      try {
+        await sy.adm("admins", { op, email });
+        await this.ui.toast(done);
+      } catch (e) {
+        await this.ui.toast(String(e?.message || e));
+      }
+    };
+    return /* @__PURE__ */ h(Page, { title: "管理員名單", onBack: () => this.back() }, failed ? /* @__PURE__ */ h(Note, { kind: "warn", text: failed }) : /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Section, { title: "站長", hint: "存在伺服器的加密設定裡，任何人都讀不出來、這裡也改不到（避免被誤刪而進不來）。要換的話到 Cloudflare 後台改。" }, root.map((e) => /* @__PURE__ */ h(Item, { icon: "👑", title: e, chevron: false }))), /* @__PURE__ */ h(Section, { title: `其他管理員（${extra.length}）`, hint: "新增後，對方要在「設定 → 同步」用「管理員登入」登入那個 Google 帳號。移除後立刻失效。" }, extra.map((e) => /* @__PURE__ */ h(Item, { icon: "👤", title: e, chevron: false, action: { label: "移除", hint: "移除這位管理員", onTap: change("remove", e, "已移除") } })), /* @__PURE__ */ h("div", { class: "nt-form" }, /* @__PURE__ */ h("input", { class: "field", name: "e", type: "email", autocomplete: "off", autocapitalize: "off", placeholder: "要新增的 Google 帳號（email）" }), /* @__PURE__ */ h(Button, { label: "新增管理員", onTap: async (v) => {
+      const e = String(v.e || "").trim();
+      if (!e) {
+        await this.ui.toast("先填 email");
+        return;
+      }
+      await change("add", e, "已新增")();
+    } })))));
+  }
   async syncView() {
     const sy = this.sync();
     if (sy && sy.on() && !this.syncWho && sy.who) this.syncWho = await sy.who().catch(() => null);
     if (sy && !sy.on()) this.syncWho = null;
     const who = this.syncWho;
-    return /* @__PURE__ */ h(Page, { title: "用 Google 帳號同步", onBack: () => this.back() }, this.syncSection(), who && who.admin ? /* @__PURE__ */ h(Section, { title: "管理員" }, /* @__PURE__ */ h(Item, { icon: "🛡", title: "短評管理", subtitle: "複查被檢舉的短評，或巡一遍最近的短評", onTap: () => {
+    return /* @__PURE__ */ h(Page, { title: "用 Google 帳號同步", onBack: () => this.back() }, this.syncSection(), who && who.admin ? /* @__PURE__ */ h(Section, { title: "管理員專區", hint: "只有管理員名單裡的 Google 帳號、用「管理員登入」登入後才看得到這一區。" }, /* @__PURE__ */ h(Item, { icon: "💬", title: "意見回饋", subtitle: "看使用者的回饋、回覆、標處理狀態", onTap: () => {
+      this.adminFbTab = "open";
+      this.go(() => this.adminFeedbackView(), "讀取回饋…");
+    } }), /* @__PURE__ */ h(Item, { icon: "🛡", title: "短評管理", subtitle: "複查被檢舉的短評，或巡一遍最近的短評", onTap: () => {
       this.adminTab = "flagged";
       this.go(() => this.adminNotesView(), "讀取短評…");
-    } })) : null, who && who.uid ? /* @__PURE__ */ h(Section, { hint: "這是你的帳號在片刻裡的代號（由 Google 帳號的識別碼雜湊而來，不是 email）。一般用不到；設定管理員時才需要。" }, /* @__PURE__ */ h(Item, { kv: true, title: "帳號代碼", right: "複製", chevron: false, onTap: async () => {
-      Pasteboard.copy(who.uid);
-      await this.ui.toast("已複製帳號代碼");
-    } })) : null);
+    } }), /* @__PURE__ */ h(Item, { icon: "👥", title: "管理員名單", subtitle: "新增或移除其他管理員", onTap: () => this.go(() => this.adminListView(), "讀取名單…") })) : null);
   }
   // 短評管理看哪一份：flagged 被檢舉的／recent 最近的
   /** 管理員專區：短評的人工審核。「待複查」是被檢舉過或被自動隱藏的；「最近的短評」是全部看得到的（新的在前），可以主動巡。
@@ -5061,7 +5237,7 @@ var App = class {
     const sy = this.sync();
     if (!sy) return "";
     if (!sy.on())
-      return /* @__PURE__ */ h(Section, { hint: this.syncNote || "登入後，收藏影城、收藏電影、收藏發行商和各項設定會存到你的帳號，在別的裝置或瀏覽器登入同一個帳號就會帶過來。我們只存帳號的識別碼（經過雜湊）和設定，不存 email 和姓名。不登入也能照常使用。" }, /* @__PURE__ */ h(Item, { icon: "🔄", title: "用 Google 登入來同步", subtitle: "例如讓主畫面的 App 和 Safari 用同一份收藏", accent: true, onTap: () => sy.login() }));
+      return /* @__PURE__ */ h(Section, { hint: this.syncNote || "登入後，收藏影城、收藏電影、收藏發行商和各項設定會存到你的帳號，在別的裝置或瀏覽器登入同一個帳號就會帶過來。我們只存帳號的識別碼（經過雜湊）和設定，不存 email 和姓名。不登入也能照常使用。" }, /* @__PURE__ */ h(Item, { icon: "🔄", title: "用 Google 登入來同步", subtitle: "例如讓主畫面的 App 和 Safari 用同一份收藏", accent: true, onTap: () => sy.login() }), /* @__PURE__ */ h(Item, { icon: "🛡", title: "管理員登入", subtitle: "站長用；一般使用者不需要。會向 Google 確認你的 email 是不是管理員", onTap: () => sy.login(true) }));
     return /* @__PURE__ */ h(Section, { hint: this.syncNote || "已登入 Google，設定有變動會自動同步。通知要在每台裝置各自開啟。" }, /* @__PURE__ */ h(Item, { icon: "✅", title: "已登入，自動同步中", subtitle: "點一下立刻同步一次", chevron: false, onTap: async () => {
       const r = await sy.pull();
       if (r && r.data && r.at > sy.at()) {
@@ -5220,12 +5396,14 @@ var App = class {
       this.settings.seenLog = CHANGELOG_LATEST;
       saveSettings(this.settings);
     }
-    return /* @__PURE__ */ h(Page, { title: "更新內容", subtitle: `目前版本 ${"2026.11.24-1713"}`, onBack: () => this.back() }, CHANGELOG.map((e) => /* @__PURE__ */ h(Section, { title: e.date }, e.items.map((it) => /* @__PURE__ */ h(Item, { title: it.text, tag: { text: it.kind === "new" ? "新功能" : "改進", tone: it.kind === "new" ? "now" : "soon" }, chevron: false })))), /* @__PURE__ */ h(Note, { text: "只列出比較有感的變動；修小錯、調整文字這類不會寫在這裡。" }));
+    return /* @__PURE__ */ h(Page, { title: "更新內容", subtitle: `目前版本 ${"2026.11.24-1722"}`, onBack: () => this.back() }, CHANGELOG.map((e) => /* @__PURE__ */ h(Section, { title: e.date }, e.items.map((it) => /* @__PURE__ */ h(Item, { title: it.text, tag: { text: it.kind === "new" ? "新功能" : "改進", tone: it.kind === "new" ? "now" : "soon" }, chevron: false })))), /* @__PURE__ */ h(Note, { text: "只列出比較有感的變動；修小錯、調整文字這類不會寫在這裡。" }));
   }
   async aboutView() {
     return /* @__PURE__ */ h(Page, { title: "關於", onBack: () => this.back() }, /* @__PURE__ */ h(Section, { hint: "連鎖影城的場次來自場次通（twshowtimes.com），感謝場次通的整理；其他來自開眼電影網，以及誠品、光點、樂聲、內惟戲院官網。實際場次以影城公告為準。" }, /* @__PURE__ */ h(Item, { icon: "ℹ️", title: "關於與資料來源", accent: true, chevron: false, onTap: () => Safari.open(ABOUT_URL) }), /* @__PURE__ */ h(Item, { icon: "🔒", title: "隱私權政策", accent: true, chevron: false, onTap: () => Safari.open(PRIVACY_URL) }), /* @__PURE__ */ h(Item, { icon: "🙏", title: "前往場次通", subtitle: "比較各影城場次、看上映場數排行", accent: true, chevron: false, onTap: () => Safari.open("https://twshowtimes.com/") })));
   }
   async settingsView() {
+    const fbList = feedbackSent() ? await Promise.race([loadMyFeedback().catch(() => null), sleep(600).then(() => null)]) : null;
+    const fbNew = fbList ? feedbackUnread(fbList) : 0;
     this.calendarName = (await currentCalendar(this.settings)).title;
     return /* @__PURE__ */ h(Page, { title: "設定" }, /* @__PURE__ */ h(Section, { title: "加入行事曆時", hint: `廣告預告：${ADS_NOTE}` }, /* @__PURE__ */ h(Item, { icon: "📅", title: "寫入的行事曆", subtitle: this.calendarName, onTap: () => this.go(() => this.calendarView()) }), /* @__PURE__ */ h(Item, { icon: "📺", title: "廣告預告", subtitle: `預計散場時間會加上 ${this.settings.ads} 分鐘`, right: "點一下切換", chevron: false, onTap: () => this.cycleAds() }), /* @__PURE__ */ h(Item, { icon: "🗺", title: "導航地圖", subtitle: "點地址、分享、行程備註的導航連結", right: MAPS_LABEL[this.settings.maps || "apple"], chevron: false, onTap: () => {
       this.settings.maps = this.settings.maps === "google" ? "apple" : "google";
@@ -5239,16 +5417,21 @@ var App = class {
     } }), /* @__PURE__ */ h(Item, { icon: "🏢", title: "收藏發行商", subtitle: "搜尋發行商、增加或取消收藏", right: (this.settings.favIssuers || []).length ? `${(this.settings.favIssuers || []).length} 家` : "還沒有", onTap: () => {
       this.issuerQuery = "";
       this.go(() => this.issuerManageView(), "讀取發行商…");
-    } })), await this.notifyLink(), this.syncLink(), /* @__PURE__ */ h(Section, { title: "關於" }, false ? /* @__PURE__ */ h(Item, { icon: "📲", title: "加到主畫面", subtitle: "像 App 一樣從主畫面開啟，看圖示教學", onTap: () => this.go(() => this.installView()) }) : null, /* @__PURE__ */ h(Item, { icon: "ℹ️", title: "關於", subtitle: "資料來源、隱私權政策、場次通", onTap: () => this.go(() => this.aboutView()) }), /* @__PURE__ */ h(Item, { icon: "📝", title: "更新內容", subtitle: this.logUnread() ? "有新的更新，點進來看看" : "最近改了什麼、多了什麼", right: this.logUnread() ? "● 新" : "", onTap: () => this.go(() => this.changelogView()) })), /* @__PURE__ */ h(
+    } })), await this.notifyLink(), this.syncLink(), /* @__PURE__ */ h(Section, { title: "關於" }, false ? /* @__PURE__ */ h(Item, { icon: "📲", title: "加到主畫面", subtitle: "像 App 一樣從主畫面開啟，看圖示教學", onTap: () => this.go(() => this.installView()) }) : null, /* @__PURE__ */ h(Item, { icon: "ℹ️", title: "關於", subtitle: "資料來源、隱私權政策、場次通", onTap: () => this.go(() => this.aboutView()) }), /* @__PURE__ */ h(Item, { icon: "💬", title: "意見回饋", subtitle: fbNew ? "站長回覆你了，點進來看" : "回報問題、資料有誤，或建議新功能", right: fbNew ? "● 新回覆" : "", onTap: () => {
+      this.fbCat = "";
+      this.fbDraft = "";
+      this.fbForce = true;
+      this.go(() => this.feedbackView(), "讀取中…");
+    } }), /* @__PURE__ */ h(Item, { icon: "📝", title: "更新內容", subtitle: this.logUnread() ? "有新的更新，點進來看看" : "最近改了什麼、多了什麼", right: this.logUnread() ? "● 新" : "", onTap: () => this.go(() => this.changelogView()) })), /* @__PURE__ */ h(
       "p",
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.24-1713"}`);
+          Pasteboard.copy(`版本 ${"2026.11.24-1722"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.24-1713"}`,
+      `版本 ${"2026.11.24-1722"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -5703,7 +5886,7 @@ var App = class {
     if (false) {
       if (!r) return /* @__PURE__ */ h(Note, { text: "（無法確認是否為最新版：連不到網站）" });
       if (r.isLatest) return /* @__PURE__ */ h(Note, { text: "✅ 已是最新版" });
-      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.24-1713"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
+      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.24-1722"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
         globalThis.location.reload();
       } }));
     }

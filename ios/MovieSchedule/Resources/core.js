@@ -26,6 +26,9 @@
     COMMUNITY_MIN: () => COMMUNITY_MIN,
     COMMUNITY_SUMMARY_URL: () => COMMUNITY_SUMMARY_URL,
     EXTRA: () => EXTRA,
+    FEEDBACK_CATS: () => FEEDBACK_CATS,
+    FEEDBACK_MAX: () => FEEDBACK_MAX,
+    FEEDBACK_STATUS: () => FEEDBACK_STATUS,
     FESTIVAL_URL: () => FESTIVAL_URL,
     FORMATS: () => FORMATS,
     MAPS_LABEL: () => MAPS_LABEL,
@@ -111,6 +114,10 @@
     favMovieRows: () => favMovieRows,
     favSnapGet: () => favSnapGet,
     favSnapSet: () => favSnapSet,
+    feedbackCat: () => feedbackCat,
+    feedbackMarkSeen: () => feedbackMarkSeen,
+    feedbackSent: () => feedbackSent,
+    feedbackUnread: () => feedbackUnread,
     festivalChipNote: () => festivalChipNote,
     festivalCinema: () => festivalCinema,
     festivalDates: () => festivalDates,
@@ -166,6 +173,7 @@
     loadIntro: () => loadIntro,
     loadMovieBoard: () => loadMovieBoard,
     loadMovies: () => loadMovies,
+    loadMyFeedback: () => loadMyFeedback,
     loadNotes: () => loadNotes,
     loadSettings: () => loadSettings,
     loadSoonBoard: () => loadSoonBoard,
@@ -227,6 +235,7 @@
     saveNote: () => saveNote,
     saveSettings: () => saveSettings,
     searchTitles: () => searchTitles,
+    sendFeedback: () => sendFeedback,
     setMetaEnabled: () => setMetaEnabled,
     setSettingsSavedHook: () => setSettingsSavedHook,
     settingsStored: () => settingsStored,
@@ -3838,6 +3847,36 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   }
   var saveNote = (title, text, spoiler) => notePost("note", title, { x: String(text || "").trim(), sp: spoiler ? 1 : 0 }, "短評沒有送出，請稍後再試");
   var reportNote = (title, id, why) => notePost("report", title, { id, why }, "檢舉沒有送出，請稍後再試");
+  var FEEDBACK_CATS = [
+    { id: "bug", label: "問題回報", hint: "哪一頁、做了什麼、看到什麼（例如：某間影城的場次打不開）" },
+    { id: "data", label: "資料有誤", hint: "哪部片或哪間影城、哪裡不對（例如：場次時間、片名、片長、評分）" },
+    { id: "idea", label: "功能建議", hint: "希望多什麼功能，或哪裡可以更好用" },
+    { id: "other", label: "其他", hint: "想說的都可以寫" }
+  ];
+  var FEEDBACK_STATUS = { new: "已收到", doing: "處理中", done: "已處理", wont: "暫不處理" };
+  var FEEDBACK_MAX = 500;
+  var feedbackCat = (id) => FEEDBACK_CATS.find((c) => c.id === id)?.label || "其他";
+  var feedbackMem = null;
+  async function feedbackPost(path, body) {
+    const r = await platform().fetchText(`${SITE_URL}/api/feedback/${path}`, { accept: "application/json", "content-type": "application/json" }, { method: "POST", body: JSON.stringify({ d: deviceId(), ...body }) });
+    if (r.status === 429) throw new Error("今天送出的回饋已經到上限，明天再試");
+    if (r.status !== 200) throw new Error(path === "send" ? "回饋沒有送出，請稍後再試" : "回饋暫時讀不到");
+    const list = JSON.parse(r.body).list || [];
+    feedbackMem = { at: Date.now(), list };
+    if (list.length) cacheSet("feedback-mine.txt", "1");
+    return list;
+  }
+  var sendFeedback = (cat, text, plat, ver) => feedbackPost("send", { cat, text, plat, ver });
+  async function loadMyFeedback(force = false) {
+    if (!force && feedbackMem && Date.now() - feedbackMem.at < 6e5) return feedbackMem.list;
+    return feedbackPost("mine", {});
+  }
+  var feedbackSent = () => cacheGet("feedback-mine.txt") === "1";
+  function feedbackUnread(list) {
+    const seen = Number(cacheGet("feedback-seen.txt")) || 0;
+    return list.filter((f) => f.reply && f.rat > seen).length;
+  }
+  var feedbackMarkSeen = () => cacheSet("feedback-seen.txt", String(Date.now()));
   var BOXOFFICE_URL = "https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/main/dist/boxoffice.json";
   var boxMem = null;
   var boxData = null;
@@ -4155,7 +4194,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   var extra = { boxOffice, filmList, soonList, nowShowing, nowShowingMulti, movieBoard: movieBoard2, festivalBoard, festivalFilm, nearby, patchSettings, fillMovie, formatList };
   var BRIDGE_LEVEL = 2;
   globalThis.MS = {
-    version: "2026.11.24-1713",
+    version: "2026.11.24-1722",
     level: BRIDGE_LEVEL,
     init(saved) {
       cache = saved || {};

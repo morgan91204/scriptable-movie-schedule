@@ -14,10 +14,10 @@ import {
   Cinema, Movie, Settings, Version, TwMovie, TwMovieCinema, CITY_ORDER, TW,
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
   loadSettings, saveSettings, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, cinemaAddress,
-  FORMATS, formatsOf, filterVersions, filterVersionsAny, movieRows, movieDays, nearest, kmLabel, WINDOWS, findShowtimes, findShowtimesMulti, multiLabel, multiDetail, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText, hallOf, tmdbTest, movieExtras, moviePoster, posterReady, posterTint, POSTER_TINTS, normImageUrl, movieRuntime, posterSrc, isLocalSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxCountries, boxByCountry, boxInfo, boxInfoRows, boxCountryText, BOX_COUNTRY_NOTE, boxCountryTag, boxCountriesPicked, movieBoard, loadBoxFor, loadCommunitySummary, loadYearRatings, loadUpcoming, soonBoard, isFavMovie, toggleFavMovie, favMovieRows, favMovieBox, boxStatus, STATUS_LABEL, boxInfoBy, soonGroups, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityVote, communityTags, loadNotes, saveNote, reportNote, noteLooksSpoiler, noteDate, NOTE_MAX, NOTE_PLACEHOLDER, NOTE_RULES, REPORT_REASONS, reviewTagsToggle, REVIEW_TAGS, REVIEW_TAGS_MAX, reviewTagLabel, topReviewTags, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, SCRIPTING_IMPORT_URL, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, festivalDefaultDate, festivalStateLabel, festivalState, festivalFooter, linkMovies, nowGroupLine, nowFilter, festivalPick, movieAbout, festivalSearch, festivalSearchLines, festivalTrailer, festivalYears, festivalGroups, festivalChipNote, festivalStatusLine, movieRatings, ratingTier, tomatoTier, popcornTier, dropStaleCaches, rerunDataReady, boxRunRows, boxRunsName, loadIntro, globalSearch, boxIsRerun, boxHasLaterRun, settingsStored, SITE_URL,
+  FORMATS, formatsOf, filterVersions, filterVersionsAny, movieRows, movieDays, nearest, kmLabel, WINDOWS, findShowtimes, findShowtimesMulti, multiLabel, multiDetail, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText, hallOf, tmdbTest, movieExtras, moviePoster, posterReady, posterTint, POSTER_TINTS, normImageUrl, movieRuntime, posterSrc, isLocalSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxCountries, boxByCountry, boxInfo, boxInfoRows, boxCountryText, BOX_COUNTRY_NOTE, boxCountryTag, boxCountriesPicked, movieBoard, loadBoxFor, loadCommunitySummary, loadYearRatings, loadUpcoming, soonBoard, isFavMovie, toggleFavMovie, favMovieRows, favMovieBox, boxStatus, STATUS_LABEL, boxInfoBy, soonGroups, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityVote, communityTags, sendFeedback, loadMyFeedback, feedbackSent, feedbackMarkSeen, feedbackCat, FEEDBACK_CATS, FEEDBACK_STATUS, FEEDBACK_MAX, loadNotes, saveNote, reportNote, noteLooksSpoiler, noteDate, NOTE_MAX, NOTE_PLACEHOLDER, NOTE_RULES, REPORT_REASONS, reviewTagsToggle, REVIEW_TAGS, REVIEW_TAGS_MAX, reviewTagLabel, topReviewTags, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, SCRIPTING_IMPORT_URL, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, festivalDefaultDate, festivalStateLabel, festivalState, festivalFooter, linkMovies, nowGroupLine, nowFilter, festivalPick, movieAbout, festivalSearch, festivalSearchLines, festivalTrailer, festivalYears, festivalGroups, festivalChipNote, festivalStatusLine, movieRatings, ratingTier, tomatoTier, popcornTier, dropStaleCaches, rerunDataReady, boxRunRows, boxRunsName, loadIntro, globalSearch, boxIsRerun, boxHasLaterRun, settingsStored, SITE_URL,
 } from "./core"
 import { CHANGELOG, CHANGELOG_LATEST } from "./changelog"
-import type { GlobalHits, ReviewNote, ReviewNotes } from "./core"
+import type { GlobalHits, ReviewNote, ReviewNotes, Feedback } from "./core"
 import type { Ratings, FavMovie, FavRow, EntryHi, Format, LatLng, Hit, Community, BoxOfficeItem, BoxSort, BoxOffice, MovieEntry, SoonEntry, UpcomingFilm, Festival, FestivalFilm, FestivalSession } from "./core"
 
 declare const Safari: any
@@ -199,6 +199,9 @@ function SettingsPage() {
     </Section>
     <Section>
       {/* 更新內容：有還沒看過的才標「新」，不會主動跳出來 */}
+      <NavigationLink destination={<FeedbackPage />}>
+        <Row title={"意見回饋"} subtitle={"回報問題、資料有誤，或建議新功能"} />
+      </NavigationLink>
       <NavigationLink destination={<ChangelogPage />}>
         <Row title={"更新內容"} subtitle={"最近改了什麼、多了什麼"} trailing={CHANGELOG_LATEST && settings.seenLog !== CHANGELOG_LATEST ? "● 新" : ""} />
       </NavigationLink>
@@ -208,6 +211,62 @@ function SettingsPage() {
 }
 
 /** 更新內容：依日期分段、新的在上。進來就算看過 */
+/** 意見回饋：選分類、寫內容送出；下面是自己送過的，每一則有處理狀態和站長的回覆 */
+function FeedbackPage() {
+  const load = useLoad(() => (feedbackSent() ? loadMyFeedback(true) : Promise.resolve([] as Feedback[])), [])
+  const [fresh, setFresh] = useState<Feedback[] | null>(null)
+  const list = fresh || load.data || []
+  const [cat, setCat] = useState("")
+  const [text, setText] = useState("")
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState("")
+  useEffect(() => { if (list.some((f) => f.reply)) feedbackMarkSeen() }, [list.length])
+  const picked = FEEDBACK_CATS.find((c) => c.id === cat) || null
+  const submit = async () => {
+    const t = text.trim()
+    if (!picked) { setMsg("先選一個分類"); return }
+    if (Array.from(t).length < 5) { setMsg("內容再多寫一點（至少 5 個字）"); return }
+    if (Array.from(t).length > FEEDBACK_MAX) { setMsg(`內容最多 ${FEEDBACK_MAX} 個字`); return }
+    setBusy(true)
+    setMsg("")
+    try {
+      setFresh(await sendFeedback(picked.id, t, "scripting", appVersion()))
+      setText("")
+      setCat("")
+      setMsg("已送出，謝謝你的回饋")
+    } catch (e) {
+      setMsg(String((e as Error)?.message || e))
+    }
+    setBusy(false)
+  }
+  return <List navigationTitle={"意見回饋"} navigationBarTitleDisplayMode={"inline"}>
+    <Section header={<Text>寫給站長</Text>} footer={<Text>不用留聯絡方式：站長的回覆和處理狀態會顯示在這一頁下面（這台裝置才看得到）。請不要寫個人資料。</Text>}>
+      <Picker title={"分類"} value={cat} onChanged={setCat}>
+        <Text tag={""}>請選擇</Text>
+        {FEEDBACK_CATS.map((c) => <Text key={c.id} tag={c.id}>{c.label}</Text>)}
+      </Picker>
+      <TextField title={"內容"} value={text} onChanged={setText} prompt={picked ? picked.hint : "先選分類，再寫內容"} axis={"vertical"} />
+      <Button title={"送出"} action={submit} disabled={busy} />
+      {msg ? <Text font={"caption"} foregroundStyle={"secondaryLabel"}>{msg}</Text> : null}
+    </Section>
+    <Section header={<Text>{`我的回饋（${list.length}）`}</Text>}>
+      {!list.length ? <Text foregroundStyle={"secondaryLabel"}>{load.error ? "回饋暫時讀不到" : "還沒有送過回饋。"}</Text> : null}
+      {list.map((f) => <VStack key={f.id} alignment={"leading"} spacing={6}>
+        <HStack spacing={8}>
+          <Text font={"caption"} fontWeight={"semibold"}>{feedbackCat(f.cat)}</Text>
+          <Text font={"caption"} fontWeight={"semibold"} foregroundStyle={f.status === "done" ? "systemGreen" : f.status === "doing" ? "systemOrange" : "systemBlue"}>{FEEDBACK_STATUS[f.status] || f.status}</Text>
+          <Text font={"caption"} foregroundStyle={"secondaryLabel"}>{noteDate(f.at)}</Text>
+        </HStack>
+        <Text>{f.text}</Text>
+        {f.reply ? <VStack alignment={"leading"} spacing={3}>
+          <Text font={"caption"} fontWeight={"semibold"} foregroundStyle={"systemBlue"}>{`站長的回覆｜${noteDate(f.rat)}`}</Text>
+          <Text>{f.reply}</Text>
+        </VStack> : null}
+      </VStack>)}
+    </Section>
+  </List>
+}
+
 function ChangelogPage() {
   const [settings, update] = useSettings()
   useEffect(() => {

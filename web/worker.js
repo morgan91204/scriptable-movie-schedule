@@ -24,7 +24,7 @@ import ICON_192 from "./public/icon-192.png";
 import ICON_512 from "./public/icon-512.png";
 // 收藏電影通知：背景接收程式（sw.js）與推送（push.js）
 import SW_JS from "./public/sw.js.txt";
-import { handlePush, runPush, PushHub, handleSync } from "./push.js";
+import { handlePush, runPush, PushHub, handleSync, handleFeedback } from "./push.js";
 export { PushHub };
 // 目前上線的版本號（從打包進來的 App 本體裡取）：網頁版用它判斷「重新整理後會不會拿到更新的版本」
 const DEPLOYED = (APP_JS.match(/"(\d{4}\.\d{2}\.\d{2}-\d{4})"/) || [])[1] || "";
@@ -48,6 +48,7 @@ export default {
     if (url.pathname === "/api/fetch" && req.method === "POST") return proxy(req, ctx);
     if (url.pathname.startsWith("/api/push/")) return handlePush(req, env, url.pathname);
     if (url.pathname.startsWith("/api/sync/")) return handleSync(req, env, url.pathname);
+    if (url.pathname.startsWith("/api/feedback/")) return handleFeedback(req, env, url.pathname);
     // Google 登入完會回到這裡，身分憑證放在網址的 # 後面（不會送到伺服器）：原封不動帶回首頁，由網頁自己處理
     if (url.pathname === "/api/auth/google") return new Response('<!doctype html><meta charset="utf-8"><title>片刻</title><script>location.replace("/"+location.hash)</script>', { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } });
     if (url.pathname === "/sw.js") return new Response(SW_JS, { headers: { "content-type": "text/javascript; charset=utf-8", "cache-control": "no-cache", "service-worker-allowed": "/" } });

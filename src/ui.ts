@@ -243,6 +243,16 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .nt-acts{display:flex;gap:8px;margin-top:9px}
 .nt-acts button{padding:7px 14px;border-radius:9px;background:var(--chip);color:var(--accent);font-size:14px;font-weight:600}
 .nt-acts button.danger{color:#ff3b30;margin-left:auto}
+.fb-area{display:block;width:100%;min-height:120px;padding:12px 14px;border:0;border-radius:12px;background:var(--chip);color:var(--fg);font:inherit;font-size:16px;line-height:1.5;margin-top:10px;outline:none;resize:vertical;-webkit-appearance:none;appearance:none}
+.fb-cats{display:flex;flex-wrap:wrap;gap:6px}
+.fb-tag{font-size:12px;font-weight:600;padding:1px 7px;border-radius:6px;background:var(--chip);color:var(--fg)}
+.fb-tag.new{background:rgba(10,132,255,.16);color:var(--accent)}
+.fb-tag.doing{background:rgba(255,159,10,.2);color:#c77700}
+.fb-tag.done{background:rgba(48,209,88,.18);color:#1f9d45}
+@media(prefers-color-scheme:dark){.fb-tag.doing{color:#ffb340}.fb-tag.done{color:#30d158}}
+.fb-text{margin-top:6px;font-size:15.5px;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere}
+.fb-reply{margin-top:9px;padding:10px 12px;border-radius:10px;background:var(--chip);font-size:15px;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere}
+.fb-reply b{display:block;font-size:12px;color:var(--accent);margin-bottom:3px}
 .nt-cover{display:block;width:100%;margin-top:6px;padding:9px 12px;border-radius:10px;background:var(--chip);color:var(--fg2);font-size:14px;text-align:left}
 .cm-star{font-size:28px;line-height:1;padding:2px 3px;color:var(--line)}
 @media(prefers-color-scheme:dark){.cm-star{color:#48484a}}
@@ -265,7 +275,7 @@ const SHELL = `<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8">
 <script>
 window.__pending=null;
 function send(id){var vals={};
-  document.querySelectorAll('input[name],select[name]').forEach(function(i){vals[i.name]=i.value;});
+  document.querySelectorAll('input[name],select[name],textarea[name]').forEach(function(i){vals[i.name]=i.value;});
   if(window.__pending){var f=window.__pending;window.__pending=null;f(JSON.stringify({id:id,vals:vals,y:window.scrollY}));}}
 // 長按 0.5 秒：觸發 data-long，並取消接下來的點擊
 var lp=null,lpFired=false,lx=0,ly=0;
@@ -280,7 +290,7 @@ document.addEventListener('click',function(e){
   if(lpFired){lpFired=false;e.preventDefault();return;}
   var el=e.target.closest('[data-act]');if(!el)return;
   var id=el.getAttribute('data-act');var vals={};
-  document.querySelectorAll('input[name],select[name]').forEach(function(i){vals[i.name]=i.value;});
+  document.querySelectorAll('input[name],select[name],textarea[name]').forEach(function(i){vals[i.name]=i.value;});
   if(window.__pending){var f=window.__pending;window.__pending=null;f(JSON.stringify({id:id,vals:vals,y:window.scrollY}));}
 });
 // 捲到指定位置：畫完馬上捲一次，下一個畫面更新時再確認一次（手勢剛結束、或瀏覽器自己想還原位置時，第一次可能被蓋掉）
