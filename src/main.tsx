@@ -10,7 +10,7 @@ import { scriptablePlatform } from "./platform-scriptable";
 import {
   Cinema, Settings, Movie, Version, EXTRA, CITY_ORDER, AD_STEPS,
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
-  loadSettings, saveSettings, settingsStored, setSettingsSavedHook, syncPick, syncApply, syncMerge, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, communityKey, globalSearch, boxIsRerun, loadIntro, SITE_URL, TW,
+  loadSettings, saveSettings, settingsStored, setSettingsSavedHook, syncPick, syncApply, syncMerge, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, communityKey, globalSearch, boxIsRerun, loadIntro, rerunDataReady, SITE_URL, TW,
   FORMATS, formatsOf, filterVersions, filterVersionsAny, movieRows, movieDays, nearest, kmLabel, WINDOWS, findShowtimes, findShowtimesMulti, multiLabel, multiDetail, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText,
   hallOf, tmdbTest, movieExtras, moviePoster, movieRuntime, posterSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxCountries, boxByCountry, boxInfo, boxInfoRows, boxCountryText, BOX_COUNTRY_NOTE, boxCountryTag, boxCountriesPicked, loadMovieBoard, loadSoonBoard, notifyPrefs, notifyPayload, notifyEndScope, notifyEndPick, notifyQuiet, NOTIFY_PRE_STEPS, NOTIFY_KINDS, boxStatus, STATUS_LABEL, boxInfoBy, isFavMovie, toggleFavMovie, favMovieRows, favMovieBox, soonGroups, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityCached, communityVote, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalsReady, festivalNote, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, festivalDefaultDate, festivalStateLabel, festivalState, festivalFooter, linkMovies, nowGroupLine, nowFilter, festivalPick, movieAbout, festivalSearch, festivalSearchLines, festivalTrailer, festivalYears, festivalsAny, festivalGroups, festivalChipNote, festivalStatusLine, movieRatings, ratingTier, tomatoTier, popcornTier, popcornCount,
 } from "./core";
@@ -1621,7 +1621,13 @@ class App {
     // 劇情簡介（伺服器向 TMDB 查的）：讀太久就先畫其他的，讀好再補上
     const introJob = loadIntro(x.name, x.release).catch(() => "");
     const introGot = await Promise.race([introJob, sleep(this.rerendering ? 0 : 800).then(() => undefined)]);
-    if (introGot === undefined) this.late = [introJob];
+    // 重映的判斷要另外兩份資料（從分享連結、收藏直接進來時還沒讀）：同樣是讀好再補上
+    const rr = rerunDataReady();
+    const rrDone = rr ? await Promise.race([rr.then(() => true), sleep(this.rerendering ? 0 : 800).then(() => false)]) : true;
+    const waiting: Promise<unknown>[] = [];
+    if (introGot === undefined) waiting.push(introJob);
+    if (rr && !rrDone) waiting.push(rr);
+    if (waiting.length) this.late = waiting;
     const intro = introGot || "";
     const date = x.release.replace(/-/g, "/");
     return (

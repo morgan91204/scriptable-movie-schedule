@@ -200,6 +200,7 @@
     releaseLabel: () => releaseLabel,
     releaseOf: () => releaseOf,
     rerunByName: () => rerunByName,
+    rerunDataReady: () => rerunDataReady,
     saveSettings: () => saveSettings,
     searchTitles: () => searchTitles,
     setMetaEnabled: () => setMetaEnabled,
@@ -2302,6 +2303,10 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     return y && shown && shown - y >= 5 ? y : 0;
   }
   var boxIsRerun = (x, b = boxFullLatest) => !!boxFirstRun(x, b) || rerunByName(x.name) || !!boxOrigYear(x);
+  function rerunDataReady() {
+    if (boxFullLatest && yearRatingsLatest) return null;
+    return Promise.all([loadBoxOfficeFull().catch(() => null), loadYearRatings().catch(() => null)]);
+  }
   function boxInfoRows(x, info) {
     const num = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
     const rows = [];
@@ -3848,7 +3853,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   var extra = { boxOffice, filmList, soonList, nowShowing, nowShowingMulti, movieBoard: movieBoard2, festivalBoard, festivalFilm, nearby, patchSettings, fillMovie, formatList };
   var BRIDGE_LEVEL = 2;
   globalThis.MS = {
-    version: "2026.11.24-1014",
+    version: "2026.11.24-1015",
     level: BRIDGE_LEVEL,
     init(saved) {
       cache = saved || {};

@@ -1810,6 +1810,11 @@ export function boxOrigYear(x: BoxOfficeItem): number {
 }
 /** 這一筆是不是重映（資料裡找得到先前上映的那一筆、片名自己寫了重映，或這部片比這次上映早了五年以上） */
 export const boxIsRerun = (x: BoxOfficeItem, b: BoxOffice | null = boxFullLatest): boolean => !!boxFirstRun(x, b) || rerunByName(x.name) || !!boxOrigYear(x);
+/** 判斷重映要用的兩份資料（各年的票房、每部片的首映年）有沒有讀好；還沒有就去讀。回傳讀好的時候 */
+export function rerunDataReady(): Promise<unknown> | null {
+  if (boxFullLatest && yearRatingsLatest) return null;
+  return Promise.all([loadBoxOfficeFull().catch(() => null), loadYearRatings().catch(() => null)]);
+}
 /** 票房頁「個別資訊」的各列：[標題, 內容]。跟官方網站列的欄位一樣（國別、發行、出品、上映日期、上映院數、累計票數、累計金額），沒有的不列 */
 export function boxInfoRows(x: BoxOfficeItem, info: BoxInfo | null): [string, string][] {
   const num = (n: number) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
