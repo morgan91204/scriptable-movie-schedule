@@ -1859,7 +1859,7 @@ class App {
     const note = state === "on" ? (on.length ? (on.length > 3 ? `${on.slice(0, 3).join("、")}等 ${on.length} 種` : on.join("、")) : "每一種通知都關著") : state === "needs-install" ? "要先把「片刻」加到主畫面" : state === "unsupported" ? "這個瀏覽器不支援" : state === "denied" ? "系統設定裡沒有允許通知" : "開放場次、上映、快下檔、影展開始時通知你";
     return (
       <Section title="通知">
-        <Item icon={state === "on" ? "🔔" : "🔕"} title="收藏電影通知" subtitle={note} right={state === "on" ? "已開啟" : "未開啟"} onTap={() => this.go(() => this.notifyView())} />
+        <Item icon={state === "on" ? "🔔" : "🔕"} title="通知設定" subtitle={note} right={state === "on" ? "已開啟" : "未開啟"} onTap={() => this.go(() => this.notifyView())} />
       </Section>
     );
   }
@@ -1909,7 +1909,7 @@ class App {
     const p = this.push();
     const logCount = p && p.log && p.state() === "on" ? (await p.log().catch(() => [])).length : -1;
     return (
-      <Page title="收藏電影通知" onBack={() => this.back()}>
+      <Page title="通知" onBack={() => this.back()}>
         {logCount >= 0 ? (
           <Section>
             <Item icon="🕘" title="最近的通知" right={logCount ? `${logCount} 則` : "還沒有"} onTap={() => this.go(() => this.notifyLogView())} />
@@ -1927,26 +1927,26 @@ class App {
     const n = (this.settings.favMovies || []).length;
     if (state === "needs-install")
       return (
-        <Section title="收藏電影通知" hint="iPhone 和 iPad 要先把「片刻」加到主畫面，從主畫面的圖示開啟後，才能開啟通知（這是 iOS 的規定）。">
+        <Section title="通知" hint="iPhone 和 iPad 要先把「片刻」加到主畫面，從主畫面的圖示開啟後，才能開啟通知（這是 iOS 的規定）。">
           <Item icon="🔔" title="先加到主畫面" subtitle="收藏電影開放場次、上映、快下檔時通知你" onTap={() => this.go(() => this.installView())} />
         </Section>
       );
     if (state === "unsupported")
       return (
-        <Section title="收藏電影通知">
+        <Section title="通知">
           <Item icon="🔕" title="這個瀏覽器不支援通知" subtitle="可以改用 Safari（iPhone 要加到主畫面）、Chrome 或 Edge" chevron={false} />
         </Section>
       );
     if (state === "denied")
       return (
-        <Section title="收藏電影通知" hint="到手機或瀏覽器的設定，把「片刻」的「通知」改成允許，再回來這裡開啟。">
+        <Section title="通知" hint="到手機或瀏覽器的設定，把「片刻」的「通知」改成允許，再回來這裡開啟。">
           <Item icon="🔕" title="通知被關掉了" subtitle="系統設定裡沒有允許「片刻」發通知" chevron={false} />
         </Section>
       );
     if (state !== "on")
       return (
-        <Section title="收藏電影通知" hint="開啟後，你收藏的片名會存在我們的伺服器上，用來判斷什麼時候通知你；不需要帳號，也不會記錄你是誰。隨時可以關閉，關閉時伺服器上的資料會一起刪掉。">
-          <Item icon="🔔" title="收藏電影有動態時通知我" subtitle={n ? `目前收藏了 ${n} 部：開放場次、上映、快下檔、影展開始時通知` : "開放場次、上映、快下檔、影展開始時通知。先開著，之後收藏的片都會算進去"} chevron={false} />
+        <Section title="通知" hint="開啟後，你收藏的片名會存在我們的伺服器上，用來判斷什麼時候通知你；有登入的話，也會記下這台裝置登入的帳號，有人回覆、追蹤你時才通知得到。隨時可以關閉，關閉時伺服器上的資料會一起刪掉。">
+          <Item icon="🔔" title="開啟通知" subtitle={signedIn() ? "有人回覆、提到或追蹤你時；收藏的電影開放場次、上映、快下檔時" : n ? `目前收藏了 ${n} 部：開放場次、上映、快下檔、影展開始時通知` : "開放場次、上映、快下檔、影展開始時通知。先開著，之後收藏的片都會算進去"} chevron={false} />
           <button class="btn primary" data-perm="notify" onTap={async () => {
             try {
               const st = await p.enable(notifyPayload(this.settings));
@@ -1977,6 +1977,9 @@ class App {
     const endNote = `${pick.fav && !picked.length ? "你收藏的影城裡" : notifyEndScope(prefs) + "合計"}，還在放映的影城從比較多變成剩下 ${max} 間以下`;
     return (
       <>
+        <Section title="社群" hint={signedIn() ? "事情發生的當下就通知；有開勿擾時段的話，那段時間的會留到之後再發。" : "要先用 Google 帳號登入，這兩種才會發。"}>
+          {NOTIFY_KINDS.filter((k) => k.group === "social").map(row)}
+        </Section>
         <Section title="收藏電影有動態時" hint="點一下開或關。">
           {NOTIFY_KINDS.filter((k) => k.group === "fav").map(row)}
         </Section>
@@ -2016,10 +2019,7 @@ class App {
         <Section title="每週摘要與公告" hint="不用收藏電影也會發；預設關閉，想要再打開。「收藏影城每週新片」要先有收藏影城。">
           {NOTIFY_KINDS.filter((k) => k.group === "all").map(row)}
         </Section>
-        <Section title="社群" hint={signedIn() ? "事情發生的當下就通知（勿擾時段裡的留到之後）。" : "要先用 Google 帳號登入，這兩種才會發。"}>
-          {NOTIFY_KINDS.filter((k) => k.group === "social").map(row)}
-        </Section>
-        <Section title="勿擾時段" hint={quiet.on ? `${hh(quiet.from)} 到${quiet.from > quiet.to ? "隔天" : ""} ${hh(quiet.to)} 不發通知，這段時間的通知留到之後再發。` : "任何時間都可能發通知。"}>
+        <Section title="勿擾時段" hint={quiet.on ? `${hh(quiet.from)} 到${quiet.from > quiet.to ? "隔天" : ""} ${hh(quiet.to)} 所有通知都不發（包含社群的回覆、追蹤），這段時間的留到之後再發。` : "任何時間都可能發通知。"}>
           <Item icon={quiet.on ? "✅" : "⬜️"} title="晚上不要通知我" chevron={false} onTap={() => set({ quietOn: !quiet.on })} />
           {quiet.on ? <PickRow title="開始" name="qfrom" value={String(quiet.from)} options={hours} onPick={(v) => set({ quietFrom: Number(v) })} /> : null}
           {quiet.on ? <PickRow title="結束" name="qto" value={String(quiet.to)} options={hours} onPick={(v) => set({ quietTo: Number(v) })} /> : null}
