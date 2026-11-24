@@ -710,11 +710,11 @@ class App {
     const email = String((sy.email && sy.email()) || "");
     const open = () => { this.diaryTab = "mine"; this.diaryMem = null; this.go(() => this.diaryView(), "讀取片單…"); };
     const u = me && me.user;
-    const status = !me ? "讀取中…" : !u ? "還沒取暱稱" : u.hidden ? "個人頁被站長停用" : u.pub ? "個人頁公開中" : "個人頁不公開";
+    const statusTag = !u ? { text: "還沒取暱稱", tone: "warn" } : u.hidden ? { text: "已被停用", tone: "bad" } : u.pub ? { text: "公開", tone: "good" } : { text: "不公開", tone: "" };
     return (
       <Section title="帳號">
         <div role="button" onTap={open}>
-          {this.profileCard({ name: u ? u.name : me ? "還沒取暱稱" : "已登入", color: u ? u.color : "gray", emoji: u ? u.emoji : "", bio: u ? u.bio : "" }, me ? me.counts : null, [email, status].filter(Boolean).join("｜"), (kind) => this.go(() => this.profileListView("", kind), "讀取中…"))}
+          {this.profileCard({ name: u ? u.name : me ? "還沒取暱稱" : "已登入", color: u ? u.color : "gray", emoji: u ? u.emoji : "", bio: u ? u.bio : "" }, me ? me.counts : null, "", (kind) => this.go(() => this.profileListView("", kind), "讀取中…"), "", me ? statusTag : undefined, email)}
         </div>
         <Item icon="🎞" title="我的片單" subtitle={u ? "看過的片、評分和短評；動態、找人" : "取暱稱、記錄看過的片、追蹤別人"} onTap={open} />
         <Item icon="🔄" title="同步與登出" subtitle="收藏和設定自動同步中" onTap={() => this.go(() => this.syncView())} />
@@ -780,7 +780,9 @@ class App {
     );
   }
   /** onNum：有給的話，四個數字可以點（點了看清單） */
-  profileCard(u: { name: string; color: string; emoji?: string; bio?: string }, c: SocialCounts | null, note = "", onNum?: (kind: "films" | "notes" | "followers" | "following") => void, extra = ""): string {
+  /** note = 卡片最下面的一行小字；onNum = 數字可以點；extra = 接在最下面的內容（共同追蹤）；
+   *  tag = 暱稱旁邊的小標（公開／不公開…）；sub = 暱稱下面的一行小字（設定頁放登入的 Gmail） */
+  profileCard(u: { name: string; color: string; emoji?: string; bio?: string }, c: SocialCounts | null, note = "", onNum?: (kind: "films" | "notes" | "followers" | "following") => void, extra = "", tag?: { text: string; tone: string }, sub = ""): string {
     // 四個數字排成一列：上面大大的數字、下面小字說明；有給 onNum 的話可以點進清單
     const num = (kind: "films" | "notes" | "followers" | "following", n: number, label: string) => (onNum ? <button class="pf-stat" onTap={() => onNum(kind)}><b>{n}</b><span>{label}</span></button> : <span class="pf-stat"><b>{n}</b><span>{label}</span></span>);
     return (
@@ -788,7 +790,8 @@ class App {
         <div class="pf-top">
           {this.avatar(u, true)}
           <div class="pf-body">
-            <div class="pf-name">{esc(u.name)}</div>
+            <div class="pf-name">{esc(u.name)}{tag ? <span class={"pf-tag " + tag.tone}>{esc(tag.text)}</span> : null}</div>
+            {sub ? <div class="pf-sub">{esc(sub)}</div> : null}
             {c ? <div class="pf-nums">{num("films", c.films, "部片")}{num("notes", c.notes, "短評")}{num("followers", c.followers, "粉絲")}{num("following", c.following, "追蹤中")}</div> : null}
           </div>
         </div>
@@ -813,7 +816,7 @@ class App {
         <div class="nt-meta">{esc([seenLabel(e.seen), howLabel(e.how), `${noteDate(e.at)}記錄`].filter(Boolean).join("｜"))}</div>
         {/* 點短評的內容：直接到那部片的討論區（可以回覆、推噓）；點上面的片名則是開那部片的頁面 */}
         {e.x ? (open ? (
-          <button class="nt-text go" aria-label={`到《${e.title}》的討論區`} onTap={() => { this.noteReset(); this.go(() => this.notesView(e.title), "讀取短評…"); }}>
+          <button class="nt-text go" aria-label={`到《${e.title}》的討論區`} onTap={() => { this.noteReset(); this.noteFocus = { x: e.x, at: Date.now() }; this.go(() => this.notesView(e.title), "讀取短評…"); }}>
             <span>{esc(e.x)}</span><i aria-hidden="true">💬 ›</i>
           </button>
         ) : <button class="nt-cover" onTap={() => { this.noteShown = [...this.noteShown, -e.at]; }}>這則可能有雷，點一下顯示</button>) : null}
@@ -867,7 +870,7 @@ class App {
     return (
       <Page title="我的片單" onBack={() => this.back()}>
         <Section>
-          {user ? this.profileCard(user, me.counts, user.hidden ? "個人頁目前被站長停用" : user.pub ? "個人頁公開中" : "個人頁不公開（只有你看得到）", (kind) => this.go(() => this.profileListView("", kind), "讀取中…")) : <Note kind="warn" text="還沒有設定暱稱：別人找不到你、不能追蹤你，短評也是匿名。你還是可以追蹤別人。" />}
+          {user ? this.profileCard(user, me.counts, user.hidden ? "個人頁目前被站長停用，別人看不到。" : "", (kind) => this.go(() => this.profileListView("", kind), "讀取中…"), "", user.hidden ? { text: "已被停用", tone: "bad" } : user.pub ? { text: "公開", tone: "good" } : { text: "不公開", tone: "" }) : <Note kind="warn" text="還沒有設定暱稱：別人找不到你、不能追蹤你，短評也是匿名。你還是可以追蹤別人。" />}
           <Item icon="✏️" title={user ? "編輯個人檔案" : "設定暱稱"} subtitle="暱稱、頭像、要不要公開" onTap={() => { this.profileDraft = null; this.go(() => this.profileEditView(user)); }} />
           {user && user.pub ? <Item icon="🔗" title="複製我的個人頁連結" chevron={false} onTap={async () => { Pasteboard.copy(`${SITE_URL}/?u=${encodeURIComponent(user.name)}`); await this.ui.toast("已複製連結"); }} /> : null}
         </Section>
@@ -1839,10 +1842,11 @@ class App {
   noteEdit = false; // 短評頁上面寫短評的那一塊有沒有展開（預設收起來）
   noteFilter = "all"; // 短評清單的篩選：all 全部／follow 追蹤中／clean 不看有雷的
   noteSort = "hot"; // 排序：hot 熱門／new 最新／top 最多推／high 評分高到低／low 評分低到高
-  noteReset() { this.noteDraft = null; this.noteSpoil = null; this.noteAsk = ""; this.noteShown = []; this.noteEdit = false; this.noteReplyTo = 0; this.noteReplyDraft = ""; this.noteMenu = 0; }
+  noteReset() { this.noteDraft = null; this.noteSpoil = null; this.noteAsk = ""; this.noteShown = []; this.noteEdit = false; this.noteReplyTo = 0; this.noteReplyDraft = ""; this.noteMenu = 0; this.noteFocus = null; }
   /** 短評頁：上面寫（或改）自己的一句話，下面是大家的。另開一頁，不擠在電影頁。
    *  防雷：輸入框提醒不提劇情、可以自己標「可能有雷」、偵測到劇透字眼送出前問一次；有雷的預設摺疊，點了才顯示。
    *  每則可以檢舉（劇透／不當內容／廣告），被多人檢舉的由伺服器自動摺疊或隱藏 */
+  noteFocus: { x: string; at: number } | null = null; // 從片單、個人頁點某一則短評進來：到討論區後捲到那一則並標亮（用內容對）
   noteReplyTo = 0; // 正在回覆哪一則（0 = 沒有）
   noteReplyDraft = ""; // 回覆打到一半的字
   noteMenu = 0; // 哪一則的「⋯」選單是開的
@@ -1899,6 +1903,10 @@ class App {
     const SORTS = [{ id: "hot", label: "熱門" }, { id: "new", label: "最新" }, { id: "top", label: "最多推" }, { id: "high", label: "評分高到低" }, { id: "low", label: "評分低到高" }];
     const editing = this.noteEdit || !!this.noteAsk;
     const unsent = !!draft.trim(); // 打到一半、還沒送出的字
+    // 要標亮的那一則（第一層裡內容一樣的；有雷、被噓到摺疊的也直接打開）。排序、篩選把它藏起來的話，改回「全部」
+    const focus = this.noteFocus ? tops.find((n) => n.x === this.noteFocus!.x) || null : null;
+    if (focus && shown.indexOf(focus) < 0) { this.noteFilter = "all"; shown.push(focus); }
+    if (focus && this.noteShown.indexOf(focus.id) < 0) this.noteShown = [...this.noteShown, focus.id];
     const total = notes.filter((n) => !n.del && !(n.hidden && !n.mine)).length;
     // 圖示（自己畫的簡單線條）：回覆、向上、向下、更多
     const ICO = {
@@ -1923,7 +1931,7 @@ class App {
       const menu = this.noteMenu === n.id;
       const replying = this.noteReplyTo === n.id;
       return (
-        <div class={"th" + (n.mine ? " mine" : "")}>
+        <div class={"th" + (n.mine ? " mine" : "") + (focus && focus.id === n.id ? " focus" : "")} data-jump={focus && focus.id === n.id ? `${n.id}-${this.noteFocus!.at}` : undefined}>
           <div class="th-head">
             {n.by ? <button class="th-av" aria-label={`${n.by.name} 的個人頁`} onTap={toProfile}>{this.avatar(n.by)}</button> : <span class="th-av"><span class="av anon" aria-hidden="true">{n.mine ? "我" : "匿"}</span></span>}
             {toProfile ? <button class="th-name" onTap={toProfile}>{esc(who)}</button> : <span class="th-name dim">{esc(who)}</span>}

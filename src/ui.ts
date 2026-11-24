@@ -366,6 +366,13 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .cmt-foot button{padding:0;font-size:12px;font-weight:600;color:var(--fg2)}
 .cmt-foot .f{color:var(--accent)}
 .cmt-foot .warn{color:var(--orange)}
+.pf-tag{display:inline-block;vertical-align:middle;margin-left:8px;padding:2px 8px;border-radius:999px;font-size:11.5px;font-weight:600;background:var(--chip);color:var(--fg2)}
+.pf-tag.good{background:rgba(48,209,88,.18);color:#1f9d45}
+.pf-tag.warn{background:rgba(255,159,10,.2);color:#c77700}
+.pf-tag.bad{background:rgba(255,69,58,.18);color:#d63a31}
+@media(prefers-color-scheme:dark){.pf-tag.good{color:#30d158}.pf-tag.warn{color:#ffb340}.pf-tag.bad{color:#ff6961}}
+.pf-sub{margin-top:2px;font-size:13px;color:var(--fg2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.th.focus{margin:8px -8px 0;padding:10px 8px 6px;border-radius:12px;background:rgba(10,132,255,.12);box-shadow:0 0 0 1.5px var(--accent) inset}
 .th-list{padding:6px 16px 12px}
 .th{padding-top:14px}
 .th-head{display:flex;flex-wrap:wrap;align-items:center;gap:4px 7px;font-size:12.5px;color:var(--fg2)}
@@ -485,10 +492,14 @@ function renderAround(root,cur,html){var box=document.createElement('div');box.i
     while(pm.firstChild!==m)po.insertBefore(pm.firstChild,o);while(m.nextSibling)po.appendChild(m.nextSibling);
     if(po!==root)copyAttrs(pm,po);o=po;m=pm;}
   return true;}
+// 畫面上有 data-jump 的元素＝「捲到這裡」：同一個目標只捲一次（之後重畫不會又被拉回去）
+var jumped=null;
+function jumpTo(){var t=document.querySelector('[data-jump]');if(!t){jumped=null;return;}var k=t.getAttribute('data-jump');if(jumped===k)return;jumped=k;
+  setTimeout(function(){var e=document.querySelector('[data-jump="'+k+'"]');if(e)e.scrollIntoView({block:'center',behavior:'smooth'});},120);}
 window.__render=function(html,to){var y=window.scrollY,root=document.getElementById('root'),cur=document.activeElement,typing=isLive(cur)&&root.contains(cur);
   if(typing&&composing){held=[html,to];return;} // 還在選字：選完再畫
   var kept=typing&&renderAround(root,cur,html);if(!kept)root.innerHTML=html;
-  stripSync();autoMore();fitText();scrollKeep(to<0?y:to);var f=kept?null:document.querySelector('input[autofocus]');if(f)setTimeout(function(){f.focus()},50);syncHist();};
+  stripSync();autoMore();fitText();scrollKeep(to<0?y:to);jumpTo();var f=kept?null:document.querySelector('input[autofocus]');if(f)setTimeout(function(){f.focus()},50);syncHist();};
 // 從螢幕左緣往右滑：回上一頁（等於點左上角的「返回」）。內容會跟著手指稍微移動，放開時滑得夠遠才算
 var sw=null;
 function swReset(now){sw=null;var c=document.querySelector('.content');if(c){c.style.transition=now?'none':'transform .15s';c.style.transform='';}}
