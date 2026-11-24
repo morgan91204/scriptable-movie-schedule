@@ -1045,6 +1045,11 @@ class App {
       <Page title={u.name} subtitle="個人頁" onBack={() => this.back()}>
         <Section>
           {this.profileCard(u, p.counts || null, p.self ? "這是你的個人頁（別人看到的不含你設成只有自己看得到的那幾筆）" : "", (kind) => this.go(() => this.profileListView(u.name, kind), "讀取中…"), mutualLine)}
+          {SOCIALS.some((x) => u[x.id]) ? (
+            <div class="pf-pills">
+              {SOCIALS.filter((x) => u[x.id]).map((x) => <button class="pf-pill" aria-label={`${x.name}：@${u[x.id]}`} onTap={() => Safari.open(x.url(u[x.id]!))}>{socialIcon(x.id)}<span>{esc(u[x.id]!)}</span></button>)}
+            </div>
+          ) : null}
           <div class="pf-btns">
             {p.self ? (
               <button class="pf-btn" onTap={() => { this.profileDraft = null; this.go(() => this.profileEditView(u)); }}>編輯個人檔案</button>
@@ -1060,7 +1065,6 @@ class App {
               }}>登入後追蹤</button>
             )}
             <button class="pf-btn" onTap={async () => { Pasteboard.copy(`${SITE_URL}/?u=${encodeURIComponent(u.name)}`); await this.ui.toast("已複製個人頁連結"); }}>分享</button>
-            {SOCIALS.filter((x) => u[x.id]).map((x) => <button class="pf-btn so-btn" aria-label={`${x.name}：@${u[x.id]}`} onTap={() => Safari.open(x.url(u[x.id]!))}>{socialIcon(x.id)}</button>)}
             {p.self ? null : <button class="pf-btn icon" aria-label="檢舉這個帳號" onTap={() => this.go(() => this.reportUserView(u.name))}>⚑</button>}
           </div>
         </Section>
