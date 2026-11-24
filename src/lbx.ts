@@ -129,3 +129,18 @@ export function lbxNote(review: string, max: number): { x: string; cut: boolean 
   const chars = Array.from(flat);
   return chars.length <= max ? { x: flat, cut: false } : { x: chars.slice(0, max - 1).join("") + "…", cut: true };
 }
+
+// ── 匯出：把片刻的片單做成 Letterboxd 匯入用的 CSV（letterboxd.com/import 收的那種）──
+// Letterboxd 匯入檔認得的欄位：Title、Year、imdbID、tmdbID、Rating（0.5～5）、Rating10（1～10）、WatchedDate（YYYY-MM-DD）、Rewatch、Tags、Review。
+// 這裡用 imdbID＋Title＋Year＋Rating10＋WatchedDate＋Tags＋Review：有 IMDb 編號的片 Letterboxd 可以直接認出來，不用靠中文片名去猜。
+export interface ExportEntry { k: string; title: string; s: number; x: string; seen: string; how?: string[] }
+const csvCell = (v: string): string => (/[",\r\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v);
+/** known：片名鍵 → { imdb, year }（從年度總表查出來的；查不到的片就只有片名）。tagOf：觀影方式的代號 → 名稱 */
+export function letterboxdCsv(entries: ExportEntry[], known: (k: string, seen: string) => { imdb: string; year: string } | null, tagOf: (how: string[]) => string): string {
+  const rows = [["imdbID", "Title", "Year", "Rating10", "WatchedDate", "Tags", "Review"]];
+  for (const e of entries) {
+    const m = known(e.k, e.seen);
+    rows.push([m ? m.imdb : "", e.title, m ? m.year : "", e.s >= 1 && e.s <= 10 ? String(e.s) : "", /^\d{4}-\d{2}-\d{2}$/.test(e.seen) ? e.seen : "", e.how && e.how.length ? tagOf(e.how) : "", e.x || ""]);
+  }
+  return rows.map((r) => r.map(csvCell).join(",")).join("\r\n") + "\r\n";
+}

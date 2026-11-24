@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.25-0135
+// @movie-schedule-app 電影行程 v2026.11.25-0147
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/brand.ts
@@ -158,6 +158,15 @@ function lbxNote(review, max) {
   const flat2 = String(review || "").replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim();
   const chars = Array.from(flat2);
   return chars.length <= max ? { x: flat2, cut: false } : { x: chars.slice(0, max - 1).join("") + "…", cut: true };
+}
+var csvCell = (v) => /[",\r\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v;
+function letterboxdCsv(entries, known, tagOf) {
+  const rows = [["imdbID", "Title", "Year", "Rating10", "WatchedDate", "Tags", "Review"]];
+  for (const e of entries) {
+    const m = known(e.k, e.seen);
+    rows.push([m ? m.imdb : "", e.title, m ? m.year : "", e.s >= 1 && e.s <= 10 ? String(e.s) : "", /^\d{4}-\d{2}-\d{2}$/.test(e.seen) ? e.seen : "", e.how && e.how.length ? tagOf(e.how) : "", e.x || ""]);
+  }
+  return rows.map((r) => r.map(csvCell).join(",")).join("\r\n") + "\r\n";
 }
 
 // src/parsers.gen.ts
@@ -4666,7 +4675,7 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .us-bar i.warn{background:#ff9f0a}
 .us-bar i.bad{background:#ff453a}
 .us-sub2{font-size:12.5px;line-height:1.5;color:var(--fg2);overflow-wrap:anywhere}
-.lb-pick{display:block;position:relative;overflow:hidden;text-align:center}
+.lb-pick{display:block;position:relative;overflow:hidden;text-align:center;text-decoration:none;box-sizing:border-box}
 .lb-pick input{position:absolute;inset:0;width:100%;height:100%;opacity:0}
 .lb-steps{margin:0;padding:14px 16px 0 34px;font-size:14.5px;line-height:1.6;color:var(--fg)}
 .lb-steps li{margin:4px 0}
@@ -5109,6 +5118,7 @@ var CHANGELOG = [
     id: "2026-11-25",
     date: "2026/11/25",
     items: [
+      { kind: "new", text: "可以匯出自己的資料（設定 → 我的片單 → 匯出我的資料，網頁版）：片單、分數、觀影日期、短評下載成表格檔，格式可以直接匯進 Letterboxd" },
       { kind: "better", text: "第一次用瀏覽器打開會先說明怎麼加到主畫面；第一次從主畫面開啟會問要不要開通知" },
       { kind: "new", text: "不公開的帳號也有個人頁了：別人看得到暱稱、頭像和自我介紹，可以送出追蹤要求；你同意之後對方才看得到你的片單和短評，並會收到「接受了你的追蹤要求」" },
       { kind: "better", text: "切換公開／不公開、關閉通知前會先確認一次，避免誤按" },
@@ -5240,6 +5250,8 @@ var App = class {
     this.diaryMem = null;
     // 自己的片單（一分鐘內不重讀）
     this.profileDraft = null;
+    // ── 匯出我的資料（只有網頁版）：做成 Letterboxd 匯入用的 CSV ──
+    this.exp = null;
     // ── 從 Letterboxd 匯入（只有網頁版）──
     this.lbx = null;
     /** 編輯個人檔案：暱稱（唯一）、顏色、要不要公開；最下面可以把片單和個人檔案整個刪掉 */
@@ -5437,7 +5449,7 @@ var App = class {
   }
   /** 最新版本是多少。網頁版問的是自己網站現在上線的版本（重新整理就會拿到的那一版），不是 GitHub 上的 */
   checkVersion() {
-    if (true) return checkLatest("2026.11.25-0135");
+    if (true) return checkLatest("2026.11.25-0147");
     return (async () => {
       try {
         let r = await globalThis.fetch("/version.json?t=" + Date.now(), { cache: "no-store" });
@@ -5445,7 +5457,7 @@ var App = class {
         const latest = String((await r.json()).version || "");
         if (!latest) return null;
         const num = (v) => Number(v.replace(/\D/g, "")) || 0;
-        return { latest, isLatest: num("2026.11.25-0135") >= num(latest) };
+        return { latest, isLatest: num("2026.11.25-0147") >= num(latest) };
       } catch (_) {
         return null;
       }
@@ -6077,7 +6089,51 @@ var App = class {
     return /* @__PURE__ */ h(Page, { title: "我的片單", onBack: () => this.back() }, /* @__PURE__ */ h(Section, null, user ? this.profileCard(user, me.counts, user.hidden ? "個人頁目前被站長停用，別人看不到。" : "", (kind) => this.go(() => this.profileListView("", kind), "讀取中…"), "", user.hidden ? { text: "已被停用", tone: "bad" } : user.pub ? { text: "公開", tone: "good" } : { text: "不公開", tone: "" }) : /* @__PURE__ */ h(Note, { kind: "warn", text: "還沒有設定暱稱：別人找不到你、不能追蹤你，短評也是匿名。你還是可以追蹤別人。" })), false ? /* @__PURE__ */ h(Section, null, /* @__PURE__ */ h(Item, { icon: "📥", title: "從 Letterboxd 匯入", subtitle: "把 Letterboxd 上的評分、觀影日期和影評搬過來", onTap: () => {
       this.lbx = null;
       this.go(() => this.lbxView());
+    } }), /* @__PURE__ */ h(Item, { icon: "📤", title: "匯出我的資料", subtitle: "下載成表格檔備份，格式可以直接匯進 Letterboxd", onTap: () => {
+      this.exp = null;
+      this.go(() => this.exportView());
     } })) : null, body);
+  }
+  /** 把整份片單讀回來（一次 100 筆），對上 IMDb 編號和年份，做成 CSV */
+  async exportBuild() {
+    const all = [];
+    for (let offset = 0; offset < 2e4; offset += 100) {
+      const r = await social("mine", { offset });
+      all.push(...r.list || []);
+      if (!r.list || r.list.length < 100) break;
+    }
+    if (!all.length) throw new Error("片單是空的，沒有東西可以匯出。");
+    const years = await loadYearRatings().catch(() => null);
+    const byName = {};
+    for (const key of Object.keys(years && years.ratings || {})) {
+      const r = years.ratings[key], cut = key.lastIndexOf("|"), name = key.slice(0, cut);
+      if (r.id) (byName[name] || (byName[name] = [])).push({ imdb: r.id, year: String(r.y || key.slice(cut + 1)) });
+    }
+    let matched = 0;
+    const known = (k, seen) => {
+      const list = byName[k];
+      if (!list || !list.length) return null;
+      matched++;
+      const upTo = /^\d{4}/.test(seen) ? seen.slice(0, 4) : "9999";
+      const sorted = list.slice().sort((a, b) => b.year.localeCompare(a.year));
+      return sorted.find((x) => x.year <= upTo) || sorted[sorted.length - 1];
+    };
+    const csv = letterboxdCsv(all, known, (how) => how.map((x) => howLabel([x])).filter(Boolean).join(", "));
+    const G = globalThis;
+    let url = "";
+    try {
+      if (this.exp && this.exp.url) G.URL.revokeObjectURL(this.exp.url);
+      url = G.URL.createObjectURL(new G.Blob([csv], { type: "text/csv;charset=utf-8" }));
+    } catch (_) {
+    }
+    this.exp = { csv, url, name: `pianke-letterboxd-${todayTPE()}.csv`, n: all.length, matched };
+  }
+  exportView() {
+    const e = this.exp;
+    return /* @__PURE__ */ h(Page, { title: "匯出我的資料", onBack: () => this.back() }, /* @__PURE__ */ h(Section, { hint: "會匯出你片單上的每一筆（含你設成只有自己看得到的）：片名、分數、觀影日期、觀影方式、短評。檔案是在你的手機上做出來的，不會傳給別人。" }, /* @__PURE__ */ h("div", { class: "nb-ask" }, /* @__PURE__ */ h("div", { class: "nb-ico", "aria-hidden": "true" }, "📤"), /* @__PURE__ */ h("b", null, e ? `準備好了：${e.n} 部` : "做成 Letterboxd 可以匯入的檔案"), /* @__PURE__ */ h("p", null, e ? `其中 ${e.matched} 部帶有 IMDb 編號，Letterboxd 可以直接認出來；其餘 ${e.n - e.matched} 部只有中文片名，匯入時可能要自己對一下。` : "一個 CSV 表格檔。可以自己留著備份，也可以到 Letterboxd 的匯入頁（letterboxd.com/import）上傳，把片刻的紀錄搬過去。")), /* @__PURE__ */ h("div", { class: "nt-form" }, e && e.url ? /* @__PURE__ */ h("a", { class: "btn primary lb-pick", href: e.url, download: e.name }, "下載 ", esc(e.name)) : null, e ? /* @__PURE__ */ h(Button, { label: "複製檔案內容", kind: "secondary", onTap: async () => {
+      Pasteboard.copy(e.csv);
+      await this.ui.toast("已複製，可以貼到備忘錄或試算表");
+    } }) : null, /* @__PURE__ */ h(Button, { label: e ? "重新產生" : "產生匯出檔", kind: e ? "secondary" : "primary", onTap: () => this.exportBuild() }))), e ? /* @__PURE__ */ h(Section, { title: "怎麼匯進 Letterboxd" }, /* @__PURE__ */ h("ol", { class: "lb-steps" }, /* @__PURE__ */ h("li", null, "用瀏覽器打開 letterboxd.com/import 並登入。"), /* @__PURE__ */ h("li", null, "選剛才下載的 CSV 檔上傳。"), /* @__PURE__ */ h("li", null, "Letterboxd 會列出對到的片讓你確認，再按匯入。")), /* @__PURE__ */ h("div", { class: "nt-form" }, /* @__PURE__ */ h(Button, { label: "打開 Letterboxd 的匯入頁", kind: "secondary", onTap: () => Safari.open("https://letterboxd.com/import/") }))) : null, /* @__PURE__ */ h("p", { class: "hint" }, "分數用 1～10 分（Letterboxd 會換成半顆星到五顆星）；觀影方式放在標籤欄。短評只帶每部片最新的一則；「有雷」的標記 Letterboxd 的匯入檔沒有對應的欄位，匯過去之後要自己再標。"));
   }
   /** 選好檔案：讀檔 → 一批一批問伺服器台灣片名（畫面上顯示進度）→ 列出清單讓使用者勾選 */
   async lbxStart() {
@@ -6676,7 +6732,7 @@ var App = class {
         return;
       }
       try {
-        await sendFeedback(cat.id, text, false ? this.isStandalone() ? "web-app" : "web" : "scriptable", "2026.11.25-0135");
+        await sendFeedback(cat.id, text, false ? this.isStandalone() ? "web-app" : "web" : "scriptable", "2026.11.25-0147");
         this.fbDraft = "";
         this.fbCat = "";
         await this.ui.toast("已送出，謝謝你的回饋");
@@ -7021,7 +7077,7 @@ var App = class {
       this.settings.seenLog = CHANGELOG_LATEST;
       saveSettings(this.settings);
     }
-    return /* @__PURE__ */ h(Page, { title: "更新內容", subtitle: `目前版本 ${"2026.11.25-0135"}`, onBack: () => this.back() }, CHANGELOG.map((e) => /* @__PURE__ */ h(Section, { title: e.date }, e.items.map((it) => /* @__PURE__ */ h(Item, { title: it.text, tag: { text: it.kind === "new" ? "新功能" : "改進", tone: it.kind === "new" ? "now" : "soon" }, chevron: false })))), /* @__PURE__ */ h(Note, { text: "只列出比較有感的變動；修小錯、調整文字這類不會寫在這裡。" }));
+    return /* @__PURE__ */ h(Page, { title: "更新內容", subtitle: `目前版本 ${"2026.11.25-0147"}`, onBack: () => this.back() }, CHANGELOG.map((e) => /* @__PURE__ */ h(Section, { title: e.date }, e.items.map((it) => /* @__PURE__ */ h(Item, { title: it.text, tag: { text: it.kind === "new" ? "新功能" : "改進", tone: it.kind === "new" ? "now" : "soon" }, chevron: false })))), /* @__PURE__ */ h(Note, { text: "只列出比較有感的變動；修小錯、調整文字這類不會寫在這裡。" }));
   }
   async aboutView() {
     return /* @__PURE__ */ h(Page, { title: "關於", onBack: () => this.back() }, /* @__PURE__ */ h(Section, { hint: "連鎖影城的場次來自場次通（twshowtimes.com），感謝場次通的整理；其他來自開眼電影網，以及誠品、光點、樂聲、內惟戲院官網。實際場次以影城公告為準。" }, /* @__PURE__ */ h(Item, { icon: "ℹ️", title: "關於與資料來源", accent: true, chevron: false, onTap: () => Safari.open(ABOUT_URL) }), /* @__PURE__ */ h(Item, { icon: "🔒", title: "隱私權政策", accent: true, chevron: false, onTap: () => Safari.open(PRIVACY_URL) }), /* @__PURE__ */ h(Item, { icon: "🙏", title: "前往場次通", subtitle: "比較各影城場次、看上映場數排行", accent: true, chevron: false, onTap: () => Safari.open("https://twshowtimes.com/") })));
@@ -7052,11 +7108,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.25-0135"}`);
+          Pasteboard.copy(`版本 ${"2026.11.25-0147"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.25-0135"}`,
+      `版本 ${"2026.11.25-0147"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -7701,7 +7757,7 @@ var App = class {
     if (false) {
       if (!r) return /* @__PURE__ */ h(Note, { text: "（無法確認是否為最新版：連不到網站）" });
       if (r.isLatest) return /* @__PURE__ */ h(Note, { text: "✅ 已是最新版" });
-      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.25-0135"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
+      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.25-0147"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
         globalThis.location.reload();
       } }));
     }

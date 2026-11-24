@@ -3,7 +3,7 @@
 // 畫面：WebView（HTML/CSS），事件迴圈在 run()。資料層在 core.ts，網頁解析在 parsers.ts。
 
 import { SOCIALS, socialIcon } from "./brand";
-import { readLetterboxd, lbxNote, LBX_NOTE_MAX } from "./lbx";
+import { readLetterboxd, lbxNote, LBX_NOTE_MAX, letterboxdCsv } from "./lbx";
 import type { LbxItem } from "./lbx";
 import { loadYearRatings, normTitle as lbxNorm } from "./core";
 import { h, Fragment, Page, Section, Item, Chips, Chip, Button, Search, PickRow, Note, Para, Loading, Empty, Hero, Steps } from "./jsx";
@@ -940,8 +940,79 @@ class App {
         <Section>
           {user ? this.profileCard(user, me.counts, user.hidden ? "個人頁目前被站長停用，別人看不到。" : "", (kind) => this.go(() => this.profileListView("", kind), "讀取中…"), "", user.hidden ? { text: "已被停用", tone: "bad" } : user.pub ? { text: "公開", tone: "good" } : { text: "不公開", tone: "" }) : <Note kind="warn" text="還沒有設定暱稱：別人找不到你、不能追蹤你，短評也是匿名。你還是可以追蹤別人。" />}
         </Section>
-        {IS_WEB ? <Section><Item icon="📥" title="從 Letterboxd 匯入" subtitle="把 Letterboxd 上的評分、觀影日期和影評搬過來" onTap={() => { this.lbx = null; this.go(() => this.lbxView()); }} /></Section> : null}
+        {IS_WEB ? (
+          <Section>
+            <Item icon="📥" title="從 Letterboxd 匯入" subtitle="把 Letterboxd 上的評分、觀影日期和影評搬過來" onTap={() => { this.lbx = null; this.go(() => this.lbxView()); }} />
+            <Item icon="📤" title="匯出我的資料" subtitle="下載成表格檔備份，格式可以直接匯進 Letterboxd" onTap={() => { this.exp = null; this.go(() => this.exportView()); }} />
+          </Section>
+        ) : null}
         {body}
+      </Page>
+    );
+  }
+  // ── 匯出我的資料（只有網頁版）：做成 Letterboxd 匯入用的 CSV ──
+  exp: { csv: string; url: string; name: string; n: number; matched: number } | null = null;
+  /** 把整份片單讀回來（一次 100 筆），對上 IMDb 編號和年份，做成 CSV */
+  async exportBuild(): Promise<void> {
+    const all: DiaryEntry[] = [];
+    for (let offset = 0; offset < 20000; offset += 100) {
+      const r = await social<{ list: DiaryEntry[]; total: number }>("mine", { offset });
+      all.push(...(r.list || []));
+      if (!r.list || r.list.length < 100) break;
+    }
+    if (!all.length) throw new Error("片單是空的，沒有東西可以匯出。");
+    // 年度總表：片名 → 可能有好幾個年份（同名的重拍、重映）
+    const years = await loadYearRatings().catch(() => null);
+    const byName: Record<string, { imdb: string; year: string }[]> = {};
+    for (const key of Object.keys((years && years.ratings) || {})) {
+      const r = years!.ratings[key], cut = key.lastIndexOf("|"), name = key.slice(0, cut);
+      if (r.id) (byName[name] || (byName[name] = [])).push({ imdb: r.id, year: String(r.y || key.slice(cut + 1)) });
+    }
+    let matched = 0;
+    const known = (k: string, seen: string) => {
+      const list = byName[k];
+      if (!list || !list.length) return null;
+      matched++;
+      // 同名的片有好幾部：取「看的那一年以前、最新的那一部」；沒記日期就取最新的
+      const upTo = /^\d{4}/.test(seen) ? seen.slice(0, 4) : "9999";
+      const sorted = list.slice().sort((a, b) => b.year.localeCompare(a.year));
+      return sorted.find((x) => x.year <= upTo) || sorted[sorted.length - 1];
+    };
+    const csv = letterboxdCsv(all, known, (how) => how.map((x) => howLabel([x])).filter(Boolean).join(", "));
+    const G = globalThis as any;
+    let url = "";
+    try { if (this.exp && this.exp.url) G.URL.revokeObjectURL(this.exp.url); url = G.URL.createObjectURL(new G.Blob([csv], { type: "text/csv;charset=utf-8" })); } catch (_) {}
+    this.exp = { csv, url, name: `pianke-letterboxd-${todayTPE()}.csv`, n: all.length, matched };
+  }
+  exportView(): string {
+    const e = this.exp;
+    return (
+      <Page title="匯出我的資料" onBack={() => this.back()}>
+        <Section hint="會匯出你片單上的每一筆（含你設成只有自己看得到的）：片名、分數、觀影日期、觀影方式、短評。檔案是在你的手機上做出來的，不會傳給別人。">
+          <div class="nb-ask">
+            <div class="nb-ico" aria-hidden="true">📤</div>
+            <b>{e ? `準備好了：${e.n} 部` : "做成 Letterboxd 可以匯入的檔案"}</b>
+            <p>{e
+              ? `其中 ${e.matched} 部帶有 IMDb 編號，Letterboxd 可以直接認出來；其餘 ${e.n - e.matched} 部只有中文片名，匯入時可能要自己對一下。`
+              : "一個 CSV 表格檔。可以自己留著備份，也可以到 Letterboxd 的匯入頁（letterboxd.com/import）上傳，把片刻的紀錄搬過去。"}</p>
+          </div>
+          <div class="nt-form">
+            {e && e.url ? <a class="btn primary lb-pick" href={e.url} download={e.name}>下載 {esc(e.name)}</a> : null}
+            {e ? <Button label="複製檔案內容" kind="secondary" onTap={async () => { Pasteboard.copy(e.csv); await this.ui.toast("已複製，可以貼到備忘錄或試算表"); }} /> : null}
+            <Button label={e ? "重新產生" : "產生匯出檔"} kind={e ? "secondary" : "primary"} onTap={() => this.exportBuild()} />
+          </div>
+        </Section>
+        {e ? (
+          <Section title="怎麼匯進 Letterboxd">
+            <ol class="lb-steps">
+              <li>用瀏覽器打開 letterboxd.com/import 並登入。</li>
+              <li>選剛才下載的 CSV 檔上傳。</li>
+              <li>Letterboxd 會列出對到的片讓你確認，再按匯入。</li>
+            </ol>
+            <div class="nt-form"><Button label="打開 Letterboxd 的匯入頁" kind="secondary" onTap={() => Safari.open("https://letterboxd.com/import/")} /></div>
+          </Section>
+        ) : null}
+        <p class="hint">分數用 1～10 分（Letterboxd 會換成半顆星到五顆星）；觀影方式放在標籤欄。短評只帶每部片最新的一則；「有雷」的標記 Letterboxd 的匯入檔沒有對應的欄位，匯過去之後要自己再標。</p>
       </Page>
     );
   }
