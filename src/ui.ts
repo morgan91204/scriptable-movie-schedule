@@ -253,6 +253,29 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .fb-text{margin-top:6px;font-size:15.5px;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere}
 .fb-reply{margin-top:9px;padding:10px 12px;border-radius:10px;background:var(--chip);font-size:15px;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere}
 .fb-reply b{display:block;font-size:12px;color:var(--accent);margin-bottom:3px}
+.av{flex:none;display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;color:#fff;font-size:13px;font-weight:700;line-height:1}
+.av.big{width:56px;height:56px;font-size:26px}
+.pf{display:flex;align-items:center;gap:14px;padding:14px 16px}
+.pf-body{min-width:0;flex:1}
+.pf-name{font-size:20px;font-weight:700;overflow-wrap:anywhere}
+.pf-note{font-size:12px;color:var(--fg2);margin-top:2px}
+.pf-nums{display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:6px;font-size:13px;color:var(--fg2)}
+.pf-nums b{color:var(--fg);font-variant-numeric:tabular-nums}
+.us-main{display:flex;align-items:center;gap:10px;flex:1;min-width:0;text-align:left;color:var(--fg);padding:4px 0}
+.us-name{font-size:16px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.us-sub{flex:none;font-size:13px;color:var(--fg2)}
+.us-follow{flex:none;margin-left:10px;padding:6px 14px;border-radius:999px;background:var(--accent);color:#fff;font-size:14px;font-weight:600}
+.us-follow.on{background:var(--chip);color:var(--fg2)}
+.sw{width:34px;height:34px;border-radius:50%;border:3px solid transparent}
+.sw.on{border-color:var(--fg);box-shadow:0 0 0 2px var(--card) inset}
+.nt-by{display:flex;align-items:center;gap:7px;margin-bottom:6px;font-size:14px;font-weight:600;color:var(--fg)}
+.nt-by.inline{display:inline-flex;margin:0;font-size:12px;gap:5px;min-width:0}
+.nt-by.inline .av{width:18px;height:18px;font-size:10px}
+.nt-by.inline span:not(.av){overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:9em}
+.nt-by em{font-style:normal;font-weight:400;color:var(--accent)}
+.en-title{flex:1;min-width:0;font-size:16px;font-weight:600;color:var(--fg);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cm-hist.wide{width:100%}
+.cm-hist.wide .bars{height:56px}
 .nt-cover{display:block;width:100%;margin-top:6px;padding:9px 12px;border-radius:10px;background:var(--chip);color:var(--fg2);font-size:14px;text-align:left}
 .cm-star{font-size:28px;line-height:1;padding:2px 3px;color:var(--line)}
 @media(prefers-color-scheme:dark){.cm-star{color:#48484a}}

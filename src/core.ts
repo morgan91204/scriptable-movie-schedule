@@ -3591,6 +3591,63 @@ function deviceId(): string {
   return id;
 }
 export const communityKey = (title: string) => normTitle(baseTitle(title)).slice(0, 120);
+
+// ── 帳號（只有網頁版有 Google 登入）：登入後，評分、標籤、短評改用帳號身分（一個帳號一票，不分裝置），
+//    另外記進「我的片單」；個人頁公開的話，短評旁邊會顯示暱稱。沒登入的人照舊用裝置的匿名代號。
+let siteBase = ""; // 網頁版：目前這個網站自己（同網域，不用繞一圈）；其他版本用正式站的網址
+/** 網頁版開機時設定：帳號、意見回饋這些功能打目前這個網站 */
+export function setSiteBase(origin: string): void { siteBase = /^https?:\/\//.test(origin) ? origin : ""; }
+const siteApi = (): string => siteBase || SITE_URL;
+let accountToken: (() => string) | null = null;
+/** 網頁版開機時設定：怎麼拿登入憑證（沒登入回傳空字串） */
+export function setAccount(fn: (() => string) | null): void { accountToken = fn; }
+export const signedIn = (): boolean => !!(accountToken && accountToken());
+/** 打網頁版伺服器的帳號功能（/api/social/*）。帶登入憑證；沒登入的人帶裝置代號（看短評、檢舉用） */
+async function socialCall(op: string, body: Record<string, unknown> = {}): Promise<{ status: number; data: any }> {
+  const token = accountToken ? accountToken() : "";
+  const r = await platform().fetchText(`${siteApi()}/api/social/${op}`, { accept: "application/json", "content-type": "application/json" }, { method: "POST", body: JSON.stringify(token ? { token, ...body } : { d: deviceId(), ...body }) });
+  let data: any = null;
+  try { data = JSON.parse(r.body); } catch (_) {}
+  return { status: r.status, data };
+}
+const SOCIAL_ERR: Record<string, string> = {
+  "not signed in": "登入已經失效，請重新登入", "too many": "操作太頻繁，請稍後再試", "bad name": "暱稱要 2～16 個字，只能用中英文、數字和底線", "name taken": "這個暱稱有人用了，換一個",
+  "rename later": "暱稱 14 天內只能改一次", "private": "對方沒有公開個人頁", "not found": "找不到這個帳號", "too many follows": "追蹤的人數到上限了", "bad date": "日期不對（不能是未來的日期）",
+};
+/** 帳號功能：做不成就丟出看得懂的錯誤 */
+export async function social<T = any>(op: string, body: Record<string, unknown> = {}): Promise<T> {
+  const r = await socialCall(op, body);
+  if (r.status !== 200 || !r.data) throw new Error(SOCIAL_ERR[(r.data && r.data.error) || ""] || "暫時連不上，請稍後再試");
+  return r.data as T;
+}
+export interface Profile { name: string; color: string; pub?: boolean; hidden?: boolean; canRename?: boolean }
+export interface DiaryEntry { k: string; title: string; s: number; x: string; sp: number; seen: string; at: number; priv?: number; by?: { name: string; color: string } }
+export interface SocialCounts { films: number; notes: number; following: number; followers: number }
+export const PROFILE_COLORS: { id: string; hex: string }[] = [
+  { id: "blue", hex: "#0a84ff" }, { id: "green", hex: "#30b158" }, { id: "orange", hex: "#ff9f0a" }, { id: "red", hex: "#ff453a" },
+  { id: "purple", hex: "#bf5af2" }, { id: "pink", hex: "#ff375f" }, { id: "teal", hex: "#40c8e0" }, { id: "gray", hex: "#8e8e93" },
+];
+export const profileColor = (id: string): string => (PROFILE_COLORS.find((c) => c.id === id) || PROFILE_COLORS[0]).hex;
+/** 片單上「看過」的寫法 */
+export const seenLabel = (seen: string): string => (!seen ? "" : seen === "?" ? "看過" : `${seen.replace(/-/g, "/")} 看過`);
+/** 登入後：把這台裝置原本匿名評過的片併進帳號（一次 20 部，分批送）。回傳併了幾部 */
+export async function adoptRatings(): Promise<number> {
+  const all = readMyVotes();
+  const keys = Object.keys(all).filter((k) => all[k] && all[k].s > 0).map((k) => ({ k, title: all[k].title || k }));
+  let n = 0;
+  for (let i = 0; i < keys.length; i += 20) {
+    const r = await socialCall("adopt", { d: deviceId(), keys: keys.slice(i, i + 20) });
+    if (r.status !== 200) break;
+    n += (r.data && r.data.adopted) || 0;
+  }
+  return n;
+}
+/** 登出：這台記的「我評過幾分」是帳號的，不再適用（下次看到那部片會重新跟伺服器確認） */
+export function forgetMyVotes(): void {
+  cacheSet("my-votes10b.json", "{}");
+  for (const k of Object.keys(communityMem)) delete communityMem[k];
+  for (const k of Object.keys(notesMem)) delete notesMem[k];
+}
 const communityMem: Record<string, Community & { at: number }> = {};
 /** 已經讀過的片刻評分（畫面重畫時用，不用再等網路） */
 export function communityCached(title: string): Community | null {
@@ -3626,7 +3683,7 @@ function loadSummary(): Promise<Summary | null> {
 /** 所有片的片刻評分總表（片名鍵 → 1～10 分各幾人）；讀不到回傳 null */
 export const loadCommunitySummary = (): Promise<Record<string, number[]> | null> => loadSummary();
 /** 這支手機的投票紀錄：s = 我給的分數，at = 上次跟伺服器確認的時間；dist／dat = 伺服器最近回的統計（剛投完票時比靜態檔新） */
-interface MyVote { s: number; at: number; dist?: number[]; dat?: number; t?: string[]; tags?: Record<string, number>; nn?: number; nat?: number }
+interface MyVote { title?: string; s: number; at: number; dist?: number[]; dat?: number; t?: string[]; tags?: Record<string, number>; nn?: number; nat?: number }
 const readMyVotes = (): Record<string, MyVote> => {
   try {
     return JSON.parse(cacheGet("my-votes10b.json") || "{}") || {}; // 10 分制換了檔名：舊檔記的是 5 星制的分數，不能沿用（再換一次：改制時舊評分全部清掉了）
@@ -3634,11 +3691,13 @@ const readMyVotes = (): Record<string, MyVote> => {
     return {};
   }
 };
-function saveMyVote(k: string, c: Community, fresh: boolean) {
+function saveMyVote(k: string, c: Community, fresh: boolean, title = "") {
   const all = readMyVotes();
+  const keepTitle = title || (all[k] && all[k].title) || "";
   for (const [key, v] of Object.entries(all)) if (!v.s && Date.now() - v.at > 60 * 86400e3) delete all[key]; // 沒投票的舊紀錄清掉
   const t = c.myTags && c.myTags.length ? c.myTags : undefined;
   all[k] = fresh ? { s: c.mine, at: Date.now(), dist: c.dist, dat: Date.now(), t, tags: c.tags, nn: c.notes, nat: Date.now() } : { s: c.mine, at: Date.now(), t };
+  if (keepTitle) all[k].title = keepTitle; // 片名（登入時併進帳號的片單要用）
   cacheSet("my-votes10b.json", JSON.stringify(all));
 }
 const fromDist = (dist: number[], mine: number): Community => {
@@ -3663,7 +3722,9 @@ export async function communityStats(title: string): Promise<Community> {
       return c;
     }
   }
-  const r = await platform().fetchText(`${COMMUNITY_API}/v2/stats?m=${encodeURIComponent(k)}&d=${encodeURIComponent(deviceId())}`, { accept: "application/json" });
+  const r = signedIn()
+    ? await socialCall("stats", { m: k }).then((x) => ({ status: x.status, body: JSON.stringify(x.data) }))
+    : await platform().fetchText(`${COMMUNITY_API}/v2/stats?m=${encodeURIComponent(k)}&d=${encodeURIComponent(deviceId())}`, { accept: "application/json" });
   if (r.status !== 200) throw new Error("片刻評分暫時讀不到");
   const c = JSON.parse(r.body) as Community;
   communityMem[k] = { ...c, at: Date.now() };
@@ -3673,27 +3734,32 @@ export async function communityStats(title: string): Promise<Community> {
 /** 投票：score 1～5；0 = 取消。回傳更新後的統計 */
 export async function communityVote(title: string, score: number): Promise<Community> {
   const k = communityKey(title);
-  const r = await platform().fetchText(
-    `${COMMUNITY_API}/v2/vote`,
-    { accept: "application/json", "content-type": "application/json" },
-    { method: "POST", body: JSON.stringify({ m: k, d: deviceId(), s: score }) }
-  );
+  const r = signedIn()
+    ? await socialCall("vote", { m: k, title: baseTitle(title), s: score }).then((x) => ({ status: x.status, body: JSON.stringify(x.data) }))
+    : await platform().fetchText(
+        `${COMMUNITY_API}/v2/vote`,
+        { accept: "application/json", "content-type": "application/json" },
+        { method: "POST", body: JSON.stringify({ m: k, d: deviceId(), s: score }) }
+      );
   if (r.status === 429) throw new Error("投票太頻繁，請稍後再試");
   if (r.status !== 200) throw new Error("評分沒有送出，請稍後再試");
   const c = JSON.parse(r.body) as Community;
   communityMem[k] = { ...c, at: Date.now() };
-  saveMyVote(k, c, true);
+  if (!score) delete notesMem[k];
+  saveMyVote(k, c, true, baseTitle(title));
   return c;
 }
 
 /** 送出心得標籤（整組換掉；空的 = 全部拿掉）。要先評過分。回傳更新後的統計 */
 export async function communityTags(title: string, tags: string[]): Promise<Community> {
   const k = communityKey(title);
-  const r = await platform().fetchText(
-    `${COMMUNITY_API}/v2/tags`,
-    { accept: "application/json", "content-type": "application/json" },
-    { method: "POST", body: JSON.stringify({ m: k, d: deviceId(), t: tags.slice(0, REVIEW_TAGS_MAX) }) }
-  );
+  const r = signedIn()
+    ? await socialCall("tags", { m: k, t: tags.slice(0, REVIEW_TAGS_MAX) }).then((x) => ({ status: x.status, body: JSON.stringify(x.data) }))
+    : await platform().fetchText(
+        `${COMMUNITY_API}/v2/tags`,
+        { accept: "application/json", "content-type": "application/json" },
+        { method: "POST", body: JSON.stringify({ m: k, d: deviceId(), t: tags.slice(0, REVIEW_TAGS_MAX) }) }
+      );
   if (r.status === 429) throw new Error("操作太頻繁，請稍後再試");
   if (r.status === 409) throw new Error("要先評分才能選心得標籤");
   if (r.status !== 200) throw new Error("心得標籤沒有送出，請稍後再試");
@@ -3705,7 +3771,12 @@ export async function communityTags(title: string, tags: string[]): Promise<Comm
 
 // ── 短評：評完分可以寫一句話（最多 60 字）。防雷：輸入框提醒不提劇情、作者可以自己標「可能有雷」（預設摺疊）、
 //    送出前偵測常見的劇透字眼提醒一次、其他人可以檢舉（2 人檢舉劇透自動摺疊，3 人檢舉自動隱藏）。
-export interface ReviewNote { id: number; x: string; sp: number; s: number; at: number; mine?: number; hidden?: number }
+export interface ReviewNote { id: number; x: string; sp: number; s: number; at: number; mine?: number; hidden?: number; by?: { name: string; color: string; f?: number } }
+/** 短評最多幾個字：有登入帳號的人可以寫長一點 */
+export const noteMax = (): number => (signedIn() ? 140 : NOTE_MAX);
+/** 網頁版一律經過自己的伺服器讀短評（才有作者的暱稱）；Scriptable／Scripting 版直接讀評分伺服器（都是匿名） */
+let notesViaSite = false;
+export function setNotesViaSite(on: boolean): void { notesViaSite = on; }
 export interface ReviewNotes { notes: ReviewNote[]; reported: number[] }
 export const NOTE_MAX = 60;
 export const NOTE_PLACEHOLDER = "不提劇情，說說看完的感覺";
@@ -3744,16 +3815,22 @@ export async function loadNotes(title: string): Promise<ReviewNotes> {
   const k = communityKey(title);
   const hit = notesMem[k];
   if (hit && Date.now() - hit.at < 60e3) return hit.data;
-  const r = await platform().fetchText(`${COMMUNITY_API}/v2/notes?m=${encodeURIComponent(k)}&d=${encodeURIComponent(deviceId())}`, { accept: "application/json" });
+  const r = notesViaSite || signedIn()
+    ? await socialCall("notes", { m: k }).then((x) => ({ status: x.status, body: JSON.stringify(x.data) }))
+    : await platform().fetchText(`${COMMUNITY_API}/v2/notes?m=${encodeURIComponent(k)}&d=${encodeURIComponent(deviceId())}`, { accept: "application/json" });
   if (r.status !== 200) throw new Error("短評暫時讀不到");
   return keepNotes(k, JSON.parse(r.body) as ReviewNotes);
 }
 async function notePost(path: string, title: string, body: Record<string, unknown>, fail: string): Promise<ReviewNotes> {
   const k = communityKey(title);
-  const r = await platform().fetchText(`${COMMUNITY_API}/v2/${path}`, { accept: "application/json", "content-type": "application/json" }, { method: "POST", body: JSON.stringify({ m: k, d: deviceId(), ...body }) });
+  // 登入的人用帳號身分送；檢舉在網頁版也走自己的伺服器（回來的清單才有暱稱）
+  const viaSite = signedIn() || (notesViaSite && path === "report");
+  const r = viaSite
+    ? await socialCall(path, { m: k, title: baseTitle(title), ...body }).then((x) => ({ status: x.status, body: JSON.stringify(x.data) }))
+    : await platform().fetchText(`${COMMUNITY_API}/v2/${path}`, { accept: "application/json", "content-type": "application/json" }, { method: "POST", body: JSON.stringify({ m: k, d: deviceId(), ...body }) });
   if (r.status === 429) throw new Error("操作太頻繁，請稍後再試");
   if (r.status === 409) throw new Error("要先評分才能寫短評");
-  if (r.status === 422) throw new Error(/too long/.test(r.body) ? `短評最多 ${NOTE_MAX} 個字` : "短評不能放連結或聯絡方式");
+  if (r.status === 422) throw new Error(/too long/.test(r.body) ? `短評最多 ${noteMax()} 個字` : "短評不能放連結或聯絡方式");
   if (r.status !== 200) throw new Error(fail);
   return keepNotes(k, JSON.parse(r.body) as ReviewNotes);
 }
@@ -3776,7 +3853,7 @@ export const FEEDBACK_MAX = 500;
 export const feedbackCat = (id: string): string => FEEDBACK_CATS.find((c) => c.id === id)?.label || "其他";
 let feedbackMem: { at: number; list: Feedback[] } | null = null;
 async function feedbackPost(path: string, body: Record<string, unknown>): Promise<Feedback[]> {
-  const r = await platform().fetchText(`${SITE_URL}/api/feedback/${path}`, { accept: "application/json", "content-type": "application/json" }, { method: "POST", body: JSON.stringify({ d: deviceId(), ...body }) });
+  const r = await platform().fetchText(`${siteApi()}/api/feedback/${path}`, { accept: "application/json", "content-type": "application/json" }, { method: "POST", body: JSON.stringify({ d: deviceId(), ...body }) });
   if (r.status === 429) throw new Error("今天送出的回饋已經到上限，明天再試");
   if (r.status !== 200) throw new Error(path === "send" ? "回饋沒有送出，請稍後再試" : "回饋暫時讀不到");
   const list = (JSON.parse(r.body).list || []) as Feedback[];

@@ -12,9 +12,9 @@ import {
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
   loadSettings, saveSettings, settingsStored, setSettingsSavedHook, syncPick, syncApply, syncMerge, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, communityKey, globalSearch, issuerRecent, favSnapGet, favSnapSet, boxIsRerun, boxHasLaterRun, boxRunRows, boxRunsName, loadIntro, rerunDataReady, SITE_URL, TW,
   FORMATS, formatsOf, filterVersions, filterVersionsAny, movieRows, movieDays, nearest, kmLabel, WINDOWS, findShowtimes, findShowtimesMulti, multiLabel, multiDetail, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText,
-  hallOf, tmdbTest, movieExtras, moviePoster, movieRuntime, posterSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxCountries, boxByCountry, boxInfo, boxInfoRows, boxCountryText, BOX_COUNTRY_NOTE, boxCountryTag, boxCountriesPicked, loadMovieBoard, loadSoonBoard, notifyPrefs, notifyPayload, notifyEndScope, notifyEndPick, notifyQuiet, NOTIFY_PRE_STEPS, NOTIFY_KINDS, boxStatus, STATUS_LABEL, boxInfoBy, isFavMovie, toggleFavMovie, favMovieRows, favMovieBox, soonGroups, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityCached, communityVote, communityTags, sendFeedback, loadMyFeedback, feedbackSent, feedbackUnread, feedbackMarkSeen, feedbackCat, FEEDBACK_CATS, FEEDBACK_STATUS, FEEDBACK_MAX, loadNotes, notesCached, saveNote, reportNote, noteLooksSpoiler, noteDate, NOTE_MAX, NOTE_PLACEHOLDER, NOTE_RULES, REPORT_REASONS, reviewTagsToggle, REVIEW_TAGS, REVIEW_TAGS_MAX, reviewTagLabel, topReviewTags, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalsReady, festivalNote, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, festivalDefaultDate, festivalStateLabel, festivalState, festivalFooter, linkMovies, nowGroupLine, nowFilter, festivalPick, movieAbout, festivalSearch, festivalSearchLines, festivalTrailer, festivalYears, festivalsAny, festivalGroups, festivalChipNote, festivalStatusLine, movieRatings, ratingTier, tomatoTier, popcornTier, popcornCount,
+  hallOf, tmdbTest, movieExtras, moviePoster, movieRuntime, posterSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxCountries, boxByCountry, boxInfo, boxInfoRows, boxCountryText, BOX_COUNTRY_NOTE, boxCountryTag, boxCountriesPicked, loadMovieBoard, loadSoonBoard, notifyPrefs, notifyPayload, notifyEndScope, notifyEndPick, notifyQuiet, NOTIFY_PRE_STEPS, NOTIFY_KINDS, boxStatus, STATUS_LABEL, boxInfoBy, isFavMovie, toggleFavMovie, favMovieRows, favMovieBox, soonGroups, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityCached, communityVote, communityTags, social, signedIn, setAccount, setSiteBase, setNotesViaSite, adoptRatings, forgetMyVotes, noteMax, profileColor, seenLabel, PROFILE_COLORS, sendFeedback, loadMyFeedback, feedbackSent, feedbackUnread, feedbackMarkSeen, feedbackCat, FEEDBACK_CATS, FEEDBACK_STATUS, FEEDBACK_MAX, loadNotes, notesCached, saveNote, reportNote, noteLooksSpoiler, noteDate, NOTE_MAX, NOTE_PLACEHOLDER, NOTE_RULES, REPORT_REASONS, reviewTagsToggle, REVIEW_TAGS, REVIEW_TAGS_MAX, reviewTagLabel, topReviewTags, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalsReady, festivalNote, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, festivalDefaultDate, festivalStateLabel, festivalState, festivalFooter, linkMovies, nowGroupLine, nowFilter, festivalPick, movieAbout, festivalSearch, festivalSearchLines, festivalTrailer, festivalYears, festivalsAny, festivalGroups, festivalChipNote, festivalStatusLine, movieRatings, ratingTier, tomatoTier, popcornTier, popcornCount,
 } from "./core";
-import type { Feedback, ReviewNote, MovieExtras, Ratings, Community, BoxOfficeItem, BoxSort, MovieEntry, SoonEntry, UpcomingFilm, FavMovie, FavRow, NotifyPrefs, NotifyKind, SyncData, GlobalHits, Festival, FestivalFilm, FestivalSession } from "./core";
+import type { Profile, DiaryEntry, SocialCounts, Feedback, ReviewNote, MovieExtras, Ratings, Community, BoxOfficeItem, BoxSort, MovieEntry, SoonEntry, UpcomingFilm, FavMovie, FavRow, NotifyPrefs, NotifyKind, SyncData, GlobalHits, Festival, FestivalFilm, FestivalSession } from "./core";
 import { setTabBar, setBackGuard, esc } from "./jsx";
 import { CHANGELOG, CHANGELOG_LATEST } from "./changelog";
 import type { TwMovie, TwMovieCinema, Format, LatLng, Hit } from "./core";
@@ -621,6 +621,9 @@ class App {
   async syncStart(): Promise<void> {
     const sy = this.sync();
     if (!sy) return;
+    setSiteBase(String((globalThis as any).location?.origin || ""));
+    setAccount(() => sy.token()); // 登入的人：評分、短評改用帳號身分
+    setNotesViaSite(true); // 短評經過自己的伺服器讀（才有作者的暱稱）
     setSettingsSavedHook(() => {
       if (this.syncMute || !sy.on()) return;
       const G = globalThis as any;
@@ -634,7 +637,8 @@ class App {
       const r = await sy.pull();
       if (r && r.data) applyLocal(syncMerge(this.settings, r.data as Partial<SyncData>));
       await sy.push(syncPick(this.settings));
-      this.syncNote = r && r.data ? "已登入，這台和帳號裡的收藏已經合在一起。" : "已登入，這台的設定已經存到帳號裡。";
+      const adopted = await adoptRatings().catch(() => 0); // 這台原本匿名評的分、寫的短評併進帳號
+      this.syncNote = (r && r.data ? "已登入，這台和帳號裡的收藏已經合在一起。" : "已登入，這台的設定已經存到帳號裡。") + (adopted ? `這台原本評過的 ${adopted} 部片也併進你的片單了。` : "");
       return;
     }
     if (!sy.on()) return;
@@ -652,6 +656,321 @@ class App {
     );
   }
   syncWho: { admin: boolean } | null = null; // 這次登入是不是管理員（這次開啟問過一次就記著）
+
+
+  // ── 我的片單、個人頁、追蹤（只有網頁版；要用 Google 登入）──
+  diaryTab = "mine"; // 片單頁看哪一塊：mine 我的片單／feed 動態／people 找人
+  peopleQ = ""; // 找人的搜尋字
+  diaryMem: { at: number; list: DiaryEntry[] } | null = null; // 自己的片單（一分鐘內不重讀）
+  profileDraft: { name: string; color: string; pub: boolean } | null = null; // 編輯個人檔案時還沒存的內容
+  async myDiary(force = false): Promise<DiaryEntry[]> {
+    if (!force && this.diaryMem && Date.now() - this.diaryMem.at < 60e3) return this.diaryMem.list;
+    const r = await social<{ list: DiaryEntry[] }>("mine");
+    this.diaryMem = { at: Date.now(), list: r.list || [] };
+    return this.diaryMem.list;
+  }
+  /** 用片名開那部片的頁面（上映中、即將上映、已下檔、影展片都找得到） */
+  async openTitle(title: string): Promise<void> {
+    const fav: FavMovie = { key: communityKey(title), title, at: 0 };
+    const row = (await favMovieRows({ ...this.settings, favMovies: [fav] }).catch(() => [] as FavRow[]))[0];
+    if (row) this.openFavRow(row); else this.go(() => this.favMovieView(fav), `讀取《${title}》…`);
+  }
+  avatar(u: { name: string; color: string }, big = false): string {
+    return <span class={"av" + (big ? " big" : "")} style={`background:${profileColor(u.color)}`} aria-hidden="true">{esc(Array.from(u.name)[0] || "?")}</span>;
+  }
+  /** 個人頁最上面那一塊：頭像（顏色＋暱稱第一個字）、暱稱、四個數字 */
+  profileCard(u: { name: string; color: string }, c: SocialCounts | null, note = ""): string {
+    return (
+      <div class="pf">
+        {this.avatar(u, true)}
+        <div class="pf-body">
+          <div class="pf-name">{esc(u.name)}</div>
+          {note ? <div class="pf-note">{esc(note)}</div> : null}
+          {c ? <div class="pf-nums"><span><b>{c.films}</b> 部片</span><span><b>{c.notes}</b> 則短評</span><span><b>{c.following}</b> 追蹤中</span><span><b>{c.followers}</b> 粉絲</span></div> : null}
+        </div>
+      </div>
+    );
+  }
+  /** 片單上的一筆：片名、分數、看過的日期、短評（有雷的摺疊）。by = 動態裡是誰的紀錄 */
+  entryRow(e: DiaryEntry, onTap: () => void, onUser?: (name: string) => void): string {
+    const open = !e.sp || this.noteShown.indexOf(-e.at) >= 0;
+    return (
+      <div class="nt">
+        {e.by ? <button class="nt-by" onTap={() => onUser && onUser(e.by!.name)}>{this.avatar(e.by)}<span>{esc(e.by.name)}</span></button> : null}
+        <div class="nt-head" role="button" onTap={onTap}>
+          <span class="en-title">{esc(e.title)}</span>
+          {e.s ? <span class={"nt-score " + ratingTier("imdb", e.s)}>{e.s} 分</span> : null}
+          {e.priv ? <span class="fb-tag">只有自己看得到</span> : null}
+          <span class="nt-rep">›</span>
+        </div>
+        <div class="nt-meta">{esc([seenLabel(e.seen), `${noteDate(e.at)}記錄`].filter(Boolean).join("｜"))}</div>
+        {e.x ? (open ? <div class="nt-text">{esc(e.x)}</div> : <button class="nt-cover" onTap={() => { this.noteShown = [...this.noteShown, -e.at]; }}>這則可能有雷，點一下顯示</button>) : null}
+      </div>
+    );
+  }
+  /** 設定 → 我的片單：自己看過、評過的片；另外兩個分頁是追蹤對象的動態、找人 */
+  async diaryView(): Promise<string> {
+    const sy = this.sync();
+    if (!sy || !sy.on())
+      return (
+        <Page title="我的片單" onBack={() => this.back()}>
+          <Section hint="登入後，你評過分、寫過短評的片會集中在這裡，換裝置也在；還可以標記看過的日期。想要的話可以取一個暱稱、公開個人頁，讓別人追蹤你，也去追蹤別人。不登入也能照常匿名評分。">
+            <Item icon="🎞" title="用 Google 登入，開始記錄" subtitle="我們只存帳號的識別碼（經過雜湊），不存 email 和姓名" accent onTap={() => sy && sy.login()} />
+          </Section>
+        </Page>
+      );
+    let me: { user: Profile | null; counts: SocialCounts } | null = null, failed = "";
+    try { me = await social("me"); } catch (e) { failed = String((e as Error)?.message || e); }
+    if (!me) return <Page title="我的片單" onBack={() => this.back()}><Note kind="warn" text={failed} /></Page>;
+    const user = me.user;
+    let body = "";
+    if (this.diaryTab === "feed") {
+      const r = await social<{ list: DiaryEntry[]; following: number }>("feed").catch(() => null);
+      body = !r ? <Note kind="warn" text="動態暫時讀不到" /> : r.list.length ? (
+        <Section hint="你追蹤的人最近記錄的片（只有他們公開的）。">
+          <div class="nt-list">{r.list.map((e) => this.entryRow(e, () => this.openTitle(e.title), (name) => this.go(() => this.profileView(name), "讀取個人頁…")))}</div>
+        </Section>
+      ) : <Section><Note text={r.following ? "你追蹤的人最近還沒有新的紀錄。" : "還沒有追蹤任何人。到「找人」看看有誰公開了片單。"} /></Section>;
+    } else if (this.diaryTab === "people") {
+      const r = await social<{ list: { name: string; color: string; films: number; following: boolean }[] }>("people", { q: this.peopleQ.trim() }).catch(() => null);
+      body = (
+        <>
+          <Search value={this.peopleQ} placeholder="用暱稱找人" onInput={(t) => { this.peopleQ = t; }} />
+          <Section title={this.peopleQ.trim() ? "符合的帳號" : "最近有新紀錄的人"} hint="只會列出公開個人頁的帳號。">
+            {!r ? <Note kind="warn" text="暫時讀不到" /> : r.list.length ? r.list.map((u) => this.userItem(u)) : <Note text={this.peopleQ.trim() ? "找不到這個暱稱（對方可能沒有公開個人頁）。" : "目前還沒有人公開片單。"} />}
+          </Section>
+        </>
+      );
+    } else {
+      const list = await this.myDiary().catch(() => null);
+      body = !list ? <Note kind="warn" text="片單暫時讀不到" /> : list.length ? (
+        <Section hint="在電影頁評分、寫短評，或標記看過，就會出現在這裡。點一筆可以改看過的日期，或設成只有自己看得到。">
+          <div class="nt-list">{list.map((e) => this.entryRow(e, () => this.go(() => this.entryView(e.title, e))))}</div>
+        </Section>
+      ) : <Section><Note text="片單還是空的。到任何一部電影的頁面評分或標記看過，就會記在這裡。" /></Section>;
+    }
+    return (
+      <Page title="我的片單" onBack={() => this.back()}>
+        <Section>
+          {user ? this.profileCard(user, me.counts, user.hidden ? "個人頁目前被站長停用" : user.pub ? "個人頁公開中" : "個人頁不公開（只有你看得到）") : <Note text="還沒有設定暱稱。設定後才能公開個人頁、讓別人追蹤你。" />}
+          <Item icon="✏️" title={user ? "編輯個人檔案" : "設定暱稱"} subtitle="暱稱、顏色、要不要公開" onTap={() => { this.profileDraft = null; this.go(() => this.profileEditView(user)); }} />
+          {user && user.pub ? <Item icon="🔗" title="複製我的個人頁連結" chevron={false} onTap={async () => { Pasteboard.copy(`${SITE_URL}/?u=${encodeURIComponent(user.name)}`); await this.ui.toast("已複製連結"); }} /> : null}
+        </Section>
+        <Chips tabs>
+          <Chip label="片單" muted={this.diaryTab !== "mine"} onTap={() => { this.diaryTab = "mine"; }} />
+          <Chip label="動態" muted={this.diaryTab !== "feed"} onTap={() => { this.diaryTab = "feed"; }} />
+          <Chip label="找人" muted={this.diaryTab !== "people"} onTap={() => { this.diaryTab = "people"; }} />
+        </Chips>
+        {body}
+      </Page>
+    );
+  }
+  /** 清單裡的一個帳號：點名字看個人頁，右邊追蹤／取消追蹤 */
+  userItem(u: { name: string; color: string; films?: number; following?: boolean }): string {
+    return (
+      <div class="item">
+        <button class="us-main" onTap={() => this.go(() => this.profileView(u.name), "讀取個人頁…")}>
+          {this.avatar(u)}
+          <span class="us-name">{esc(u.name)}</span>
+          {u.films !== undefined ? <span class="us-sub">{u.films} 部片</span> : null}
+        </button>
+        {signedIn() ? <button class={"us-follow" + (u.following ? " on" : "")} onTap={async () => {
+          try { await social("follow", { name: u.name, on: !u.following }); await this.ui.toast(u.following ? "已取消追蹤" : `已追蹤 ${u.name}`); } catch (e) { await this.ui.toast(String((e as Error)?.message || e)); }
+        }}>{u.following ? "追蹤中" : "追蹤"}</button> : null}
+      </div>
+    );
+  }
+  /** 編輯個人檔案：暱稱（唯一）、顏色、要不要公開；最下面可以把片單和個人檔案整個刪掉 */
+  profileEditView(user: Profile | null): string {
+    const d = this.profileDraft || { name: user ? user.name : "", color: user ? user.color : "blue", pub: user ? !!user.pub : false };
+    const keep = (v?: Record<string, string>) => { this.profileDraft = { ...d, name: v && typeof v.n === "string" ? v.n : d.name }; };
+    return (
+      <Page title={user ? "編輯個人檔案" : "設定暱稱"} onBack={() => this.back()}>
+        <Section title="暱稱" hint="2～16 個字，只能用中英文、數字和底線；不能跟別人重複。14 天內只能改一次。請不要用真實姓名或冒用他人名義。">
+          <div class="nt-form">
+            <input class="field" name="n" maxlength="16" autocomplete="off" autocapitalize="off" value={d.name} placeholder="例如：愛看片的小明" />
+          </div>
+        </Section>
+        <Section title="頭像顏色" hint="頭像是這個顏色加上暱稱的第一個字（不能上傳照片）。">
+          <div class="nt-form"><div class="fb-cats">
+            {PROFILE_COLORS.map((c) => <button class={"sw" + (c.id === d.color ? " on" : "")} style={`background:${c.hex}`} aria-label={c.id} aria-pressed={c.id === d.color ? "true" : "false"} onTap={(v: Record<string, string>) => { keep(v); this.profileDraft = { ...this.profileDraft!, color: c.id }; }} />)}
+          </div></div>
+        </Section>
+        <Section title="公開" hint="公開後：別人可以看到你的個人頁（片單、評分、短評）、可以追蹤你，你寫的短評旁邊會顯示暱稱。不公開：片單只有你看得到，短評照樣匿名。每一筆也可以單獨設成只有自己看得到。">
+          <div class="nt-form">
+            <button class={"nt-check" + (d.pub ? " on" : "")} aria-pressed={d.pub ? "true" : "false"} onTap={(v: Record<string, string>) => { keep(v); this.profileDraft = { ...this.profileDraft!, pub: !d.pub }; }}>
+              <i>{d.pub ? "✓" : ""}</i><span>公開我的個人頁</span>
+            </button>
+            <Button label="儲存" onTap={async (v) => {
+              keep(v);
+              const p = this.profileDraft!;
+              try { await social("profile-set", { name: p.name.trim(), color: p.color, pub: p.pub }); this.profileDraft = null; await this.ui.toast("已儲存"); this.back(); } catch (e) { await this.ui.toast(String((e as Error)?.message || e)); }
+            }} />
+          </div>
+        </Section>
+        {user ? (
+          <Section title="刪除" hint="會刪掉你的片單、暱稱、追蹤關係，以及你用這個帳號評的分和寫的短評。刪了救不回來。收藏和設定的同步不受影響（那個在「用 Google 帳號同步」裡刪）。">
+            <Item icon="🗑" title="刪除我的片單和個人檔案" chevron={false} onTap={() => this.go(() => this.wipeConfirmView())} />
+          </Section>
+        ) : null}
+      </Page>
+    );
+  }
+  wipeConfirmView(): string {
+    return (
+      <Page title="確定要刪除？" onBack={() => this.back()}>
+        <Note kind="warn" text="片單、暱稱、追蹤關係，還有你用這個帳號評的分和寫的短評都會刪掉，救不回來。" />
+        <Button label="確定刪除" kind="danger" onTap={async () => {
+          try { await this.wipeSocial(); await this.ui.toast("已刪除"); } catch (e) { await this.ui.toast(String((e as Error)?.message || e)); }
+          this.back(); this.back();
+        }} />
+        <Button label="取消" kind="secondary" onTap={() => this.back()} />
+      </Page>
+    );
+  }
+  /** 把帳號的片單和社交資料刪乾淨（伺服器一次處理 20 筆，送到沒有為止） */
+  async wipeSocial(): Promise<void> {
+    for (let i = 0; i < 200; i++) { const r = await social<{ left: number }>("wipe"); if (!r.left) break; }
+    forgetMyVotes();
+    this.diaryMem = null;
+  }
+  /** 某個人的公開個人頁 */
+  async profileView(name: string): Promise<string> {
+    type P = { user: Profile; self?: boolean; private?: boolean; counts?: SocialCounts; dist?: number[]; list?: DiaryEntry[]; following?: boolean; since?: number };
+    let p: P | null = null, failed = "";
+    try { p = await social<P>("profile", { name }); } catch (e) { failed = String((e as Error)?.message || e); }
+    if (!p) return <Page title="個人頁" onBack={() => this.back()}><Note kind="warn" text={failed === "找不到這個帳號" ? "找不到這個帳號（可能改了暱稱，或已經刪除）。" : failed} /></Page>;
+    const u = p.user;
+    if (p.private) return <Page title={u.name} onBack={() => this.back()}><Section>{this.profileCard(u, null)}<Note text="這個帳號沒有公開個人頁。" /></Section></Page>;
+    const dist = p.dist || [], max = Math.max(1, ...dist), rated = dist.reduce((a, b) => a + b, 0);
+    const list = p.list || [];
+    return (
+      <Page title={u.name} subtitle="個人頁" onBack={() => this.back()}>
+        <Section>
+          {this.profileCard(u, p.counts || null, p.self ? "這是你的個人頁（別人看到的不含你設成只有自己看得到的那幾筆）" : "")}
+          {p.self ? null : signedIn() ? (
+            <div class="nt-form"><Button label={p.following ? "追蹤中（點一下取消）" : "追蹤"} kind={p.following ? "secondary" : "primary"} onTap={async () => {
+              try { await social("follow", { name: u.name, on: !p!.following }); await this.ui.toast(p!.following ? "已取消追蹤" : `已追蹤 ${u.name}`); } catch (e) { await this.ui.toast(String((e as Error)?.message || e)); }
+            }} /></div>
+          ) : <Note text="登入後可以追蹤這個人（設定 → 我的片單）。" />}
+        </Section>
+        {rated ? (
+          <Section title={`評分分布（${rated} 部）`}>
+            <div class="cm"><div class="cm-hist wide" aria-hidden="true">
+              <div class="bars">{[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((v) => <i class={dist[v - 1] ? "" : "zero"} style={`height:${Math.max(8, Math.round(((dist[v - 1] || 0) / max) * 100))}%`} />)}</div>
+              <div class="axis"><span>1 分</span><span>10 分</span></div>
+            </div></div>
+          </Section>
+        ) : null}
+        <Section title={`片單（${p.counts ? p.counts.films : list.length}）`} hint={list.length >= 50 ? "只列最近 50 筆。" : ""}>
+          {list.length ? <div class="nt-list">{list.map((e) => this.entryRow(e, () => this.openTitle(e.title)))}</div> : <Note text="還沒有公開的紀錄。" />}
+        </Section>
+        {p.self ? null : (
+          <Section>
+            <Item icon="⚑" title="檢舉這個帳號" subtitle="暱稱不雅、冒用他人名義，或其他不當行為" onTap={() => this.go(() => this.reportUserView(u.name))} />
+          </Section>
+        )}
+      </Page>
+    );
+  }
+  reportUserView(name: string): string {
+    const WHY = [{ id: "name", label: "暱稱不雅或不當" }, { id: "fake", label: "冒用他人名義" }, { id: "abuse", label: "騷擾或其他不當行為" }];
+    return (
+      <Page title="檢舉帳號" onBack={() => this.back()}>
+        <Section title={`檢舉「${name}」的原因`} hint="檢舉是匿名的，站長會複查。個別短評有問題的話，請到那則短評按「檢舉」。">
+          {WHY.map((w) => <Item title={w.label} onTap={async () => {
+            try { await social("report-user", { name, why: w.id }); await this.ui.toast("已送出檢舉，謝謝"); } catch (e) { await this.ui.toast(String((e as Error)?.message || e)); }
+            this.back();
+          }} />)}
+        </Section>
+      </Page>
+    );
+  }
+  /** 片單上的一筆：看過的日期、要不要只給自己看。分數和短評在電影頁改 */
+  async entryView(title: string, known?: DiaryEntry): Promise<string> {
+    const k = communityKey(title);
+    const list = await this.myDiary().catch(() => [] as DiaryEntry[]);
+    const e = list.find((x) => x.k === k) || known || null;
+    const seen = e ? e.seen : "";
+    const save = async (body: Record<string, unknown>, done: string) => {
+      try { await social("entry", { m: k, title: title, ...body }); this.diaryMem = null; await this.ui.toast(done); } catch (err) { await this.ui.toast(String((err as Error)?.message || err)); }
+    };
+    return (
+      <Page title="片單" subtitle={`《${title}》`} onBack={() => this.back()}>
+        <Section>
+          {e && (e.s || e.x) ? <div class="nt-list">{this.entryRow(e, () => this.openTitle(title))}</div> : <Note text="還沒有評分。可以先標記看過，之後再到電影頁評分、寫短評。" />}
+          <Item icon="🎬" title="打開這部片的頁面" subtitle="評分、心得標籤、短評都在那裡改" onTap={() => this.openTitle(title)} />
+        </Section>
+        <Section title="看過的日期" hint="不記得哪一天可以只標「看過」。">
+          <div class="nt-form">
+            <input class="field" name="d" type="date" max={todayTPE()} value={/^\d{4}-/.test(seen) ? seen : ""} />
+            <Button label="儲存日期" onTap={async (v) => { const d = String(v.d || ""); if (!d) { await this.ui.toast("先選日期"); return; } await save({ seen: d }, "已記下看過的日期"); }} />
+            <Button label={seen === "?" ? "已標記看過（沒記日期）" : "看過，但不記日期"} kind="secondary" onTap={() => save({ seen: "?" }, "已標記看過")} />
+            {seen ? <Button label="取消「看過」" kind="danger" onTap={() => save({ seen: "" }, "已取消")} /> : null}
+          </div>
+        </Section>
+        {e ? (
+          <Section title="誰看得到" hint="設成只有自己看得到：這一筆不會出現在你的個人頁和別人的動態裡，你在這部片的短評也會顯示成匿名。分數照樣算進這部片的平均。">
+            <div class="nt-form">
+              <button class={"nt-check" + (e.priv ? " on" : "")} aria-pressed={e.priv ? "true" : "false"} onTap={() => save({ priv: !e.priv }, e.priv ? "這一筆恢復公開" : "這一筆只有你看得到了")}>
+                <i>{e.priv ? "✓" : ""}</i><span>只有自己看得到</span>
+              </button>
+            </div>
+          </Section>
+        ) : null}
+      </Page>
+    );
+  }
+  /** 管理員：帳號管理。被檢舉的、被停用的帳號；可以停用個人頁、清掉檢舉、強制改暱稱 */
+  adminUserQ = "";
+  async adminUsersView(): Promise<string> {
+    const sy = this.sync();
+    type U = { name: string; color: string; pub: boolean; hidden: boolean; films: number; reports: Record<string, number> };
+    const WHY: Record<string, string> = { name: "暱稱不當", fake: "冒名", abuse: "不當行為" };
+    let list: U[] = [], users = 0, failed = "";
+    const q = this.adminUserQ.trim();
+    try { const r = await sy.adm("users", q ? { op: "find", q } : { op: "list" }); list = r.list || []; users = r.users || 0; } catch (e) { failed = String((e as Error)?.message || e); }
+    const act = (body: Record<string, unknown>, done: string) => async () => { try { await sy.adm("users", body); await this.ui.toast(done); } catch (e) { await this.ui.toast(String((e as Error)?.message || e)); } };
+    return (
+      <Page title="帳號管理" subtitle="管理員專區" onBack={() => this.back()}>
+        <Search value={this.adminUserQ} placeholder="用暱稱找帳號" onInput={(t) => { this.adminUserQ = t; }} />
+        {failed ? <Note kind="warn" text={failed} /> : (
+          <Section title={q ? `符合「${q}」的帳號` : `被檢舉或被停用的帳號（${list.length}）`} hint={q ? "" : `目前共有 ${users} 個帳號設了暱稱。停用：個人頁別人看不到、短評變成匿名，對方的片單不會被刪。`}>
+            {list.length ? <div class="nt-list">{list.map((u) => {
+              const why = Object.keys(u.reports || {}).map((w) => `${WHY[w] || w} ${u.reports[w]}`).join("、");
+              return (
+                <div class="nt">
+                  <div class="nt-head">{this.avatar(u)}<span class="en-title">{esc(u.name)}</span><span class={"nt-score" + (u.hidden ? " bad" : "")}>{u.hidden ? "已停用" : u.pub ? "公開" : "不公開"}</span></div>
+                  <div class="nt-meta">{u.films} 部片{why ? `｜檢舉：${why}` : ""}</div>
+                  <div class="nt-acts">
+                    <button onTap={() => this.go(() => this.profileView(u.name), "讀取個人頁…")}>看個人頁</button>
+                    <button onTap={act({ op: "hide", name: u.name, on: !u.hidden }, u.hidden ? "已恢復" : "已停用")}>{u.hidden ? "恢復" : "停用"}</button>
+                    {why ? <button onTap={act({ op: "clear", name: u.name }, "已清掉檢舉")}>沒問題</button> : null}
+                    <button class="danger" onTap={() => this.go(() => this.adminRenameView(u.name))}>改暱稱</button>
+                  </div>
+                </div>
+              );
+            })}</div> : <Note text={q ? "找不到。" : "目前沒有被檢舉或被停用的帳號。"} />}
+          </Section>
+        )}
+      </Page>
+    );
+  }
+  adminRenameView(name: string): string {
+    const sy = this.sync();
+    return (
+      <Page title="強制改暱稱" onBack={() => this.back()}>
+        <Section title={`把「${name}」改成`} hint="暱稱不雅或冒名時用。對方之後 14 天內不能自己改回來。">
+          <div class="nt-form">
+            <input class="field" name="n" maxlength="16" autocomplete="off" placeholder="新的暱稱，例如：使用者1234" />
+            <Button label="改掉" kind="danger" onTap={async (v) => {
+              try { await sy.adm("users", { op: "rename", name, to: String(v.n || "").trim() }); await this.ui.toast("已改暱稱"); this.back(); } catch (e) { await this.ui.toast(String((e as Error)?.message || e)); }
+            }} />
+          </div>
+        </Section>
+      </Page>
+    );
+  }
 
   // ── 意見回饋（使用者）──
   fbCat = ""; // 回饋頁選的分類
@@ -803,6 +1122,7 @@ class App {
           <Section title="管理員專區" hint="只有管理員名單裡的 Google 帳號、用「管理員登入」登入後才看得到這一區。">
             <Item icon="💬" title="意見回饋" subtitle="看使用者的回饋、回覆、標處理狀態" onTap={() => { this.adminFbTab = "open"; this.go(() => this.adminFeedbackView(), "讀取回饋…"); }} />
             <Item icon="🛡" title="短評管理" subtitle="複查被檢舉的短評，或巡一遍最近的短評" onTap={() => { this.adminTab = "flagged"; this.go(() => this.adminNotesView(), "讀取短評…"); }} />
+            <Item icon="🪪" title="帳號管理" subtitle="被檢舉的帳號：停用個人頁、強制改暱稱" onTap={() => { this.adminUserQ = ""; this.go(() => this.adminUsersView(), "讀取帳號…"); }} />
             <Item icon="👥" title="管理員名單" subtitle="新增或移除其他管理員" onTap={() => this.go(() => this.adminListView(), "讀取名單…")} />
           </Section>
         ) : null}
@@ -880,8 +1200,8 @@ class App {
           if (r && r.data && r.at > sy.at()) { this.syncMute = true; this.settings = syncApply(this.settings, r.data as Partial<SyncData>); saveSettings(this.settings); this.syncMute = false; sy.setAt(r.at); this.pushSync(); await this.ui.toast("已帶入帳號裡比較新的設定"); }
           else await this.ui.toast((await sy.push(syncPick(this.settings))) ? "已同步" : "同步失敗，請稍後再試");
         }} />
-        <Item icon="🚪" title="登出" subtitle="這台的收藏會留著，只是不再同步" chevron={false} onTap={async () => { await sy.logout(); this.syncNote = ""; await this.ui.toast("已登出"); }} />
-        <Item icon="🗑" title="刪除帳號裡的資料並登出" subtitle="伺服器上的設定會刪掉，所有裝置都會登出；這台的收藏會留著" chevron={false} onTap={async () => { await sy.wipe(); this.syncNote = ""; await this.ui.toast("已刪除並登出"); }} />
+        <Item icon="🚪" title="登出" subtitle="這台的收藏會留著，只是不再同步" chevron={false} onTap={async () => { await sy.logout(); forgetMyVotes(); this.syncWho = null; this.diaryMem = null; this.syncNote = ""; await this.ui.toast("已登出"); }} />
+        <Item icon="🗑" title="刪除帳號裡的資料並登出" subtitle="伺服器上的設定、片單、暱稱和你用帳號評的分都會刪掉，所有裝置都會登出；這台的收藏會留著" chevron={false} onTap={async () => { await this.wipeSocial().catch(() => undefined); await sy.wipe(); this.syncWho = null; this.syncNote = ""; await this.ui.toast("已刪除並登出"); }} />
       </Section>
     );
   }
@@ -1121,6 +1441,11 @@ class App {
           <Item icon="🏢" title="收藏發行商" subtitle="搜尋發行商、增加或取消收藏" right={(this.settings.favIssuers || []).length ? `${(this.settings.favIssuers || []).length} 家` : "還沒有"} onTap={() => { this.issuerQuery = ""; this.go(() => this.issuerManageView(), "讀取發行商…"); }} />
         </Section>
         {await this.notifyLink()}
+        {this.sync() ? (
+          <Section title="我的片單">
+            <Item icon="🎞" title="我的片單" subtitle={signedIn() ? "看過的片、評分和短評；追蹤的人的動態" : "登入後記錄看過的片，也能公開個人頁、追蹤別人"} onTap={() => { this.diaryTab = "mine"; this.diaryMem = null; this.go(() => this.diaryView(), "讀取片單…"); }} />
+          </Section>
+        ) : null}
         {this.syncLink()}
         <Section title="關於">
           {IS_WEB && !this.isStandalone() ? <Item icon="📲" title="加到主畫面" subtitle="像 App 一樣從主畫面開啟，看圖示教學" onTap={() => this.go(() => this.installView())} /> : null}
@@ -1375,11 +1700,13 @@ class App {
       keep(v);
       const text = String(this.noteDraft === null ? draft : this.noteDraft).replace(/\s+/g, " ").trim();
       if (!text) { await this.ui.toast("先寫一句再送出"); return; }
-      if (Array.from(text).length > NOTE_MAX) { await this.ui.toast(`短評最多 ${NOTE_MAX} 個字`); return; }
+      if (Array.from(text).length > noteMax()) { await this.ui.toast(`短評最多 ${noteMax()} 個字`); return; }
       if (!spoil && noteLooksSpoiler(text) && this.noteAsk !== text) { this.noteAsk = text; return; } // 先問一次要不要標記
       await send(text, spoil);
     };
     const others = notes.filter((n) => !n.mine);
+    // 登入的人：這部片我追蹤的人怎麼評（沒追蹤任何人就是空的）
+    const friends = signedIn() ? ((await social<{ list: DiaryEntry[] }>("friends", { m: communityKey(title) }).catch(() => null)) || { list: [] }).list : [];
     const row = (n: ReviewNote) => {
       const open = !n.sp || this.noteShown.indexOf(n.id) >= 0;
       const reported = !!list && list.reported.indexOf(n.id) >= 0;
@@ -1388,6 +1715,7 @@ class App {
           <div class="nt-head">
             {n.s ? <span class={"nt-score " + ratingTier("imdb", n.s)}>{n.s} 分</span> : null}
             {n.sp ? <span class="nt-sp">可能有雷</span> : null}
+            {n.by ? <button class="nt-by inline" onTap={(v: Record<string, string>) => { keep(v); this.go(() => this.profileView(n.by!.name), "讀取個人頁…"); }}>{this.avatar(n.by)}<span>{esc(n.by.name)}</span>{n.by.f ? <em>追蹤中</em> : null}</button> : null}
             <span class="nt-date">{esc(noteDate(n.at))}</span>
             {n.mine ? null : reported ? <span class="nt-rep done">已檢舉</span> : <button class="nt-rep" aria-label="檢舉這則短評" onTap={(v: Record<string, string>) => { keep(v); this.go(() => this.reportView(title, n)); }}>檢舉</button>}
           </div>
@@ -1401,7 +1729,7 @@ class App {
           {!voted ? <Note text="先替這部片評分，就可以寫一句短評。" /> : (
             <div class="nt-form">
               {my && my.hidden ? <Note kind="warn" text="你的短評被多人檢舉，目前別人看不到。可以修改後重新送出。" /> : null}
-              <input class="field" name="x" maxlength={String(NOTE_MAX)} enterkeyhint="done" autocomplete="off" value={draft} placeholder={`${NOTE_PLACEHOLDER}（最多 ${NOTE_MAX} 字）`} />
+              <input class="field" name="x" maxlength={String(noteMax())} enterkeyhint="done" autocomplete="off" value={draft} placeholder={`${NOTE_PLACEHOLDER}（最多 ${noteMax()} 字）`} />
               <button class={"nt-check" + (spoil ? " on" : "")} aria-pressed={spoil ? "true" : "false"} onTap={(v: Record<string, string>) => { keep(v); this.noteSpoil = !spoil; this.noteAsk = ""; }}>
                 <i>{spoil ? "✓" : ""}</i><span>可能有雷</span><em>勾了以後預設摺疊，點了才會顯示</em>
               </button>
@@ -1418,6 +1746,11 @@ class App {
             </div>
           )}
         </Section>
+        {friends.length ? (
+          <Section title={`你追蹤的人（${friends.length}）`}>
+            <div class="nt-list">{friends.map((e) => this.entryRow({ ...e, title: e.by ? e.by.name : e.title, by: undefined }, () => this.go(() => this.profileView(e.by!.name), "讀取個人頁…")))}</div>
+          </Section>
+        ) : null}
         <Section title={`大家的短評（${others.length}）`} hint={others.length ? "看到劇透、不當內容或廣告可以點「檢舉」。" : ""}>
           {failed ? <Note kind="warn" text={failed} /> : null}
           {others.length ? <div class="nt-list">{others.map(row)}</div> : failed ? null : <Note text={my ? "目前只有你寫了短評。" : "還沒有人寫短評。"} />}
@@ -1528,6 +1861,13 @@ class App {
                 </div>
               ) : null}
             </>
+          ) : null}
+          {c && signedIn() ? (
+            <button class="cm-tagbar" onTap={() => this.go(() => this.entryView(title), "讀取片單…")}>
+              <span>我的片單</span>
+              <em>{mine ? "已記錄，可以標看過的日期" : "還沒評分也可以先標記看過"}</em>
+              <i>設定 ▸</i>
+            </button>
           ) : null}
           {c && (mine || c.notes) ? (
             <button class="cm-tagbar" onTap={() => { this.noteReset(); this.go(() => this.notesView(title), "讀取短評…"); }}>
@@ -2547,6 +2887,8 @@ class App {
     if (!IS_WEB) return;
     const search = String((globalThis as any).location?.search || "");
     const param = (name: string) => { const m = new RegExp(`[?&]${name}=([^&]*)`).exec(search); try { return m ? decodeURIComponent(m[1].replace(/\+/g, " ")) : ""; } catch (_) { return ""; } };
+    const who = param("u").trim().slice(0, 16);
+    if (who) { this.switchTab("settings"); this.go(() => this.profileView(who), "讀取個人頁…"); return; }
     const title = param("m").trim().slice(0, 120);
     if (!title) return;
     const fid = param("f"), film = param("ff");

@@ -36,6 +36,12 @@ binding = "RATINGS"
 service = "movie-ratings"
 entrypoint = "AdminRpc"
 
+# 登入帳號的人評分、寫短評：驗過登入後從這個入口交給評分伺服器（一個帳號一票）。同樣只有綁定的 Worker 連得到
+[[services]]
+binding = "RATE"
+service = "movie-ratings"
+entrypoint = "AccountRpc"
+
 # 管理員名單不寫在這裡（這個程式庫是公開的）：
 #   站長本人放在這個 Worker 的加密設定 ADMIN_EMAILS（Cloudflare 後台 → Workers → app → 設定 → 變數與機密；只能寫入、讀不出來），
 #   其他管理員在 App 的「設定 → 同步 → 管理員名單」新增、移除。

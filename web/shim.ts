@@ -235,6 +235,7 @@ const syncPost = async (path: string, body: Record<string, unknown>): Promise<an
 };
 g.__sync = {
   on: () => !!lsGet(SY.token),
+  token: () => lsGet(SY.token) || "",
   at: () => Number(lsGet(SY.at)) || 0,
   setAt: (at: number) => lsSet(SY.at, String(at || "")),
   login(admin?: boolean) {

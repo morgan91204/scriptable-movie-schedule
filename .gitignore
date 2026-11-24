@@ -18,3 +18,8 @@ ios/build.log
 ios/DerivedData/
 ios/archive.log
 ios/upload.log
+
+# 本機測試用的設定（不能進版本庫）
+.dev.vars
+web/.dev.vars
+web/.wrangler/

@@ -1,3 +1,4 @@
+import { social, socialAdmin, socialInit } from "./social.js";
 // 收藏電影通知（Web Push）：使用者在設定開啟後，瀏覽器會給一組「推送位址」，連同他開啟通知的那幾部片存在這裡；
 // 每小時檢查一次（見 worker.js 的 scheduled），條件成立就推一則通知：
 //   open  開放場次了：片單上出現這部片（之前沒有）
@@ -209,7 +210,10 @@ function cinemaWeekFilms(data, cinemas) {
 }
 /** 所有訂閱都存在這一個 Durable Object 裡（人數不多；每筆一個鍵） */
 export class PushHub {
-  constructor(state, env) { this.state = state; this.env = env; this.data = null; this.dataAt = 0; }
+  constructor(state, env) {
+    this.state = state; this.env = env; this.data = null; this.dataAt = 0;
+    socialInit(state.storage.sql); // 片單、個人頁、追蹤用的資料表（見 social.js）
+  }
   async notifyData() {
     if (this.data && Date.now() - this.dataAt < 10 * 60e3) return this.data;
     const r = await fetch(NOTIFY_URL + "?t=" + Math.floor(Date.now() / 600e3));
@@ -225,6 +229,7 @@ export class PushHub {
     try { b = await req.json(); } catch (_) { return json({ error: "bad json" }, 400); }
     if (path.startsWith("/sync/")) return this.sync(path, b || {});
     if (path.startsWith("/feedback/")) return this.feedback(path, b || {});
+    if (path.startsWith("/social/")) return social(this, path, b || {});
     const endpoint = String((b.subscription && b.subscription.endpoint) || b.endpoint || "");
     if (!okEndpoint(endpoint) || endpoint.length > 1000) return json({ error: "bad endpoint" }, 400);
     const id = "s:" + (await idOf(endpoint));
@@ -303,8 +308,9 @@ export class PushHub {
     // 是不是管理員：這張登入憑證是用「管理員登入」拿到的，而且那個 email 現在還在名單裡（被移除就立刻失效）
     const admin = !!sess.adm && (await this.isAdmin(sess.adm));
     if (path === "/sync/who") return json({ ok: true, admin });
-    if (path === "/sync/admins" || path === "/sync/fb") {
+    if (path === "/sync/admins" || path === "/sync/fb" || path === "/sync/users") {
       if (!admin) return json({ error: "forbidden" }, 403);
+      if (path === "/sync/users") return socialAdmin(this, b.body || {});
       return path === "/sync/admins" ? this.adminList(b.body || {}, sess.adm) : this.adminFeedback(b.body || {});
     }
     // 管理員專區：短評的人工審核。轉給評分伺服器的管理入口（服務綁定，外面連不到）
@@ -504,6 +510,13 @@ export async function handlePush(req, env, path) {
   if (Number(req.headers.get("content-length") || 0) > 60000) return json({ error: "too large" }, 413);
   const hub = env.PUSH.get(env.PUSH.idFromName("hub"));
   return hub.fetch(new Request("https://hub" + path.replace("/api/push", ""), { method: "POST", body: await req.text(), headers: { "content-type": "application/json" } }));
+}
+/** worker.js 把 /api/social/* 交給這裡（片單、個人頁、追蹤） */
+export async function handleSocial(req, env, path) {
+  if (req.method !== "POST") return json({ error: "method" }, 405);
+  if (Number(req.headers.get("content-length") || 0) > 20000) return json({ error: "too large" }, 413);
+  const hub = env.PUSH.get(env.PUSH.idFromName("hub"));
+  return hub.fetch(new Request("https://hub" + path.replace("/api/social", "/social"), { method: "POST", body: await req.text(), headers: { "content-type": "application/json" } }));
 }
 /** worker.js 把 /api/feedback/* 交給這裡（意見回饋；跟通知用同一個儲存空間） */
 export async function handleFeedback(req, env, path) {

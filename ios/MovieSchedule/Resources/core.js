@@ -42,6 +42,7 @@
     POSTERS_URL: () => POSTERS_URL,
     POSTER_TINTS: () => POSTER_TINTS,
     PRIVACY_URL: () => PRIVACY_URL,
+    PROFILE_COLORS: () => PROFILE_COLORS,
     RATE_SOURCES: () => RATE_SOURCES,
     REPORT_REASONS: () => REPORT_REASONS,
     REVIEW_TAGS: () => REVIEW_TAGS,
@@ -59,6 +60,7 @@
     WINDOWS: () => WINDOWS,
     YEAR_RATINGS_URL: () => YEAR_RATINGS_URL,
     addDays: () => addDays,
+    adoptRatings: () => adoptRatings,
     atDayLive: () => atDayLive,
     baseTitle: () => baseTitle,
     bookingUrl: () => bookingUrl,
@@ -149,6 +151,7 @@
     findShowtimesMulti: () => findShowtimesMulti,
     fmt: () => fmt,
     foregroundTask: () => foregroundTask,
+    forgetMyVotes: () => forgetMyVotes,
     formatsOf: () => formatsOf,
     globalSearch: () => globalSearch,
     groupByMovie: () => groupByMovie,
@@ -205,6 +208,7 @@
     normTitle: () => normTitle,
     noteDate: () => noteDate,
     noteLooksSpoiler: () => noteLooksSpoiler,
+    noteMax: () => noteMax,
     notesCached: () => notesCached,
     notifyEndPick: () => notifyEndPick,
     notifyEndScope: () => notifyEndScope,
@@ -224,6 +228,7 @@
     posterSrc: () => posterSrc,
     posterTint: () => posterTint,
     prefetchPosters: () => prefetchPosters,
+    profileColor: () => profileColor,
     ratingTier: () => ratingTier,
     ratingsOfIdent: () => ratingsOfIdent,
     releaseLabel: () => releaseLabel,
@@ -236,13 +241,19 @@
     saveNote: () => saveNote,
     saveSettings: () => saveSettings,
     searchTitles: () => searchTitles,
+    seenLabel: () => seenLabel,
     sendFeedback: () => sendFeedback,
+    setAccount: () => setAccount,
     setMetaEnabled: () => setMetaEnabled,
+    setNotesViaSite: () => setNotesViaSite,
     setSettingsSavedHook: () => setSettingsSavedHook,
+    setSiteBase: () => setSiteBase,
     settingsStored: () => settingsStored,
     shareText: () => shareText,
     showDay: () => showDay,
     showMinute: () => showMinute,
+    signedIn: () => signedIn,
+    social: () => social,
     soonBoard: () => soonBoard,
     soonGroups: () => soonGroups,
     syncApply: () => syncApply,
@@ -3810,6 +3821,70 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     return id;
   }
   var communityKey = (title) => normTitle(baseTitle(title)).slice(0, 120);
+  var siteBase = "";
+  function setSiteBase(origin) {
+    siteBase = /^https?:\/\//.test(origin) ? origin : "";
+  }
+  var siteApi = () => siteBase || SITE_URL;
+  var accountToken = null;
+  function setAccount(fn) {
+    accountToken = fn;
+  }
+  var signedIn = () => !!(accountToken && accountToken());
+  async function socialCall(op, body = {}) {
+    const token = accountToken ? accountToken() : "";
+    const r = await platform().fetchText(`${siteApi()}/api/social/${op}`, { accept: "application/json", "content-type": "application/json" }, { method: "POST", body: JSON.stringify(token ? { token, ...body } : { d: deviceId(), ...body }) });
+    let data = null;
+    try {
+      data = JSON.parse(r.body);
+    } catch (_) {
+    }
+    return { status: r.status, data };
+  }
+  var SOCIAL_ERR = {
+    "not signed in": "登入已經失效，請重新登入",
+    "too many": "操作太頻繁，請稍後再試",
+    "bad name": "暱稱要 2～16 個字，只能用中英文、數字和底線",
+    "name taken": "這個暱稱有人用了，換一個",
+    "rename later": "暱稱 14 天內只能改一次",
+    "private": "對方沒有公開個人頁",
+    "not found": "找不到這個帳號",
+    "too many follows": "追蹤的人數到上限了",
+    "bad date": "日期不對（不能是未來的日期）"
+  };
+  async function social(op, body = {}) {
+    const r = await socialCall(op, body);
+    if (r.status !== 200 || !r.data) throw new Error(SOCIAL_ERR[r.data && r.data.error || ""] || "暫時連不上，請稍後再試");
+    return r.data;
+  }
+  var PROFILE_COLORS = [
+    { id: "blue", hex: "#0a84ff" },
+    { id: "green", hex: "#30b158" },
+    { id: "orange", hex: "#ff9f0a" },
+    { id: "red", hex: "#ff453a" },
+    { id: "purple", hex: "#bf5af2" },
+    { id: "pink", hex: "#ff375f" },
+    { id: "teal", hex: "#40c8e0" },
+    { id: "gray", hex: "#8e8e93" }
+  ];
+  var profileColor = (id) => (PROFILE_COLORS.find((c) => c.id === id) || PROFILE_COLORS[0]).hex;
+  var seenLabel = (seen) => !seen ? "" : seen === "?" ? "看過" : `${seen.replace(/-/g, "/")} 看過`;
+  async function adoptRatings() {
+    const all = readMyVotes();
+    const keys = Object.keys(all).filter((k) => all[k] && all[k].s > 0).map((k) => ({ k, title: all[k].title || k }));
+    let n = 0;
+    for (let i = 0; i < keys.length; i += 20) {
+      const r = await socialCall("adopt", { d: deviceId(), keys: keys.slice(i, i + 20) });
+      if (r.status !== 200) break;
+      n += r.data && r.data.adopted || 0;
+    }
+    return n;
+  }
+  function forgetMyVotes() {
+    cacheSet("my-votes10b.json", "{}");
+    for (const k of Object.keys(communityMem)) delete communityMem[k];
+    for (const k of Object.keys(notesMem)) delete notesMem[k];
+  }
   var communityMem = {};
   function communityCached(title) {
     return communityMem[communityKey(title)] || null;
@@ -3844,11 +3919,13 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
       return {};
     }
   };
-  function saveMyVote(k, c, fresh) {
+  function saveMyVote(k, c, fresh, title = "") {
     const all = readMyVotes();
+    const keepTitle = title || all[k] && all[k].title || "";
     for (const [key, v] of Object.entries(all)) if (!v.s && Date.now() - v.at > 60 * 864e5) delete all[key];
     const t = c.myTags && c.myTags.length ? c.myTags : void 0;
     all[k] = fresh ? { s: c.mine, at: Date.now(), dist: c.dist, dat: Date.now(), t, tags: c.tags, nn: c.notes, nat: Date.now() } : { s: c.mine, at: Date.now(), t };
+    if (keepTitle) all[k].title = keepTitle;
     cacheSet("my-votes10b.json", JSON.stringify(all));
   }
   var fromDist = (dist, mine) => {
@@ -3871,7 +3948,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
         return c2;
       }
     }
-    const r = await platform().fetchText(`${COMMUNITY_API}/v2/stats?m=${encodeURIComponent(k)}&d=${encodeURIComponent(deviceId())}`, { accept: "application/json" });
+    const r = signedIn() ? await socialCall("stats", { m: k }).then((x) => ({ status: x.status, body: JSON.stringify(x.data) })) : await platform().fetchText(`${COMMUNITY_API}/v2/stats?m=${encodeURIComponent(k)}&d=${encodeURIComponent(deviceId())}`, { accept: "application/json" });
     if (r.status !== 200) throw new Error("片刻評分暫時讀不到");
     const c = JSON.parse(r.body);
     communityMem[k] = { ...c, at: Date.now() };
@@ -3880,7 +3957,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   }
   async function communityVote(title, score) {
     const k = communityKey(title);
-    const r = await platform().fetchText(
+    const r = signedIn() ? await socialCall("vote", { m: k, title: baseTitle(title), s: score }).then((x) => ({ status: x.status, body: JSON.stringify(x.data) })) : await platform().fetchText(
       `${COMMUNITY_API}/v2/vote`,
       { accept: "application/json", "content-type": "application/json" },
       { method: "POST", body: JSON.stringify({ m: k, d: deviceId(), s: score }) }
@@ -3889,12 +3966,13 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     if (r.status !== 200) throw new Error("評分沒有送出，請稍後再試");
     const c = JSON.parse(r.body);
     communityMem[k] = { ...c, at: Date.now() };
-    saveMyVote(k, c, true);
+    if (!score) delete notesMem[k];
+    saveMyVote(k, c, true, baseTitle(title));
     return c;
   }
   async function communityTags(title, tags) {
     const k = communityKey(title);
-    const r = await platform().fetchText(
+    const r = signedIn() ? await socialCall("tags", { m: k, t: tags.slice(0, REVIEW_TAGS_MAX) }).then((x) => ({ status: x.status, body: JSON.stringify(x.data) })) : await platform().fetchText(
       `${COMMUNITY_API}/v2/tags`,
       { accept: "application/json", "content-type": "application/json" },
       { method: "POST", body: JSON.stringify({ m: k, d: deviceId(), t: tags.slice(0, REVIEW_TAGS_MAX) }) }
@@ -3906,6 +3984,11 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     communityMem[k] = { ...c, at: Date.now() };
     saveMyVote(k, c, true);
     return c;
+  }
+  var noteMax = () => signedIn() ? 140 : NOTE_MAX;
+  var notesViaSite = false;
+  function setNotesViaSite(on) {
+    notesViaSite = on;
   }
   var NOTE_MAX = 60;
   var NOTE_PLACEHOLDER = "不提劇情，說說看完的感覺";
@@ -3944,16 +4027,17 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     const k = communityKey(title);
     const hit = notesMem[k];
     if (hit && Date.now() - hit.at < 6e4) return hit.data;
-    const r = await platform().fetchText(`${COMMUNITY_API}/v2/notes?m=${encodeURIComponent(k)}&d=${encodeURIComponent(deviceId())}`, { accept: "application/json" });
+    const r = notesViaSite || signedIn() ? await socialCall("notes", { m: k }).then((x) => ({ status: x.status, body: JSON.stringify(x.data) })) : await platform().fetchText(`${COMMUNITY_API}/v2/notes?m=${encodeURIComponent(k)}&d=${encodeURIComponent(deviceId())}`, { accept: "application/json" });
     if (r.status !== 200) throw new Error("短評暫時讀不到");
     return keepNotes(k, JSON.parse(r.body));
   }
   async function notePost(path, title, body, fail) {
     const k = communityKey(title);
-    const r = await platform().fetchText(`${COMMUNITY_API}/v2/${path}`, { accept: "application/json", "content-type": "application/json" }, { method: "POST", body: JSON.stringify({ m: k, d: deviceId(), ...body }) });
+    const viaSite = signedIn() || notesViaSite && path === "report";
+    const r = viaSite ? await socialCall(path, { m: k, title: baseTitle(title), ...body }).then((x) => ({ status: x.status, body: JSON.stringify(x.data) })) : await platform().fetchText(`${COMMUNITY_API}/v2/${path}`, { accept: "application/json", "content-type": "application/json" }, { method: "POST", body: JSON.stringify({ m: k, d: deviceId(), ...body }) });
     if (r.status === 429) throw new Error("操作太頻繁，請稍後再試");
     if (r.status === 409) throw new Error("要先評分才能寫短評");
-    if (r.status === 422) throw new Error(/too long/.test(r.body) ? `短評最多 ${NOTE_MAX} 個字` : "短評不能放連結或聯絡方式");
+    if (r.status === 422) throw new Error(/too long/.test(r.body) ? `短評最多 ${noteMax()} 個字` : "短評不能放連結或聯絡方式");
     if (r.status !== 200) throw new Error(fail);
     return keepNotes(k, JSON.parse(r.body));
   }
@@ -3970,7 +4054,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   var feedbackCat = (id) => FEEDBACK_CATS.find((c) => c.id === id)?.label || "其他";
   var feedbackMem = null;
   async function feedbackPost(path, body) {
-    const r = await platform().fetchText(`${SITE_URL}/api/feedback/${path}`, { accept: "application/json", "content-type": "application/json" }, { method: "POST", body: JSON.stringify({ d: deviceId(), ...body }) });
+    const r = await platform().fetchText(`${siteApi()}/api/feedback/${path}`, { accept: "application/json", "content-type": "application/json" }, { method: "POST", body: JSON.stringify({ d: deviceId(), ...body }) });
     if (r.status === 429) throw new Error("今天送出的回饋已經到上限，明天再試");
     if (r.status !== 200) throw new Error(path === "send" ? "回饋沒有送出，請稍後再試" : "回饋暫時讀不到");
     const list = JSON.parse(r.body).list || [];
@@ -4306,7 +4390,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   var extra = { boxOffice, filmList, soonList, nowShowing, nowShowingMulti, movieBoard: movieBoard2, festivalBoard, festivalFilm, nearby, patchSettings, fillMovie, formatList };
   var BRIDGE_LEVEL = 2;
   globalThis.MS = {
-    version: "2026.11.24-1748",
+    version: "2026.11.24-1803",
     level: BRIDGE_LEVEL,
     init(saved) {
       cache = saved || {};
