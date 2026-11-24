@@ -65,11 +65,28 @@ export default {
     if (f) return new Response(f[0], { headers: { "content-type": f[1], "cache-control": f[2] } });
     return new Response("找不到這個頁面", { status: 404, headers: { "content-type": "text/plain; charset=utf-8" } });
   },
-  // 每小時一次：檢查收藏電影有沒有新動態，有就推通知（見 push.js）
+  // 排程（見 wrangler.toml 的 crons）：
+  //   每小時一次：檢查收藏電影有沒有新動態，有就推通知（見 push.js）
+  //   每 30 分鐘一次：叫 GitHub 去匯出片刻評分的統計檔。GitHub 自己的免費排程常常晚好幾個小時，Cloudflare 的準時很多
   async scheduled(event, env, ctx) {
-    ctx.waitUntil(runPush(env).catch(() => null));
+    if (event.cron === EXPORT_CRON) ctx.waitUntil(dispatchWorkflow(env, "community.yml").catch(() => null));
+    else ctx.waitUntil(runPush(env).catch(() => null));
   },
 };
+
+const EXPORT_CRON = "9,39 * * * *"; // 要跟 wrangler.toml 裡的一模一樣
+const REPO = "morgan91204/scriptable-movie-schedule";
+/** 按一下 GitHub Actions 某個排程的「執行」（等同在網頁上按 Run workflow）。
+ *  權杖放在這個 Worker 的加密設定 GH_DISPATCH_TOKEN（只給「這個程式庫的 Actions 讀寫」）；沒設就什麼都不做，GitHub 自己的排程照舊會跑 */
+async function dispatchWorkflow(env, file) {
+  if (!env.GH_DISPATCH_TOKEN) return 0;
+  const r = await fetch(`https://api.github.com/repos/${REPO}/actions/workflows/${file}/dispatches`, {
+    method: "POST",
+    headers: { authorization: `Bearer ${env.GH_DISPATCH_TOKEN}`, accept: "application/vnd.github+json", "x-github-api-version": "2022-11-28", "user-agent": "pianke-scheduler", "content-type": "application/json" },
+    body: JSON.stringify({ ref: "main" }),
+  });
+  return r.status; // 204 = 成功
+}
 
 async function proxy(req, ctx) {
   let b;

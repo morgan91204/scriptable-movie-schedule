@@ -47,4 +47,5 @@ entrypoint = "AccountRpc"
 #   其他管理員在 App 的「設定 → 同步 → 管理員名單」新增、移除。
 
 [triggers]
-crons = ["41 * * * *"]
+# 41 分：推通知。9、39 分：叫 GitHub 匯出片刻評分的統計檔（見 worker.js 的 scheduled）
+crons = ["41 * * * *", "9,39 * * * *"]

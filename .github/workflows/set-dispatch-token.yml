@@ -1,0 +1,33 @@
+# 把 GitHub 權杖交給 Cloudflare 保管（只能手動執行；換新的權杖時再跑一次）。
+# 用途：網頁版伺服器的排程要準時叫 GitHub 匯出評分統計（見 web/worker.js 的 dispatchWorkflow），需要一把能「執行 Actions」的權杖。
+# 做法：權杖先存成這個程式庫的 Actions secret（GH_DISPATCH_TOKEN），這個排程把它轉存成 Cloudflare Worker「app」的加密設定。
+# 權杖全程不會顯示在畫面或紀錄裡，也不會經過任何人的對話。
+name: 設定排程用的 GitHub 權杖
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  set:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: 先確認權杖能用（查得到這個排程才算）
+        env:
+          TOKEN: ${{ secrets.GH_DISPATCH_TOKEN }}
+        run: |
+          if [ -z "$TOKEN" ]; then echo "還沒有 GH_DISPATCH_TOKEN 這個 secret"; exit 1; fi
+          code=$(curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer $TOKEN" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/${{ github.repository }}/actions/workflows/community.yml")
+          echo "GitHub 回應 $code"
+          [ "$code" = "200" ] || { echo "權杖讀不到這個程式庫的 Actions：請確認選了這個程式庫、Actions 權限是 Read and write"; exit 1; }
+      - name: 存成 Cloudflare 的加密設定
+        working-directory: web
+        env:
+          TOKEN: ${{ secrets.GH_DISPATCH_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: 817e94b26f15cb4cedfde46021b6f0fe
+        run: printf '%s' "$TOKEN" | npx wrangler@4 secret put GH_DISPATCH_TOKEN > /dev/null && echo "已存好"
