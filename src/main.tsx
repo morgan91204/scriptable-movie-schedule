@@ -49,6 +49,7 @@ async function currentCalendar(s: Settings): Promise<Calendar> {
   return await Calendar.defaultForEvents();
 }
 
+const PERSON_ADD = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10" cy="8" r="3.6"/><path d="M3 20a7 7 0 0 1 14 0"/><path d="M19 7v6M16 10h6"/></svg>';
 class App {
   ui = new UI();
   stack: View[] = [];
@@ -66,13 +67,13 @@ class App {
   }
   // ── 底部分頁：首頁／電影／影城／設定，各自是一個根畫面；點目前的分頁會回到該分頁的根
   tab = "home";
-  /** 網頁版多一個「通知」（有人推、噓、回覆你的短評，或追蹤你）；其他版本沒有帳號，不顯示 */
+  /** 網頁版多一個「社群」（追蹤對象的動態、通知、找人）；其他版本沒有帳號，不顯示 */
   get TABS(): { id: string; label: string; icon: string }[] {
     return [
       { id: "home", label: "首頁", icon: "house" },
       { id: "movies", label: "電影", icon: "film" },
       { id: "cinemas", label: "影城", icon: "building" },
-      ...(this.sync() ? [{ id: "activity", label: "通知", icon: "bell" }] : []),
+      ...(this.sync() ? [{ id: "activity", label: "社群", icon: "people" }] : []),
       { id: "settings", label: "設定", icon: "gear" },
     ];
   }
@@ -94,12 +95,13 @@ class App {
   }
   switchTab(id: string) {
     this.tab = id;
+    if (id === "activity") this.socialTab = ""; // 每次點進社群頁籤：有新通知就先看通知，沒有就看動態
     const root: Record<string, [View, string]> = {
       home: [() => this.homeView(), "讀取中…"],
       movies: [() => this.movieListView(), "讀取電影清單…"],
       cinemas: [() => this.citiesView(), "讀取中…"],
       settings: [() => this.settingsView(), "讀取中…"],
-      activity: [() => this.activityView(), "讀取通知…"],
+      activity: [() => this.activityView(), "讀取中…"],
     };
     const [view, loading] = root[id] || root.home;
     this.loadingText = loading;
@@ -144,13 +146,16 @@ class App {
     this.go(() => this.homeView(), "讀取影城清單…");
     // 從通知點進來（?tab=soon／?tab=fest）：直接開電影分頁的那一類
     const startTab = IS_WEB ? (/[?&]tab=(soon|fest|activity)\b/.exec(String((globalThis as any).location?.search || "")) || [])[1] : "";
-    if (startTab === "activity") { if (this.sync()) this.switchTab("activity"); }
+    if (startTab === "activity") { if (this.sync()) { this.switchTab("activity"); this.socialTab = "act"; } }
     else if (startTab) { this.movieMode = startTab as "soon" | "fest"; this.switchTab("movies"); }
     // 連點頁籤重新整理之後：回到剛才那個頁籤
     if (IS_WEB) { try { const G = globalThis as any; const t = G.sessionStorage.getItem("ms:reload-tab"); if (t) { G.sessionStorage.removeItem("ms:reload-tab"); if (/^(movies|cinemas|settings|activity)$/.test(t)) this.switchTab(t); } } catch (_) {} }
     // 登入的人：開機時看一下有沒有新通知（頁籤上的紅點），不等它
     if (signedIn()) this.pushSync(); // 讓通知伺服器知道這台登入的是誰（舊的訂閱沒有記）
-    if (signedIn()) social<{ unread?: number }>("me").then((d) => { this.unread = d.unread || 0; }, () => undefined);
+    const peek = () => { if (signedIn()) social<{ unread?: number }>("me").then((d) => this.setUnread(d.unread || 0), () => undefined); else this.setUnread(0); };
+    peek();
+    // 從背景切回來：再看一次有沒有新通知（頁籤紅點、主畫面圖示上的數字），最多半分鐘一次
+    if (IS_WEB) { try { let last = Date.now(); const D = (globalThis as any).document; D.addEventListener("visibilitychange", () => { if (D.visibilityState === "visible" && Date.now() - last > 30e3) { last = Date.now(); peek(); } }); } catch (_) {} }
     await this.openShared().catch(() => undefined);
     if (this.followedAfterLogin) {
       // 為了追蹤某個人才登入的：回到他的個人頁，再帶去取暱稱（設過或按過稍後再說就不問）
@@ -714,7 +719,7 @@ class App {
       );
     if (!this.meMem || Date.now() - this.meMem.at > 60e3) {
       // 最多等 0.9 秒，不拖慢設定頁；等不到先顯示「讀取中」，下次重畫就有了
-      const job = social<{ user: Profile | null; counts: SocialCounts; admin?: boolean; unread?: number }>("me").then((d) => { this.meMem = { at: Date.now(), data: d }; this.unread = d.unread || 0; }, () => undefined);
+      const job = social<{ user: Profile | null; counts: SocialCounts; admin?: boolean; unread?: number }>("me").then((d) => { this.meMem = { at: Date.now(), data: d }; this.setUnread(d.unread || 0); }, () => undefined);
       await Promise.race([job, sleep(900)]);
     }
     const me = this.meMem ? this.meMem.data : null;
@@ -727,7 +732,20 @@ class App {
         <div role="button" onTap={open}>
           {this.profileCard({ name: u ? u.name : me ? "還沒取暱稱" : "已登入", color: u ? u.color : "gray", emoji: u ? u.emoji : "", bio: u ? u.bio : "" }, me ? me.counts : null, "", (kind) => this.go(() => this.profileListView("", kind), "讀取中…"), "", me ? statusTag : undefined, email)}
         </div>
-        <Item icon="🎞" title="我的片單" subtitle={u ? "看過的片、評分和短評；動態、找人" : "取暱稱、記錄看過的片、追蹤別人"} onTap={open} />
+        {u && (u.th || u.ig) ? (
+          <div class="pf-pills">
+            {u.th ? <button class="pf-pill" onTap={() => Safari.open(`https://www.threads.net/@${encodeURIComponent(u.th!)}`)}>Threads　@{esc(u.th)}</button> : null}
+            {u.ig ? <button class="pf-pill" onTap={() => Safari.open(`https://www.instagram.com/${encodeURIComponent(u.ig!)}/`)}>IG　@{esc(u.ig)}</button> : null}
+          </div>
+        ) : null}
+        {me ? (
+          <div class="pf-btns">
+            <button class="pf-btn" onTap={() => { this.profileDraft = null; this.go(() => this.profileEditView(u || null)); }}>{u ? "編輯個人檔案" : "設定暱稱"}</button>
+            {u && u.pub && !u.hidden ? <button class="pf-btn" onTap={async () => { Pasteboard.copy(`${SITE_URL}/?u=${encodeURIComponent(u.name)}`); await this.ui.toast("已複製個人頁連結"); }}>分享個人檔案</button> : null}
+            <button class="pf-btn icon" aria-label="找人追蹤" onTap={() => { this.switchTab("activity"); this.socialTab = "people"; }}>{PERSON_ADD}</button>
+          </div>
+        ) : null}
+        <Item icon="🎞" title="我的片單" subtitle={u ? "看過的片、評分和短評" : "取暱稱、記錄看過的片、追蹤別人"} onTap={open} />
         <Item icon="🔄" title="同步與登出" subtitle="收藏和設定自動同步中" onTap={() => this.go(() => this.syncView())} />
         {me && me.admin ? <Item icon="🛡" title="管理員專區" subtitle="意見回饋、短評、帳號、管理員名單" onTap={() => this.go(() => this.adminHomeView())} /> : null}
       </Section>
@@ -834,7 +852,7 @@ class App {
       </div>
     );
   }
-  /** 設定 → 我的片單：自己看過、評過的片；另外兩個分頁是追蹤對象的動態、找人 */
+  /** 設定 → 我的片單：自己看過、評過的片（追蹤對象的動態、找人在底部的「社群」頁籤） */
   async diaryView(): Promise<string> {
     const sy = this.sync();
     if (!sy || !sy.on())
@@ -853,24 +871,7 @@ class App {
     this.hasProfile = !!user;
     if (!user && !profileSkipped()) return this.profileEditView(null, true);
     let body = "";
-    if (this.diaryTab === "feed") {
-      const r = await social<{ list: DiaryEntry[]; following: number }>("feed").catch(() => null);
-      body = !r ? <Note kind="warn" text="動態暫時讀不到" /> : r.list.length ? (
-        <Section hint="你追蹤的人最近記錄的片（只有他們公開的）。">
-          <div class="nt-list">{r.list.map((e) => this.entryRow(e, () => this.openTitle(e.title), (name) => this.go(() => this.profileView(name), "讀取個人頁…")))}</div>
-        </Section>
-      ) : <Section><Note text={r.following ? "你追蹤的人最近還沒有新的紀錄。" : "還沒有追蹤任何人。到「找人」看看有誰公開了片單。"} /></Section>;
-    } else if (this.diaryTab === "people") {
-      const r = await social<{ list: { name: string; color: string; films: number; following: boolean }[] }>("people", { q: this.peopleQ.trim() }).catch(() => null);
-      body = (
-        <>
-          <Search value={this.peopleQ} placeholder="用暱稱找人" onInput={(t) => { this.peopleQ = t; }} />
-          <Section title={this.peopleQ.trim() ? "符合的帳號" : "最近有新紀錄的人"} hint="只會列出公開個人頁的帳號。">
-            {!r ? <Note kind="warn" text="暫時讀不到" /> : r.list.length ? r.list.map((u) => this.userItem(u)) : <Note text={this.peopleQ.trim() ? "找不到這個暱稱（對方可能沒有公開個人頁）。" : "目前還沒有人公開片單。"} />}
-          </Section>
-        </>
-      );
-    } else {
+    {
       const list = await this.myDiary().catch(() => null);
       body = !list ? <Note kind="warn" text="片單暫時讀不到" /> : list.length ? (
         <Section hint="在電影頁評分、寫短評，或標記看過，就會出現在這裡。點一筆可以改看過的日期，或設成只有自己看得到。">
@@ -882,14 +883,8 @@ class App {
       <Page title="我的片單" onBack={() => this.back()}>
         <Section>
           {user ? this.profileCard(user, me.counts, user.hidden ? "個人頁目前被站長停用，別人看不到。" : "", (kind) => this.go(() => this.profileListView("", kind), "讀取中…"), "", user.hidden ? { text: "已被停用", tone: "bad" } : user.pub ? { text: "公開", tone: "good" } : { text: "不公開", tone: "" }) : <Note kind="warn" text="還沒有設定暱稱：別人找不到你、不能追蹤你，短評也是匿名。你還是可以追蹤別人。" />}
-          <Item icon="✏️" title={user ? "編輯個人檔案" : "設定暱稱"} subtitle="暱稱、頭像、要不要公開" onTap={() => { this.profileDraft = null; this.go(() => this.profileEditView(user)); }} />
-          {user && user.pub ? <Item icon="🔗" title="複製我的個人頁連結" chevron={false} onTap={async () => { Pasteboard.copy(`${SITE_URL}/?u=${encodeURIComponent(user.name)}`); await this.ui.toast("已複製連結"); }} /> : null}
         </Section>
-        <Chips tabs>
-          <Chip label="片單" muted={this.diaryTab !== "mine"} onTap={() => { this.diaryTab = "mine"; }} />
-          <Chip label="動態" muted={this.diaryTab !== "feed"} onTap={() => { this.diaryTab = "feed"; }} />
-          <Chip label="找人" muted={this.diaryTab !== "people"} onTap={() => { this.diaryTab = "people"; }} />
-        </Chips>
+        <Section><Item icon="👥" title="動態、找人" subtitle="追蹤對象最近看了什麼、用暱稱找人，都搬到底部的「社群」了" onTap={() => { this.switchTab("activity"); this.socialTab = "feed"; }} /></Section>
         {body}
       </Page>
     );
@@ -1153,18 +1148,94 @@ class App {
   }
 
   // ── 通知頁（網頁版最下面的頁籤）：有人推、噓、回覆你的短評，或追蹤你 ──
+  /** 還沒看的通知數：頁籤上的紅點，加到主畫面的「片刻」圖示上也會有數字（裝置支援才有；看過就清掉） */
+  setUnread(n: number): void {
+    this.unread = n;
+    if (!IS_WEB) return;
+    try { const nav = (globalThis as any).navigator; if (n > 0 && nav.setAppBadge) nav.setAppBadge(n).catch(() => undefined); else if (!n && nav.clearAppBadge) nav.clearAppBadge().catch(() => undefined); } catch (_) {}
+  }
+  socialTab = ""; // 社群頁籤看哪一塊：feed 動態／act 通知／people 找人（空的 = 進來時再決定）
+  /** 社群頁籤上面那一排：動態｜通知｜找人 */
+  socialTabs(): string {
+    const seg = this.socialTab;
+    return (
+      <Chips tabs>
+        <Chip label="動態" muted={seg !== "feed"} onTap={() => { this.socialTab = "feed"; }} />
+        <Chip label={this.unread > 0 ? `通知 ${this.unread > 99 ? "99+" : this.unread}` : "通知"} muted={seg !== "act"} onTap={() => { this.socialTab = "act"; }} />
+        <Chip label="找人" muted={seg !== "people"} onTap={() => { this.socialTab = "people"; }} />
+      </Chips>
+    );
+  }
+  /** 動態裡的一則：頭像＋「誰 給《片名》幾分／看了《片名》」＋時間，下面是他的短評（點了到討論區） */
+  feedRow(e: DiaryEntry): string {
+    const by = e.by!;
+    const toUser = () => this.go(() => this.profileView(by.name), "讀取個人頁…");
+    const shown = !e.sp || this.noteShown.indexOf(-e.at) >= 0;
+    const meta = [seenLabel(e.seen), howLabel(e.how)].filter(Boolean).join("｜");
+    return (
+      <div class="fd">
+        <button class="fd-av" aria-label={`${by.name} 的個人頁`} onTap={toUser}>{this.avatar(by)}</button>
+        <div class="fd-body">
+          <div class="fd-line">
+            <button class="fd-name" onTap={toUser}>{esc(by.name)}</button>
+            <span>{e.s ? " 給" : e.x ? " 評了" : " 看了"}</span>
+            <button class="fd-film" onTap={() => this.openTitle(e.title)}>《{esc(e.title)}》</button>
+            {e.s ? <span class={"nt-score " + ratingTier("imdb", e.s)}>{e.s} 分</span> : null}
+            <em>・{esc(agoLabel(e.at))}</em>
+          </div>
+          {meta ? <div class="fd-meta">{esc(meta)}</div> : null}
+          {e.x ? (shown ? (
+            <button class="fd-note" aria-label={`到《${e.title}》的討論區`} onTap={() => { this.noteReset(); this.noteFocus = { x: e.x, at: Date.now() }; this.go(() => this.notesView(e.title), "讀取短評…"); }}>
+              <span>{esc(e.x)}</span><i aria-hidden="true">💬</i>
+            </button>
+          ) : <button class="nt-cover" onTap={() => { this.noteShown = [...this.noteShown, -e.at]; }}>這則可能有雷，點一下顯示</button>) : null}
+        </div>
+      </div>
+    );
+  }
+  /** 社群頁籤：動態（追蹤對象最近看了什麼）、通知（誰推、回覆、提到、追蹤我）、找人 */
   async activityView(): Promise<string> {
     const sy = this.sync();
     if (!sy || !sy.on())
       return (
-        <Page title="通知">
-          <Section hint="登入後，有人推或回覆你的短評、追蹤你，都會列在這裡。">
-            <Item icon="👤" title="用 Google 登入" subtitle="登入後才收得到通知" accent onTap={() => sy && sy.login()} />
+        <Page title="社群">
+          <Section hint="登入後可以追蹤別人、看他們最近看了什麼；有人推或回覆你的短評、追蹤你，也會列在這裡。">
+            <Item icon="👤" title="用 Google 登入" subtitle="登入後才有動態和通知" accent onTap={() => sy && sy.login()} />
           </Section>
         </Page>
       );
+    if (!this.socialTab) this.socialTab = this.unread > 0 ? "act" : "feed";
+    if (this.socialTab === "feed") {
+      const r = await social<{ list: DiaryEntry[]; following: number }>("feed").catch(() => null);
+      return (
+        <Page title="社群">
+          {this.socialTabs()}
+          {!r ? <Section><Note kind="warn" text="動態暫時讀不到" /></Section> : r.list.length ? (
+            <Section><div class="fd-list">{r.list.filter((e) => e.by).map((e) => this.feedRow(e))}</div></Section>
+          ) : (
+            <Section>
+              <Note text={r.following ? "你追蹤的人最近還沒有新的紀錄。" : "還沒有追蹤任何人。追蹤之後，他們評分、寫短評、記錄看過的片會出現在這裡。"} />
+              <Item icon="🔍" title="找人追蹤" subtitle="看看誰公開了片單" onTap={() => { this.socialTab = "people"; }} />
+            </Section>
+          )}
+          {r && r.list.length ? <p class="hint">只會出現對方公開的紀錄。</p> : null}
+        </Page>
+      );
+    }
+    if (this.socialTab === "people") {
+      const r = await social<{ list: { name: string; color: string; films: number; following: boolean }[] }>("people", { q: this.peopleQ.trim() }).catch(() => null);
+      return (
+        <Page title="社群">
+          {this.socialTabs()}
+          <Search value={this.peopleQ} placeholder="用暱稱找人" onInput={(t) => { this.peopleQ = t; }} />
+          <Section title={this.peopleQ.trim() ? "符合的帳號" : "最近有新紀錄的人"} hint="只會列出公開個人頁的帳號。">
+            {!r ? <Note kind="warn" text="暫時讀不到" /> : r.list.length ? r.list.map((u) => this.userItem(u)) : <Note text={this.peopleQ.trim() ? "找不到這個暱稱（對方可能沒有公開個人頁）。" : "目前還沒有人公開片單。"} />}
+          </Section>
+        </Page>
+      );
+    }
     let list: Activity[] = [], failed = "";
-    try { list = (await social<{ list: Activity[] }>("activity")).list || []; this.unread = 0; if (this.meMem) this.meMem.data = { ...this.meMem.data, unread: 0 } as any; } catch (e) { failed = String((e as Error)?.message || e); }
+    try { list = (await social<{ list: Activity[] }>("activity")).list || []; this.setUnread(0); if (this.meMem) this.meMem.data = { ...this.meMem.data, unread: 0 } as any; } catch (e) { failed = String((e as Error)?.message || e); }
     const row = (a: Activity) => {
       const names = a.who.map((w) => w.name);
       const rest = a.n - names.length;
@@ -1200,7 +1271,8 @@ class App {
     const week = Date.now() - 7 * 86400e3;
     const fresh = list.filter((a) => a.fresh), recent = list.filter((a) => !a.fresh && a.at >= week), older = list.filter((a) => !a.fresh && a.at < week);
     return (
-      <Page title="通知">
+      <Page title="社群">
+        {this.socialTabs()}
         {failed ? <Section><Note kind="warn" text={failed} /></Section> : !list.length ? (
           <Section hint="噓只會顯示人數，不會顯示是誰。"><Note text="還沒有通知。有人推、噓或回覆你的短評，或是追蹤你，會出現在這裡。" /></Section>
         ) : (
@@ -1433,7 +1505,7 @@ class App {
           if (r && r.data && r.at > sy.at()) { this.syncMute = true; this.settings = syncApply(this.settings, r.data as Partial<SyncData>); saveSettings(this.settings); this.syncMute = false; sy.setAt(r.at); this.pushSync(); await this.ui.toast("已帶入帳號裡比較新的設定"); }
           else await this.ui.toast((await sy.push(syncPick(this.settings))) ? "已同步" : "同步失敗，請稍後再試");
         }} />
-        <Item icon="🚪" title="登出" subtitle="這台的收藏會留著，只是不再同步" chevron={false} onTap={async () => { await sy.logout(); forgetMyVotes(); this.syncWho = null; this.diaryMem = null; this.meMem = null; this.hasProfile = null; this.syncNote = ""; this.pushSync(); await this.ui.toast("已登出"); }} />
+        <Item icon="🚪" title="登出" subtitle="這台的收藏會留著，只是不再同步" chevron={false} onTap={async () => { await sy.logout(); forgetMyVotes(); this.syncWho = null; this.diaryMem = null; this.meMem = null; this.hasProfile = null; this.syncNote = ""; this.setUnread(0); this.pushSync(); await this.ui.toast("已登出"); }} />
         <Item icon="🗑" title="刪除帳號裡的資料並登出" subtitle="伺服器上的設定、片單、暱稱和你用帳號評的分都會刪掉，所有裝置都會登出；這台的收藏會留著" chevron={false} onTap={async () => { await this.wipeSocial().catch(() => undefined); await sy.wipe(); this.syncWho = null; this.syncNote = ""; this.pushSync(); await this.ui.toast("已刪除並登出"); }} />
       </Section>
     );

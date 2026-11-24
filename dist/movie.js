@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.24-2252
+// @movie-schedule-app 電影行程 v2026.11.24-2301
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/parsers.gen.ts
@@ -3981,6 +3981,7 @@ function setBackGuard(fn) {
 }
 var TAB_ICONS = {
   house: '<svg viewBox="0 0 24 24"><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v10h5v-6h4v6h5V10"/></svg>',
+  people: '<svg viewBox="0 0 24 24"><circle cx="9" cy="8.5" r="3.4"/><path d="M2.8 19.5a6.2 6.2 0 0 1 12.4 0"/><path d="M15.6 5.4a3.3 3.3 0 0 1 0 6.2"/><path d="M17.6 14.3a6 6 0 0 1 3.6 5.2"/></svg>',
   bell: '<svg viewBox="0 0 24 24"><path d="M6 16.5V11a6 6 0 1 1 12 0v5.5l1.6 2H4.4z"/><path d="M10 20.5a2.2 2.2 0 0 0 4 0"/></svg>',
   film: '<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 4v16M17 4v16M3 9h4M3 15h4M17 9h4M17 15h4"/></svg>',
   building: '<svg viewBox="0 0 24 24"><path d="M3 21h18"/><path d="M5 21V7l5-3v17"/><path d="M10 21V11l9-3v13"/><path d="M14 13h2M14 17h2"/></svg>',
@@ -4447,6 +4448,24 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 @media(prefers-color-scheme:dark){.pf-tag.good{color:#30d158}.pf-tag.warn{color:#ffb340}.pf-tag.bad{color:#ff6961}}
 .pf-sub{margin-top:2px;font-size:13px;color:var(--fg2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .th.focus{margin:8px -8px 0;padding:10px 8px 6px;border-radius:12px;background:rgba(10,132,255,.12);box-shadow:0 0 0 1.5px var(--accent) inset}
+.fd-list{padding:4px 16px 6px}
+.fd{display:flex;align-items:flex-start;gap:12px;padding:12px 0}
+.fd+.fd{border-top:1px solid var(--line)}
+.fd-av>.av{width:44px;height:44px;font-size:20px}
+.fd-av>.av.emo{font-size:25px}
+.fd-av{flex:none;padding:0;width:44px;height:44px}
+.fd-body{flex:1;min-width:0}
+.fd-line{font-size:15px;line-height:1.5;overflow-wrap:anywhere;color:var(--fg2)}
+.fd-line button{display:inline;padding:0;font:inherit;font-weight:700;color:var(--fg)}
+.fd-line .nt-score{display:inline-block;margin-left:2px;vertical-align:1px;white-space:nowrap}
+.pf-pills{display:flex;flex-wrap:wrap;gap:8px;padding:0 16px 12px}
+.pf-pill{max-width:100%;padding:5px 12px;border-radius:999px;border:1px solid var(--line);color:var(--fg);font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fd-line em{font-style:normal;white-space:nowrap}
+.fd-meta{margin-top:2px;font-size:12.5px;color:var(--fg2)}
+.fd-note{display:flex;align-items:flex-end;gap:8px;width:100%;margin-top:8px;padding:9px 12px;border-radius:12px;background:var(--chip);color:var(--fg);font-size:15px;line-height:1.45;text-align:left;overflow-wrap:anywhere}
+.fd-note span{flex:1;min-width:0}
+.fd-note i{flex:none;font-style:normal;font-size:13px}
+.fd-note:active{opacity:.6}
 .ac-list{padding:4px 16px 8px}
 .ac{display:flex;align-items:center;gap:10px;padding:10px 0}
 .ac.fresh{margin:0 -8px;padding:10px 8px;border-radius:12px;background:rgba(10,132,255,.1)}
@@ -4819,9 +4838,12 @@ var scriptablePlatform = {
 // src/changelog.ts
 var CHANGELOG = [
   {
-    id: "2026-11-24c",
+    id: "2026-11-24d",
     date: "2026/11/24",
     items: [
+      { kind: "new", text: "底部的「通知」變成「社群」：追蹤對象的動態、通知、找人都在這裡（動態和找人從我的片單搬過來）" },
+      { kind: "new", text: "有新通知時，主畫面的「片刻」圖示上會顯示數字（要先把片刻加到主畫面並開啟通知）；從背景切回來也會更新紅點" },
+      { kind: "better", text: "設定的帳號卡下面可以直接編輯、分享個人檔案" },
       { kind: "new", text: "短評和回覆裡可以 @暱稱 提到別人，對方會收到通知；內文裡的 @暱稱 點了會開那個人的個人頁" },
       { kind: "new", text: "個人檔案可以填 Threads、Instagram 帳號，公開個人頁上會多兩顆按鈕" },
       { kind: "new", text: "多了「通知」頁籤（登入後出現）：有人推、回覆你的短評，或追蹤你、回追你，都會列在這裡；可以直接回追" },
@@ -4867,6 +4889,7 @@ async function currentCalendar(s) {
   }
   return await Calendar.defaultForEvents();
 }
+var PERSON_ADD = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10" cy="8" r="3.6"/><path d="M3 20a7 7 0 0 1 14 0"/><path d="M19 7v6M16 10h6"/></svg>';
 var App = class {
   constructor() {
     this.ui = new UI();
@@ -4943,6 +4966,7 @@ var App = class {
     this.hasProfile = null;
     /** 管理員：帳號管理。被檢舉的、被停用的帳號；可以停用個人頁、清掉檢舉、強制改暱稱 */
     this.adminUserQ = "";
+    this.socialTab = "";
     // ── 意見回饋（使用者）──
     this.fbCat = "";
     // 回饋頁選的分類
@@ -5076,13 +5100,13 @@ var App = class {
     this.loadingText = loading;
     this.stack.push(view);
   }
-  /** 網頁版多一個「通知」（有人推、噓、回覆你的短評，或追蹤你）；其他版本沒有帳號，不顯示 */
+  /** 網頁版多一個「社群」（追蹤對象的動態、通知、找人）；其他版本沒有帳號，不顯示 */
   get TABS() {
     return [
       { id: "home", label: "首頁", icon: "house" },
       { id: "movies", label: "電影", icon: "film" },
       { id: "cinemas", label: "影城", icon: "building" },
-      ...this.sync() ? [{ id: "activity", label: "通知", icon: "bell" }] : [],
+      ...this.sync() ? [{ id: "activity", label: "社群", icon: "people" }] : [],
       { id: "settings", label: "設定", icon: "gear" }
     ];
   }
@@ -5106,12 +5130,13 @@ var App = class {
   }
   switchTab(id) {
     this.tab = id;
+    if (id === "activity") this.socialTab = "";
     const root = {
       home: [() => this.homeView(), "讀取中…"],
       movies: [() => this.movieListView(), "讀取電影清單…"],
       cinemas: [() => this.citiesView(), "讀取中…"],
       settings: [() => this.settingsView(), "讀取中…"],
-      activity: [() => this.activityView(), "讀取通知…"]
+      activity: [() => this.activityView(), "讀取中…"]
     };
     const [view, loading] = root[id] || root.home;
     this.loadingText = loading;
@@ -5125,7 +5150,7 @@ var App = class {
   }
   /** 最新版本是多少。網頁版問的是自己網站現在上線的版本（重新整理就會拿到的那一版），不是 GitHub 上的 */
   checkVersion() {
-    if (true) return checkLatest("2026.11.24-2252");
+    if (true) return checkLatest("2026.11.24-2301");
     return (async () => {
       try {
         let r = await globalThis.fetch("/version.json?t=" + Date.now(), { cache: "no-store" });
@@ -5133,7 +5158,7 @@ var App = class {
         const latest = String((await r.json()).version || "");
         if (!latest) return null;
         const num = (v) => Number(v.replace(/\D/g, "")) || 0;
-        return { latest, isLatest: num("2026.11.24-2252") >= num(latest) };
+        return { latest, isLatest: num("2026.11.24-2301") >= num(latest) };
       } catch (_) {
         return null;
       }
@@ -5148,7 +5173,10 @@ var App = class {
     this.go(() => this.homeView(), "讀取影城清單…");
     const startTab = false ? (/[?&]tab=(soon|fest|activity)\b/.exec(String(globalThis.location?.search || "")) || [])[1] : "";
     if (startTab === "activity") {
-      if (this.sync()) this.switchTab("activity");
+      if (this.sync()) {
+        this.switchTab("activity");
+        this.socialTab = "act";
+      }
     } else if (startTab) {
       this.movieMode = startTab;
       this.switchTab("movies");
@@ -5165,9 +5193,24 @@ var App = class {
       }
     }
     if (signedIn()) this.pushSync();
-    if (signedIn()) social("me").then((d) => {
-      this.unread = d.unread || 0;
-    }, () => void 0);
+    const peek = () => {
+      if (signedIn()) social("me").then((d) => this.setUnread(d.unread || 0), () => void 0);
+      else this.setUnread(0);
+    };
+    peek();
+    if (false) {
+      try {
+        let last = Date.now();
+        const D = globalThis.document;
+        D.addEventListener("visibilitychange", () => {
+          if (D.visibilityState === "visible" && Date.now() - last > 3e4) {
+            last = Date.now();
+            peek();
+          }
+        });
+      } catch (_) {
+      }
+    }
     await this.openShared().catch(() => void 0);
     if (this.followedAfterLogin) {
       const who = this.followedAfterLogin;
@@ -5594,7 +5637,7 @@ var App = class {
     if (!this.meMem || Date.now() - this.meMem.at > 6e4) {
       const job = social("me").then((d) => {
         this.meMem = { at: Date.now(), data: d };
-        this.unread = d.unread || 0;
+        this.setUnread(d.unread || 0);
       }, () => void 0);
       await Promise.race([job, sleep(900)]);
     }
@@ -5607,7 +5650,16 @@ var App = class {
     };
     const u = me && me.user;
     const statusTag = !u ? { text: "還沒取暱稱", tone: "warn" } : u.hidden ? { text: "已被停用", tone: "bad" } : u.pub ? { text: "公開", tone: "good" } : { text: "不公開", tone: "" };
-    return /* @__PURE__ */ h(Section, { title: "帳號" }, /* @__PURE__ */ h("div", { role: "button", onTap: open }, this.profileCard({ name: u ? u.name : me ? "還沒取暱稱" : "已登入", color: u ? u.color : "gray", emoji: u ? u.emoji : "", bio: u ? u.bio : "" }, me ? me.counts : null, "", (kind) => this.go(() => this.profileListView("", kind), "讀取中…"), "", me ? statusTag : void 0, email)), /* @__PURE__ */ h(Item, { icon: "🎞", title: "我的片單", subtitle: u ? "看過的片、評分和短評；動態、找人" : "取暱稱、記錄看過的片、追蹤別人", onTap: open }), /* @__PURE__ */ h(Item, { icon: "🔄", title: "同步與登出", subtitle: "收藏和設定自動同步中", onTap: () => this.go(() => this.syncView()) }), me && me.admin ? /* @__PURE__ */ h(Item, { icon: "🛡", title: "管理員專區", subtitle: "意見回饋、短評、帳號、管理員名單", onTap: () => this.go(() => this.adminHomeView()) }) : null);
+    return /* @__PURE__ */ h(Section, { title: "帳號" }, /* @__PURE__ */ h("div", { role: "button", onTap: open }, this.profileCard({ name: u ? u.name : me ? "還沒取暱稱" : "已登入", color: u ? u.color : "gray", emoji: u ? u.emoji : "", bio: u ? u.bio : "" }, me ? me.counts : null, "", (kind) => this.go(() => this.profileListView("", kind), "讀取中…"), "", me ? statusTag : void 0, email)), u && (u.th || u.ig) ? /* @__PURE__ */ h("div", { class: "pf-pills" }, u.th ? /* @__PURE__ */ h("button", { class: "pf-pill", onTap: () => Safari.open(`https://www.threads.net/@${encodeURIComponent(u.th)}`) }, "Threads　@", esc(u.th)) : null, u.ig ? /* @__PURE__ */ h("button", { class: "pf-pill", onTap: () => Safari.open(`https://www.instagram.com/${encodeURIComponent(u.ig)}/`) }, "IG　@", esc(u.ig)) : null) : null, me ? /* @__PURE__ */ h("div", { class: "pf-btns" }, /* @__PURE__ */ h("button", { class: "pf-btn", onTap: () => {
+      this.profileDraft = null;
+      this.go(() => this.profileEditView(u || null));
+    } }, u ? "編輯個人檔案" : "設定暱稱"), u && u.pub && !u.hidden ? /* @__PURE__ */ h("button", { class: "pf-btn", onTap: async () => {
+      Pasteboard.copy(`${SITE_URL}/?u=${encodeURIComponent(u.name)}`);
+      await this.ui.toast("已複製個人頁連結");
+    } }, "分享個人檔案") : null, /* @__PURE__ */ h("button", { class: "pf-btn icon", "aria-label": "找人追蹤", onTap: () => {
+      this.switchTab("activity");
+      this.socialTab = "people";
+    } }, PERSON_ADD)) : null, /* @__PURE__ */ h(Item, { icon: "🎞", title: "我的片單", subtitle: u ? "看過的片、評分和短評" : "取暱稱、記錄看過的片、追蹤別人", onTap: open }), /* @__PURE__ */ h(Item, { icon: "🔄", title: "同步與登出", subtitle: "收藏和設定自動同步中", onTap: () => this.go(() => this.syncView()) }), me && me.admin ? /* @__PURE__ */ h(Item, { icon: "🛡", title: "管理員專區", subtitle: "意見回饋、短評、帳號、管理員名單", onTap: () => this.go(() => this.adminHomeView()) }) : null);
   }
   syncLink() {
     const sy = this.sync();
@@ -5665,7 +5717,7 @@ var App = class {
       this.noteShown = [...this.noteShown, -e.at];
     } }, "這則可能有雷，點一下顯示") : null);
   }
-  /** 設定 → 我的片單：自己看過、評過的片；另外兩個分頁是追蹤對象的動態、找人 */
+  /** 設定 → 我的片單：自己看過、評過的片（追蹤對象的動態、找人在底部的「社群」頁籤） */
   async diaryView() {
     const sy = this.sync();
     if (!sy || !sy.on())
@@ -5681,30 +5733,13 @@ var App = class {
     this.hasProfile = !!user;
     if (!user && !profileSkipped()) return this.profileEditView(null, true);
     let body = "";
-    if (this.diaryTab === "feed") {
-      const r = await social("feed").catch(() => null);
-      body = !r ? /* @__PURE__ */ h(Note, { kind: "warn", text: "動態暫時讀不到" }) : r.list.length ? /* @__PURE__ */ h(Section, { hint: "你追蹤的人最近記錄的片（只有他們公開的）。" }, /* @__PURE__ */ h("div", { class: "nt-list" }, r.list.map((e) => this.entryRow(e, () => this.openTitle(e.title), (name) => this.go(() => this.profileView(name), "讀取個人頁…"))))) : /* @__PURE__ */ h(Section, null, /* @__PURE__ */ h(Note, { text: r.following ? "你追蹤的人最近還沒有新的紀錄。" : "還沒有追蹤任何人。到「找人」看看有誰公開了片單。" }));
-    } else if (this.diaryTab === "people") {
-      const r = await social("people", { q: this.peopleQ.trim() }).catch(() => null);
-      body = /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Search, { value: this.peopleQ, placeholder: "用暱稱找人", onInput: (t) => {
-        this.peopleQ = t;
-      } }), /* @__PURE__ */ h(Section, { title: this.peopleQ.trim() ? "符合的帳號" : "最近有新紀錄的人", hint: "只會列出公開個人頁的帳號。" }, !r ? /* @__PURE__ */ h(Note, { kind: "warn", text: "暫時讀不到" }) : r.list.length ? r.list.map((u) => this.userItem(u)) : /* @__PURE__ */ h(Note, { text: this.peopleQ.trim() ? "找不到這個暱稱（對方可能沒有公開個人頁）。" : "目前還沒有人公開片單。" })));
-    } else {
+    {
       const list = await this.myDiary().catch(() => null);
       body = !list ? /* @__PURE__ */ h(Note, { kind: "warn", text: "片單暫時讀不到" }) : list.length ? /* @__PURE__ */ h(Section, { hint: "在電影頁評分、寫短評，或標記看過，就會出現在這裡。點一筆可以改看過的日期，或設成只有自己看得到。" }, /* @__PURE__ */ h("div", { class: "nt-list" }, list.map((e) => this.entryRow(e, () => this.go(() => this.entryView(e.title, e)))))) : /* @__PURE__ */ h(Section, null, /* @__PURE__ */ h(Note, { text: "片單還是空的。到任何一部電影的頁面評分或標記看過，就會記在這裡。" }));
     }
-    return /* @__PURE__ */ h(Page, { title: "我的片單", onBack: () => this.back() }, /* @__PURE__ */ h(Section, null, user ? this.profileCard(user, me.counts, user.hidden ? "個人頁目前被站長停用，別人看不到。" : "", (kind) => this.go(() => this.profileListView("", kind), "讀取中…"), "", user.hidden ? { text: "已被停用", tone: "bad" } : user.pub ? { text: "公開", tone: "good" } : { text: "不公開", tone: "" }) : /* @__PURE__ */ h(Note, { kind: "warn", text: "還沒有設定暱稱：別人找不到你、不能追蹤你，短評也是匿名。你還是可以追蹤別人。" }), /* @__PURE__ */ h(Item, { icon: "✏️", title: user ? "編輯個人檔案" : "設定暱稱", subtitle: "暱稱、頭像、要不要公開", onTap: () => {
-      this.profileDraft = null;
-      this.go(() => this.profileEditView(user));
-    } }), user && user.pub ? /* @__PURE__ */ h(Item, { icon: "🔗", title: "複製我的個人頁連結", chevron: false, onTap: async () => {
-      Pasteboard.copy(`${SITE_URL}/?u=${encodeURIComponent(user.name)}`);
-      await this.ui.toast("已複製連結");
-    } }) : null), /* @__PURE__ */ h(Chips, { tabs: true }, /* @__PURE__ */ h(Chip, { label: "片單", muted: this.diaryTab !== "mine", onTap: () => {
-      this.diaryTab = "mine";
-    } }), /* @__PURE__ */ h(Chip, { label: "動態", muted: this.diaryTab !== "feed", onTap: () => {
-      this.diaryTab = "feed";
-    } }), /* @__PURE__ */ h(Chip, { label: "找人", muted: this.diaryTab !== "people", onTap: () => {
-      this.diaryTab = "people";
+    return /* @__PURE__ */ h(Page, { title: "我的片單", onBack: () => this.back() }, /* @__PURE__ */ h(Section, null, user ? this.profileCard(user, me.counts, user.hidden ? "個人頁目前被站長停用，別人看不到。" : "", (kind) => this.go(() => this.profileListView("", kind), "讀取中…"), "", user.hidden ? { text: "已被停用", tone: "bad" } : user.pub ? { text: "公開", tone: "good" } : { text: "不公開", tone: "" }) : /* @__PURE__ */ h(Note, { kind: "warn", text: "還沒有設定暱稱：別人找不到你、不能追蹤你，短評也是匿名。你還是可以追蹤別人。" })), /* @__PURE__ */ h(Section, null, /* @__PURE__ */ h(Item, { icon: "👥", title: "動態、找人", subtitle: "追蹤對象最近看了什麼、用暱稱找人，都搬到底部的「社群」了", onTap: () => {
+      this.switchTab("activity");
+      this.socialTab = "feed";
     } })), body);
   }
   /** 清單裡的一個帳號：點名字看個人頁，右邊追蹤／取消追蹤 */
@@ -5898,14 +5933,65 @@ var App = class {
     } }))));
   }
   // ── 通知頁（網頁版最下面的頁籤）：有人推、噓、回覆你的短評，或追蹤你 ──
+  /** 還沒看的通知數：頁籤上的紅點，加到主畫面的「片刻」圖示上也會有數字（裝置支援才有；看過就清掉） */
+  setUnread(n) {
+    this.unread = n;
+    if (true) return;
+    try {
+      const nav = globalThis.navigator;
+      if (n > 0 && nav.setAppBadge) nav.setAppBadge(n).catch(() => void 0);
+      else if (!n && nav.clearAppBadge) nav.clearAppBadge().catch(() => void 0);
+    } catch (_) {
+    }
+  }
+  // 社群頁籤看哪一塊：feed 動態／act 通知／people 找人（空的 = 進來時再決定）
+  /** 社群頁籤上面那一排：動態｜通知｜找人 */
+  socialTabs() {
+    const seg = this.socialTab;
+    return /* @__PURE__ */ h(Chips, { tabs: true }, /* @__PURE__ */ h(Chip, { label: "動態", muted: seg !== "feed", onTap: () => {
+      this.socialTab = "feed";
+    } }), /* @__PURE__ */ h(Chip, { label: this.unread > 0 ? `通知 ${this.unread > 99 ? "99+" : this.unread}` : "通知", muted: seg !== "act", onTap: () => {
+      this.socialTab = "act";
+    } }), /* @__PURE__ */ h(Chip, { label: "找人", muted: seg !== "people", onTap: () => {
+      this.socialTab = "people";
+    } }));
+  }
+  /** 動態裡的一則：頭像＋「誰 給《片名》幾分／看了《片名》」＋時間，下面是他的短評（點了到討論區） */
+  feedRow(e) {
+    const by = e.by;
+    const toUser = () => this.go(() => this.profileView(by.name), "讀取個人頁…");
+    const shown = !e.sp || this.noteShown.indexOf(-e.at) >= 0;
+    const meta = [seenLabel(e.seen), howLabel(e.how)].filter(Boolean).join("｜");
+    return /* @__PURE__ */ h("div", { class: "fd" }, /* @__PURE__ */ h("button", { class: "fd-av", "aria-label": `${by.name} 的個人頁`, onTap: toUser }, this.avatar(by)), /* @__PURE__ */ h("div", { class: "fd-body" }, /* @__PURE__ */ h("div", { class: "fd-line" }, /* @__PURE__ */ h("button", { class: "fd-name", onTap: toUser }, esc(by.name)), /* @__PURE__ */ h("span", null, e.s ? " 給" : e.x ? " 評了" : " 看了"), /* @__PURE__ */ h("button", { class: "fd-film", onTap: () => this.openTitle(e.title) }, "《", esc(e.title), "》"), e.s ? /* @__PURE__ */ h("span", { class: "nt-score " + ratingTier("imdb", e.s) }, e.s, " 分") : null, /* @__PURE__ */ h("em", null, "・", esc(agoLabel(e.at)))), meta ? /* @__PURE__ */ h("div", { class: "fd-meta" }, esc(meta)) : null, e.x ? shown ? /* @__PURE__ */ h("button", { class: "fd-note", "aria-label": `到《${e.title}》的討論區`, onTap: () => {
+      this.noteReset();
+      this.noteFocus = { x: e.x, at: Date.now() };
+      this.go(() => this.notesView(e.title), "讀取短評…");
+    } }, /* @__PURE__ */ h("span", null, esc(e.x)), /* @__PURE__ */ h("i", { "aria-hidden": "true" }, "💬")) : /* @__PURE__ */ h("button", { class: "nt-cover", onTap: () => {
+      this.noteShown = [...this.noteShown, -e.at];
+    } }, "這則可能有雷，點一下顯示") : null));
+  }
+  /** 社群頁籤：動態（追蹤對象最近看了什麼）、通知（誰推、回覆、提到、追蹤我）、找人 */
   async activityView() {
     const sy = this.sync();
     if (!sy || !sy.on())
-      return /* @__PURE__ */ h(Page, { title: "通知" }, /* @__PURE__ */ h(Section, { hint: "登入後，有人推或回覆你的短評、追蹤你，都會列在這裡。" }, /* @__PURE__ */ h(Item, { icon: "👤", title: "用 Google 登入", subtitle: "登入後才收得到通知", accent: true, onTap: () => sy && sy.login() })));
+      return /* @__PURE__ */ h(Page, { title: "社群" }, /* @__PURE__ */ h(Section, { hint: "登入後可以追蹤別人、看他們最近看了什麼；有人推或回覆你的短評、追蹤你，也會列在這裡。" }, /* @__PURE__ */ h(Item, { icon: "👤", title: "用 Google 登入", subtitle: "登入後才有動態和通知", accent: true, onTap: () => sy && sy.login() })));
+    if (!this.socialTab) this.socialTab = this.unread > 0 ? "act" : "feed";
+    if (this.socialTab === "feed") {
+      const r = await social("feed").catch(() => null);
+      return /* @__PURE__ */ h(Page, { title: "社群" }, this.socialTabs(), !r ? /* @__PURE__ */ h(Section, null, /* @__PURE__ */ h(Note, { kind: "warn", text: "動態暫時讀不到" })) : r.list.length ? /* @__PURE__ */ h(Section, null, /* @__PURE__ */ h("div", { class: "fd-list" }, r.list.filter((e) => e.by).map((e) => this.feedRow(e)))) : /* @__PURE__ */ h(Section, null, /* @__PURE__ */ h(Note, { text: r.following ? "你追蹤的人最近還沒有新的紀錄。" : "還沒有追蹤任何人。追蹤之後，他們評分、寫短評、記錄看過的片會出現在這裡。" }), /* @__PURE__ */ h(Item, { icon: "🔍", title: "找人追蹤", subtitle: "看看誰公開了片單", onTap: () => {
+        this.socialTab = "people";
+      } })), r && r.list.length ? /* @__PURE__ */ h("p", { class: "hint" }, "只會出現對方公開的紀錄。") : null);
+    }
+    if (this.socialTab === "people") {
+      const r = await social("people", { q: this.peopleQ.trim() }).catch(() => null);
+      return /* @__PURE__ */ h(Page, { title: "社群" }, this.socialTabs(), /* @__PURE__ */ h(Search, { value: this.peopleQ, placeholder: "用暱稱找人", onInput: (t) => {
+        this.peopleQ = t;
+      } }), /* @__PURE__ */ h(Section, { title: this.peopleQ.trim() ? "符合的帳號" : "最近有新紀錄的人", hint: "只會列出公開個人頁的帳號。" }, !r ? /* @__PURE__ */ h(Note, { kind: "warn", text: "暫時讀不到" }) : r.list.length ? r.list.map((u) => this.userItem(u)) : /* @__PURE__ */ h(Note, { text: this.peopleQ.trim() ? "找不到這個暱稱（對方可能沒有公開個人頁）。" : "目前還沒有人公開片單。" })));
+    }
     let list = [], failed = "";
     try {
       list = (await social("activity")).list || [];
-      this.unread = 0;
+      this.setUnread(0);
       if (this.meMem) this.meMem.data = { ...this.meMem.data, unread: 0 };
     } catch (e) {
       failed = String(e?.message || e);
@@ -5935,7 +6021,7 @@ var App = class {
     };
     const week = Date.now() - 7 * 864e5;
     const fresh = list.filter((a) => a.fresh), recent = list.filter((a) => !a.fresh && a.at >= week), older = list.filter((a) => !a.fresh && a.at < week);
-    return /* @__PURE__ */ h(Page, { title: "通知" }, failed ? /* @__PURE__ */ h(Section, null, /* @__PURE__ */ h(Note, { kind: "warn", text: failed })) : !list.length ? /* @__PURE__ */ h(Section, { hint: "噓只會顯示人數，不會顯示是誰。" }, /* @__PURE__ */ h(Note, { text: "還沒有通知。有人推、噓或回覆你的短評，或是追蹤你，會出現在這裡。" })) : /* @__PURE__ */ h(Fragment, null, fresh.length ? /* @__PURE__ */ h(Section, { title: "新的" }, /* @__PURE__ */ h("div", { class: "ac-list" }, fresh.map(row))) : null, recent.length ? /* @__PURE__ */ h(Section, { title: "過去 7 天" }, /* @__PURE__ */ h("div", { class: "ac-list" }, recent.map(row))) : null, older.length ? /* @__PURE__ */ h(Section, { title: "更早" }, /* @__PURE__ */ h("div", { class: "ac-list" }, older.map(row))) : null, /* @__PURE__ */ h("p", { class: "hint" }, "噓只會顯示人數，不會顯示是誰。沒有公開個人頁的人會顯示成「有人」。")));
+    return /* @__PURE__ */ h(Page, { title: "社群" }, this.socialTabs(), failed ? /* @__PURE__ */ h(Section, null, /* @__PURE__ */ h(Note, { kind: "warn", text: failed })) : !list.length ? /* @__PURE__ */ h(Section, { hint: "噓只會顯示人數，不會顯示是誰。" }, /* @__PURE__ */ h(Note, { text: "還沒有通知。有人推、噓或回覆你的短評，或是追蹤你，會出現在這裡。" })) : /* @__PURE__ */ h(Fragment, null, fresh.length ? /* @__PURE__ */ h(Section, { title: "新的" }, /* @__PURE__ */ h("div", { class: "ac-list" }, fresh.map(row))) : null, recent.length ? /* @__PURE__ */ h(Section, { title: "過去 7 天" }, /* @__PURE__ */ h("div", { class: "ac-list" }, recent.map(row))) : null, older.length ? /* @__PURE__ */ h(Section, { title: "更早" }, /* @__PURE__ */ h("div", { class: "ac-list" }, older.map(row))) : null, /* @__PURE__ */ h("p", { class: "hint" }, "噓只會顯示人數，不會顯示是誰。沒有公開個人頁的人會顯示成「有人」。")));
   }
   // 剛進回饋頁：跟伺服器要最新的（之後在這一頁裡點來點去不用每次重讀）
   /** 意見回饋頁：上面選分類、寫內容送出；下面是自己送過的，每一則有處理狀態和站長的回覆 */
@@ -5964,7 +6050,7 @@ var App = class {
         return;
       }
       try {
-        await sendFeedback(cat.id, text, false ? this.isStandalone() ? "web-app" : "web" : "scriptable", "2026.11.24-2252");
+        await sendFeedback(cat.id, text, false ? this.isStandalone() ? "web-app" : "web" : "scriptable", "2026.11.24-2301");
         this.fbDraft = "";
         this.fbCat = "";
         await this.ui.toast("已送出，謝謝你的回饋");
@@ -6130,6 +6216,7 @@ var App = class {
       this.meMem = null;
       this.hasProfile = null;
       this.syncNote = "";
+      this.setUnread(0);
       this.pushSync();
       await this.ui.toast("已登出");
     } }), /* @__PURE__ */ h(Item, { icon: "🗑", title: "刪除帳號裡的資料並登出", subtitle: "伺服器上的設定、片單、暱稱和你用帳號評的分都會刪掉，所有裝置都會登出；這台的收藏會留著", chevron: false, onTap: async () => {
@@ -6278,7 +6365,7 @@ var App = class {
       this.settings.seenLog = CHANGELOG_LATEST;
       saveSettings(this.settings);
     }
-    return /* @__PURE__ */ h(Page, { title: "更新內容", subtitle: `目前版本 ${"2026.11.24-2252"}`, onBack: () => this.back() }, CHANGELOG.map((e) => /* @__PURE__ */ h(Section, { title: e.date }, e.items.map((it) => /* @__PURE__ */ h(Item, { title: it.text, tag: { text: it.kind === "new" ? "新功能" : "改進", tone: it.kind === "new" ? "now" : "soon" }, chevron: false })))), /* @__PURE__ */ h(Note, { text: "只列出比較有感的變動；修小錯、調整文字這類不會寫在這裡。" }));
+    return /* @__PURE__ */ h(Page, { title: "更新內容", subtitle: `目前版本 ${"2026.11.24-2301"}`, onBack: () => this.back() }, CHANGELOG.map((e) => /* @__PURE__ */ h(Section, { title: e.date }, e.items.map((it) => /* @__PURE__ */ h(Item, { title: it.text, tag: { text: it.kind === "new" ? "新功能" : "改進", tone: it.kind === "new" ? "now" : "soon" }, chevron: false })))), /* @__PURE__ */ h(Note, { text: "只列出比較有感的變動；修小錯、調整文字這類不會寫在這裡。" }));
   }
   async aboutView() {
     return /* @__PURE__ */ h(Page, { title: "關於", onBack: () => this.back() }, /* @__PURE__ */ h(Section, { hint: "連鎖影城的場次來自場次通（twshowtimes.com），感謝場次通的整理；其他來自開眼電影網，以及誠品、光點、樂聲、內惟戲院官網。實際場次以影城公告為準。" }, /* @__PURE__ */ h(Item, { icon: "ℹ️", title: "關於與資料來源", accent: true, chevron: false, onTap: () => Safari.open(ABOUT_URL) }), /* @__PURE__ */ h(Item, { icon: "🔒", title: "隱私權政策", accent: true, chevron: false, onTap: () => Safari.open(PRIVACY_URL) }), /* @__PURE__ */ h(Item, { icon: "🙏", title: "前往場次通", subtitle: "比較各影城場次、看上映場數排行", accent: true, chevron: false, onTap: () => Safari.open("https://twshowtimes.com/") })));
@@ -6309,11 +6396,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.24-2252"}`);
+          Pasteboard.copy(`版本 ${"2026.11.24-2301"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.24-2252"}`,
+      `版本 ${"2026.11.24-2301"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -6949,7 +7036,7 @@ var App = class {
     if (false) {
       if (!r) return /* @__PURE__ */ h(Note, { text: "（無法確認是否為最新版：連不到網站）" });
       if (r.isLatest) return /* @__PURE__ */ h(Note, { text: "✅ 已是最新版" });
-      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.24-2252"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
+      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.24-2301"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
         globalThis.location.reload();
       } }));
     }

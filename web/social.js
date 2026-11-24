@@ -62,7 +62,10 @@ async function pushTo(hub, sql, to, kind, actor, make) {
   try {
     const a = actor ? sql.exec("SELECT name, pub, hidden FROM users WHERE uid = ?", actor).toArray()[0] : null;
     const who = a && a.pub && !a.hidden && a.name ? a.name + " " : "有人";
-    await hub.socialPush(to, kind, { url: "/?tab=activity", ...make(who) });
+    // badge = 對方還沒看的通知數（顯示在主畫面圖示上）
+    const seen = (sql.exec('SELECT at FROM activity_seen WHERE "to" = ?', to).toArray()[0] || { at: 0 }).at;
+    const badge = sql.exec('SELECT COUNT(*) AS c FROM activity WHERE "to" = ? AND at > ?', to, seen).toArray()[0].c;
+    await hub.socialPush(to, kind, { url: "/?tab=activity", badge, ...make(who) });
   } catch (_) {}
 }
 const ACT_KEEP = 300; // 一個人最多留幾筆通知

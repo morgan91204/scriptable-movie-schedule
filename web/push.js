@@ -364,7 +364,7 @@ export class PushHub {
       const sub = await this.state.storage.get(id);
       if (!sub) { await this.state.storage.delete(k); continue; }
       if (!this.env.PUSH_ANY_HOUR && inQuiet(optConfig(sub.opt).quiet, h)) continue;
-      const note = list.length === 1 ? list[0] : { title: `你有 ${list.length} 則新通知`, body: list.slice(-3).map((n) => n.title).join("\n"), tag: "social:digest", url: "/?tab=activity" };
+      const note = list.length === 1 ? list[0] : { title: `你有 ${list.length} 則新通知`, body: list.slice(-3).map((n) => n.title).join("\n"), tag: "social:digest", url: "/?tab=activity", badge: Math.max(...list.map((n) => Number(n.badge) || 0), list.length) };
       const status = await send(sub, note, this.env).catch(() => 0);
       if (status === 404 || status === 410) await this.state.storage.delete(id);
       await this.state.storage.delete(k);
