@@ -996,11 +996,6 @@ class App {
             </div>
           </Section>
         ) : <p class="hint">改好按右上角的「儲存」。{user ? "要不要公開個人頁，在設定的帳號那一區切換。" : ""}</p>}
-        {user ? (
-          <Section title="刪除" hint="會刪掉你的片單、暱稱、追蹤關係，以及你用這個帳號評的分和寫的短評。刪了救不回來。收藏和設定的同步不受影響（那個在「用 Google 帳號同步」裡刪）。">
-            <Item icon="🗑" title="刪除我的片單和個人檔案" chevron={false} onTap={() => this.go(() => this.wipeConfirmView())} />
-          </Section>
-        ) : null}
       </Page>
     );
   }
@@ -1560,6 +1555,7 @@ class App {
           else await this.ui.toast((await sy.push(syncPick(this.settings))) ? "已同步" : "同步失敗，請稍後再試");
         }} />
         <Item icon="🚪" title="登出" subtitle="這台的收藏會留著，只是不再同步" chevron={false} onTap={async () => { await sy.logout(); forgetMyVotes(); this.syncWho = null; this.diaryMem = null; this.meMem = null; this.hasProfile = null; this.syncNote = ""; this.setUnread(0); this.pushSync(); await this.ui.toast("已登出"); }} />
+        {this.hasProfile !== false ? <Item icon="🧹" title="只刪除我的片單和個人檔案" subtitle="片單、暱稱、追蹤關係、用帳號評的分和短評會刪掉，救不回來；不會登出，收藏和設定的同步不受影響" chevron={false} onTap={() => this.go(() => this.wipeConfirmView())} /> : null}
         <Item icon="🗑" title="刪除帳號裡的資料並登出" subtitle="伺服器上的設定、片單、暱稱和你用帳號評的分都會刪掉，所有裝置都會登出；這台的收藏會留著" chevron={false} onTap={async () => { await this.wipeSocial().catch(() => undefined); await sy.wipe(); this.syncWho = null; this.syncNote = ""; this.pushSync(); await this.ui.toast("已刪除並登出"); }} />
       </Section>
     );
