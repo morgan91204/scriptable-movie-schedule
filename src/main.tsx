@@ -886,7 +886,10 @@ class App {
   /** first = 第一次設定（有歡迎說明和「稍後再說」）；pushed = 是另外開的一頁（存好、跳過都要退回原本那一頁） */
   profileEditView(user: Profile | null, first = false, pushed = false): string {
     // 第一次設定：預設勾公開（要交朋友得公開；不想公開可以自己取消）
-    const d = this.profileDraft || { name: user ? user.name : "", color: user ? user.color : "blue", emoji: (user && user.emoji) || "", pub: user ? !!user.pub : first };
+    // 第一次取暱稱：先填上 Google 帳號的名稱（去掉空白和符號、最多 16 個字），使用者可以改
+    const sy0 = this.sync();
+    const suggest = !user && sy0 && sy0.gname ? Array.from(String(sy0.gname() || "").normalize("NFC").replace(/[^\p{L}\p{N}_]/gu, "")).slice(0, 16).join("") : "";
+    const d = this.profileDraft || { name: user ? user.name : suggest.length >= 2 ? suggest : "", color: user ? user.color : "blue", emoji: (user && user.emoji) || "", pub: user ? !!user.pub : first };
     /** 每個按鈕都帶著輸入框目前的內容：暱稱、自己打的表情符號、色盤選的顏色（跟目前的不一樣才算有改） */
     const keep = (v?: Record<string, string>) => {
       const picked = v && /^#[0-9a-f]{6}$/i.test(v.c || "") && v.c.toLowerCase() !== profileColor(d.color).toLowerCase() ? v.c.toLowerCase() : d.color;
@@ -896,7 +899,7 @@ class App {
     return (
       <Page title={user ? "編輯個人檔案" : first ? "先取一個暱稱" : "設定暱稱"} onBack={() => this.back()}>
         {first ? <Note text={(pushed ? "剛才的動作已經完成了。接下來，" : "歡迎使用「我的片單」。") + "取一個暱稱、公開個人頁，別人才找得到你、能追蹤你，你寫的短評旁邊也會顯示暱稱。只會問這一次，之後在「設定 → 我的片單」可以改。\n不想公開也沒關係：取消下面的「公開我的個人頁」，或按最下面的「稍後再說」，片單就只有你自己看得到（還是可以追蹤別人）。"} /> : null}
-        <Section title="暱稱" hint="2～16 個字，只能用中英文、數字和底線；不能跟別人重複。14 天內只能改一次。請不要用真實姓名或冒用他人名義。">
+        <Section title="暱稱" hint={(!user && suggest.length >= 2 ? "已經先幫你填上 Google 帳號的名稱，可以直接改成你想要的；如果那是本名，建議換一個。" : "") + "2～16 個字，只能用中英文、數字和底線；不能跟別人重複。14 天內只能改一次。請不要冒用他人名義。"}>
           <div class="nt-form">
             <input class="field" name="n" maxlength="16" autocomplete="off" autocapitalize="off" value={d.name} placeholder="例如：愛看片的小明" />
           </div>
