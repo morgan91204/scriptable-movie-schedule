@@ -888,7 +888,6 @@ class App {
         <Section>
           {user ? this.profileCard(user, me.counts, user.hidden ? "個人頁目前被站長停用，別人看不到。" : "", (kind) => this.go(() => this.profileListView("", kind), "讀取中…"), "", user.hidden ? { text: "已被停用", tone: "bad" } : user.pub ? { text: "公開", tone: "good" } : { text: "不公開", tone: "" }) : <Note kind="warn" text="還沒有設定暱稱：別人找不到你、不能追蹤你，短評也是匿名。你還是可以追蹤別人。" />}
         </Section>
-        <Section><Item icon="👥" title="動態、找人" subtitle="追蹤對象最近看了什麼、用暱稱找人，都搬到底部的「社群」了" onTap={() => { this.switchTab("activity"); this.socialTab = "feed"; }} /></Section>
         {body}
       </Page>
     );
