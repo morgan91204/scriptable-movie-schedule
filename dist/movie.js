@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.25-0019
+// @movie-schedule-app 電影行程 v2026.11.25-0024
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/brand.ts
@@ -4479,7 +4479,7 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .nt-form .field{background:var(--chip)}
 .nt-form .btn{margin-top:10px}
 .nt-check{display:flex;align-items:center;gap:9px;width:100%;margin-top:10px;padding:4px 0;text-align:left;font-size:15px;color:var(--fg)}
-.nt-check i{flex:none;width:22px;height:22px;border-radius:6px;border:1.5px solid var(--fg2);font-style:normal;font-size:14px;font-weight:800;line-height:19px;text-align:center;color:#fff}
+.nt-check i{flex:none;width:22px;height:22px;border-radius:6px;border:1.5px solid var(--fg2);display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;font-style:normal;font-size:13px;font-weight:800;line-height:1;color:#fff}
 .nt-check.on i{background:var(--accent);border-color:var(--accent)}
 .nt-check em{flex:1;min-width:0;font-style:normal;font-size:12px;color:var(--fg2)}
 .nt-list{padding:0 16px}
@@ -4663,7 +4663,8 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .lb{display:flex;gap:11px;padding:12px 0}
 .lb+.lb{border-top:1px solid var(--line)}
 .lb.off .lb-top,.lb.off .lb-sub,.lb.off .lb-x{opacity:.45}
-.lb-ck{flex:none;width:26px;height:26px;margin-top:1px;padding:0;border-radius:8px;border:1.5px solid var(--line);color:#fff;font-size:15px;line-height:1}
+.lb-ck{flex:none;display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;width:26px;height:26px;margin-top:1px;padding:0;border-radius:8px;border:1.5px solid var(--line);color:#fff;line-height:0}
+.lb-ck svg{display:block}
 .lb-ck.on{background:var(--accent);border-color:var(--accent)}
 .lb-body{flex:1;min-width:0}
 .lb-top{display:flex;align-items:baseline;gap:8px}
@@ -5397,7 +5398,7 @@ var App = class {
   }
   /** 最新版本是多少。網頁版問的是自己網站現在上線的版本（重新整理就會拿到的那一版），不是 GitHub 上的 */
   checkVersion() {
-    if (true) return checkLatest("2026.11.25-0019");
+    if (true) return checkLatest("2026.11.25-0024");
     return (async () => {
       try {
         let r = await globalThis.fetch("/version.json?t=" + Date.now(), { cache: "no-store" });
@@ -5405,7 +5406,7 @@ var App = class {
         const latest = String((await r.json()).version || "");
         if (!latest) return null;
         const num = (v) => Number(v.replace(/\D/g, "")) || 0;
-        return { latest, isLatest: num("2026.11.25-0019") >= num(latest) };
+        return { latest, isLatest: num("2026.11.25-0024") >= num(latest) };
       } catch (_) {
         return null;
       }
@@ -6140,7 +6141,7 @@ var App = class {
       const long = Array.from(r.note).length > 90;
       return /* @__PURE__ */ h("div", { class: "lb" + (r.on ? "" : " off") }, /* @__PURE__ */ h("button", { class: "lb-ck" + (r.on ? " on" : ""), "aria-pressed": r.on ? "true" : "false", "aria-label": `匯入《${r.title}》`, onTap: tap(() => {
         r.on = !r.on;
-      }) }, r.on ? "✓" : ""), /* @__PURE__ */ h("div", { class: "lb-body" }, /* @__PURE__ */ h("div", { class: "lb-top" }, /* @__PURE__ */ h("b", null, esc(r.title)), r.it.s ? /* @__PURE__ */ h("span", { class: "nt-score " + ratingTier("imdb", r.it.s) }, r.it.s, " 分") : /* @__PURE__ */ h("span", { class: "fb-tag" }, "只標看過")), /* @__PURE__ */ h("div", { class: "lb-sub" }, esc([`${r.it.name}${r.it.year ? `（${r.it.year}）` : ""}`, /^\d{4}-/.test(r.it.seen) ? r.it.seen.replace(/-/g, "/") + " 看的" : "", r.plain ? "沒有台灣片名" : ""].filter(Boolean).join("｜"))), r.have ? /* @__PURE__ */ h("div", { class: "lb-have" }, /* @__PURE__ */ h("div", { class: "lb-haveline" }, /* @__PURE__ */ h("span", null, "片刻現在"), /* @__PURE__ */ h("b", { class: "nt-score " + ratingTier("imdb", r.have) }, r.have, " 分")), r.haveX ? /* @__PURE__ */ h("div", { class: "lb-havex" }, esc(r.haveX)) : null, r.on && r.it.s && r.it.s !== r.have ? /* @__PURE__ */ h("div", { class: "lb-seg", role: "group", "aria-label": "分數用哪一個" }, /* @__PURE__ */ h("button", { class: r.keep ? "on" : "", "aria-pressed": r.keep ? "true" : "false", onTap: tap(() => {
+      }) }, r.on ? '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>' : ""), /* @__PURE__ */ h("div", { class: "lb-body" }, /* @__PURE__ */ h("div", { class: "lb-top" }, /* @__PURE__ */ h("b", null, esc(r.title)), r.it.s ? /* @__PURE__ */ h("span", { class: "nt-score " + ratingTier("imdb", r.it.s) }, r.it.s, " 分") : /* @__PURE__ */ h("span", { class: "fb-tag" }, "只標看過")), /* @__PURE__ */ h("div", { class: "lb-sub" }, esc([`${r.it.name}${r.it.year ? `（${r.it.year}）` : ""}`, /^\d{4}-/.test(r.it.seen) ? r.it.seen.replace(/-/g, "/") + " 看的" : "", r.plain ? "沒有台灣片名" : ""].filter(Boolean).join("｜"))), r.have ? /* @__PURE__ */ h("div", { class: "lb-have" }, /* @__PURE__ */ h("div", { class: "lb-haveline" }, /* @__PURE__ */ h("span", null, "片刻現在"), /* @__PURE__ */ h("b", { class: "nt-score " + ratingTier("imdb", r.have) }, r.have, " 分")), r.haveX ? /* @__PURE__ */ h("div", { class: "lb-havex" }, esc(r.haveX)) : null, r.on && r.it.s && r.it.s !== r.have ? /* @__PURE__ */ h("div", { class: "lb-seg", role: "group", "aria-label": "分數用哪一個" }, /* @__PURE__ */ h("button", { class: r.keep ? "on" : "", "aria-pressed": r.keep ? "true" : "false", onTap: tap(() => {
         r.keep = true;
       }) }, "分數維持 ", r.have, " 分"), /* @__PURE__ */ h("button", { class: r.keep ? "" : "on", "aria-pressed": r.keep ? "false" : "true", onTap: tap(() => {
         r.keep = false;
@@ -6505,7 +6506,7 @@ var App = class {
         return;
       }
       try {
-        await sendFeedback(cat.id, text, false ? this.isStandalone() ? "web-app" : "web" : "scriptable", "2026.11.25-0019");
+        await sendFeedback(cat.id, text, false ? this.isStandalone() ? "web-app" : "web" : "scriptable", "2026.11.25-0024");
         this.fbDraft = "";
         this.fbCat = "";
         await this.ui.toast("已送出，謝謝你的回饋");
@@ -6843,7 +6844,7 @@ var App = class {
       this.settings.seenLog = CHANGELOG_LATEST;
       saveSettings(this.settings);
     }
-    return /* @__PURE__ */ h(Page, { title: "更新內容", subtitle: `目前版本 ${"2026.11.25-0019"}`, onBack: () => this.back() }, CHANGELOG.map((e) => /* @__PURE__ */ h(Section, { title: e.date }, e.items.map((it) => /* @__PURE__ */ h(Item, { title: it.text, tag: { text: it.kind === "new" ? "新功能" : "改進", tone: it.kind === "new" ? "now" : "soon" }, chevron: false })))), /* @__PURE__ */ h(Note, { text: "只列出比較有感的變動；修小錯、調整文字這類不會寫在這裡。" }));
+    return /* @__PURE__ */ h(Page, { title: "更新內容", subtitle: `目前版本 ${"2026.11.25-0024"}`, onBack: () => this.back() }, CHANGELOG.map((e) => /* @__PURE__ */ h(Section, { title: e.date }, e.items.map((it) => /* @__PURE__ */ h(Item, { title: it.text, tag: { text: it.kind === "new" ? "新功能" : "改進", tone: it.kind === "new" ? "now" : "soon" }, chevron: false })))), /* @__PURE__ */ h(Note, { text: "只列出比較有感的變動；修小錯、調整文字這類不會寫在這裡。" }));
   }
   async aboutView() {
     return /* @__PURE__ */ h(Page, { title: "關於", onBack: () => this.back() }, /* @__PURE__ */ h(Section, { hint: "連鎖影城的場次來自場次通（twshowtimes.com），感謝場次通的整理；其他來自開眼電影網，以及誠品、光點、樂聲、內惟戲院官網。實際場次以影城公告為準。" }, /* @__PURE__ */ h(Item, { icon: "ℹ️", title: "關於與資料來源", accent: true, chevron: false, onTap: () => Safari.open(ABOUT_URL) }), /* @__PURE__ */ h(Item, { icon: "🔒", title: "隱私權政策", accent: true, chevron: false, onTap: () => Safari.open(PRIVACY_URL) }), /* @__PURE__ */ h(Item, { icon: "🙏", title: "前往場次通", subtitle: "比較各影城場次、看上映場數排行", accent: true, chevron: false, onTap: () => Safari.open("https://twshowtimes.com/") })));
@@ -6874,11 +6875,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.25-0019"}`);
+          Pasteboard.copy(`版本 ${"2026.11.25-0024"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.25-0019"}`,
+      `版本 ${"2026.11.25-0024"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -7519,7 +7520,7 @@ var App = class {
     if (false) {
       if (!r) return /* @__PURE__ */ h(Note, { text: "（無法確認是否為最新版：連不到網站）" });
       if (r.isLatest) return /* @__PURE__ */ h(Note, { text: "✅ 已是最新版" });
-      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.25-0019"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
+      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.25-0024"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
         globalThis.location.reload();
       } }));
     }

@@ -1046,7 +1046,7 @@ class App {
       const long = Array.from(r.note).length > 90;
       return (
         <div class={"lb" + (r.on ? "" : " off")}>
-          <button class={"lb-ck" + (r.on ? " on" : "")} aria-pressed={r.on ? "true" : "false"} aria-label={`匯入《${r.title}》`} onTap={tap(() => { r.on = !r.on; })}>{r.on ? "✓" : ""}</button>
+          <button class={"lb-ck" + (r.on ? " on" : "")} aria-pressed={r.on ? "true" : "false"} aria-label={`匯入《${r.title}》`} onTap={tap(() => { r.on = !r.on; })}>{r.on ? '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>' : ""}</button>
           <div class="lb-body">
             <div class="lb-top"><b>{esc(r.title)}</b>{r.it.s ? <span class={"nt-score " + ratingTier("imdb", r.it.s)}>{r.it.s} 分</span> : <span class="fb-tag">只標看過</span>}</div>
             <div class="lb-sub">{esc([`${r.it.name}${r.it.year ? `（${r.it.year}）` : ""}`, /^\d{4}-/.test(r.it.seen) ? r.it.seen.replace(/-/g, "/") + " 看的" : "", r.plain ? "沒有台灣片名" : ""].filter(Boolean).join("｜"))}</div>

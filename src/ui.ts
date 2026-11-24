@@ -233,7 +233,7 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .nt-form .field{background:var(--chip)}
 .nt-form .btn{margin-top:10px}
 .nt-check{display:flex;align-items:center;gap:9px;width:100%;margin-top:10px;padding:4px 0;text-align:left;font-size:15px;color:var(--fg)}
-.nt-check i{flex:none;width:22px;height:22px;border-radius:6px;border:1.5px solid var(--fg2);font-style:normal;font-size:14px;font-weight:800;line-height:19px;text-align:center;color:#fff}
+.nt-check i{flex:none;width:22px;height:22px;border-radius:6px;border:1.5px solid var(--fg2);display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;font-style:normal;font-size:13px;font-weight:800;line-height:1;color:#fff}
 .nt-check.on i{background:var(--accent);border-color:var(--accent)}
 .nt-check em{flex:1;min-width:0;font-style:normal;font-size:12px;color:var(--fg2)}
 .nt-list{padding:0 16px}
@@ -417,7 +417,8 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .lb{display:flex;gap:11px;padding:12px 0}
 .lb+.lb{border-top:1px solid var(--line)}
 .lb.off .lb-top,.lb.off .lb-sub,.lb.off .lb-x{opacity:.45}
-.lb-ck{flex:none;width:26px;height:26px;margin-top:1px;padding:0;border-radius:8px;border:1.5px solid var(--line);color:#fff;font-size:15px;line-height:1}
+.lb-ck{flex:none;display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;width:26px;height:26px;margin-top:1px;padding:0;border-radius:8px;border:1.5px solid var(--line);color:#fff;line-height:0}
+.lb-ck svg{display:block}
 .lb-ck.on{background:var(--accent);border-color:var(--accent)}
 .lb-body{flex:1;min-width:0}
 .lb-top{display:flex;align-items:baseline;gap:8px}
