@@ -271,6 +271,19 @@ g.__sync = {
     if (r && r.ok) lsSet(SY.at, String(r.at));
     return !!(r && r.ok);
   },
+  /** 這個帳號的代碼，以及是不是管理員 */
+  async who(): Promise<{ uid: string; admin: boolean } | null> {
+    if (!lsGet(SY.token)) return null;
+    const r = await syncPost("who", { token: lsGet(SY.token) }).catch(() => null);
+    return r && r.ok ? { uid: String(r.uid || ""), admin: !!r.admin } : null;
+  },
+  /** 管理員專區的動作（不是管理員會被伺服器拒絕） */
+  async admin(body: Record<string, unknown>): Promise<any> {
+    const r = await syncPost("admin", { token: lsGet(SY.token), body }).catch(() => null);
+    if (!r || !r.ok) throw new Error(r && r.error === "forbidden" ? "這個帳號不是管理員" : "管理功能暫時連不上");
+    if (r.result && r.result.error) throw new Error("動作沒有完成（" + r.result.error + "）");
+    return r.result;
+  },
   async logout(): Promise<void> { const t = lsGet(SY.token); lsSet(SY.token, ""); lsSet(SY.at, ""); if (t) await syncPost("logout", { token: t }).catch(() => null); },
   async wipe(): Promise<void> { const t = lsGet(SY.token); lsSet(SY.token, ""); lsSet(SY.at, ""); if (t) await syncPost("wipe", { token: t }).catch(() => null); },
 };

@@ -651,10 +651,79 @@ class App {
       </Section>
     );
   }
-  syncView(): string {
+  syncWho: { uid: string; admin: boolean } | null = null; // 登入的帳號代碼、是不是管理員（這次開啟問過一次就記著）
+  async syncView(): Promise<string> {
+    const sy = this.sync();
+    if (sy && sy.on() && !this.syncWho && sy.who) this.syncWho = await sy.who().catch(() => null);
+    if (sy && !sy.on()) this.syncWho = null;
+    const who = this.syncWho;
     return (
       <Page title="用 Google 帳號同步" onBack={() => this.back()}>
         {this.syncSection()}
+        {who && who.admin ? (
+          <Section title="管理員">
+            <Item icon="🛡" title="短評管理" subtitle="複查被檢舉的短評，或巡一遍最近的短評" onTap={() => { this.adminTab = "flagged"; this.go(() => this.adminNotesView(), "讀取短評…"); }} />
+          </Section>
+        ) : null}
+        {who && who.uid ? (
+          <Section hint="這是你的帳號在片刻裡的代號（由 Google 帳號的識別碼雜湊而來，不是 email）。一般用不到；設定管理員時才需要。">
+            <Item kv title="帳號代碼" right="複製" chevron={false} onTap={async () => { Pasteboard.copy(who.uid); await this.ui.toast("已複製帳號代碼"); }} />
+          </Section>
+        ) : null}
+      </Page>
+    );
+  }
+  adminTab = "flagged"; // 短評管理看哪一份：flagged 被檢舉的／recent 最近的
+  /** 管理員專區：短評的人工審核。「待複查」是被檢舉過或被自動隱藏的；「最近的短評」是全部看得到的（新的在前），可以主動巡。
+   *  每則可以隱藏、還原（之後不再被自動隱藏）、刪除。只有管理員名單裡的 Google 帳號進得來，伺服器每個動作都會再驗一次 */
+  async adminNotesView(): Promise<string> {
+    const sy = this.sync();
+    const WHY: Record<string, string> = { spoiler: "劇透", abuse: "不當內容", spam: "廣告" };
+    type Row = { m: string; id: number; x: string; sp?: number; s?: number; at: number; hidden?: number; keep?: number; why?: Record<string, number> };
+    let rows: Row[] = [], total = 0, failed = "";
+    try {
+      if (this.adminTab === "recent") { const r = await sy.admin({ op: "recent" }); rows = r.recent || []; total = r.total || rows.length; }
+      else {
+        const r = await sy.admin({ op: "flagged" });
+        for (const k of Object.keys(r.flagged || {})) for (const n of r.flagged[k]) rows.push({ m: k, ...n });
+        rows.sort((a, b) => (a.keep ? 1 : 0) - (b.keep ? 1 : 0) || b.at - a.at); // 還沒處理的在前
+        total = rows.length;
+      }
+    } catch (e) { failed = String((e as Error)?.message || e); }
+    const act = (op: string, n: Row, done: string) => async () => {
+      try { await sy.admin({ op, m: n.m, id: n.id }); await this.ui.toast(done); } catch (e) { await this.ui.toast(String((e as Error)?.message || e)); }
+    };
+    const row = (n: Row) => {
+      const why = Object.keys(n.why || {}).map((w) => `${WHY[w] || w} ${n.why![w]}`).join("、");
+      const state = n.hidden ? "已隱藏" : n.keep ? "已還原" : "顯示中";
+      return (
+        <div class="nt">
+          <div class="nt-head">
+            <span class={"nt-score" + (n.hidden ? " bad" : n.keep ? " good" : "")}>{state}</span>
+            {n.sp ? <span class="nt-sp">可能有雷</span> : null}
+            <span class="nt-date">{esc(noteDate(n.at))}{n.s ? `｜${n.s} 分` : ""}</span>
+          </div>
+          <div class="nt-text">{esc(n.x)}</div>
+          <div class="nt-meta">{esc(n.m)}{why ? `｜檢舉：${why}` : ""}</div>
+          <div class="nt-acts">
+            {n.hidden ? <button onTap={act("restore", n, "已還原，之後不會再被自動隱藏")}>還原</button> : <button onTap={act("hide", n, "已隱藏")}>隱藏</button>}
+            {!n.hidden && !n.keep && why ? <button onTap={act("restore", n, "已標成沒問題，之後不會再被自動隱藏")}>沒問題</button> : null}
+            <button class="danger" onTap={act("delete", n, "已刪除")}>刪除</button>
+          </div>
+        </div>
+      );
+    };
+    return (
+      <Page title="短評管理" onBack={() => this.back()}>
+        <Chips tabs>
+          <Chip label="待複查" muted={this.adminTab !== "flagged"} onTap={() => { this.adminTab = "flagged"; }} />
+          <Chip label="最近的短評" muted={this.adminTab !== "recent"} onTap={() => { this.adminTab = "recent"; }} />
+        </Chips>
+        {failed ? <Note kind="warn" text={failed} /> : (
+          <Section title={this.adminTab === "recent" ? `最近的短評（${total}）` : `被檢舉或被隱藏的（${total}）`} hint={this.adminTab === "recent" ? "所有看得到的短評，新的在前（最多列 200 則）。" : "隱藏：別人看不到，作者自己看得到提示。還原／沒問題：恢復顯示，之後不再被自動隱藏。刪除：直接拿掉，救不回來。"}>
+            {rows.length ? <div class="nt-list">{rows.map(row)}</div> : <Note text={this.adminTab === "recent" ? "還沒有人寫短評。" : "目前沒有要複查的短評。"} />}
+          </Section>
+        )}
       </Page>
     );
   }

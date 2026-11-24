@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.24-1703
+// @movie-schedule-app 電影行程 v2026.11.24-1713
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/parsers.gen.ts
@@ -4056,6 +4056,10 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .nt-rep{flex:none;font-size:12px;color:var(--fg2);padding:4px 0 4px 10px}
 .nt-rep.done{opacity:.6}
 .nt-text{margin-top:6px;font-size:15.5px;line-height:1.5;overflow-wrap:anywhere}
+.nt-meta{margin-top:5px;font-size:12px;color:var(--fg2);overflow-wrap:anywhere}
+.nt-acts{display:flex;gap:8px;margin-top:9px}
+.nt-acts button{padding:7px 14px;border-radius:9px;background:var(--chip);color:var(--accent);font-size:14px;font-weight:600}
+.nt-acts button.danger{color:#ff3b30;margin-left:auto}
 .nt-cover{display:block;width:100%;margin-top:6px;padding:9px 12px;border-radius:10px;background:var(--chip);color:var(--fg2);font-size:14px;text-align:left}
 .cm-star{font-size:28px;line-height:1;padding:2px 3px;color:var(--line)}
 @media(prefers-color-scheme:dark){.cm-star{color:#48484a}}
@@ -4463,6 +4467,8 @@ var App = class {
     this.syncMute = false;
     // 正在套用伺服器的設定：這次存檔不要再傳回去
     this.syncTimer = null;
+    this.syncWho = null;
+    this.adminTab = "flagged";
     this.notifyOpen = false;
     // ── 依縣市找影院 ──
     // 搜尋欄直接放在這一頁最上面：有打字就即時顯示符合的影城（不另開一頁），清空就回到縣市清單
@@ -4585,7 +4591,7 @@ var App = class {
   }
   /** 最新版本是多少。網頁版問的是自己網站現在上線的版本（重新整理就會拿到的那一版），不是 GitHub 上的 */
   checkVersion() {
-    if (true) return checkLatest("2026.11.24-1703");
+    if (true) return checkLatest("2026.11.24-1713");
     return (async () => {
       try {
         let r = await globalThis.fetch("/version.json?t=" + Date.now(), { cache: "no-store" });
@@ -4593,7 +4599,7 @@ var App = class {
         const latest = String((await r.json()).version || "");
         if (!latest) return null;
         const num = (v) => Number(v.replace(/\D/g, "")) || 0;
-        return { latest, isLatest: num("2026.11.24-1703") >= num(latest) };
+        return { latest, isLatest: num("2026.11.24-1713") >= num(latest) };
       } catch (_) {
         return null;
       }
@@ -4997,8 +5003,59 @@ var App = class {
     if (!sy) return "";
     return /* @__PURE__ */ h(Section, { title: "同步" }, /* @__PURE__ */ h(Item, { icon: "🔄", title: "用 Google 帳號同步", subtitle: sy.on() ? "收藏和設定有變動會自動同步" : "讓主畫面的 App 和瀏覽器用同一份收藏", right: sy.on() ? "已登入" : "未登入", onTap: () => this.go(() => this.syncView()) }));
   }
-  syncView() {
-    return /* @__PURE__ */ h(Page, { title: "用 Google 帳號同步", onBack: () => this.back() }, this.syncSection());
+  // 登入的帳號代碼、是不是管理員（這次開啟問過一次就記著）
+  async syncView() {
+    const sy = this.sync();
+    if (sy && sy.on() && !this.syncWho && sy.who) this.syncWho = await sy.who().catch(() => null);
+    if (sy && !sy.on()) this.syncWho = null;
+    const who = this.syncWho;
+    return /* @__PURE__ */ h(Page, { title: "用 Google 帳號同步", onBack: () => this.back() }, this.syncSection(), who && who.admin ? /* @__PURE__ */ h(Section, { title: "管理員" }, /* @__PURE__ */ h(Item, { icon: "🛡", title: "短評管理", subtitle: "複查被檢舉的短評，或巡一遍最近的短評", onTap: () => {
+      this.adminTab = "flagged";
+      this.go(() => this.adminNotesView(), "讀取短評…");
+    } })) : null, who && who.uid ? /* @__PURE__ */ h(Section, { hint: "這是你的帳號在片刻裡的代號（由 Google 帳號的識別碼雜湊而來，不是 email）。一般用不到；設定管理員時才需要。" }, /* @__PURE__ */ h(Item, { kv: true, title: "帳號代碼", right: "複製", chevron: false, onTap: async () => {
+      Pasteboard.copy(who.uid);
+      await this.ui.toast("已複製帳號代碼");
+    } })) : null);
+  }
+  // 短評管理看哪一份：flagged 被檢舉的／recent 最近的
+  /** 管理員專區：短評的人工審核。「待複查」是被檢舉過或被自動隱藏的；「最近的短評」是全部看得到的（新的在前），可以主動巡。
+   *  每則可以隱藏、還原（之後不再被自動隱藏）、刪除。只有管理員名單裡的 Google 帳號進得來，伺服器每個動作都會再驗一次 */
+  async adminNotesView() {
+    const sy = this.sync();
+    const WHY = { spoiler: "劇透", abuse: "不當內容", spam: "廣告" };
+    let rows = [], total = 0, failed = "";
+    try {
+      if (this.adminTab === "recent") {
+        const r = await sy.admin({ op: "recent" });
+        rows = r.recent || [];
+        total = r.total || rows.length;
+      } else {
+        const r = await sy.admin({ op: "flagged" });
+        for (const k of Object.keys(r.flagged || {})) for (const n of r.flagged[k]) rows.push({ m: k, ...n });
+        rows.sort((a, b) => (a.keep ? 1 : 0) - (b.keep ? 1 : 0) || b.at - a.at);
+        total = rows.length;
+      }
+    } catch (e) {
+      failed = String(e?.message || e);
+    }
+    const act = (op, n, done) => async () => {
+      try {
+        await sy.admin({ op, m: n.m, id: n.id });
+        await this.ui.toast(done);
+      } catch (e) {
+        await this.ui.toast(String(e?.message || e));
+      }
+    };
+    const row = (n) => {
+      const why = Object.keys(n.why || {}).map((w) => `${WHY[w] || w} ${n.why[w]}`).join("、");
+      const state = n.hidden ? "已隱藏" : n.keep ? "已還原" : "顯示中";
+      return /* @__PURE__ */ h("div", { class: "nt" }, /* @__PURE__ */ h("div", { class: "nt-head" }, /* @__PURE__ */ h("span", { class: "nt-score" + (n.hidden ? " bad" : n.keep ? " good" : "") }, state), n.sp ? /* @__PURE__ */ h("span", { class: "nt-sp" }, "可能有雷") : null, /* @__PURE__ */ h("span", { class: "nt-date" }, esc(noteDate(n.at)), n.s ? `｜${n.s} 分` : "")), /* @__PURE__ */ h("div", { class: "nt-text" }, esc(n.x)), /* @__PURE__ */ h("div", { class: "nt-meta" }, esc(n.m), why ? `｜檢舉：${why}` : ""), /* @__PURE__ */ h("div", { class: "nt-acts" }, n.hidden ? /* @__PURE__ */ h("button", { onTap: act("restore", n, "已還原，之後不會再被自動隱藏") }, "還原") : /* @__PURE__ */ h("button", { onTap: act("hide", n, "已隱藏") }, "隱藏"), !n.hidden && !n.keep && why ? /* @__PURE__ */ h("button", { onTap: act("restore", n, "已標成沒問題，之後不會再被自動隱藏") }, "沒問題") : null, /* @__PURE__ */ h("button", { class: "danger", onTap: act("delete", n, "已刪除") }, "刪除")));
+    };
+    return /* @__PURE__ */ h(Page, { title: "短評管理", onBack: () => this.back() }, /* @__PURE__ */ h(Chips, { tabs: true }, /* @__PURE__ */ h(Chip, { label: "待複查", muted: this.adminTab !== "flagged", onTap: () => {
+      this.adminTab = "flagged";
+    } }), /* @__PURE__ */ h(Chip, { label: "最近的短評", muted: this.adminTab !== "recent", onTap: () => {
+      this.adminTab = "recent";
+    } })), failed ? /* @__PURE__ */ h(Note, { kind: "warn", text: failed }) : /* @__PURE__ */ h(Section, { title: this.adminTab === "recent" ? `最近的短評（${total}）` : `被檢舉或被隱藏的（${total}）`, hint: this.adminTab === "recent" ? "所有看得到的短評，新的在前（最多列 200 則）。" : "隱藏：別人看不到，作者自己看得到提示。還原／沒問題：恢復顯示，之後不再被自動隱藏。刪除：直接拿掉，救不回來。" }, rows.length ? /* @__PURE__ */ h("div", { class: "nt-list" }, rows.map(row)) : /* @__PURE__ */ h(Note, { text: this.adminTab === "recent" ? "還沒有人寫短評。" : "目前沒有要複查的短評。" })));
   }
   syncSection() {
     const sy = this.sync();
@@ -5163,7 +5220,7 @@ var App = class {
       this.settings.seenLog = CHANGELOG_LATEST;
       saveSettings(this.settings);
     }
-    return /* @__PURE__ */ h(Page, { title: "更新內容", subtitle: `目前版本 ${"2026.11.24-1703"}`, onBack: () => this.back() }, CHANGELOG.map((e) => /* @__PURE__ */ h(Section, { title: e.date }, e.items.map((it) => /* @__PURE__ */ h(Item, { title: it.text, tag: { text: it.kind === "new" ? "新功能" : "改進", tone: it.kind === "new" ? "now" : "soon" }, chevron: false })))), /* @__PURE__ */ h(Note, { text: "只列出比較有感的變動；修小錯、調整文字這類不會寫在這裡。" }));
+    return /* @__PURE__ */ h(Page, { title: "更新內容", subtitle: `目前版本 ${"2026.11.24-1713"}`, onBack: () => this.back() }, CHANGELOG.map((e) => /* @__PURE__ */ h(Section, { title: e.date }, e.items.map((it) => /* @__PURE__ */ h(Item, { title: it.text, tag: { text: it.kind === "new" ? "新功能" : "改進", tone: it.kind === "new" ? "now" : "soon" }, chevron: false })))), /* @__PURE__ */ h(Note, { text: "只列出比較有感的變動；修小錯、調整文字這類不會寫在這裡。" }));
   }
   async aboutView() {
     return /* @__PURE__ */ h(Page, { title: "關於", onBack: () => this.back() }, /* @__PURE__ */ h(Section, { hint: "連鎖影城的場次來自場次通（twshowtimes.com），感謝場次通的整理；其他來自開眼電影網，以及誠品、光點、樂聲、內惟戲院官網。實際場次以影城公告為準。" }, /* @__PURE__ */ h(Item, { icon: "ℹ️", title: "關於與資料來源", accent: true, chevron: false, onTap: () => Safari.open(ABOUT_URL) }), /* @__PURE__ */ h(Item, { icon: "🔒", title: "隱私權政策", accent: true, chevron: false, onTap: () => Safari.open(PRIVACY_URL) }), /* @__PURE__ */ h(Item, { icon: "🙏", title: "前往場次通", subtitle: "比較各影城場次、看上映場數排行", accent: true, chevron: false, onTap: () => Safari.open("https://twshowtimes.com/") })));
@@ -5187,11 +5244,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.24-1703"}`);
+          Pasteboard.copy(`版本 ${"2026.11.24-1713"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.24-1703"}`,
+      `版本 ${"2026.11.24-1713"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -5646,7 +5703,7 @@ var App = class {
     if (false) {
       if (!r) return /* @__PURE__ */ h(Note, { text: "（無法確認是否為最新版：連不到網站）" });
       if (r.isLatest) return /* @__PURE__ */ h(Note, { text: "✅ 已是最新版" });
-      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.24-1703"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
+      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.24-1713"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
         globalThis.location.reload();
       } }));
     }

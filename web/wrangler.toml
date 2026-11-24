@@ -30,5 +30,16 @@ class_name = "PushHub"
 tag = "v1"
 new_sqlite_classes = ["PushHub"]
 
+# 管理員專區（短評的人工審核）：直接呼叫評分伺服器的管理入口。這個入口只有綁定的 Worker 連得到，不對外
+[[services]]
+binding = "RATINGS"
+service = "movie-ratings"
+entrypoint = "AdminRpc"
+
+# 管理員名單：Google 帳號的「帳號代碼」（設定 → 同步 頁面最下面可以複製；是識別碼的雜湊，不是 email），多個用逗號分開。
+# 只有名單裡的帳號登入後，同步頁才會多出「短評管理」
+[vars]
+ADMIN_USERS = ""
+
 [triggers]
 crons = ["41 * * * *"]

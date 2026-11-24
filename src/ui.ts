@@ -239,6 +239,10 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .nt-rep{flex:none;font-size:12px;color:var(--fg2);padding:4px 0 4px 10px}
 .nt-rep.done{opacity:.6}
 .nt-text{margin-top:6px;font-size:15.5px;line-height:1.5;overflow-wrap:anywhere}
+.nt-meta{margin-top:5px;font-size:12px;color:var(--fg2);overflow-wrap:anywhere}
+.nt-acts{display:flex;gap:8px;margin-top:9px}
+.nt-acts button{padding:7px 14px;border-radius:9px;background:var(--chip);color:var(--accent);font-size:14px;font-weight:600}
+.nt-acts button.danger{color:#ff3b30;margin-left:auto}
 .nt-cover{display:block;width:100%;margin-top:6px;padding:9px 12px;border-radius:10px;background:var(--chip);color:var(--fg2);font-size:14px;text-align:left}
 .cm-star{font-size:28px;line-height:1;padding:2px 3px;color:var(--line)}
 @media(prefers-color-scheme:dark){.cm-star{color:#48484a}}

@@ -281,6 +281,14 @@ export class PushHub {
       await this.state.storage.put(ukey, { data: JSON.parse(text), at });
       return json({ ok: true, at });
     }
+    // 這個帳號的代碼（識別碼的雜湊，不是 email），以及是不是管理員（代碼在 wrangler.toml 的 ADMIN_USERS 名單裡）
+    const admin = String(this.env.ADMIN_USERS || "").split(/[\s,]+/).indexOf(sess.uid) >= 0;
+    if (path === "/sync/who") return json({ ok: true, uid: sess.uid, admin });
+    // 管理員專區：短評的人工審核。轉給評分伺服器的管理入口（服務綁定，外面連不到）
+    if (path === "/sync/admin") {
+      if (!admin || !this.env.RATINGS) return json({ error: "forbidden" }, 403);
+      try { return json({ ok: true, result: await this.env.RATINGS.admin(b.body || {}) }); } catch (e) { return json({ error: "評分伺服器沒有回應" }, 502); }
+    }
     if (path === "/sync/logout") { await this.state.storage.delete(tkey); return json({ ok: true }); }
     if (path === "/sync/wipe") {
       await this.state.storage.delete(ukey);
