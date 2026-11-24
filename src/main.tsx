@@ -1846,6 +1846,7 @@ class App {
       </Page>
     );
   }
+  rateOpenFor = ""; // 哪一部片的「你的評分」是展開的（預設收起來，省空間）
   watchOpenFor = ""; // 哪一部片的「觀影紀錄」是展開的
   /** 評分卡裡的「觀影紀錄」（登入的人才有）：觀影時間、觀影方式，跟心得標籤一樣在同一頁展開，不用跳頁。
    *  沒評分也可以填（填了就算看過，會記進我的片單） */
@@ -1914,6 +1915,7 @@ class App {
     const top = topReviewTags(c);
     const myTags = c && c.myTags ? c.myTags.filter((id) => reviewTagLabel(id)) : [];
     const tagsOpen = this.tagsOpenFor === communityKey(title);
+    const rateOpen = this.rateOpenFor === communityKey(title);
     const pickTag = async (id: string) => {
       const next = reviewTagsToggle(myTags, id);
       if (!next) { await this.ui.toast(`最多選 ${REVIEW_TAGS_MAX} 個，先取消一個再選`); return; }
@@ -1960,10 +1962,15 @@ class App {
             <div class="cm-empty">{esc(status)}</div>
           )}
           {top.length ? <div class="cm-toptags" aria-label="大家選最多的心得標籤">{top.map((t) => <span>{esc(t.label)} <b>{t.pct}%</b></span>)}</div> : null}
-          <div class={"cm-mine" + (n ? " line" : "")}>
+          {/* 你的評分：預設收起來只留一列（分數、選了幾個標籤），點了才展開評分格、心得標籤、觀影紀錄 */}
+          <button class={"cm-mine fold" + (n ? " line" : "")} aria-expanded={rateOpen ? "true" : "false"} onTap={() => { this.rateOpenFor = rateOpen ? "" : communityKey(title); }}>
             <span>你的評分</span>
-            {mine ? <b>{mine} 分</b> : <em>點一個分數</em>}
-          </div>
+            {mine ? <b>{mine} 分</b> : <em>{rateOpen ? "點一個分數" : "還沒評分"}</em>}
+            {!rateOpen && myTags.length ? <em class="cm-sum">{esc(myTags.map(reviewTagLabel).join("、"))}</em> : <em class="cm-sum" />}
+            <i>{rateOpen ? "收合 ▾" : mine ? "修改 ▸" : "評分 ▸"}</i>
+          </button>
+          {rateOpen ? (
+          <>
           <div class="cm-pick">
             {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((v) => (
               <button class={"cm-num" + (v <= mine ? " on" : "")} aria-label={`${v} 分`} aria-pressed={v === mine ? "true" : "false"} onTap={() => vote(v)}>
@@ -1995,6 +2002,8 @@ class App {
             </>
           ) : null}
           {c && signedIn() ? this.watchInline(title) : null}
+          </>
+          ) : null}
           {c && (mine || c.notes) ? (
             <button class="cm-tagbar" onTap={() => { this.noteReset(); this.go(() => this.notesView(title), "讀取短評…"); }}>
               <span>短評</span>

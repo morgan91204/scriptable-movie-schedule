@@ -200,6 +200,9 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .cm-empty{font-size:15px;font-weight:600}
 .cm-mine{display:flex;align-items:baseline;gap:10px;margin-top:10px;font-size:15px;font-weight:600}
 .cm-mine.line{margin-top:13px;padding-top:11px;border-top:1px solid var(--line)}
+.cm-mine.fold{width:100%;text-align:left;color:var(--fg)}
+.cm-mine.fold .cm-sum{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cm-mine.fold i{flex:none;font-style:normal;font-weight:400;font-size:13px;color:var(--accent)}
 .cm-mine b{color:var(--accent);font-weight:700}
 .cm-mine em{font-style:normal;font-weight:400;font-size:13px;color:var(--fg2)}
 .cm-pick{display:flex;gap:4px;margin-top:8px}
