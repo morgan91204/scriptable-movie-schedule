@@ -7,6 +7,7 @@ export const CHANGELOG: ChangeEntry[] = [
     id: "2026-11-25",
     date: "2026/11/25",
     items: [
+      { kind: "better", text: "通知的勿擾時段改成預設關閉：想要晚上不被打擾，到通知設定打開「晚上不要通知我」" },
       { kind: "better", text: "自己的短評發出後可以補標「有雷」或取消（短評右下的 ⋯ 選單）" },
       { kind: "new", text: "可以從 Letterboxd 匯入（設定 → 我的片單 → 從 Letterboxd 匯入，網頁版）：評分、觀影日期、影評一次搬過來，匯入前可以逐筆勾選" },
       { kind: "better", text: "心得標籤可以選更多：亮點、氛圍各最多 3 個，觀影提醒不限；氛圍多了熱血、浪漫、恐怖、溫馨、壓抑、爽快、困惑" },

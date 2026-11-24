@@ -88,7 +88,7 @@ function optConfig(raw) {
   return {
     fmts: (Array.isArray(raw.fmts) ? raw.fmts : []).filter((f) => FORMATS.indexOf(f) >= 0),
     preDays: Math.min(14, Math.max(1, Math.round(Number(raw.preDays) || 3))),
-    quiet: { on: q.on !== false, from: hour(q.from, 22), to: hour(q.to, 9) },
+    quiet: { on: q.on === true, from: hour(q.from, 22), to: hour(q.to, 9) }, // 勿擾預設關閉（要使用者自己打開）
     cinemas: (Array.isArray(raw.cinemas) ? raw.cinemas : []).slice(0, 80).map((c) => String(c).slice(0, 60)).filter(Boolean),
   };
 }

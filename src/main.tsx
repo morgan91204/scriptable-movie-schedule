@@ -155,7 +155,7 @@ class App {
     // 連點頁籤重新整理之後：回到剛才那個頁籤
     if (IS_WEB) { try { const G = globalThis as any; const t = G.sessionStorage.getItem("ms:reload-tab"); if (t) { G.sessionStorage.removeItem("ms:reload-tab"); if (/^(movies|cinemas|settings|activity)$/.test(t)) this.switchTab(t); } } catch (_) {} }
     // 登入的人：開機時看一下有沒有新通知（頁籤上的紅點），不等它
-    if (signedIn()) this.pushSync(); // 讓通知伺服器知道這台登入的是誰（舊的訂閱沒有記）
+    this.pushSync(); // 有開通知的話：讓通知伺服器知道這台登入的是誰、勿擾時段等設定是不是最新的
     const peek = () => { if (signedIn()) social<{ unread?: number }>("me").then((d) => this.setUnread(d.unread || 0), () => undefined); else this.setUnread(0); };
     peek();
     // 從背景切回來：再看一次有沒有新通知（頁籤紅點、主畫面圖示上的數字），最多半分鐘一次

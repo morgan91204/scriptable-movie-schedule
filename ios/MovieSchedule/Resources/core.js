@@ -907,7 +907,7 @@ function parseTwMovieDay(doc) {
   ];
   var NOTIFY_PRE_STEPS = [1, 3, 7];
   var notifyPrefs = (s) => ({ open: true, rel: true, end: true, fest: true, favc: true, fmt: false, pre: true, rate: false, week: false, flist: false, cweek: false, reply: true, follow: true, ...s.notify || {} });
-  var notifyQuiet = (p) => ({ on: p.quietOn !== false, from: p.quietFrom ?? 22, to: p.quietTo ?? 9 });
+  var notifyQuiet = (p) => ({ on: p.quietOn === true, from: p.quietFrom ?? 22, to: p.quietTo ?? 9 });
   var notifyFavs = (s) => (s.favMovies || []).map((f) => ({ key: f.key, title: f.title, ...f.fest ? { fest: { id: f.fest.id, name: f.fest.name } } : {} }));
   var MAPS_LABEL = { apple: "Apple 地圖", google: "Google 地圖" };
   function mapsUrl(name, address, app = "apple") {
@@ -4460,7 +4460,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   var extra = { boxOffice, filmList, soonList, nowShowing, nowShowingMulti, movieBoard: movieBoard2, festivalBoard, festivalFilm, nearby, patchSettings, fillMovie, formatList };
   var BRIDGE_LEVEL = 2;
   globalThis.MS = {
-    version: "2026.11.25-0032",
+    version: "2026.11.25-0042",
     level: BRIDGE_LEVEL,
     init(saved) {
       cache = saved || {};

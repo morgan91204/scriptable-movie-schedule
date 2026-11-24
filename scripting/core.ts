@@ -102,8 +102,8 @@ export const NOTIFY_KINDS: { id: NotifyKind; label: string; note: string; group:
 /** 「上映前提醒」可以選幾天前 */
 export const NOTIFY_PRE_STEPS = [1, 3, 7];
 export const notifyPrefs = (s: Settings): NotifyPrefs => ({ open: true, rel: true, end: true, fest: true, favc: true, fmt: false, pre: true, rate: false, week: false, flist: false, cweek: false, reply: true, follow: true, ...(s.notify || {}) });
-/** 勿擾時段（幾點到幾點不發；預設晚上十點到早上九點） */
-export const notifyQuiet = (p: NotifyPrefs): { on: boolean; from: number; to: number } => ({ on: p.quietOn !== false, from: p.quietFrom ?? 22, to: p.quietTo ?? 9 });
+/** 勿擾時段（幾點到幾點不發）。預設關閉；打開的話預設是晚上十點到早上九點 */
+export const notifyQuiet = (p: NotifyPrefs): { on: boolean; from: number; to: number } => ({ on: p.quietOn === true, from: p.quietFrom ?? 22, to: p.quietTo ?? 9 });
 /** 交給通知伺服器的收藏清單：只有片名鍵、片名、影展代碼（海報、收藏時間這些不傳） */
 export const notifyFavs = (s: Settings): { key: string; title: string; fest?: { id: string; name: string } }[] =>
   (s.favMovies || []).map((f) => ({ key: f.key, title: f.title, ...(f.fest ? { fest: { id: f.fest.id, name: f.fest.name } } : {}) }));

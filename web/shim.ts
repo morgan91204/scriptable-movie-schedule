@@ -377,7 +377,10 @@ g.__push = {
   },
   /** 收藏或通知種類變了：把最新的清單同步給伺服器（沒開通知就什麼都不做） */
   async sync(payload: Record<string, unknown>): Promise<void> {
-    if (!pushOK() || pushState !== "on") return;
+    if (!pushOK()) return;
+    // 剛開機時還不知道這台有沒有開通知（pushState 還是預設的 off）：先查一次，免得開機那次同步被跳過
+    if (pushState !== "on") await this.refresh().catch(() => "off");
+    if (pushState !== "on") return;
     const sub = await currentSub();
     if (sub) await post("/api/push/subscribe", { ...payload, token: lsGet(SY.token) || "", subscription: sub.toJSON() }).catch(() => null);
   },
