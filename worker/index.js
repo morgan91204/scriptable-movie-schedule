@@ -18,7 +18,7 @@
 // 伺服器不會把裝置代號傳給任何人：短評對外只有流水號。
 // 舊版 App 用的 v1（5 星制）照常能用：投 n 星存成 2n 分；讀的時候把 10 分制兩兩併成 5 星（1–2 分 = 1 星…9–10 分 = 5 星）
 // 省請求數：GitHub Actions 每 30 分鐘把 /v1/all 存成靜態檔，App 平常讀靜態檔，只有投票（和每部片第一次查自己的票）才會打到這裡。
-import { DurableObject } from "cloudflare:workers";
+import { DurableObject, WorkerEntrypoint } from "cloudflare:workers";
 
 const HEADERS = {
   "content-type": "application/json; charset=utf-8",
@@ -52,6 +52,37 @@ const stats5 = (o) => {
   const sum = dist.reduce((a, c, i) => a + c * (i + 1), 0);
   return { n: o.n, avg: o.n ? Math.round((sum / o.n) * 10) / 10 : 0, dist, mine: Math.ceil((o.mine || 0) / 2) };
 };
+
+/** 站長管理的動作（兩個入口共用：帶金鑰的 /admin，以及只有網頁版伺服器連得到的 AdminRpc）。
+ *  flagged 列出被檢舉或被隱藏的／recent 最近的短評（人工巡一遍用）／hide 隱藏／restore 還原／delete 刪除／import 從備份匯回 */
+async function adminOp(env, b) {
+  const op = String((b && b.op) || "");
+  const index = env.INDEX.get(env.INDEX.idFromName("all"));
+  if (op === "flagged") return { flagged: await index.flagged() };
+  if (op === "recent") {
+    const list = [];
+    for (const [k, notes] of Object.entries(await index.allNotes())) for (const n of notes) list.push({ m: k, ...n });
+    list.sort((a, c) => c.at - a.at);
+    return { recent: list.slice(0, 200), total: list.length };
+  }
+  if (!okMovie(b.m)) return { error: "bad movie" };
+  const movie = env.MOVIE.get(env.MOVIE.idFromName(b.m));
+  if (op === "hide" || op === "restore" || op === "delete") {
+    if (!Number.isInteger(Number(b.id))) return { error: "bad id" };
+    return movie.moderate(op, Number(b.id), b.m);
+  }
+  if (op === "import" && Array.isArray(b.notes)) return movie.importNotes(b.notes.slice(0, 500), b.m);
+  return { error: "bad op" };
+}
+/** 給網頁版伺服器（Worker「app」）用的管理入口：只能透過 Cloudflare 的服務綁定呼叫，外面的網路連不到這裡，所以不用金鑰。
+ *  誰是管理員由網頁版伺服器把關（登入的 Google 帳號要在管理員名單裡） */
+export class AdminRpc extends WorkerEntrypoint {
+  async admin(body) {
+    const op = String((body && body.op) || "");
+    if (["flagged", "recent", "hide", "restore", "delete"].indexOf(op) < 0) return { error: "bad op" };
+    return adminOp(this.env, body);
+  }
+}
 
 /** 比對兩段文字是不是一樣（先各自雜湊再比，花的時間不會洩漏對了幾個字） */
 async function sameText(a, b) {
@@ -173,16 +204,8 @@ export default {
         } catch (_) {
           return json({ error: "bad json" }, 400);
         }
-        const op = String((b && b.op) || "");
-        if (op === "flagged") return json({ flagged: await env.INDEX.get(env.INDEX.idFromName("all")).flagged() });
-        if (!okMovie(b.m)) return json({ error: "bad movie" }, 400);
-        const movie = env.MOVIE.get(env.MOVIE.idFromName(b.m));
-        if (op === "hide" || op === "restore" || op === "delete") {
-          if (!Number.isInteger(Number(b.id))) return json({ error: "bad id" }, 400);
-          return json(await movie.moderate(op, Number(b.id), b.m));
-        }
-        if (op === "import" && Array.isArray(b.notes)) return json(await movie.importNotes(b.notes.slice(0, 500), b.m));
-        return json({ error: "bad op" }, 400);
+        const out = await adminOp(env, b);
+        return json(out, out.error ? 400 : 200);
       }
 
       return json({ error: "not found" }, 404);
