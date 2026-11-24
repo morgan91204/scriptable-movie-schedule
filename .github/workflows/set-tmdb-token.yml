@@ -1,0 +1,37 @@
+# 把 TMDB 金鑰交給 Cloudflare 保管（只能手動執行；換新的金鑰時再跑一次）。
+# 用途：「從 Letterboxd 匯入」要把英文片名對成台灣片名，由網頁版伺服器去問 TMDB（見 web/social.js 的 lbxMatch），需要一把 TMDB 金鑰。
+# 做法：用這個程式庫已經有的 Actions secret（TMDB_TOKEN，本來就拿來補片長、海報），轉存成 Cloudflare Worker「app」的加密設定。
+# 金鑰全程不會顯示在畫面或紀錄裡，也不會經過任何人的對話。
+name: 把 TMDB 金鑰交給網頁版伺服器
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  set:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: 先確認金鑰能用
+        env:
+          TOKEN: ${{ secrets.TMDB_TOKEN }}
+        run: |
+          if [ -z "$TOKEN" ]; then echo "還沒有 TMDB_TOKEN 這個 secret"; exit 1; fi
+          if printf '%s' "$TOKEN" | grep -Eq '^[0-9a-f]{32}$'; then
+            code=$(curl -s -o /dev/null -w "%{http_code}" "https://api.themoviedb.org/3/configuration?api_key=$TOKEN")
+          else
+            code=$(curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer $TOKEN" "https://api.themoviedb.org/3/configuration")
+          fi
+          echo "TMDB 回應 $code"
+          [ "$code" = "200" ] || { echo "這把金鑰 TMDB 不認"; exit 1; }
+      - name: 存成 Cloudflare 的加密設定
+        working-directory: web
+        env:
+          TOKEN: ${{ secrets.TMDB_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: 817e94b26f15cb4cedfde46021b6f0fe
+        run: printf '%s' "$TOKEN" | npx wrangler@4 secret put TMDB_TOKEN > /dev/null && echo "已存好"

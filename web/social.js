@@ -39,6 +39,8 @@ export function socialInit(sql) {
   if (!sql.exec("SELECT 1 FROM pragma_table_info('entries') WHERE name = 'how'").toArray().length) sql.exec("ALTER TABLE entries ADD COLUMN how TEXT NOT NULL DEFAULT ''");
   // users.emoji = 頭像用的表情符號（後來才加的欄位）；沒有就用暱稱的第一個字
   if (!sql.exec("SELECT 1 FROM pragma_table_info('users') WHERE name = 'emoji'").toArray().length) sql.exec("ALTER TABLE users ADD COLUMN emoji TEXT NOT NULL DEFAULT ''");
+  // 從 Letterboxd 匯入時查過的片名對照（英文片名｜年份 → 台灣片名、IMDb 編號），查過的不再問 TMDB
+  sql.exec("CREATE TABLE IF NOT EXISTS lbx_map (k TEXT PRIMARY KEY, zh TEXT NOT NULL DEFAULT '', imdb TEXT NOT NULL DEFAULT '', y INTEGER NOT NULL DEFAULT 0, at INTEGER NOT NULL DEFAULT 0)");
   // users.th、users.ig = 個人頁上的 Threads、Instagram 帳號（只存帳號名稱，不存網址）
   for (const c of ["th", "ig", "tw"]) if (!sql.exec("SELECT 1 FROM pragma_table_info('users') WHERE name = ?", c).toArray().length) sql.exec(`ALTER TABLE users ADD COLUMN ${c} TEXT NOT NULL DEFAULT ''`);
   // users.bio = 個人頁上的一行自我介紹（後來才加的欄位）
@@ -67,6 +69,34 @@ async function pushTo(hub, sql, to, kind, actor, make) {
     const badge = sql.exec('SELECT COUNT(*) AS c FROM activity WHERE "to" = ? AND at > ?', to, seen).toArray()[0].c;
     await hub.socialPush(to, kind, { url: "/?tab=activity", badge, ...make(who) });
   } catch (_) {}
+}
+/** 問 TMDB：一部片的台灣片名和 IMDb 編號。先找同一年的，找不到再放寬到前後一年。查過的記在 lbx_map，一個月內不重查 */
+async function lbxMatch(env, sql, token, name, year) {
+  if (!name) return null;
+  const k = name.toLowerCase() + "|" + year;
+  const hit = sql.exec("SELECT zh, imdb, y, at FROM lbx_map WHERE k = ?", k).toArray()[0];
+  if (hit && Date.now() - hit.at < 30 * 864e5) return hit.zh ? { zh: hit.zh, imdb: hit.imdb, y: hit.y } : null;
+  const base = env.TMDB_BASE || "https://api.themoviedb.org/3";
+  const v3 = /^[0-9a-f]{32}$/i.test(token);
+  const get = async (path) => {
+    const r = await fetch(base + path + (v3 ? (path.indexOf("?") >= 0 ? "&" : "?") + "api_key=" + token : ""), { headers: { accept: "application/json", ...(v3 ? {} : { authorization: "Bearer " + token }) } });
+    if (!r.ok) throw new Error("tmdb " + r.status);
+    return r.json();
+  };
+  const q = "/search/movie?language=zh-TW&include_adult=false&query=" + encodeURIComponent(name);
+  const y = /^\d{4}$/.test(year) ? Number(year) : 0;
+  const yearOf = (m) => Number(String(m.release_date || "").slice(0, 4)) || 0;
+  let found = y ? ((await get(q + "&primary_release_year=" + y)).results || []) : [];
+  if (!found.length) found = ((await get(q)).results || []).filter((m) => !y || Math.abs(yearOf(m) - y) <= 1);
+  const same = (t) => String(t || "").toLowerCase() === name.toLowerCase();
+  const pick = found.find((m) => same(m.original_title) || same(m.title)) || found[0];
+  let out = null;
+  if (pick) {
+    const d = await get("/movie/" + pick.id + "?language=zh-TW");
+    out = { zh: String(d.title || pick.title || "").slice(0, 120), imdb: /^tt\d+$/.test(String(d.imdb_id || "")) ? d.imdb_id : "", y: yearOf(d) || yearOf(pick) || y };
+  }
+  sql.exec("INSERT INTO lbx_map (k, zh, imdb, y, at) VALUES (?, ?, ?, ?, ?) ON CONFLICT(k) DO UPDATE SET zh = excluded.zh, imdb = excluded.imdb, y = excluded.y, at = excluded.at", k, out ? out.zh : "", out ? out.imdb : "", out ? out.y : 0, Date.now());
+  return out && out.zh ? out : null;
 }
 const ACT_KEEP = 300; // 一個人最多留幾筆通知
 /** 記一筆通知。自己對自己的不記；同一個人對同一則的推噓只留最新的一筆（改來改去不會洗版） */
@@ -329,6 +359,42 @@ export async function social(hub, path, b) {
     return fail(r) || json(r);
   }
 
+  // 從 Letterboxd 匯入：一次要打很多趟（每趟十幾筆），不算進下面「10 分鐘 150 次」的限制，另外靠每趟的筆數上限和每個來源每分鐘的請求上限擋
+  if (op === "lbx-match") {
+    // 從 Letterboxd 匯入的第一步：把「英文片名＋年份」對成台灣片名（問 TMDB；金鑰是伺服器的加密設定，不會給 App）
+    const token = String(hub.env.TMDB_TOKEN || "").trim();
+    if (!token) return json({ error: "no tmdb" }, 503);
+    const items = (Array.isArray(b.items) ? b.items : []).slice(0, 12);
+    const list = await Promise.all(items.map((it) => lbxMatch(hub.env, sql, token, String((it && it.n) || "").slice(0, 200), String((it && it.y) || "").slice(0, 4)).catch(() => null)));
+    return json({ ok: true, list });
+  }
+  if (op === "lbx-import") {
+    // 第二步：使用者確認過的那幾筆，記進片單、算進評分、影評變成短評。一次最多 15 筆；已經評過分的片不動（除非 over）
+    const items = (Array.isArray(b.items) ? b.items : []).slice(0, 15);
+    if (!rate) return json({ error: "bad request" }, 400);
+    const out = [];
+    for (const it of items) {
+      const k = String((it && it.m) || ""), title = cleanTitle(it && it.title), s = Math.round(Number(it && it.s)) || 0;
+      if (!okKey(k) || !title || s < 0 || s > 10) { out.push("bad"); continue; }
+      const old = one(sql, "SELECT s, x FROM entries WHERE uid = ? AND k = ?", uid, k);
+      if (old && old.s && !b.over) { out.push("have"); continue; }
+      const seen = /^\d{4}-\d{2}-\d{2}$/.test(String(it.seen || "")) && String(it.seen) <= new Date(Date.now() + 8 * 3600e3).toISOString().slice(0, 10) ? String(it.seen) : "?";
+      let x = "", sp = 0, note = "";
+      try {
+        if (s) { const r = await rate.vote(k, udev(uid), s); if (r && r.error) { out.push("fail"); continue; } }
+        const text = s ? String(it.x || "").replace(/[\u0000-\u001f\u007f-\u009f]/g, " ").replace(/\s+/g, " ").trim().slice(0, 400) : "";
+        if (text && !(old && old.x === text)) {
+          const r = await rate.noteAdd(k, udev(uid), text, it.sp ? 1 : 0, 0);
+          if (r && r.error) note = r.error; else { x = text; sp = it.sp ? 1 : 0; }
+        } else if (old && old.x) { x = old.x; }
+      } catch (_) { out.push("fail"); continue; }
+      // 記錄時間用觀影日期（沒有日期的排到三個月前），免得一次匯入幾百筆把追蹤者的動態洗掉
+      const at = seen !== "?" ? Math.min(Date.now(), Date.parse(seen + "T12:00:00+08:00")) : Date.now() - 90 * 864e5;
+      upsertEntry(sql, uid, k, title, { ...(s ? { s } : {}), ...(x ? { x, sp } : {}), seen, at });
+      out.push(note ? "note:" + note : "ok");
+    }
+    return json({ ok: true, list: out });
+  }
   // 會寫入的動作：先看有沒有超過次數
   if (!quotaOk(sql, uid)) return json({ error: "too many" }, 429);
   if (op === "profile-set") {
