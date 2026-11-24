@@ -49,7 +49,7 @@ export async function unzip(buf: ArrayBuffer, want: (path: string) => boolean): 
   if (end < 0) throw new Error("這不是 zip 檔");
   const count = dv.getUint16(end + 10, true);
   let p = dv.getUint32(end + 16, true);
-  const dec = new TextDecoder();
+  const dec = new (globalThis as any).TextDecoder();
   const out: Record<string, Uint8Array> = {};
   for (let n = 0; n < count && p + 46 <= u8.length; n++) {
     if (dv.getUint32(p, true) !== 0x02014b50) break;
@@ -88,7 +88,7 @@ const okDate = (d: string): string => (/^\d{4}-\d{2}-\d{2}$/.test(d) ? d : "");
  *  觀影日期和影評用最新的那一筆 */
 export async function readLetterboxd(files: { name: string; data: ArrayBuffer }[]): Promise<LbxItem[]> {
   const texts: Record<string, string> = {};
-  const dec = new TextDecoder();
+  const dec = new (globalThis as any).TextDecoder();
   for (const f of files) {
     if (/\.zip$/i.test(f.name)) {
       const got = await unzip(f.data, (p) => !!wanted(p));

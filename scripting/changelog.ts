@@ -4,9 +4,10 @@ export interface ChangeItem { kind: "new" | "better"; text: string }
 export interface ChangeEntry { id: string; date: string; items: ChangeItem[] }
 export const CHANGELOG: ChangeEntry[] = [
   {
-    id: "2026-11-24e",
+    id: "2026-11-24f",
     date: "2026/11/24",
     items: [
+      { kind: "new", text: "可以從 Letterboxd 匯入（設定 → 我的片單 → 從 Letterboxd 匯入，網頁版）：評分、觀影日期、影評一次搬過來，匯入前可以逐筆勾選" },
       { kind: "better", text: "心得標籤可以選更多：亮點、氛圍各最多 3 個，觀影提醒不限；氛圍多了熱血、浪漫、恐怖、溫馨、壓抑、爽快、困惑" },
       { kind: "new", text: "底部的「通知」變成「社群」：追蹤對象的動態、通知、搜尋片友都在這裡（從我的片單搬過來）" },
       { kind: "new", text: "有新通知時，主畫面的「片刻」圖示上會顯示數字（要先把片刻加到主畫面並開啟通知）；從背景切回來也會更新紅點" },

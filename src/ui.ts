@@ -407,6 +407,26 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .us-bar i.warn{background:#ff9f0a}
 .us-bar i.bad{background:#ff453a}
 .us-sub2{font-size:12.5px;line-height:1.5;color:var(--fg2);overflow-wrap:anywhere}
+.lb-pick{display:block;position:relative;overflow:hidden;text-align:center}
+.lb-pick input{position:absolute;inset:0;width:100%;height:100%;opacity:0}
+.lb-steps{margin:0;padding:0 16px 4px 34px;font-size:14.5px;line-height:1.6;color:var(--fg)}
+.lb-steps li{margin:4px 0}
+.lb-prog{padding:22px 16px;text-align:center;font-size:15px;color:var(--fg2)}
+.lb-prog b{display:block;margin-bottom:10px;font-size:22px;color:var(--fg);font-variant-numeric:tabular-nums}
+.lb-list{padding:0 16px 6px}
+.lb{display:flex;gap:11px;padding:12px 0}
+.lb+.lb{border-top:1px solid var(--line)}
+.lb.off .lb-body{opacity:.45}
+.lb-ck{flex:none;width:26px;height:26px;margin-top:1px;padding:0;border-radius:8px;border:1.5px solid var(--line);color:#fff;font-size:15px;line-height:1}
+.lb-ck.on{background:var(--accent);border-color:var(--accent)}
+.lb-body{flex:1;min-width:0}
+.lb-top{display:flex;align-items:baseline;gap:8px}
+.lb-top b{flex:1;min-width:0;font-size:16px;overflow-wrap:anywhere}
+.lb-sub{margin-top:2px;font-size:12.5px;color:var(--fg2);overflow-wrap:anywhere}
+.lb-x{margin-top:7px;padding:8px 10px;border-radius:10px;background:var(--chip);font-size:14px;line-height:1.45;overflow-wrap:anywhere}
+.lb-opts{display:flex;flex-wrap:wrap;gap:6px;margin-top:7px}
+.lb-opts .cm-tag{padding:4px 10px;font-size:12.5px}
+.lb-bar{display:flex;flex-wrap:wrap;gap:6px;padding:0 16px 12px}
 .fd-list{padding:4px 16px 6px}
 .fd{display:flex;align-items:flex-start;gap:12px;padding:12px 0}
 .fd+.fd{border-top:1px solid var(--line)}
@@ -554,6 +574,11 @@ function isLive(el){return !!(el&&el.getAttribute&&el.getAttribute('data-live'))
 document.addEventListener('compositionstart',function(){composing=true;});
 document.addEventListener('compositionend',function(e){composing=false;if(held){var x=held;held=null;window.__render(x[0],x[1]);}if(isLive(e.target))liveGo(e.target);});
 document.addEventListener('input',function(e){if(isLive(e.target)&&!composing)liveGo(e.target);});
+// 選檔案（data-file）：把選的檔案讀進記憶體放在 window.__files，再通知 App（檔案只留在這一頁裡，不會上傳）
+document.addEventListener('change',function(e){var el=e.target;if(!el||el.type!=='file'||!el.getAttribute||!el.getAttribute('data-file'))return;
+  var id=el.getAttribute('data-file'),fs=[].slice.call(el.files||[],0,8);if(!fs.length)return;
+  Promise.all(fs.map(function(f){return f.arrayBuffer().then(function(b){return{name:f.name,data:b};});})).then(function(list){window.__files=list;
+    var n=0,t=setInterval(function(){if(window.__pending){clearInterval(t);send(id);}else if(++n>60)clearInterval(t);},100);});});
 function copyAttrs(from,to){var i,a=to.attributes;for(i=a.length-1;i>=0;i--)to.removeAttribute(a[i].name);a=from.attributes;for(i=0;i<a.length;i++)to.setAttribute(a[i].name,a[i].value);}
 // 正在搜尋欄裡打字時重畫：搜尋欄和它外面那幾層留在原地（整個換掉的話游標和鍵盤會不見），只換掉周圍的內容
 function renderAround(root,cur,html){var box=document.createElement('div');box.innerHTML=html;

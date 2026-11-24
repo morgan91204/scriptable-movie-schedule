@@ -3,6 +3,9 @@
 // 畫面：WebView（HTML/CSS），事件迴圈在 run()。資料層在 core.ts，網頁解析在 parsers.ts。
 
 import { SOCIALS, socialIcon } from "./brand";
+import { readLetterboxd, lbxNote } from "./lbx";
+import type { LbxItem } from "./lbx";
+import { loadYearRatings, normTitle as lbxNorm } from "./core";
 import { h, Fragment, Page, Section, Item, Chips, Chip, Button, Search, PickRow, Note, Para, Loading, Empty, Hero, Steps } from "./jsx";
 import type { RatingBadge } from "./jsx";
 import { UI } from "./ui";
@@ -889,6 +892,183 @@ class App {
           {user ? this.profileCard(user, me.counts, user.hidden ? "個人頁目前被站長停用，別人看不到。" : "", (kind) => this.go(() => this.profileListView("", kind), "讀取中…"), "", user.hidden ? { text: "已被停用", tone: "bad" } : user.pub ? { text: "公開", tone: "good" } : { text: "不公開", tone: "" }) : <Note kind="warn" text="還沒有設定暱稱：別人找不到你、不能追蹤你，短評也是匿名。你還是可以追蹤別人。" />}
         </Section>
         {body}
+        {IS_WEB ? <Section><Item icon="📥" title="從 Letterboxd 匯入" subtitle="把 Letterboxd 上的評分、觀影日期和影評搬過來" onTap={() => { this.lbx = null; this.go(() => this.lbxView()); }} /></Section> : null}
+      </Page>
+    );
+  }
+  // ── 從 Letterboxd 匯入（只有網頁版）──
+  lbx: {
+    stage: "match" | "review" | "import" | "done";
+    rows: { it: LbxItem; title: string; k: string; note: string; cut: boolean; on: boolean; noteOn: boolean; sp: boolean; have: number; plain: boolean }[];
+    miss: LbxItem[];
+    done: number; total: number; ticks: Promise<void>[]; bump: () => void;
+    result: { ok: number; have: number; noNote: number; fail: number; why: string[] };
+    err: string; all: boolean;
+  } | null = null;
+  /** 選好檔案：讀檔 → 一批一批問伺服器台灣片名（畫面上顯示進度）→ 列出清單讓使用者勾選 */
+  async lbxStart(): Promise<void> {
+    const G = globalThis as any;
+    const files: { name: string; data: ArrayBuffer }[] = G.__files || [];
+    G.__files = null;
+    const items = await readLetterboxd(files);
+    if (!items.length) throw new Error("檔案裡沒有任何紀錄。");
+    const BATCH = 12, steps = Math.ceil(items.length / BATCH) + 1;
+    // 每做完一批就讓畫面重畫一次：先準備好「每一批一個」的通知，畫面第一次畫的時候全部掛上去
+    const fire: (() => void)[] = [];
+    const ticks = Array.from({ length: steps }, () => new Promise<void>((ok) => fire.push(ok)));
+    let at = 0;
+    const st = (this.lbx = { stage: "match" as const, rows: [], miss: [], done: 0, total: items.length, ticks, bump: () => { const f = fire[at++]; if (f) f(); }, result: { ok: 0, have: 0, noNote: 0, fail: 0, why: [] }, err: "", all: false }) as NonNullable<App["lbx"]>;
+    void (async () => {
+      try {
+        const [years, mine] = await Promise.all([loadYearRatings().catch(() => null), this.myDiary().catch(() => [] as DiaryEntry[])]);
+        // IMDb 編號 → 片刻用的片名（同一部片有好幾種版本的話取最短的那個，就是本片）
+        const byImdb: Record<string, string> = {};
+        for (const key of Object.keys((years && years.ratings) || {})) { const id = years!.ratings[key].id, name = key.split("|")[0]; if (id && (!byImdb[id] || name.length < byImdb[id].length)) byImdb[id] = name; }
+        const max = noteMax();
+        for (let i = 0; i < items.length; i += BATCH) {
+          if (this.lbx !== st) return; // 使用者重來或離開了
+          const part = items.slice(i, i + BATCH);
+          const r = await social<{ list: ({ zh: string; imdb: string; y: number } | null)[] }>("lbx-match", { items: part.map((p) => ({ n: p.name, y: p.year })) });
+          part.forEach((it, j) => {
+            const m = r.list[j];
+            if (!m || !m.zh) { st.miss.push(it); return; }
+            // 這部片在片刻已經有固定的片名（年度總表裡有）就用那個，評分才會算在同一部片上
+            const known = m.imdb ? byImdb[m.imdb] : "";
+            const title = known && known !== lbxNorm(m.zh) ? known : m.zh;
+            const k = communityKey(title);
+            if (st.rows.some((x) => x.k === k)) return; // 兩筆對到同一部片：留第一筆
+            const have = (mine.find((e) => e.k === k) || { s: 0 }).s || 0;
+            const n = it.x ? lbxNote(it.x, max) : { x: "", cut: false };
+            st.rows.push({ it, title, k, note: n.x, cut: n.cut, on: !have, noteOn: !!n.x && !n.cut && it.s > 0, sp: false, have, plain: !/[\u3400-\u9fff]/.test(title) });
+          });
+          st.done = Math.min(items.length, i + BATCH);
+          st.bump();
+        }
+        st.stage = "review";
+      } catch (e) { st.err = String((e as Error)?.message || e); st.stage = "review"; }
+      st.bump();
+    })();
+  }
+  /** 按下匯入：把勾選的那幾筆一批一批送出 */
+  lbxSend(): void {
+    const st = this.lbx;
+    if (!st) return;
+    const todo = st.rows.filter((r) => r.on);
+    const BATCH = 15, fire: (() => void)[] = [];
+    st.ticks = Array.from({ length: Math.ceil(todo.length / BATCH) + 1 }, () => new Promise<void>((ok) => fire.push(ok)));
+    let at = 0;
+    st.bump = () => { const f = fire[at++]; if (f) f(); };
+    st.stage = "import"; st.done = 0; st.total = todo.length; st.err = "";
+    const WHY: Record<string, string> = { "no links": "有連結或聯絡方式", "too long": "太長", "too many notes": "這部片你已經寫滿 5 則", duplicate: "跟已經有的重複", "vote first": "沒有評分" };
+    void (async () => {
+      try {
+        for (let i = 0; i < todo.length; i += BATCH) {
+          if (this.lbx !== st) return;
+          const part = todo.slice(i, i + BATCH);
+          const r = await social<{ list: string[] }>("lbx-import", { items: part.map((p) => ({ m: p.k, title: p.title, s: p.it.s, seen: p.it.seen, ...(p.noteOn && p.note ? { x: p.note, sp: p.sp ? 1 : 0 } : {}) })) });
+          part.forEach((p, j) => {
+            const code = r.list[j] || "fail";
+            if (code === "ok") st.result.ok++;
+            else if (code === "have") st.result.have++;
+            else if (code.indexOf("note:") === 0) { st.result.ok++; st.result.noNote++; st.result.why.push(`《${p.title}》：${WHY[code.slice(5)] || "沒有通過檢查"}`); }
+            else st.result.fail++;
+          });
+          st.done = Math.min(todo.length, i + BATCH);
+          st.bump();
+        }
+      } catch (e) { st.err = String((e as Error)?.message || e); }
+      st.stage = "done";
+      this.diaryMem = null; this.meMem = null;
+      st.bump();
+    })();
+  }
+  lbxView(): string {
+    const st = this.lbx;
+    const back = () => { this.lbx = null; this.back(); };
+    if (!st) {
+      return (
+        <Page title="從 Letterboxd 匯入" onBack={back}>
+          <Section title="先到 Letterboxd 下載你的資料">
+            <ol class="lb-steps">
+              <li>用瀏覽器打開 letterboxd.com 並登入（App 裡沒有這個功能）。</li>
+              <li>進 Settings → Data，按 Export Your Data。</li>
+              <li>會下載一個 zip 檔，存在「檔案」App 的下載項目。</li>
+            </ol>
+            <div class="nt-form"><Button label="打開 Letterboxd 的匯出頁" kind="secondary" onTap={() => Safari.open("https://letterboxd.com/settings/data/")} /></div>
+          </Section>
+          <Section title="再選那個 zip 檔" hint="檔案只在你的手機上讀取，不會上傳。接下來會先列出清單讓你一筆一筆確認，按下匯入之前不會寫入任何東西。">
+            <div class="nt-form">
+              <label class="btn primary lb-pick">選擇 Letterboxd 匯出的 zip 檔<input type="file" accept=".zip,.csv,application/zip,text/csv" multiple onFile={() => this.lbxStart()} /></label>
+            </div>
+          </Section>
+          <p class="hint">會匯入：評分（半顆星換成 1 分，五顆星 = 10 分，會算進片刻的平均）、觀影日期、影評（變成短評，最多 {noteMax()} 字，可以逐筆決定要不要匯、有沒有雷）。片刻裡已經評過分的片不會被蓋掉。</p>
+        </Page>
+      );
+    }
+    if (st.stage === "match" || st.stage === "import") {
+      for (const t of st.ticks) this.late.push(t);
+      return (
+        <Page title="從 Letterboxd 匯入" onBack={back}>
+          <Section><div class="lb-prog"><b>{st.done}／{st.total}</b>{st.stage === "match" ? "正在對照台灣片名…" : "正在匯入…"}<br />請停在這一頁，不要關掉。</div></Section>
+        </Page>
+      );
+    }
+    if (st.stage === "done") {
+      const r = st.result;
+      return (
+        <Page title="匯入完成" onBack={back}>
+          {st.err ? <Section><Note kind="warn" text={`中途停下來了：${st.err}。已經匯入的不受影響，可以再匯一次，匯過的會自動略過。`} /></Section> : null}
+          <Section>
+            <Item kv title="匯入" right={`${r.ok} 部`} chevron={false} />
+            {r.have ? <Item kv title="片刻已經評過，略過" right={`${r.have} 部`} chevron={false} /> : null}
+            {r.fail ? <Item kv title="沒有成功" right={`${r.fail} 部`} chevron={false} /> : null}
+            {r.noNote ? <Item kv title="評分有匯入，但影評沒有" right={`${r.noNote} 則`} chevron={false} /> : null}
+          </Section>
+          {r.why.length ? <Section title="沒匯入的影評"><div class="lb-list">{r.why.slice(0, 30).map((w) => <div class="lb-sub" style="padding:6px 0">{esc(w)}</div>)}</div></Section> : null}
+          <Section><div class="nt-form"><Button label="看我的片單" onTap={() => { this.lbx = null; this.back(); }} /></div></Section>
+        </Page>
+      );
+    }
+    // 確認清單
+    const picked = st.rows.filter((r) => r.on), notes = picked.filter((r) => r.noteOn && r.note).length;
+    const LIMIT = 150, shown = st.all ? st.rows : st.rows.slice(0, LIMIT);
+    const row = (r: (typeof st.rows)[number]) => (
+      <div class={"lb" + (r.on ? "" : " off")}>
+        <button class={"lb-ck" + (r.on ? " on" : "")} aria-pressed={r.on ? "true" : "false"} aria-label={`匯入《${r.title}》`} onTap={() => { r.on = !r.on; }}>{r.on ? "✓" : ""}</button>
+        <div class="lb-body">
+          <div class="lb-top"><b>{esc(r.title)}</b>{r.it.s ? <span class={"nt-score " + ratingTier("imdb", r.it.s)}>{r.it.s} 分</span> : <span class="fb-tag">只標看過</span>}</div>
+          <div class="lb-sub">{esc([`${r.it.name}${r.it.year ? `（${r.it.year}）` : ""}`, /^\d{4}-/.test(r.it.seen) ? r.it.seen.replace(/-/g, "/") + " 看的" : "", r.have ? `片刻已經評 ${r.have} 分，預設不匯` : "", r.plain ? "沒有台灣片名" : ""].filter(Boolean).join("｜"))}</div>
+          {r.note && r.it.s ? (
+            <>
+              <div class="lb-x" style={r.noteOn ? "" : "opacity:.45"}>{esc(r.note)}</div>
+              <div class="lb-opts">
+                <button class={"cm-tag" + (r.noteOn ? " on" : "")} aria-pressed={r.noteOn ? "true" : "false"} onTap={() => { r.noteOn = !r.noteOn; }}>{r.noteOn ? "匯入影評 ✓" : "匯入影評"}</button>
+                {r.noteOn ? <button class={"cm-tag" + (r.sp ? " on" : "")} aria-pressed={r.sp ? "true" : "false"} onTap={() => { r.sp = !r.sp; }}>{r.sp ? "有雷 ✓" : "有雷？"}</button> : null}
+                {r.cut ? <span class="lb-sub" style="align-self:center">原文太長，只留前 {noteMax()} 字</span> : null}
+              </div>
+            </>
+          ) : null}
+        </div>
+      </div>
+    );
+    return (
+      <Page title="確認要匯入的" subtitle={`${st.rows.length} 部`} onBack={back} right={picked.length ? <button class="bar-save" onTap={() => this.lbxSend()}>匯入</button> : undefined}>
+        {st.err ? <Section><Note kind="warn" text={st.err === "no tmdb" || /503/.test(st.err) ? "片名對照的服務還沒設定好，暫時不能匯入。" : `對照片名時停下來了：${st.err}。下面是已經對到的。`} /></Section> : null}
+        {st.rows.length ? (
+          <>
+            <Section title={`要匯入 ${picked.length} 部、影評 ${notes} 則`} hint="勾掉不想匯入的。影評會變成公開的短評：有提到劇情的請點「有雷？」，別人要點開才看得到。太長被截掉的影評預設不匯。">
+              <div class="lb-bar">
+                <button class="cm-tag" onTap={() => { const on = picked.length < st.rows.length; for (const r of st.rows) r.on = on; }}>{picked.length < st.rows.length ? "全選" : "全不選"}</button>
+                <button class="cm-tag" onTap={() => { for (const r of st.rows) if (r.note) r.noteOn = false; }}>影評全部不匯</button>
+                <button class="cm-tag" onTap={() => { for (const r of st.rows) if (r.note) r.sp = true; }}>影評全部標有雷</button>
+              </div>
+              <div class="lb-list">{shown.map(row)}</div>
+              {st.rows.length > shown.length ? <Item title={`顯示全部 ${st.rows.length} 部`} accent chevron={false} onTap={() => { st.all = true; }} /> : null}
+            </Section>
+            <Section><div class="nt-form"><Button label={picked.length ? `匯入這 ${picked.length} 部` : "先勾選要匯入的"} onTap={() => { if (picked.length) this.lbxSend(); }} /></div></Section>
+          </>
+        ) : !st.err ? <Section><Note text="沒有對到任何一部片。" /></Section> : null}
+        {st.miss.length ? <Section title={`對不到台灣片名（${st.miss.length} 部，不會匯入）`}><div class="lb-list">{st.miss.slice(0, 60).map((m) => <div class="lb-sub" style="padding:5px 0">{esc(m.name)}{m.year ? `（${m.year}）` : ""}</div>)}</div></Section> : null}
       </Page>
     );
   }

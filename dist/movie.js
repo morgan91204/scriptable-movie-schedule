@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.25-0006
+// @movie-schedule-app 電影行程 v2026.11.25-0010
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/brand.ts
@@ -16,6 +16,148 @@ var PATHS = {
   tw: "M23.953 4.57a10 10 0 01-2.825.775 4.958 4.958 0 002.163-2.723c-.951.555-2.005.959-3.127 1.184a4.92 4.92 0 00-8.384 4.482C7.69 8.095 4.067 6.13 1.64 3.162a4.822 4.822 0 00-.666 2.475c0 1.71.87 3.213 2.188 4.096a4.904 4.904 0 01-2.228-.616v.06a4.923 4.923 0 003.946 4.827 4.996 4.996 0 01-2.212.085 4.936 4.936 0 004.604 3.417 9.867 9.867 0 01-6.102 2.105c-.39 0-.779-.023-1.17-.067a13.995 13.995 0 007.557 2.209c9.053 0 13.998-7.496 13.998-13.985 0-.21 0-.42-.015-.63A9.935 9.935 0 0024 4.59z"
 };
 var socialIcon = (k) => `<span class="so so-${k}" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="${PATHS[k]}"/></svg></span>`;
+
+// src/lbx.ts
+function parseCsv(text) {
+  const s = String(text || "").replace(/^﻿/, "");
+  const rows = [];
+  let row = [], cell = "", quoted = false;
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (quoted) {
+      if (c === '"') {
+        if (s[i + 1] === '"') {
+          cell += '"';
+          i++;
+        } else quoted = false;
+      } else cell += c;
+    } else if (c === '"') quoted = true;
+    else if (c === ",") {
+      row.push(cell);
+      cell = "";
+    } else if (c === "\n" || c === "\r") {
+      if (c === "\r" && s[i + 1] === "\n") i++;
+      row.push(cell);
+      cell = "";
+      if (row.length > 1 || row[0] !== "") rows.push(row);
+      row = [];
+    } else cell += c;
+  }
+  row.push(cell);
+  if (row.length > 1 || row[0] !== "") rows.push(row);
+  return rows;
+}
+async function unzip(buf, want) {
+  const u8 = new Uint8Array(buf), dv = new DataView(buf);
+  let end = -1;
+  for (let i = u8.length - 22; i >= Math.max(0, u8.length - 66e3); i--) if (dv.getUint32(i, true) === 101010256) {
+    end = i;
+    break;
+  }
+  if (end < 0) throw new Error("這不是 zip 檔");
+  const count = dv.getUint16(end + 10, true);
+  let p = dv.getUint32(end + 16, true);
+  const dec = new globalThis.TextDecoder();
+  const out = {};
+  for (let n = 0; n < count && p + 46 <= u8.length; n++) {
+    if (dv.getUint32(p, true) !== 33639248) break;
+    const method = dv.getUint16(p + 10, true), csize = dv.getUint32(p + 20, true), usize = dv.getUint32(p + 24, true);
+    const nameLen = dv.getUint16(p + 28, true), extraLen = dv.getUint16(p + 30, true), commentLen = dv.getUint16(p + 32, true), local = dv.getUint32(p + 42, true);
+    const path = dec.decode(u8.subarray(p + 46, p + 46 + nameLen));
+    p += 46 + nameLen + extraLen + commentLen;
+    if (!want(path) || usize > 3e7 || local + 30 > u8.length) continue;
+    const start = local + 30 + dv.getUint16(local + 26, true) + dv.getUint16(local + 28, true);
+    const raw = u8.subarray(start, start + csize);
+    if (method === 0) out[path] = raw;
+    else if (method === 8) {
+      const DS = globalThis.DecompressionStream;
+      if (!DS) throw new Error("這個瀏覽器解不開壓縮檔，請先自己解壓縮，再選裡面的 csv 檔");
+      const stream = new globalThis.Blob([raw]).stream().pipeThrough(new DS("deflate-raw"));
+      out[path] = new Uint8Array(await new globalThis.Response(stream).arrayBuffer());
+    }
+  }
+  return out;
+}
+var WANT = ["ratings.csv", "diary.csv", "reviews.csv", "watched.csv"];
+var wanted = (path) => {
+  const parts = path.split("/"), file = parts[parts.length - 1].toLowerCase();
+  if (WANT.indexOf(file) < 0 || /^\._/.test(file)) return "";
+  if (parts.slice(0, -1).some((d) => /^(likes|deleted|orphaned|lists|__MACOSX)$/i.test(d))) return "";
+  return file;
+};
+var toScore = (stars) => {
+  const n = Math.round(Number(stars) * 2);
+  return n >= 1 && n <= 10 ? n : 0;
+};
+var okDate = (d) => /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : "";
+async function readLetterboxd(files) {
+  const texts = {};
+  const dec = new globalThis.TextDecoder();
+  for (const f of files) {
+    if (/\.zip$/i.test(f.name)) {
+      const got = await unzip(f.data, (p) => !!wanted(p));
+      for (const path of Object.keys(got).sort((a, b) => a.length - b.length)) {
+        const k = wanted(path);
+        if (k && !(k in texts)) texts[k] = dec.decode(got[path]);
+      }
+    } else {
+      const k = wanted(f.name);
+      if (k) texts[k] = dec.decode(new Uint8Array(f.data));
+    }
+  }
+  if (!Object.keys(texts).length) throw new Error("裡面找不到 Letterboxd 的資料（ratings.csv、diary.csv、reviews.csv、watched.csv）。請選 Letterboxd 匯出的那個 zip 檔。");
+  const table = (file) => {
+    const rows = parseCsv(texts[file] || "");
+    if (rows.length < 2) return [];
+    const head = rows[0].map((h2) => h2.trim().toLowerCase());
+    return rows.slice(1).map((r) => {
+      const o = {};
+      head.forEach((h2, i) => {
+        o[h2] = (r[i] || "").trim();
+      });
+      return o;
+    }).filter((o) => o.name);
+  };
+  const items = /* @__PURE__ */ new Map();
+  const get2 = (r) => {
+    const key = r.name.toLowerCase() + "|" + (r.year || "");
+    let it = items.get(key);
+    if (!it) items.set(key, it = { name: r.name, year: /^\d{4}$/.test(r.year || "") ? r.year : "", s: 0, seen: "", x: "", at: "" });
+    return it;
+  };
+  for (const r of table("watched.csv")) {
+    const it = get2(r);
+    if (!it.seen) it.seen = "?";
+  }
+  const byDate = (a, b) => (a["watched date"] || a.date || "").localeCompare(b["watched date"] || b.date || "");
+  for (const r of table("diary.csv").sort(byDate)) {
+    const it = get2(r);
+    const d = okDate(r["watched date"]);
+    if (d) it.seen = d;
+    else if (!it.seen) it.seen = "?";
+    if (toScore(r.rating)) it.s = toScore(r.rating);
+  }
+  for (const r of table("reviews.csv").sort(byDate)) {
+    const it = get2(r);
+    const d = okDate(r["watched date"]);
+    if (d) it.seen = d;
+    else if (!it.seen) it.seen = "?";
+    if (toScore(r.rating)) it.s = toScore(r.rating);
+    if (r.review) it.x = r.review;
+  }
+  for (const r of table("ratings.csv")) {
+    const it = get2(r);
+    if (toScore(r.rating)) it.s = toScore(r.rating);
+    if (!it.seen) it.seen = "?";
+    it.at = r.date || "";
+  }
+  return Array.from(items.values()).sort((a, b) => (b.seen === "?" ? "" : b.seen).localeCompare(a.seen === "?" ? "" : a.seen) || a.name.localeCompare(b.name)).map(({ at: _at, ...it }) => it);
+}
+function lbxNote(review, max) {
+  const flat2 = String(review || "").replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim();
+  const chars = Array.from(flat2);
+  return chars.length <= max ? { x: flat2, cut: false } : { x: chars.slice(0, max - 1).join("") + "…", cut: true };
+}
 
 // src/parsers.gen.ts
 var PARSERS_JS = `function parseTwIndex(doc) {
@@ -3988,6 +4130,10 @@ function h(type, props, ...children) {
       attrs += ` data-act="${register(v)}"`;
       continue;
     }
+    if (k === "onFile") {
+      attrs += ` data-file="${register(v)}"`;
+      continue;
+    }
     if (k === "onInput") {
       attrs += ` data-live="${register(v)}"`;
       continue;
@@ -4506,6 +4652,26 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .us-bar i.warn{background:#ff9f0a}
 .us-bar i.bad{background:#ff453a}
 .us-sub2{font-size:12.5px;line-height:1.5;color:var(--fg2);overflow-wrap:anywhere}
+.lb-pick{display:block;position:relative;overflow:hidden;text-align:center}
+.lb-pick input{position:absolute;inset:0;width:100%;height:100%;opacity:0}
+.lb-steps{margin:0;padding:0 16px 4px 34px;font-size:14.5px;line-height:1.6;color:var(--fg)}
+.lb-steps li{margin:4px 0}
+.lb-prog{padding:22px 16px;text-align:center;font-size:15px;color:var(--fg2)}
+.lb-prog b{display:block;margin-bottom:10px;font-size:22px;color:var(--fg);font-variant-numeric:tabular-nums}
+.lb-list{padding:0 16px 6px}
+.lb{display:flex;gap:11px;padding:12px 0}
+.lb+.lb{border-top:1px solid var(--line)}
+.lb.off .lb-body{opacity:.45}
+.lb-ck{flex:none;width:26px;height:26px;margin-top:1px;padding:0;border-radius:8px;border:1.5px solid var(--line);color:#fff;font-size:15px;line-height:1}
+.lb-ck.on{background:var(--accent);border-color:var(--accent)}
+.lb-body{flex:1;min-width:0}
+.lb-top{display:flex;align-items:baseline;gap:8px}
+.lb-top b{flex:1;min-width:0;font-size:16px;overflow-wrap:anywhere}
+.lb-sub{margin-top:2px;font-size:12.5px;color:var(--fg2);overflow-wrap:anywhere}
+.lb-x{margin-top:7px;padding:8px 10px;border-radius:10px;background:var(--chip);font-size:14px;line-height:1.45;overflow-wrap:anywhere}
+.lb-opts{display:flex;flex-wrap:wrap;gap:6px;margin-top:7px}
+.lb-opts .cm-tag{padding:4px 10px;font-size:12.5px}
+.lb-bar{display:flex;flex-wrap:wrap;gap:6px;padding:0 16px 12px}
 .fd-list{padding:4px 16px 6px}
 .fd{display:flex;align-items:flex-start;gap:12px;padding:12px 0}
 .fd+.fd{border-top:1px solid var(--line)}
@@ -4652,6 +4818,11 @@ function isLive(el){return !!(el&&el.getAttribute&&el.getAttribute('data-live'))
 document.addEventListener('compositionstart',function(){composing=true;});
 document.addEventListener('compositionend',function(e){composing=false;if(held){var x=held;held=null;window.__render(x[0],x[1]);}if(isLive(e.target))liveGo(e.target);});
 document.addEventListener('input',function(e){if(isLive(e.target)&&!composing)liveGo(e.target);});
+// 選檔案（data-file）：把選的檔案讀進記憶體放在 window.__files，再通知 App（檔案只留在這一頁裡，不會上傳）
+document.addEventListener('change',function(e){var el=e.target;if(!el||el.type!=='file'||!el.getAttribute||!el.getAttribute('data-file'))return;
+  var id=el.getAttribute('data-file'),fs=[].slice.call(el.files||[],0,8);if(!fs.length)return;
+  Promise.all(fs.map(function(f){return f.arrayBuffer().then(function(b){return{name:f.name,data:b};});})).then(function(list){window.__files=list;
+    var n=0,t=setInterval(function(){if(window.__pending){clearInterval(t);send(id);}else if(++n>60)clearInterval(t);},100);});});
 function copyAttrs(from,to){var i,a=to.attributes;for(i=a.length-1;i>=0;i--)to.removeAttribute(a[i].name);a=from.attributes;for(i=0;i<a.length;i++)to.setAttribute(a[i].name,a[i].value);}
 // 正在搜尋欄裡打字時重畫：搜尋欄和它外面那幾層留在原地（整個換掉的話游標和鍵盤會不見），只換掉周圍的內容
 function renderAround(root,cur,html){var box=document.createElement('div');box.innerHTML=html;
@@ -4898,9 +5069,10 @@ var scriptablePlatform = {
 // src/changelog.ts
 var CHANGELOG = [
   {
-    id: "2026-11-24e",
+    id: "2026-11-24f",
     date: "2026/11/24",
     items: [
+      { kind: "new", text: "可以從 Letterboxd 匯入（設定 → 我的片單 → 從 Letterboxd 匯入，網頁版）：評分、觀影日期、影評一次搬過來，匯入前可以逐筆勾選" },
       { kind: "better", text: "心得標籤可以選更多：亮點、氛圍各最多 3 個，觀影提醒不限；氛圍多了熱血、浪漫、恐怖、溫馨、壓抑、爽快、困惑" },
       { kind: "new", text: "底部的「通知」變成「社群」：追蹤對象的動態、通知、搜尋片友都在這裡（從我的片單搬過來）" },
       { kind: "new", text: "有新通知時，主畫面的「片刻」圖示上會顯示數字（要先把片刻加到主畫面並開啟通知）；從背景切回來也會更新紅點" },
@@ -5021,6 +5193,8 @@ var App = class {
     this.diaryMem = null;
     // 自己的片單（一分鐘內不重讀）
     this.profileDraft = null;
+    // ── 從 Letterboxd 匯入（只有網頁版）──
+    this.lbx = null;
     /** 編輯個人檔案：暱稱（唯一）、顏色、要不要公開；最下面可以把片單和個人檔案整個刪掉 */
     this.followedAfterLogin = "";
     // 登入前按了誰的「登入後追蹤」（登入完成時填上）
@@ -5211,7 +5385,7 @@ var App = class {
   }
   /** 最新版本是多少。網頁版問的是自己網站現在上線的版本（重新整理就會拿到的那一版），不是 GitHub 上的 */
   checkVersion() {
-    if (true) return checkLatest("2026.11.25-0006");
+    if (true) return checkLatest("2026.11.25-0010");
     return (async () => {
       try {
         let r = await globalThis.fetch("/version.json?t=" + Date.now(), { cache: "no-store" });
@@ -5219,7 +5393,7 @@ var App = class {
         const latest = String((await r.json()).version || "");
         if (!latest) return null;
         const num = (v) => Number(v.replace(/\D/g, "")) || 0;
-        return { latest, isLatest: num("2026.11.25-0006") >= num(latest) };
+        return { latest, isLatest: num("2026.11.25-0010") >= num(latest) };
       } catch (_) {
         return null;
       }
@@ -5807,7 +5981,150 @@ var App = class {
       const list = await this.myDiary().catch(() => null);
       body = !list ? /* @__PURE__ */ h(Note, { kind: "warn", text: "片單暫時讀不到" }) : list.length ? /* @__PURE__ */ h(Section, { hint: "在電影頁評分、寫短評，或標記看過，就會出現在這裡。點一筆可以改看過的日期，或設成只有自己看得到。" }, /* @__PURE__ */ h("div", { class: "nt-list" }, list.map((e) => this.entryRow(e, () => this.go(() => this.entryView(e.title, e)))))) : /* @__PURE__ */ h(Section, null, /* @__PURE__ */ h(Note, { text: "片單還是空的。到任何一部電影的頁面評分或標記看過，就會記在這裡。" }));
     }
-    return /* @__PURE__ */ h(Page, { title: "我的片單", onBack: () => this.back() }, /* @__PURE__ */ h(Section, null, user ? this.profileCard(user, me.counts, user.hidden ? "個人頁目前被站長停用，別人看不到。" : "", (kind) => this.go(() => this.profileListView("", kind), "讀取中…"), "", user.hidden ? { text: "已被停用", tone: "bad" } : user.pub ? { text: "公開", tone: "good" } : { text: "不公開", tone: "" }) : /* @__PURE__ */ h(Note, { kind: "warn", text: "還沒有設定暱稱：別人找不到你、不能追蹤你，短評也是匿名。你還是可以追蹤別人。" })), body);
+    return /* @__PURE__ */ h(Page, { title: "我的片單", onBack: () => this.back() }, /* @__PURE__ */ h(Section, null, user ? this.profileCard(user, me.counts, user.hidden ? "個人頁目前被站長停用，別人看不到。" : "", (kind) => this.go(() => this.profileListView("", kind), "讀取中…"), "", user.hidden ? { text: "已被停用", tone: "bad" } : user.pub ? { text: "公開", tone: "good" } : { text: "不公開", tone: "" }) : /* @__PURE__ */ h(Note, { kind: "warn", text: "還沒有設定暱稱：別人找不到你、不能追蹤你，短評也是匿名。你還是可以追蹤別人。" })), body, false ? /* @__PURE__ */ h(Section, null, /* @__PURE__ */ h(Item, { icon: "📥", title: "從 Letterboxd 匯入", subtitle: "把 Letterboxd 上的評分、觀影日期和影評搬過來", onTap: () => {
+      this.lbx = null;
+      this.go(() => this.lbxView());
+    } })) : null);
+  }
+  /** 選好檔案：讀檔 → 一批一批問伺服器台灣片名（畫面上顯示進度）→ 列出清單讓使用者勾選 */
+  async lbxStart() {
+    const G = globalThis;
+    const files = G.__files || [];
+    G.__files = null;
+    const items = await readLetterboxd(files);
+    if (!items.length) throw new Error("檔案裡沒有任何紀錄。");
+    const BATCH = 12, steps = Math.ceil(items.length / BATCH) + 1;
+    const fire = [];
+    const ticks = Array.from({ length: steps }, () => new Promise((ok) => fire.push(ok)));
+    let at = 0;
+    const st = this.lbx = { stage: "match", rows: [], miss: [], done: 0, total: items.length, ticks, bump: () => {
+      const f = fire[at++];
+      if (f) f();
+    }, result: { ok: 0, have: 0, noNote: 0, fail: 0, why: [] }, err: "", all: false };
+    void (async () => {
+      try {
+        const [years, mine] = await Promise.all([loadYearRatings().catch(() => null), this.myDiary().catch(() => [])]);
+        const byImdb = {};
+        for (const key of Object.keys(years && years.ratings || {})) {
+          const id = years.ratings[key].id, name = key.split("|")[0];
+          if (id && (!byImdb[id] || name.length < byImdb[id].length)) byImdb[id] = name;
+        }
+        const max = noteMax();
+        for (let i = 0; i < items.length; i += BATCH) {
+          if (this.lbx !== st) return;
+          const part = items.slice(i, i + BATCH);
+          const r = await social("lbx-match", { items: part.map((p) => ({ n: p.name, y: p.year })) });
+          part.forEach((it, j) => {
+            const m = r.list[j];
+            if (!m || !m.zh) {
+              st.miss.push(it);
+              return;
+            }
+            const known = m.imdb ? byImdb[m.imdb] : "";
+            const title = known && known !== normTitle(m.zh) ? known : m.zh;
+            const k = communityKey(title);
+            if (st.rows.some((x) => x.k === k)) return;
+            const have = (mine.find((e) => e.k === k) || { s: 0 }).s || 0;
+            const n = it.x ? lbxNote(it.x, max) : { x: "", cut: false };
+            st.rows.push({ it, title, k, note: n.x, cut: n.cut, on: !have, noteOn: !!n.x && !n.cut && it.s > 0, sp: false, have, plain: !/[\u3400-\u9fff]/.test(title) });
+          });
+          st.done = Math.min(items.length, i + BATCH);
+          st.bump();
+        }
+        st.stage = "review";
+      } catch (e) {
+        st.err = String(e?.message || e);
+        st.stage = "review";
+      }
+      st.bump();
+    })();
+  }
+  /** 按下匯入：把勾選的那幾筆一批一批送出 */
+  lbxSend() {
+    const st = this.lbx;
+    if (!st) return;
+    const todo = st.rows.filter((r) => r.on);
+    const BATCH = 15, fire = [];
+    st.ticks = Array.from({ length: Math.ceil(todo.length / BATCH) + 1 }, () => new Promise((ok) => fire.push(ok)));
+    let at = 0;
+    st.bump = () => {
+      const f = fire[at++];
+      if (f) f();
+    };
+    st.stage = "import";
+    st.done = 0;
+    st.total = todo.length;
+    st.err = "";
+    const WHY = { "no links": "有連結或聯絡方式", "too long": "太長", "too many notes": "這部片你已經寫滿 5 則", duplicate: "跟已經有的重複", "vote first": "沒有評分" };
+    void (async () => {
+      try {
+        for (let i = 0; i < todo.length; i += BATCH) {
+          if (this.lbx !== st) return;
+          const part = todo.slice(i, i + BATCH);
+          const r = await social("lbx-import", { items: part.map((p) => ({ m: p.k, title: p.title, s: p.it.s, seen: p.it.seen, ...p.noteOn && p.note ? { x: p.note, sp: p.sp ? 1 : 0 } : {} })) });
+          part.forEach((p, j) => {
+            const code = r.list[j] || "fail";
+            if (code === "ok") st.result.ok++;
+            else if (code === "have") st.result.have++;
+            else if (code.indexOf("note:") === 0) {
+              st.result.ok++;
+              st.result.noNote++;
+              st.result.why.push(`《${p.title}》：${WHY[code.slice(5)] || "沒有通過檢查"}`);
+            } else st.result.fail++;
+          });
+          st.done = Math.min(todo.length, i + BATCH);
+          st.bump();
+        }
+      } catch (e) {
+        st.err = String(e?.message || e);
+      }
+      st.stage = "done";
+      this.diaryMem = null;
+      this.meMem = null;
+      st.bump();
+    })();
+  }
+  lbxView() {
+    const st = this.lbx;
+    const back = () => {
+      this.lbx = null;
+      this.back();
+    };
+    if (!st) {
+      return /* @__PURE__ */ h(Page, { title: "從 Letterboxd 匯入", onBack: back }, /* @__PURE__ */ h(Section, { title: "先到 Letterboxd 下載你的資料" }, /* @__PURE__ */ h("ol", { class: "lb-steps" }, /* @__PURE__ */ h("li", null, "用瀏覽器打開 letterboxd.com 並登入（App 裡沒有這個功能）。"), /* @__PURE__ */ h("li", null, "進 Settings → Data，按 Export Your Data。"), /* @__PURE__ */ h("li", null, "會下載一個 zip 檔，存在「檔案」App 的下載項目。")), /* @__PURE__ */ h("div", { class: "nt-form" }, /* @__PURE__ */ h(Button, { label: "打開 Letterboxd 的匯出頁", kind: "secondary", onTap: () => Safari.open("https://letterboxd.com/settings/data/") }))), /* @__PURE__ */ h(Section, { title: "再選那個 zip 檔", hint: "檔案只在你的手機上讀取，不會上傳。接下來會先列出清單讓你一筆一筆確認，按下匯入之前不會寫入任何東西。" }, /* @__PURE__ */ h("div", { class: "nt-form" }, /* @__PURE__ */ h("label", { class: "btn primary lb-pick" }, "選擇 Letterboxd 匯出的 zip 檔", /* @__PURE__ */ h("input", { type: "file", accept: ".zip,.csv,application/zip,text/csv", multiple: true, onFile: () => this.lbxStart() })))), /* @__PURE__ */ h("p", { class: "hint" }, "會匯入：評分（半顆星換成 1 分，五顆星 = 10 分，會算進片刻的平均）、觀影日期、影評（變成短評，最多 ", noteMax(), " 字，可以逐筆決定要不要匯、有沒有雷）。片刻裡已經評過分的片不會被蓋掉。"));
+    }
+    if (st.stage === "match" || st.stage === "import") {
+      for (const t of st.ticks) this.late.push(t);
+      return /* @__PURE__ */ h(Page, { title: "從 Letterboxd 匯入", onBack: back }, /* @__PURE__ */ h(Section, null, /* @__PURE__ */ h("div", { class: "lb-prog" }, /* @__PURE__ */ h("b", null, st.done, "／", st.total), st.stage === "match" ? "正在對照台灣片名…" : "正在匯入…", /* @__PURE__ */ h("br", null), "請停在這一頁，不要關掉。")));
+    }
+    if (st.stage === "done") {
+      const r = st.result;
+      return /* @__PURE__ */ h(Page, { title: "匯入完成", onBack: back }, st.err ? /* @__PURE__ */ h(Section, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `中途停下來了：${st.err}。已經匯入的不受影響，可以再匯一次，匯過的會自動略過。` })) : null, /* @__PURE__ */ h(Section, null, /* @__PURE__ */ h(Item, { kv: true, title: "匯入", right: `${r.ok} 部`, chevron: false }), r.have ? /* @__PURE__ */ h(Item, { kv: true, title: "片刻已經評過，略過", right: `${r.have} 部`, chevron: false }) : null, r.fail ? /* @__PURE__ */ h(Item, { kv: true, title: "沒有成功", right: `${r.fail} 部`, chevron: false }) : null, r.noNote ? /* @__PURE__ */ h(Item, { kv: true, title: "評分有匯入，但影評沒有", right: `${r.noNote} 則`, chevron: false }) : null), r.why.length ? /* @__PURE__ */ h(Section, { title: "沒匯入的影評" }, /* @__PURE__ */ h("div", { class: "lb-list" }, r.why.slice(0, 30).map((w) => /* @__PURE__ */ h("div", { class: "lb-sub", style: "padding:6px 0" }, esc(w))))) : null, /* @__PURE__ */ h(Section, null, /* @__PURE__ */ h("div", { class: "nt-form" }, /* @__PURE__ */ h(Button, { label: "看我的片單", onTap: () => {
+        this.lbx = null;
+        this.back();
+      } }))));
+    }
+    const picked = st.rows.filter((r) => r.on), notes = picked.filter((r) => r.noteOn && r.note).length;
+    const LIMIT = 150, shown = st.all ? st.rows : st.rows.slice(0, LIMIT);
+    const row = (r) => /* @__PURE__ */ h("div", { class: "lb" + (r.on ? "" : " off") }, /* @__PURE__ */ h("button", { class: "lb-ck" + (r.on ? " on" : ""), "aria-pressed": r.on ? "true" : "false", "aria-label": `匯入《${r.title}》`, onTap: () => {
+      r.on = !r.on;
+    } }, r.on ? "✓" : ""), /* @__PURE__ */ h("div", { class: "lb-body" }, /* @__PURE__ */ h("div", { class: "lb-top" }, /* @__PURE__ */ h("b", null, esc(r.title)), r.it.s ? /* @__PURE__ */ h("span", { class: "nt-score " + ratingTier("imdb", r.it.s) }, r.it.s, " 分") : /* @__PURE__ */ h("span", { class: "fb-tag" }, "只標看過")), /* @__PURE__ */ h("div", { class: "lb-sub" }, esc([`${r.it.name}${r.it.year ? `（${r.it.year}）` : ""}`, /^\d{4}-/.test(r.it.seen) ? r.it.seen.replace(/-/g, "/") + " 看的" : "", r.have ? `片刻已經評 ${r.have} 分，預設不匯` : "", r.plain ? "沒有台灣片名" : ""].filter(Boolean).join("｜"))), r.note && r.it.s ? /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h("div", { class: "lb-x", style: r.noteOn ? "" : "opacity:.45" }, esc(r.note)), /* @__PURE__ */ h("div", { class: "lb-opts" }, /* @__PURE__ */ h("button", { class: "cm-tag" + (r.noteOn ? " on" : ""), "aria-pressed": r.noteOn ? "true" : "false", onTap: () => {
+      r.noteOn = !r.noteOn;
+    } }, r.noteOn ? "匯入影評 ✓" : "匯入影評"), r.noteOn ? /* @__PURE__ */ h("button", { class: "cm-tag" + (r.sp ? " on" : ""), "aria-pressed": r.sp ? "true" : "false", onTap: () => {
+      r.sp = !r.sp;
+    } }, r.sp ? "有雷 ✓" : "有雷？") : null, r.cut ? /* @__PURE__ */ h("span", { class: "lb-sub", style: "align-self:center" }, "原文太長，只留前 ", noteMax(), " 字") : null)) : null));
+    return /* @__PURE__ */ h(Page, { title: "確認要匯入的", subtitle: `${st.rows.length} 部`, onBack: back, right: picked.length ? /* @__PURE__ */ h("button", { class: "bar-save", onTap: () => this.lbxSend() }, "匯入") : void 0 }, st.err ? /* @__PURE__ */ h(Section, null, /* @__PURE__ */ h(Note, { kind: "warn", text: st.err === "no tmdb" || /503/.test(st.err) ? "片名對照的服務還沒設定好，暫時不能匯入。" : `對照片名時停下來了：${st.err}。下面是已經對到的。` })) : null, st.rows.length ? /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Section, { title: `要匯入 ${picked.length} 部、影評 ${notes} 則`, hint: "勾掉不想匯入的。影評會變成公開的短評：有提到劇情的請點「有雷？」，別人要點開才看得到。太長被截掉的影評預設不匯。" }, /* @__PURE__ */ h("div", { class: "lb-bar" }, /* @__PURE__ */ h("button", { class: "cm-tag", onTap: () => {
+      const on = picked.length < st.rows.length;
+      for (const r of st.rows) r.on = on;
+    } }, picked.length < st.rows.length ? "全選" : "全不選"), /* @__PURE__ */ h("button", { class: "cm-tag", onTap: () => {
+      for (const r of st.rows) if (r.note) r.noteOn = false;
+    } }, "影評全部不匯"), /* @__PURE__ */ h("button", { class: "cm-tag", onTap: () => {
+      for (const r of st.rows) if (r.note) r.sp = true;
+    } }, "影評全部標有雷")), /* @__PURE__ */ h("div", { class: "lb-list" }, shown.map(row)), st.rows.length > shown.length ? /* @__PURE__ */ h(Item, { title: `顯示全部 ${st.rows.length} 部`, accent: true, chevron: false, onTap: () => {
+      st.all = true;
+    } }) : null), /* @__PURE__ */ h(Section, null, /* @__PURE__ */ h("div", { class: "nt-form" }, /* @__PURE__ */ h(Button, { label: picked.length ? `匯入這 ${picked.length} 部` : "先勾選要匯入的", onTap: () => {
+      if (picked.length) this.lbxSend();
+    } })))) : !st.err ? /* @__PURE__ */ h(Section, null, /* @__PURE__ */ h(Note, { text: "沒有對到任何一部片。" })) : null, st.miss.length ? /* @__PURE__ */ h(Section, { title: `對不到台灣片名（${st.miss.length} 部，不會匯入）` }, /* @__PURE__ */ h("div", { class: "lb-list" }, st.miss.slice(0, 60).map((m) => /* @__PURE__ */ h("div", { class: "lb-sub", style: "padding:5px 0" }, esc(m.name), m.year ? `（${m.year}）` : "")))) : null);
   }
   /** 清單裡的一個帳號：點名字看個人頁，右邊追蹤／取消追蹤 */
   userItem(u) {
@@ -6141,7 +6458,7 @@ var App = class {
         return;
       }
       try {
-        await sendFeedback(cat.id, text, false ? this.isStandalone() ? "web-app" : "web" : "scriptable", "2026.11.25-0006");
+        await sendFeedback(cat.id, text, false ? this.isStandalone() ? "web-app" : "web" : "scriptable", "2026.11.25-0010");
         this.fbDraft = "";
         this.fbCat = "";
         await this.ui.toast("已送出，謝謝你的回饋");
@@ -6479,7 +6796,7 @@ var App = class {
       this.settings.seenLog = CHANGELOG_LATEST;
       saveSettings(this.settings);
     }
-    return /* @__PURE__ */ h(Page, { title: "更新內容", subtitle: `目前版本 ${"2026.11.25-0006"}`, onBack: () => this.back() }, CHANGELOG.map((e) => /* @__PURE__ */ h(Section, { title: e.date }, e.items.map((it) => /* @__PURE__ */ h(Item, { title: it.text, tag: { text: it.kind === "new" ? "新功能" : "改進", tone: it.kind === "new" ? "now" : "soon" }, chevron: false })))), /* @__PURE__ */ h(Note, { text: "只列出比較有感的變動；修小錯、調整文字這類不會寫在這裡。" }));
+    return /* @__PURE__ */ h(Page, { title: "更新內容", subtitle: `目前版本 ${"2026.11.25-0010"}`, onBack: () => this.back() }, CHANGELOG.map((e) => /* @__PURE__ */ h(Section, { title: e.date }, e.items.map((it) => /* @__PURE__ */ h(Item, { title: it.text, tag: { text: it.kind === "new" ? "新功能" : "改進", tone: it.kind === "new" ? "now" : "soon" }, chevron: false })))), /* @__PURE__ */ h(Note, { text: "只列出比較有感的變動；修小錯、調整文字這類不會寫在這裡。" }));
   }
   async aboutView() {
     return /* @__PURE__ */ h(Page, { title: "關於", onBack: () => this.back() }, /* @__PURE__ */ h(Section, { hint: "連鎖影城的場次來自場次通（twshowtimes.com），感謝場次通的整理；其他來自開眼電影網，以及誠品、光點、樂聲、內惟戲院官網。實際場次以影城公告為準。" }, /* @__PURE__ */ h(Item, { icon: "ℹ️", title: "關於與資料來源", accent: true, chevron: false, onTap: () => Safari.open(ABOUT_URL) }), /* @__PURE__ */ h(Item, { icon: "🔒", title: "隱私權政策", accent: true, chevron: false, onTap: () => Safari.open(PRIVACY_URL) }), /* @__PURE__ */ h(Item, { icon: "🙏", title: "前往場次通", subtitle: "比較各影城場次、看上映場數排行", accent: true, chevron: false, onTap: () => Safari.open("https://twshowtimes.com/") })));
@@ -6510,11 +6827,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.25-0006"}`);
+          Pasteboard.copy(`版本 ${"2026.11.25-0010"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.25-0006"}`,
+      `版本 ${"2026.11.25-0010"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -7155,7 +7472,7 @@ var App = class {
     if (false) {
       if (!r) return /* @__PURE__ */ h(Note, { text: "（無法確認是否為最新版：連不到網站）" });
       if (r.isLatest) return /* @__PURE__ */ h(Note, { text: "✅ 已是最新版" });
-      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.25-0006"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
+      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.25-0010"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
         globalThis.location.reload();
       } }));
     }

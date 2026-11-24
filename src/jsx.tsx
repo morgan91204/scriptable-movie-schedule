@@ -63,6 +63,10 @@ export function h(type: string | ((props: any) => string), props: any, ...childr
       attrs += ` data-act="${register(v)}"`;
       continue;
     }
+    if (k === "onFile") { // 選檔案：選好之後觸發，檔案內容放在 window.__files（見 ui.ts 的 data-file）
+      attrs += ` data-file="${register(v)}"`;
+      continue;
+    }
     if (k === "onInput") { // 搜尋欄：打字停一下就觸發（見 ui.ts 的 data-live）
       attrs += ` data-live="${register(v)}"`;
       continue;
