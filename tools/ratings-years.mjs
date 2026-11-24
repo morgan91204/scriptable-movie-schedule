@@ -63,6 +63,7 @@ for (const y of Object.keys(years).sort().reverse()) { // 新的年份先查
 todo.sort((a, b) => Number(a.redo) - Number(b.redo));
 console.log(`年度排行共 ${seen.size} 部（不重複）；已有評分紀錄 ${Object.keys(ratings).length}、找不到是哪部片 ${Object.keys(miss).length}；還要查 ${todo.length}，這一輪查 ${Math.min(todo.length, MAX)}`);
 
+const sorted = (o) => Object.fromEntries(Object.keys(o).sort().map((k) => [k, o[k]]));
 const same = (s) => core.normTitle(String(s || "")).replace(/臺/g, "台").replace(/祕/g, "秘").replace(/爲/g, "為");
 const tmdb = async (path) => {
   const r = await fetch("https://api.themoviedb.org/3" + path, { headers: { accept: "application/json", Authorization: "Bearer " + TOKEN }, signal: AbortSignal.timeout(25000) });
@@ -121,27 +122,47 @@ await Promise.all(Array.from({ length: LANES }, async (_, lane) => {
   }
 }));
 if (stopped) console.log(`這一輪提早結束：${stopped}；剩下的下一輪再查`);
-// 補「原本是哪一年的片」（y）：這一欄是後來才加的。已經知道 IMDb 編號的片只要問 TMDB 一次（不用再查 IMDb、爛番茄），一輪最多補 8 分鐘
+// 補「原本是哪一年的片」（y）和中文簡介：這兩樣是後來才加的。已經知道 IMDb 編號的片只要問 TMDB 一次（不用再查 IMDb、爛番茄），一輪最多補 8 分鐘。
+// 簡介不放進評分總表（會讓它變得很大）：每個上映年一個檔（INTRO_DIR 底下的 intro-<年>.json，片名鍵 → 簡介），App 進到那部片的頁面才下載那一年的。
+// 紀錄裡的 o = 1 表示簡介問過了（有沒有都算）；yq = 1 表示年份問過、TMDB 沒有
+const INTRO_DIR = process.env.INTRO_DIR || "";
+const intros = {}; // 年 → { 片名鍵|年 : 簡介 }
+const introOf = (year) => (intros[year] ||= (INTRO_DIR ? read(`${INTRO_DIR}/intro-${year}.json`, {}) : {}));
 {
-  const need = Object.keys(ratings).filter((k) => ratings[k].id && !ratings[k].y && !ratings[k].yq);
+  const need = Object.keys(ratings).filter((k) => ratings[k].id && ((!ratings[k].y && !ratings[k].yq) || (INTRO_DIR && !ratings[k].o)));
   const until = Date.now() + 8 * 60e3;
-  let filled = 0, asked = 0;
+  let years = 0, texts = 0, asked = 0;
   for (const k of need) {
     if (Date.now() > until) break;
+    const rec = ratings[k];
     try {
       asked++;
-      const d = await tmdb(`/find/${ratings[k].id}?external_source=imdb_id`);
+      const d = await tmdb(`/find/${rec.id}?external_source=imdb_id&language=zh-TW`);
       const hit = (d.movie_results || [])[0] || (d.tv_results || [])[0];
-      const y = hit ? Number(String(hit.release_date || hit.first_air_date || "").slice(0, 4)) || 0 : 0;
-      if (y) { ratings[k].y = y; filled++; } else ratings[k].yq = 1; // 問過了、TMDB 沒有年份：不再問
+      if (!rec.y) {
+        const y = hit ? Number(String(hit.release_date || hit.first_air_date || "").slice(0, 4)) || 0 : 0;
+        if (y) { rec.y = y; years++; } else rec.yq = 1;
+      }
+      if (INTRO_DIR) {
+        const text = hit ? String(hit.overview || "").replace(/\s+/g, " ").trim().slice(0, 600) : "";
+        // 要有中文字才算（TMDB 沒有中文簡介時會回空的，偶爾回別的語言）
+        if (text.length >= 20 && /[\u4e00-\u9fff]/.test(text)) { introOf(k.split("|").pop())[k] = text; texts++; }
+        rec.o = 1;
+      }
     } catch (_) { /* 連線出錯：下一輪再補 */ }
     await new Promise((r) => setTimeout(r, 40));
   }
-  if (need.length) console.log(`補首映年：還缺 ${need.length} 部，這一輪問了 ${asked} 部、補上 ${filled} 部`);
+  if (need.length) console.log(`補首映年與簡介：還缺 ${need.length} 部，這一輪問了 ${asked} 部；補上年份 ${years}、簡介 ${texts}`);
+  if (INTRO_DIR) {
+    fs.mkdirSync(INTRO_DIR, { recursive: true });
+    for (const year of Object.keys(intros)) {
+      for (const k of Object.keys(intros[year])) if (!seen.has(k)) delete intros[year][k];
+      fs.writeFileSync(`${INTRO_DIR}/intro-${year}.json`, JSON.stringify(sorted(intros[year])) + "\n");
+    }
+  }
 }
 for (const k of Object.keys(miss)) if (!seen.has(k)) delete miss[k];
 for (const k of Object.keys(ratings)) if (!seen.has(k)) delete ratings[k];
-const sorted = (o) => Object.fromEntries(Object.keys(o).sort().map((k) => [k, o[k]]));
 const all = Object.values(ratings);
 fs.writeFileSync(outPath, JSON.stringify({ total: seen.size, ratings: sorted(ratings), miss: sorted(miss) }) + "\n");
 console.log(`這一輪：有評分 ${found}、查到片但沒有評分 ${none}、找不到是哪部片 ${unknown}、讀取失敗 ${failed}`);

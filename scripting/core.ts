@@ -1818,6 +1818,14 @@ export function boxInfoRows(x: BoxOfficeItem, info: BoxInfo | null): [string, st
   if ((info && info.issue) || x.issue) rows.push(["發行", (info && info.issue) || x.issue || ""]);
   if (info && info.produce) rows.push(["出品", info.produce]);
   rows.push(["上映日期", x.release.replace(/-/g, "/")]);
+  // 上映類型：重映（認得出來的都標）；首映只有在伺服器查到這部片的年份、確定不是老片時才寫，查不到的不亂標
+  {
+    const first0 = boxFirstRun(x), orig0 = boxOrigYear(x), rec = yearRatingsLatest ? yearRatingsLatest.ratings[yearRatingKey(x.name, x.release)] : null;
+    if (first0) rows.push(["上映類型", `重映（${first0.release.slice(0, 4)} 年上映過）`]);
+    else if (orig0) rows.push(["上映類型", `重映（${orig0} 年的片）`]);
+    else if (rerunByName(x.name)) rows.push(["上映類型", "重映"]);
+    else if (rec && rec.y) rows.push(["上映類型", "首映"]);
+  }
   if (x.theaters) rows.push(["上映戲院", `${x.theaters} 間`]);
   if (x.week !== null && !x.since) rows.push(["本週票房", money(x.week)]);
   // 重映的片：官方的累計只算這一次重映，寫清楚，並把首輪的票房列在下面（資料從 2016 年開始，更早的首輪沒有數字）
@@ -2116,7 +2124,7 @@ export async function loadMovieBoard(opt: { scope?: string; sort?: string; years
 // ───────────────────────── 即將上映：場次通（已經排了場次）＋開眼的近期上映（還沒有場次） ─────────────────────────
 export const UPCOMING_URL = "https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/data/upcoming.json";
 /** 還沒有場次的即將上映片（伺服器每六小時從開眼電影網的「近期上映」整理，海報用 TMDB 查好；見 tools/upcoming.mjs） */
-export interface UpcomingFilm { title: string; release: string; rating: string; runtime: number; en: string; poster: string; url: string; approx?: boolean /* 只知道是哪一週上映，日期是大約的 */ }
+export interface UpcomingFilm { title: string; release: string; rating: string; runtime: number; en: string; poster: string; url: string; approx?: boolean /* 只知道是哪一週上映，日期是大約的 */; intro?: string /* 劇情簡介（TMDB 的中文簡介，沒有就沒有這一欄） */ }
 let upcomingMem: { at: number; job: Promise<UpcomingFilm[]> } | null = null;
 /** 讀即將上映的片單（記憶體 30 分鐘、手機 6 小時）；讀不到回傳空的（清單就只剩場次通有場次的片） */
 export function loadUpcoming(): Promise<UpcomingFilm[]> {
@@ -2276,6 +2284,27 @@ export function loadYearRatings(): Promise<YearRatings | null> {
   })().then((d) => { if (d) yearRatingsLatest = d; return d; }); // 記下來：判斷重映時要查首映年
   yearRatingsMem = { at: Date.now(), job };
   return job;
+}
+
+// ── 已下檔的片的劇情簡介（伺服器向 TMDB 查的中文簡介，每個上映年一個檔；進到那部片的頁面才讀那一年的）──
+const introMem: Record<string, Promise<Record<string, string>>> = {};
+/** 這部片的簡介；沒有（TMDB 沒有中文簡介、或那一年的檔讀不到）回傳空字串 */
+export function loadIntro(name: string, release: string): Promise<string> {
+  const year = String(release || "").slice(0, 4);
+  if (!/^20\d{2}$/.test(year)) return Promise.resolve("");
+  const job = (introMem[year] ||= (async (): Promise<Record<string, string>> => {
+    const file = `intro-${year}.json`;
+    try {
+      const c = JSON.parse(cacheGet(file) || "null");
+      if (c && c.data && Date.now() - c.at < 24 * 3600e3) return c.data;
+    } catch (_) {}
+    const r = await platform().fetchText(`https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/data/${file}?t=${Math.floor(Date.now() / 3600e3)}`, { accept: "application/json" });
+    const d = r.status === 200 ? JSON.parse(r.body) : null;
+    if (!d || typeof d !== "object") { delete introMem[year]; return {}; } // 這次讀不到：下次再試
+    try { cacheSet(file, JSON.stringify({ at: Date.now(), data: d })); } catch (_) {}
+    return d;
+  })().catch(() => { delete introMem[year]; return {}; }));
+  return job.then((m) => String(m[yearRatingKey(name, release)] || ""));
 }
 
 // ───────────────────────── 收藏電影 ─────────────────────────

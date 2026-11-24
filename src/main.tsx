@@ -10,7 +10,7 @@ import { scriptablePlatform } from "./platform-scriptable";
 import {
   Cinema, Settings, Movie, Version, EXTRA, CITY_ORDER, AD_STEPS,
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
-  loadSettings, saveSettings, settingsStored, setSettingsSavedHook, syncPick, syncApply, syncMerge, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, communityKey, globalSearch, boxIsRerun, SITE_URL, TW,
+  loadSettings, saveSettings, settingsStored, setSettingsSavedHook, syncPick, syncApply, syncMerge, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, communityKey, globalSearch, boxIsRerun, loadIntro, SITE_URL, TW,
   FORMATS, formatsOf, filterVersions, filterVersionsAny, movieRows, movieDays, nearest, kmLabel, WINDOWS, findShowtimes, findShowtimesMulti, multiLabel, multiDetail, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText,
   hallOf, tmdbTest, movieExtras, moviePoster, movieRuntime, posterSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxCountries, boxByCountry, boxInfo, boxInfoRows, boxCountryText, BOX_COUNTRY_NOTE, boxCountryTag, boxCountriesPicked, loadMovieBoard, loadSoonBoard, notifyPrefs, notifyPayload, notifyEndScope, notifyEndPick, notifyQuiet, NOTIFY_PRE_STEPS, NOTIFY_KINDS, boxStatus, STATUS_LABEL, boxInfoBy, isFavMovie, toggleFavMovie, favMovieRows, favMovieBox, soonGroups, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityCached, communityVote, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalsReady, festivalNote, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, festivalDefaultDate, festivalStateLabel, festivalState, festivalFooter, linkMovies, nowGroupLine, nowFilter, festivalPick, movieAbout, festivalSearch, festivalSearchLines, festivalTrailer, festivalYears, festivalsAny, festivalGroups, festivalChipNote, festivalStatusLine, movieRatings, ratingTier, tomatoTier, popcornTier, popcornCount,
 } from "./core";
@@ -1618,11 +1618,21 @@ class App {
   /** 票房排行上、場次通已經沒有場次的片：海報、評分、預告、片刻評分與票房 */
   async boxMovieView(x: BoxOfficeItem): Promise<string> {
     const [e, info] = await Promise.all([this.extras(x.name), boxInfo(x).catch(() => null)]);
+    // 劇情簡介（伺服器向 TMDB 查的）：讀太久就先畫其他的，讀好再補上
+    const introJob = loadIntro(x.name, x.release).catch(() => "");
+    const introGot = await Promise.race([introJob, sleep(this.rerendering ? 0 : 800).then(() => undefined)]);
+    if (introGot === undefined) this.late = [introJob];
+    const intro = introGot || "";
     const date = x.release.replace(/-/g, "/");
     return (
       <Page title={x.name} subtitle={`票房第 ${x.rank} 名`} onBack={() => this.back()}>
         {this.hero(e, x.name, [boxCountryText(x.country), `${date} 上映`])}
         {/* 個別資訊：跟官方網站列的欄位一樣（國別、發行、出品、上映日期、院數、票數、金額） */}
+        {intro ? (
+          <Section title="劇情簡介" hint="簡介來自 TMDB。">
+            <Para text={intro} />
+          </Section>
+        ) : null}
         <Section title="票房資訊" hint="資料來源：國家電影及視聽文化中心「全國電影票房統計」。">
           <Item kv title="狀態" tag={{ text: STATUS_LABEL[boxStatus(x)], tone: boxStatus(x) }} />
           {boxInfoRows(x, info).map(([label, value]) => <Item kv title={label} right={value} />)}
@@ -1711,6 +1721,11 @@ class App {
     return (
       <Page title={u.title} subtitle={`${date} 上映`} onBack={() => this.back()}>
         {this.hero(e, u.title, [u.en, [`${date} ${u.approx ? "當週" : ""}上映`, u.rating, u.runtime ? `${u.runtime} 分` : ""].filter(Boolean).join("｜")].filter(Boolean), { en: u.en, poster: u.poster })}
+        {u.intro ? (
+          <Section title="劇情簡介" hint="簡介來自 TMDB。">
+            <Para text={u.intro} />
+          </Section>
+        ) : null}
         <Note text="戲院還沒有排這部片的場次。通常上映前一到兩週會開放，到時候這裡會自動變成可以查場次。上映日期可能再調整。" />
         <Button label="🌐 開眼電影網的介紹" kind="secondary" onTap={() => Safari.open(u.url)} />
       </Page>

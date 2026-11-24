@@ -30,6 +30,10 @@ jobs:
       - run: npm ci --no-audit --no-fund
       - name: 取上一次的評分紀錄
         run: curl -fsSL "https://raw.githubusercontent.com/${{ github.repository }}/data/ratings-years.json?t=$(date +%s)" -o "$RUNNER_TEMP/prev-ratings.json" || echo "還沒有評分紀錄，從頭查"
+      - name: 取上一次的簡介（每個上映年一個檔）
+        run: |
+          mkdir -p "$RUNNER_TEMP/intro"
+          for y in $(seq 2016 $(date +%Y)); do curl -fsSL "https://raw.githubusercontent.com/${{ github.repository }}/data/intro-$y.json?t=$(date +%s)" -o "$RUNNER_TEMP/intro/intro-$y.json" || rm -f "$RUNNER_TEMP/intro/intro-$y.json"; done
       - name: 查評分（慢慢查，連續讀不到就提早結束）
         run: node tools/ratings-years.mjs "$RUNNER_TEMP/prev-ratings.json" "$RUNNER_TEMP/ratings-years.json"
         env:
@@ -38,6 +42,7 @@ jobs:
           RATINGS_MAX: ${{ inputs.max || '1200' }}
           RATINGS_LANES: ${{ inputs.lanes || '3' }}
           RATINGS_MINUTES: "42"
+          INTRO_DIR: ${{ runner.temp }}/intro
       - name: 發佈到 data 分支（跟其他排程同時發佈時可能被蓋掉，所以確認一次，沒上去就再發一次）
         run: |
           tools/publish-data.sh "$RUNNER_TEMP/ratings-years.json" ratings-years.json "更新資料"
@@ -45,3 +50,7 @@ jobs:
           git checkout -q -f "$GITHUB_SHA"
           git fetch -q origin data
           if ! git show FETCH_HEAD:ratings-years.json | cmp -s - "$RUNNER_TEMP/ratings-years.json"; then echo "被蓋掉了，再發一次"; tools/publish-data.sh "$RUNNER_TEMP/ratings-years.json" ratings-years.json "更新資料"; fi
+      - name: 發佈簡介（有變的年份才會真的推上去）
+        run: |
+          git checkout -q -f "$GITHUB_SHA"
+          for f in "$RUNNER_TEMP"/intro/intro-*.json; do [ -f "$f" ] && tools/publish-data.sh "$f" "$(basename "$f")" "更新資料" && git checkout -q -f "$GITHUB_SHA"; done || true

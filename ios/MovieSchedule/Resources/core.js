@@ -147,6 +147,7 @@
     loadCinemas: () => loadCinemas,
     loadCommunitySummary: () => loadCommunitySummary,
     loadFestivals: () => loadFestivals,
+    loadIntro: () => loadIntro,
     loadMovieBoard: () => loadMovieBoard,
     loadMovies: () => loadMovies,
     loadSettings: () => loadSettings,
@@ -2308,6 +2309,13 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     if (info && info.issue || x.issue) rows.push(["發行", info && info.issue || x.issue || ""]);
     if (info && info.produce) rows.push(["出品", info.produce]);
     rows.push(["上映日期", x.release.replace(/-/g, "/")]);
+    {
+      const first0 = boxFirstRun(x), orig0 = boxOrigYear(x), rec = yearRatingsLatest ? yearRatingsLatest.ratings[yearRatingKey(x.name, x.release)] : null;
+      if (first0) rows.push(["上映類型", `重映（${first0.release.slice(0, 4)} 年上映過）`]);
+      else if (orig0) rows.push(["上映類型", `重映（${orig0} 年的片）`]);
+      else if (rerunByName(x.name)) rows.push(["上映類型", "重映"]);
+      else if (rec && rec.y) rows.push(["上映類型", "首映"]);
+    }
     if (x.theaters) rows.push(["上映戲院", `${x.theaters} 間`]);
     if (x.week !== null && !x.since) rows.push(["本週票房", money(x.week)]);
     const first = boxFirstRun(x), orig = boxOrigYear(x), rerun = !!first || rerunByName(x.name) || !!orig;
@@ -2728,6 +2736,34 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     });
     yearRatingsMem = { at: Date.now(), job };
     return job;
+  }
+  var introMem = {};
+  function loadIntro(name, release) {
+    const year = String(release || "").slice(0, 4);
+    if (!/^20\d{2}$/.test(year)) return Promise.resolve("");
+    const job = introMem[year] ||= (async () => {
+      const file = `intro-${year}.json`;
+      try {
+        const c = JSON.parse(cacheGet(file) || "null");
+        if (c && c.data && Date.now() - c.at < 24 * 36e5) return c.data;
+      } catch (_) {
+      }
+      const r = await platform().fetchText(`https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/data/${file}?t=${Math.floor(Date.now() / 36e5)}`, { accept: "application/json" });
+      const d = r.status === 200 ? JSON.parse(r.body) : null;
+      if (!d || typeof d !== "object") {
+        delete introMem[year];
+        return {};
+      }
+      try {
+        cacheSet(file, JSON.stringify({ at: Date.now(), data: d }));
+      } catch (_) {
+      }
+      return d;
+    })().catch(() => {
+      delete introMem[year];
+      return {};
+    });
+    return job.then((m) => String(m[yearRatingKey(name, release)] || ""));
   }
   var isFavMovie = (s, title) => (s.favMovies || []).some((f) => f.key === communityKey(title));
   function toggleFavMovie(s, m) {
@@ -3812,7 +3848,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   var extra = { boxOffice, filmList, soonList, nowShowing, nowShowingMulti, movieBoard: movieBoard2, festivalBoard, festivalFilm, nearby, patchSettings, fillMovie, formatList };
   var BRIDGE_LEVEL = 2;
   globalThis.MS = {
-    version: "2026.11.24-0957",
+    version: "2026.11.24-1005",
     level: BRIDGE_LEVEL,
     init(saved) {
       cache = saved || {};
