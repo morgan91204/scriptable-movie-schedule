@@ -248,9 +248,13 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .nt-acts button{padding:7px 14px;border-radius:9px;background:var(--chip);color:var(--accent);font-size:14px;font-weight:600}
 .nt-acts button.danger{color:#ff3b30;margin-left:auto}
 .fb-area{display:block;width:100%;min-height:120px;padding:12px 14px;border:0;border-radius:12px;background:var(--chip);color:var(--fg);font:inherit;font-size:16px;line-height:1.5;margin-top:10px;outline:none;resize:vertical;-webkit-appearance:none;appearance:none}
-.wt-date{display:flex;align-items:center;gap:8px}
-.wt-date .field{flex:1;min-width:0;margin-top:0;background:var(--chip);padding:9px 12px;font-size:16px}
-.wt-date .cm-tag{flex:none;padding:9px 16px}
+.wt-pick{position:relative;display:flex;align-items:center;gap:10px;padding:11px 14px;border-radius:12px;background:var(--chip);color:var(--fg);overflow:hidden}
+.wt-pick.on{box-shadow:0 0 0 1.5px var(--accent) inset}
+.wt-ico{flex:none;font-size:18px;line-height:1}
+.wt-text{flex:1;min-width:0;font-size:16px;font-weight:600;font-variant-numeric:tabular-nums}
+.wt-pick:not(.on) .wt-text{color:var(--accent)}
+.wt-hint{flex:none;font-size:12px;color:var(--fg2)}
+.wt-pick input{position:absolute;inset:0;width:100%;height:100%;margin:0;padding:0;border:0;opacity:0;font-size:16px;-webkit-appearance:none;appearance:none}
 .wt-quick{margin-top:8px}
 .fb-area.note{min-height:96px;margin-top:8px}
 .fb-cats{display:flex;flex-wrap:wrap;gap:6px}

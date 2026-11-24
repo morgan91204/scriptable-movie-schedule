@@ -1882,10 +1882,13 @@ class App {
           <div class="cm-tags">
             <div class="cm-tagrow">
               <span class="cm-taghead">觀影時間{seen === "?" ? "（已標記看過，沒記日期）" : ""}</span>
-              <div class="wt-date">
-                <input class="field" name="wd" type="date" max={todayTPE()} value={/^\d{4}-/.test(seen) ? seen : ""} />
-                <button class="cm-tag on" onTap={async (v: Record<string, string>) => { const d = String(v.wd || ""); if (!d) { await this.ui.toast("先選日期"); return; } await save({ seen: d }, "已記下觀影時間"); }}>儲存</button>
-              </div>
+              {/* 一顆看得懂的按鈕：上面寫「選擇日期」或已經選的日期；真正的日期選單疊在上面（透明），點下去直接開系統的日曆，選了就存，不用再按儲存 */}
+              <label class={"wt-pick" + (/^\d{4}-/.test(seen) ? " on" : "")}>
+                <span class="wt-ico">📅</span>
+                <span class="wt-text">{/^\d{4}-/.test(seen) ? seen.replace(/-/g, "/") : "選擇日期"}</span>
+                <span class="wt-hint">{/^\d{4}-/.test(seen) ? "點一下修改" : "點一下開日曆"}</span>
+                <input name="wd" type="date" max={todayTPE()} value={/^\d{4}-/.test(seen) ? seen : ""} aria-label="觀影日期" onInput={(v: Record<string, string>) => { const d = String(v.wd || ""); if (d && d !== seen) return save({ seen: d }, `已記下：${d.replace(/-/g, "/")} 看的`); }} />
+              </label>
               <div class="cm-tagset wt-quick">
                 <button class={"cm-tag" + (seen === todayTPE() ? " on" : "")} onTap={() => save({ seen: todayTPE() }, "已記下：今天看的")}>今天</button>
                 <button class={"cm-tag" + (seen === "?" ? " on" : "")} onTap={() => save({ seen: "?" }, "已標記看過")}>不記得日期</button>
