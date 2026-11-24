@@ -1864,7 +1864,7 @@ class App {
     const SORTS = [{ id: "hot", label: "熱門" }, { id: "new", label: "最新" }, { id: "top", label: "最多推" }, { id: "high", label: "評分高到低" }, { id: "low", label: "評分低到高" }];
     const editing = this.noteEdit || !!this.noteAsk;
     const unsent = !!draft.trim(); // 打到一半、還沒送出的字
-    /** 一則留言：最左邊推噓（▲ 分數 ▼），再來頭像，右邊一個泡泡（名字＋評分＋內容），泡泡下面一行小字（時間、檢舉／刪除） */
+    /** 一則留言：左邊頭像，右邊一個泡泡（名字＋評分＋內容），泡泡下面一行小字（時間、檢舉／刪除），最後面是推噓（▲ 分數 ▼） */
     const row = (n: ReviewNote) => {
       const p = n.p || 0;
       // 有雷的、被噓到很低的都先摺起來，點了才顯示
@@ -1876,11 +1876,6 @@ class App {
       const vote = (dir: number) => async (v: Record<string, string>) => { keep(v); await say(voteNote(title, n.id, n.my === dir ? 0 : dir), ""); };
       return (
         <div class={"cmt" + (n.mine ? " mine" : "")}>
-          <div class="cmt-vote">
-            {n.mine ? <span class="vb off" aria-hidden="true">▲</span> : <button class={"vb" + (n.my === 1 ? " up" : "")} aria-label="推" aria-pressed={n.my === 1 ? "true" : "false"} onTap={vote(1)}>▲</button>}
-            <b class={p > 0 ? "pos" : p < 0 ? "neg" : ""} aria-label={`推減噓：${p}`}>{p}</b>
-            {n.mine ? <span class="vb off" aria-hidden="true">▼</span> : <button class={"vb" + (n.my === -1 ? " down" : "")} aria-label="噓" aria-pressed={n.my === -1 ? "true" : "false"} onTap={vote(-1)}>▼</button>}
-          </div>
           {n.by ? <button class="cmt-av" aria-label={`${n.by.name} 的個人頁`} onTap={toProfile}>{this.avatar(n.by)}</button> : <span class="cmt-av"><span class="av anon" aria-hidden="true">{n.mine ? "我" : "匿"}</span></span>}
           <div class="cmt-main">
             <div class="cmt-bub">
@@ -1897,6 +1892,12 @@ class App {
               {n.mine && n.by ? <span>我</span> : null}
               {n.mine && n.hidden ? <span class="warn">已被隱藏（別人看不到）</span> : null}
               {n.mine ? <button onTap={async (v: Record<string, string>) => { keep(v); await say(deleteNote(title, n.id), "已刪除"); }}>刪除</button> : reported ? <span>已檢舉</span> : <button aria-label="檢舉這則短評" onTap={(v: Record<string, string>) => { keep(v); this.go(() => this.reportView(title, n)); }}>檢舉</button>}
+              {/* 推和噓放在這一行的最後面：▲ 分數 ▼ */}
+              <span class="cmt-vote">
+                {n.mine ? <span class="vb off" aria-hidden="true">▲</span> : <button class={"vb" + (n.my === 1 ? " up" : "")} aria-label="推" aria-pressed={n.my === 1 ? "true" : "false"} onTap={vote(1)}>▲</button>}
+                <b class={p > 0 ? "pos" : p < 0 ? "neg" : ""} aria-label={`推減噓：${p}`}>{p}</b>
+                {n.mine ? <span class="vb off" aria-hidden="true">▼</span> : <button class={"vb" + (n.my === -1 ? " down" : "")} aria-label="噓" aria-pressed={n.my === -1 ? "true" : "false"} onTap={vote(-1)}>▼</button>}
+              </span>
             </div>
           </div>
         </div>
