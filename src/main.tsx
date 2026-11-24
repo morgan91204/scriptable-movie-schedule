@@ -1808,6 +1808,7 @@ class App {
       .sort((x, y) => (this.noteSort === "high" ? y.s - x.s || y.at - x.at : this.noteSort === "low" ? x.s - y.s || y.at - x.at : y.at - x.at));
     const SORTS = [{ id: "new", label: "最新" }, { id: "high", label: "分數高到低" }, { id: "low", label: "分數低到高" }];
     const editing = this.noteEdit || !!this.noteAsk;
+    const unsent = this.noteDraft !== null && this.noteDraft.trim() !== (my ? my.x : ""); // 打到一半、還沒送出的字
     /** 一則留言：左邊頭像，右邊一個泡泡（名字＋分數＋內容），泡泡下面一行小字（時間、檢舉） */
     const row = (n: ReviewNote) => {
       const open = !n.sp || this.noteShown.indexOf(n.id) >= 0;
@@ -1843,34 +1844,39 @@ class App {
           {!voted ? <Note text="先替這部片評分，就可以寫一句短評。" /> : !editing ? (
             // 收起來的樣子：像留言區最上面那一格「寫點什麼…」，點了才展開
             <button class="cmt-new" onTap={() => { this.noteEdit = true; }}>
-              <span class="cmt-new-box">{my ? esc(my.x) : `${NOTE_PLACEHOLDER}…`}</span>
-              <i>{my ? "修改" : "寫短評"}</i>
+              <span class={"cmt-new-box" + (unsent ? " draft" : "")}>{unsent ? esc(draft) : my ? esc(my.x) : `${NOTE_PLACEHOLDER}…`}</span>
+              <i>{unsent ? "還沒送出，繼續寫" : my ? "修改" : "寫短評"}</i>
             </button>
           ) : (
             <div class="nt-form">
               {my && my.hidden ? <Note kind="warn" text="你的短評被多人檢舉，目前別人看不到。可以修改後重新送出。" /> : null}
+              {/* 往下滑看別人的短評時自動收起來（沒在打字的時候）；打到一半的字會留著 */}
+              <button class="hid" data-fold="" aria-hidden="true" tabindex="-1" onTap={(v: Record<string, string>) => { keep(v); if (!this.noteAsk) this.noteEdit = false; }} />
               <textarea class="fb-area note" name="x" maxlength={String(noteMax())} placeholder={`${NOTE_PLACEHOLDER}（最多 ${noteMax()} 字）`}>{esc(draft)}</textarea>
-              <button class={"nt-check" + (spoil ? " on" : "")} aria-pressed={spoil ? "true" : "false"} onTap={(v: Record<string, string>) => { keep(v); this.noteSpoil = !spoil; this.noteAsk = ""; }}>
-                <i>{spoil ? "✓" : ""}</i><span>可能有雷</span><em>勾了以後預設摺疊，點了才會顯示</em>
-              </button>
               {this.noteAsk ? (
                 <>
                   <Note kind="warn" text="這句看起來可能有雷。要標記「可能有雷」再送出嗎？" />
-                  <Button label="標記後送出" onTap={async (v) => { keep(v); await send(this.noteAsk, true); }} />
-                  <Button label="沒有雷，直接送出" kind="secondary" onTap={async (v) => { keep(v); await send(this.noteAsk, false); }} />
+                  <div class="cmt-row">
+                    <button onTap={() => { this.noteAsk = ""; }}>再改一下</button>
+                    <span class="sp" />
+                    <button onTap={async (v: Record<string, string>) => { keep(v); await send(this.noteAsk, false); }}>沒有雷，直接送出</button>
+                    <button class="go" onTap={async (v: Record<string, string>) => { keep(v); await send(this.noteAsk, true); }}>標記後送出</button>
+                  </div>
                 </>
               ) : (
-                <Button label={my ? "更新短評" : "送出短評"} onTap={submit} />
+                // 一排搞定：左邊勾「可能有雷」，右邊刪除、取消、送出
+                <div class="cmt-row">
+                  <button class={"cmt-spoil" + (spoil ? " on" : "")} aria-pressed={spoil ? "true" : "false"} aria-label="可能有雷：勾了以後預設摺疊，點了才會顯示" onTap={(v: Record<string, string>) => { keep(v); this.noteSpoil = !spoil; }}><i>{spoil ? "✓" : ""}</i>可能有雷</button>
+                  <span class="sp" />
+                  {my ? <button class="danger" onTap={() => send("", false)}>刪除</button> : null}
+                  <button onTap={() => { this.noteEdit = false; this.noteDraft = null; this.noteSpoil = null; this.noteAsk = ""; }}>取消</button>
+                  <button class="go" onTap={submit}>{my ? "更新" : "送出"}</button>
+                </div>
               )}
-              <div class="cmt-acts">
-                <button onTap={() => { this.noteEdit = false; this.noteDraft = null; this.noteSpoil = null; this.noteAsk = ""; }}>取消</button>
-                {my ? <button class="danger" onTap={() => send("", false)}>刪除我的短評</button> : null}
-              </div>
-              <div class="cm-tagnote">{NOTE_RULES}</div>
             </div>
           )}
         </Section>
-        <Section title={`短評（${notes.length}）`} hint={notes.length ? "看到劇透、不當內容或廣告可以點「檢舉」。" : ""}>
+        <Section title={`短評（${notes.length}）`} hint={`${NOTE_RULES}${notes.length ? "看到的話可以點「檢舉」。" : ""}`}>
           {notes.length > 1 || hasFollow ? (
             <div class="cmt-bar">
               <div class="cmt-filters">

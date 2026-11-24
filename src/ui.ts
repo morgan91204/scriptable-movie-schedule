@@ -304,9 +304,18 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .cmt-new{display:flex;align-items:center;gap:10px;width:100%;padding:12px 16px;text-align:left}
 .cmt-new-box{flex:1;min-width:0;padding:10px 14px;border-radius:18px;background:var(--chip);color:var(--fg2);font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .cmt-new i{flex:none;font-style:normal;font-size:14px;font-weight:600;color:var(--accent)}
-.cmt-acts{display:flex;justify-content:space-between;margin-top:10px}
-.cmt-acts button{padding:6px 2px;font-size:14px;color:var(--fg2)}
-.cmt-acts button.danger{color:#ff3b30}
+.hid{display:none}
+.cmt-new-box.draft{color:var(--fg)}
+.nt-form .fb-area.note{min-height:64px;margin-top:8px}
+.cmt-row{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;margin-top:8px}
+.cmt-row .sp{flex:1}
+.cmt-row button{padding:7px 0;font-size:14px;color:var(--fg2)}
+.cmt-row button.danger{color:#ff3b30}
+.cmt-row button.go{padding:7px 18px;border-radius:999px;background:var(--accent);color:#fff;font-weight:600}
+.cmt-spoil{display:inline-flex;align-items:center;gap:7px}
+.cmt-spoil i{width:20px;height:20px;border-radius:6px;border:1.5px solid var(--fg2);font-style:normal;font-size:13px;font-weight:800;line-height:17px;text-align:center;color:#fff}
+.cmt-spoil.on{color:var(--fg)}
+.cmt-spoil.on i{background:var(--accent);border-color:var(--accent)}
 .cmt-bar{display:flex;align-items:center;gap:8px;padding:12px 16px 4px}
 .cmt-filters{display:flex;flex-wrap:wrap;gap:6px;flex:1;min-width:0}
 .cmt-filters .cm-tag{font-size:13px;padding:5px 11px}
@@ -443,6 +452,11 @@ function syncHist(){if(!histOn||document.querySelector('.loading'))return; // �
       else if(!has&&histGuard){histGuard=false;histSkip=true;history.back();}}catch(_){histOn=false;}}
 window.addEventListener('popstate',function(){if(histSkip){histSkip=false;return;}
   if(!histGuard)return;histGuard=false;var b=document.querySelector('.back');if(b)b.click();});
+// 有 data-fold 的隱藏按鈕＝「滑動就收合」：畫面上出現之後，使用者滑超過 160px、而且沒有正在打字，就替他點一下（由那一頁決定要收什麼）
+var foldY=null;
+window.addEventListener('scroll',function(){var b=document.querySelector('[data-fold]');if(!b){foldY=null;return;}if(foldY===null){foldY=window.scrollY;return;}
+  var a=document.activeElement;if(a&&/^(TEXTAREA|INPUT|SELECT)$/.test(a.tagName))return;
+  if(Math.abs(window.scrollY-foldY)>160){foldY=null;b.click();}},{passive:true});
 document.addEventListener('keydown',function(e){if(e.key==='Enter'){if(isLive(e.target)){e.target.blur();return;}var b=document.querySelector('[data-enter]');if(b)b.click();}}); // 搜尋欄按 Enter：收起鍵盤（結果早就出來了）
 </script></body></html>`;
 

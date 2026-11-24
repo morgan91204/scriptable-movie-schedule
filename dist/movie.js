@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.24-1905
+// @movie-schedule-app 電影行程 v2026.11.24-1906
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/parsers.gen.ts
@@ -4346,9 +4346,18 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .cmt-new{display:flex;align-items:center;gap:10px;width:100%;padding:12px 16px;text-align:left}
 .cmt-new-box{flex:1;min-width:0;padding:10px 14px;border-radius:18px;background:var(--chip);color:var(--fg2);font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .cmt-new i{flex:none;font-style:normal;font-size:14px;font-weight:600;color:var(--accent)}
-.cmt-acts{display:flex;justify-content:space-between;margin-top:10px}
-.cmt-acts button{padding:6px 2px;font-size:14px;color:var(--fg2)}
-.cmt-acts button.danger{color:#ff3b30}
+.hid{display:none}
+.cmt-new-box.draft{color:var(--fg)}
+.nt-form .fb-area.note{min-height:64px;margin-top:8px}
+.cmt-row{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;margin-top:8px}
+.cmt-row .sp{flex:1}
+.cmt-row button{padding:7px 0;font-size:14px;color:var(--fg2)}
+.cmt-row button.danger{color:#ff3b30}
+.cmt-row button.go{padding:7px 18px;border-radius:999px;background:var(--accent);color:#fff;font-weight:600}
+.cmt-spoil{display:inline-flex;align-items:center;gap:7px}
+.cmt-spoil i{width:20px;height:20px;border-radius:6px;border:1.5px solid var(--fg2);font-style:normal;font-size:13px;font-weight:800;line-height:17px;text-align:center;color:#fff}
+.cmt-spoil.on{color:var(--fg)}
+.cmt-spoil.on i{background:var(--accent);border-color:var(--accent)}
 .cmt-bar{display:flex;align-items:center;gap:8px;padding:12px 16px 4px}
 .cmt-filters{display:flex;flex-wrap:wrap;gap:6px;flex:1;min-width:0}
 .cmt-filters .cm-tag{font-size:13px;padding:5px 11px}
@@ -4484,6 +4493,11 @@ function syncHist(){if(!histOn||document.querySelector('.loading'))return; // �
       else if(!has&&histGuard){histGuard=false;histSkip=true;history.back();}}catch(_){histOn=false;}}
 window.addEventListener('popstate',function(){if(histSkip){histSkip=false;return;}
   if(!histGuard)return;histGuard=false;var b=document.querySelector('.back');if(b)b.click();});
+// 有 data-fold 的隱藏按鈕＝「滑動就收合」：畫面上出現之後，使用者滑超過 160px、而且沒有正在打字，就替他點一下（由那一頁決定要收什麼）
+var foldY=null;
+window.addEventListener('scroll',function(){var b=document.querySelector('[data-fold]');if(!b){foldY=null;return;}if(foldY===null){foldY=window.scrollY;return;}
+  var a=document.activeElement;if(a&&/^(TEXTAREA|INPUT|SELECT)$/.test(a.tagName))return;
+  if(Math.abs(window.scrollY-foldY)>160){foldY=null;b.click();}},{passive:true});
 document.addEventListener('keydown',function(e){if(e.key==='Enter'){if(isLive(e.target)){e.target.blur();return;}var b=document.querySelector('[data-enter]');if(b)b.click();}}); // 搜尋欄按 Enter：收起鍵盤（結果早就出來了）
 <\/script></body></html>`;
 var UI = class {
@@ -4967,7 +4981,7 @@ var App = class {
   }
   /** 最新版本是多少。網頁版問的是自己網站現在上線的版本（重新整理就會拿到的那一版），不是 GitHub 上的 */
   checkVersion() {
-    if (true) return checkLatest("2026.11.24-1905");
+    if (true) return checkLatest("2026.11.24-1906");
     return (async () => {
       try {
         let r = await globalThis.fetch("/version.json?t=" + Date.now(), { cache: "no-store" });
@@ -4975,7 +4989,7 @@ var App = class {
         const latest = String((await r.json()).version || "");
         if (!latest) return null;
         const num = (v) => Number(v.replace(/\D/g, "")) || 0;
-        return { latest, isLatest: num("2026.11.24-1905") >= num(latest) };
+        return { latest, isLatest: num("2026.11.24-1906") >= num(latest) };
       } catch (_) {
         return null;
       }
@@ -5705,7 +5719,7 @@ var App = class {
         return;
       }
       try {
-        await sendFeedback(cat.id, text, false ? this.isStandalone() ? "web-app" : "web" : "scriptable", "2026.11.24-1905");
+        await sendFeedback(cat.id, text, false ? this.isStandalone() ? "web-app" : "web" : "scriptable", "2026.11.24-1906");
         this.fbDraft = "";
         this.fbCat = "";
         await this.ui.toast("已送出，謝謝你的回饋");
@@ -6027,7 +6041,7 @@ var App = class {
       this.settings.seenLog = CHANGELOG_LATEST;
       saveSettings(this.settings);
     }
-    return /* @__PURE__ */ h(Page, { title: "更新內容", subtitle: `目前版本 ${"2026.11.24-1905"}`, onBack: () => this.back() }, CHANGELOG.map((e) => /* @__PURE__ */ h(Section, { title: e.date }, e.items.map((it) => /* @__PURE__ */ h(Item, { title: it.text, tag: { text: it.kind === "new" ? "新功能" : "改進", tone: it.kind === "new" ? "now" : "soon" }, chevron: false })))), /* @__PURE__ */ h(Note, { text: "只列出比較有感的變動；修小錯、調整文字這類不會寫在這裡。" }));
+    return /* @__PURE__ */ h(Page, { title: "更新內容", subtitle: `目前版本 ${"2026.11.24-1906"}`, onBack: () => this.back() }, CHANGELOG.map((e) => /* @__PURE__ */ h(Section, { title: e.date }, e.items.map((it) => /* @__PURE__ */ h(Item, { title: it.text, tag: { text: it.kind === "new" ? "新功能" : "改進", tone: it.kind === "new" ? "now" : "soon" }, chevron: false })))), /* @__PURE__ */ h(Note, { text: "只列出比較有感的變動；修小錯、調整文字這類不會寫在這裡。" }));
   }
   async aboutView() {
     return /* @__PURE__ */ h(Page, { title: "關於", onBack: () => this.back() }, /* @__PURE__ */ h(Section, { hint: "連鎖影城的場次來自場次通（twshowtimes.com），感謝場次通的整理；其他來自開眼電影網，以及誠品、光點、樂聲、內惟戲院官網。實際場次以影城公告為準。" }, /* @__PURE__ */ h(Item, { icon: "ℹ️", title: "關於與資料來源", accent: true, chevron: false, onTap: () => Safari.open(ABOUT_URL) }), /* @__PURE__ */ h(Item, { icon: "🔒", title: "隱私權政策", accent: true, chevron: false, onTap: () => Safari.open(PRIVACY_URL) }), /* @__PURE__ */ h(Item, { icon: "🙏", title: "前往場次通", subtitle: "比較各影城場次、看上映場數排行", accent: true, chevron: false, onTap: () => Safari.open("https://twshowtimes.com/") })));
@@ -6058,11 +6072,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.24-1905"}`);
+          Pasteboard.copy(`版本 ${"2026.11.24-1906"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.24-1905"}`,
+      `版本 ${"2026.11.24-1906"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -6263,6 +6277,7 @@ var App = class {
     const shown = notes.filter((n) => this.noteFilter === "follow" ? !!(n.by && n.by.f) || !!n.mine : this.noteFilter === "clean" ? !n.sp : true).sort((x, y) => this.noteSort === "high" ? y.s - x.s || y.at - x.at : this.noteSort === "low" ? x.s - y.s || y.at - x.at : y.at - x.at);
     const SORTS = [{ id: "new", label: "最新" }, { id: "high", label: "分數高到低" }, { id: "low", label: "分數低到高" }];
     const editing = this.noteEdit || !!this.noteAsk;
+    const unsent = this.noteDraft !== null && this.noteDraft.trim() !== (my ? my.x : "");
     const row = (n) => {
       const open = !n.sp || this.noteShown.indexOf(n.id) >= 0;
       const reported = !!list && list.reported.indexOf(n.id) >= 0;
@@ -6286,23 +6301,30 @@ var App = class {
       // 收起來的樣子：像留言區最上面那一格「寫點什麼…」，點了才展開
       /* @__PURE__ */ h("button", { class: "cmt-new", onTap: () => {
         this.noteEdit = true;
-      } }, /* @__PURE__ */ h("span", { class: "cmt-new-box" }, my ? esc(my.x) : `${NOTE_PLACEHOLDER}…`), /* @__PURE__ */ h("i", null, my ? "修改" : "寫短評"))
-    ) : /* @__PURE__ */ h("div", { class: "nt-form" }, my && my.hidden ? /* @__PURE__ */ h(Note, { kind: "warn", text: "你的短評被多人檢舉，目前別人看不到。可以修改後重新送出。" }) : null, /* @__PURE__ */ h("textarea", { class: "fb-area note", name: "x", maxlength: String(noteMax()), placeholder: `${NOTE_PLACEHOLDER}（最多 ${noteMax()} 字）` }, esc(draft)), /* @__PURE__ */ h("button", { class: "nt-check" + (spoil ? " on" : ""), "aria-pressed": spoil ? "true" : "false", onTap: (v) => {
+      } }, /* @__PURE__ */ h("span", { class: "cmt-new-box" + (unsent ? " draft" : "") }, unsent ? esc(draft) : my ? esc(my.x) : `${NOTE_PLACEHOLDER}…`), /* @__PURE__ */ h("i", null, unsent ? "還沒送出，繼續寫" : my ? "修改" : "寫短評"))
+    ) : /* @__PURE__ */ h("div", { class: "nt-form" }, my && my.hidden ? /* @__PURE__ */ h(Note, { kind: "warn", text: "你的短評被多人檢舉，目前別人看不到。可以修改後重新送出。" }) : null, /* @__PURE__ */ h("button", { class: "hid", "data-fold": "", "aria-hidden": "true", tabindex: "-1", onTap: (v) => {
       keep(v);
-      this.noteSpoil = !spoil;
+      if (!this.noteAsk) this.noteEdit = false;
+    } }), /* @__PURE__ */ h("textarea", { class: "fb-area note", name: "x", maxlength: String(noteMax()), placeholder: `${NOTE_PLACEHOLDER}（最多 ${noteMax()} 字）` }, esc(draft)), this.noteAsk ? /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: "這句看起來可能有雷。要標記「可能有雷」再送出嗎？" }), /* @__PURE__ */ h("div", { class: "cmt-row" }, /* @__PURE__ */ h("button", { onTap: () => {
       this.noteAsk = "";
-    } }, /* @__PURE__ */ h("i", null, spoil ? "✓" : ""), /* @__PURE__ */ h("span", null, "可能有雷"), /* @__PURE__ */ h("em", null, "勾了以後預設摺疊，點了才會顯示")), this.noteAsk ? /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: "這句看起來可能有雷。要標記「可能有雷」再送出嗎？" }), /* @__PURE__ */ h(Button, { label: "標記後送出", onTap: async (v) => {
-      keep(v);
-      await send(this.noteAsk, true);
-    } }), /* @__PURE__ */ h(Button, { label: "沒有雷，直接送出", kind: "secondary", onTap: async (v) => {
+    } }, "再改一下"), /* @__PURE__ */ h("span", { class: "sp" }), /* @__PURE__ */ h("button", { onTap: async (v) => {
       keep(v);
       await send(this.noteAsk, false);
-    } })) : /* @__PURE__ */ h(Button, { label: my ? "更新短評" : "送出短評", onTap: submit }), /* @__PURE__ */ h("div", { class: "cmt-acts" }, /* @__PURE__ */ h("button", { onTap: () => {
-      this.noteEdit = false;
-      this.noteDraft = null;
-      this.noteSpoil = null;
-      this.noteAsk = "";
-    } }, "取消"), my ? /* @__PURE__ */ h("button", { class: "danger", onTap: () => send("", false) }, "刪除我的短評") : null), /* @__PURE__ */ h("div", { class: "cm-tagnote" }, NOTE_RULES))), /* @__PURE__ */ h(Section, { title: `短評（${notes.length}）`, hint: notes.length ? "看到劇透、不當內容或廣告可以點「檢舉」。" : "" }, notes.length > 1 || hasFollow ? /* @__PURE__ */ h("div", { class: "cmt-bar" }, /* @__PURE__ */ h("div", { class: "cmt-filters" }, /* @__PURE__ */ h("button", { class: "cm-tag" + (this.noteFilter === "all" ? " on" : ""), onTap: (v) => {
+    } }, "沒有雷，直接送出"), /* @__PURE__ */ h("button", { class: "go", onTap: async (v) => {
+      keep(v);
+      await send(this.noteAsk, true);
+    } }, "標記後送出"))) : (
+      // 一排搞定：左邊勾「可能有雷」，右邊刪除、取消、送出
+      /* @__PURE__ */ h("div", { class: "cmt-row" }, /* @__PURE__ */ h("button", { class: "cmt-spoil" + (spoil ? " on" : ""), "aria-pressed": spoil ? "true" : "false", "aria-label": "可能有雷：勾了以後預設摺疊，點了才會顯示", onTap: (v) => {
+        keep(v);
+        this.noteSpoil = !spoil;
+      } }, /* @__PURE__ */ h("i", null, spoil ? "✓" : ""), "可能有雷"), /* @__PURE__ */ h("span", { class: "sp" }), my ? /* @__PURE__ */ h("button", { class: "danger", onTap: () => send("", false) }, "刪除") : null, /* @__PURE__ */ h("button", { onTap: () => {
+        this.noteEdit = false;
+        this.noteDraft = null;
+        this.noteSpoil = null;
+        this.noteAsk = "";
+      } }, "取消"), /* @__PURE__ */ h("button", { class: "go", onTap: submit }, my ? "更新" : "送出"))
+    ))), /* @__PURE__ */ h(Section, { title: `短評（${notes.length}）`, hint: `${NOTE_RULES}${notes.length ? "看到的話可以點「檢舉」。" : ""}` }, notes.length > 1 || hasFollow ? /* @__PURE__ */ h("div", { class: "cmt-bar" }, /* @__PURE__ */ h("div", { class: "cmt-filters" }, /* @__PURE__ */ h("button", { class: "cm-tag" + (this.noteFilter === "all" ? " on" : ""), onTap: (v) => {
       keep(v);
       this.noteFilter = "all";
     } }, "全部"), hasFollow ? /* @__PURE__ */ h("button", { class: "cm-tag" + (this.noteFilter === "follow" ? " on" : ""), onTap: (v) => {
@@ -6605,7 +6627,7 @@ var App = class {
     if (false) {
       if (!r) return /* @__PURE__ */ h(Note, { text: "（無法確認是否為最新版：連不到網站）" });
       if (r.isLatest) return /* @__PURE__ */ h(Note, { text: "✅ 已是最新版" });
-      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.24-1905"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
+      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.24-1906"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
         globalThis.location.reload();
       } }));
     }
