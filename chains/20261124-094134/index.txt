@@ -1,0 +1,5 @@
+01.html 403 392 https://www.vscinemas.com.tw/robots.txt
+02.html 403 392 https://www.vscinemas.com.tw/ShowTimes/
+03.html 000ERR 0 https://www.skcinemas.com/robots.txt
+04.html 000ERR 0 https://www.skcinemas.com/
+05.html 200 2800 https://www.ambassador.com.tw/robots.txt
