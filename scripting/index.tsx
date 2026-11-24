@@ -14,7 +14,7 @@ import {
   Cinema, Movie, Settings, Version, TwMovie, TwMovieCinema, CITY_ORDER, TW,
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
   loadSettings, saveSettings, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, cinemaAddress,
-  FORMATS, formatsOf, filterVersions, filterVersionsAny, movieRows, movieDays, nearest, kmLabel, WINDOWS, findShowtimes, findShowtimesMulti, multiLabel, multiDetail, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText, hallOf, tmdbTest, movieExtras, moviePoster, posterReady, posterTint, POSTER_TINTS, normImageUrl, movieRuntime, posterSrc, isLocalSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxCountries, boxByCountry, boxInfo, boxInfoRows, boxCountryText, BOX_COUNTRY_NOTE, boxCountryTag, boxCountriesPicked, movieBoard, loadBoxFor, loadCommunitySummary, loadYearRatings, loadUpcoming, soonBoard, isFavMovie, toggleFavMovie, favMovieRows, favMovieBox, boxStatus, STATUS_LABEL, boxInfoBy, soonGroups, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityVote, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, SCRIPTING_IMPORT_URL, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, festivalDefaultDate, festivalStateLabel, festivalState, festivalFooter, linkMovies, nowGroupLine, nowFilter, festivalPick, movieAbout, festivalSearch, festivalSearchLines, festivalTrailer, festivalYears, festivalGroups, festivalChipNote, festivalStatusLine, movieRatings, ratingTier, tomatoTier, popcornTier,
+  FORMATS, formatsOf, filterVersions, filterVersionsAny, movieRows, movieDays, nearest, kmLabel, WINDOWS, findShowtimes, findShowtimesMulti, multiLabel, multiDetail, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText, hallOf, tmdbTest, movieExtras, moviePoster, posterReady, posterTint, POSTER_TINTS, normImageUrl, movieRuntime, posterSrc, isLocalSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxCountries, boxByCountry, boxInfo, boxInfoRows, boxCountryText, BOX_COUNTRY_NOTE, boxCountryTag, boxCountriesPicked, movieBoard, loadBoxFor, loadCommunitySummary, loadYearRatings, loadUpcoming, soonBoard, isFavMovie, toggleFavMovie, favMovieRows, favMovieBox, boxStatus, STATUS_LABEL, boxInfoBy, soonGroups, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityVote, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, SCRIPTING_IMPORT_URL, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, festivalDefaultDate, festivalStateLabel, festivalState, festivalFooter, linkMovies, nowGroupLine, nowFilter, festivalPick, movieAbout, festivalSearch, festivalSearchLines, festivalTrailer, festivalYears, festivalGroups, festivalChipNote, festivalStatusLine, movieRatings, ratingTier, tomatoTier, popcornTier, dropStaleCaches, rerunDataReady, boxRunRows, loadIntro,
 } from "./core"
 import type { Ratings, FavMovie, FavRow, EntryHi, Format, LatLng, Hit, Community, BoxOfficeItem, BoxSort, BoxOffice, MovieEntry, SoonEntry, UpcomingFilm, Festival, FestivalFilm, FestivalSession } from "./core"
 
@@ -32,6 +32,8 @@ declare function clearTimeout(t: any): void
 declare const Storage: any
 
 setPlatform(scriptingPlatform)
+// 換了新版：伺服器資料的快取丟掉重抓（設定、收藏、評分的裝置代號不動）
+dropStaleCaches(String((Script as any).metadata?.version || ""))
 
 /** 版本號來自 script.json（建置時寫入），Scripting 自動更新後會跟著變 */
 function appVersion(): string {
@@ -974,9 +976,33 @@ function StatusRow({ status }: { status: string }) {
     <StatusPill status={status} />
   </HStack>
 }
+/** 歷次上映：這部片在票房資料裡的每一次上映（首映、重映各一列）和合計；只有一次上映就不顯示 */
+function RunsSection({ item: x }: { item: BoxOfficeItem }) {
+  // 判斷重映要另外兩份資料（各年票房、每部片的首映年）：讀好才算得出來
+  const rows = useLoad(async () => { await (rerunDataReady() || Promise.resolve()); return boxRunRows(x) }, [x.name, x.release])
+  const list = rows.data || []
+  if (!list.length) return null
+  return <Section header={<Text>歷次上映</Text>} footer={<Text>官方把每一次上映分開算，這裡把同一部片的放在一起。資料從 2016 年開始，更早的上映沒有紀錄。</Text>}>
+    {list.map((r) => {
+      const body = <HStack spacing={12}>
+        <VStack alignment={"leading"} spacing={2}>
+          <Text fontWeight={r.run ? "regular" : "semibold"}>{r.title + (r.current ? "（這一筆）" : "")}</Text>
+          {r.note ? <Text font={"caption"} foregroundStyle={"secondaryLabel"} lineLimit={1}>{r.note}</Text> : null}
+        </VStack>
+        <Spacer />
+        <Text foregroundStyle={"secondaryLabel"} fontWeight={r.run ? "regular" : "semibold"}>{r.value}</Text>
+      </HStack>
+      return r.run && !r.current
+        ? <NavigationLink key={r.title} destination={<BoxOfficeMoviePage item={r.run} />}>{body}</NavigationLink>
+        : <VStack key={r.title}>{body}</VStack>
+    })}
+  </Section>
+}
 function BoxOfficeMoviePage({ item: x }: { item: BoxOfficeItem }) {
   const date = x.release.replace(/-/g, "/")
-  const info = useLoad(() => boxInfo(x), [x.name, x.release]) // 發行、出品、累計票數（點進來才下載）
+  // 發行、出品、累計票數（點進來才下載）；順便等判斷重映要的資料，這樣「上映類型」那一列才出得來
+  const info = useLoad(async () => { await (rerunDataReady() || Promise.resolve()); return boxInfo(x).catch(() => null) }, [x.name, x.release])
+  const intro = useLoad(() => loadIntro(x.name, x.release), [x.name, x.release]) // 劇情簡介（伺服器向 TMDB 查的）
   return <List navigationTitle={x.name} navigationBarTitleDisplayMode={"inline"}>
     <MovieHero title={x.name} lines={[boxCountryText(x.country), `${date} 上映`]} />
     {/* 個別資訊：跟官方網站列的欄位一樣（國別、發行、出品、上映日期、院數、票數、金額） */}
@@ -989,6 +1015,10 @@ function BoxOfficeMoviePage({ item: x }: { item: BoxOfficeItem }) {
         <Text foregroundStyle={"secondaryLabel"} lineLimit={1} minScaleFactor={0.6}>{value}</Text>
       </HStack>)}
     </Section>
+    <RunsSection item={x} />
+    {intro.data ? <Section header={<Text>劇情簡介</Text>} footer={<Text>簡介來自 TMDB。</Text>}>
+      <Text font={"subheadline"}>{intro.data}</Text>
+    </Section> : null}
   </List>
 }
 
@@ -997,6 +1027,9 @@ function SoonMoviePage({ film: u }: { film: UpcomingFilm }) {
   const date = u.release.replace(/-/g, "/")
   return <List navigationTitle={u.title} navigationBarTitleDisplayMode={"inline"}>
     <MovieHero title={u.title} en={u.en} lines={[u.en, [`${date} ${u.approx ? "當週" : ""}上映`, u.rating, u.runtime ? `${u.runtime} 分` : ""].filter(Boolean).join("｜")].filter(Boolean)} />
+    {u.intro ? <Section header={<Text>劇情簡介</Text>} footer={<Text>簡介來自 TMDB。</Text>}>
+      <Text font={"subheadline"}>{u.intro}</Text>
+    </Section> : null}
     <Section footer={<Text>戲院還沒有排這部片的場次。通常上映前一到兩週會開放，到時候這裡會自動變成可以查場次。上映日期可能再調整。</Text>}>
       <Button title={"開眼電影網的介紹"} systemImage={"safari"} action={() => Safari.openURL(u.url)} />
     </Section>
@@ -1407,6 +1440,7 @@ function MoviePage({ movie }: { movie: TwMovie }) {
         <Text foregroundStyle={"secondaryLabel"} lineLimit={1} minScaleFactor={0.6}>{value}</Text>
       </HStack>) : null}
     </Section>
+    {box.data ? <RunsSection item={box.data.x} /> : null}
     {about.text || about.credits ? <Section header={<Text>劇情簡介</Text>} footer={<Text>簡介來自場次通。</Text>}>
       {about.text ? <Text font={"subheadline"}>{about.text}</Text> : null}
       {about.credits ? <Text font={"footnote"} foregroundStyle={"secondaryLabel"}>{about.credits}</Text> : null}

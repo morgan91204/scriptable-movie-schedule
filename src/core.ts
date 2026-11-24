@@ -274,6 +274,19 @@ export function syncMerge(local: Settings, r: Partial<SyncData>): Settings {
 const cacheGet = (name: string) => platform().cacheGet(name);
 const cacheSet = (name: string, v: string) => platform().cacheSet(name, v);
 
+/** 換了新版：手機上存的伺服器資料快取丟掉、重新拿（新版常會多欄位、換格式，舊的留著會變成「新畫面配舊資料」）。
+ *  使用者自己的東西（設定、評分用的裝置代號、投過的票）不動。網頁版另外有自己的一套（web/shim.ts，整批清）；這裡給 Scripting 版用 */
+export function dropStaleCaches(version: string): void {
+  try {
+    if (!version || cacheGet("cache-version.txt") === version) return;
+    const thisYear = Number(todayTPE().slice(0, 4));
+    const names = ["meta2.json", "ratings-years3.json", "boxoffice-years3.json", "boxoffice5.json", "boxoffice-weeks.json", "upcoming.json", "festival.json", "official.json", "tw-near.json", "tw-far.json"];
+    for (let y = 2016; y <= thisYear; y++) names.push(`intro-${y}.json`, `festival-${y}.json`);
+    for (const n of names) if (cacheGet(n)) cacheSet(n, ""); // 空字串 = 沒有：讀的地方都會當成還沒抓過
+    cacheSet("cache-version.txt", version);
+  } catch (_) {}
+}
+
 // ───────────────────────── 網路與解析 ─────────────────────────
 
 async function get(url: string): Promise<{ ok: boolean; body: string }> {

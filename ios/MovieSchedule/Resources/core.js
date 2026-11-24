@@ -96,6 +96,7 @@
     dateLabel: () => dateLabel,
     datesOf: () => datesOf,
     distanceKm: () => distanceKm,
+    dropStaleCaches: () => dropStaleCaches,
     extractTmdbKey: () => extractTmdbKey,
     favMovieBox: () => favMovieBox,
     favMovieRows: () => favMovieRows,
@@ -1018,6 +1019,17 @@ function parseTwMovieDay(doc) {
   }
   var cacheGet = (name) => platform().cacheGet(name);
   var cacheSet = (name, v) => platform().cacheSet(name, v);
+  function dropStaleCaches(version) {
+    try {
+      if (!version || cacheGet("cache-version.txt") === version) return;
+      const thisYear = Number(todayTPE().slice(0, 4));
+      const names = ["meta2.json", "ratings-years3.json", "boxoffice-years3.json", "boxoffice5.json", "boxoffice-weeks.json", "upcoming.json", "festival.json", "official.json", "tw-near.json", "tw-far.json"];
+      for (let y = 2016; y <= thisYear; y++) names.push(`intro-${y}.json`, `festival-${y}.json`);
+      for (const n of names) if (cacheGet(n)) cacheSet(n, "");
+      cacheSet("cache-version.txt", version);
+    } catch (_) {
+    }
+  }
   async function get(url) {
     const r = await platform().fetchText(url, { "User-Agent": UA, "Accept-Language": "zh-TW,zh;q=0.9" });
     return { ok: r.status >= 200 && r.status < 300, body: r.body };
@@ -3885,7 +3897,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   var extra = { boxOffice, filmList, soonList, nowShowing, nowShowingMulti, movieBoard: movieBoard2, festivalBoard, festivalFilm, nearby, patchSettings, fillMovie, formatList };
   var BRIDGE_LEVEL = 2;
   globalThis.MS = {
-    version: "2026.11.24-1034",
+    version: "2026.11.24-1037",
     level: BRIDGE_LEVEL,
     init(saved) {
       cache = saved || {};
