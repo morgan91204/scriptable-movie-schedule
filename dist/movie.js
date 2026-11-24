@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.24-2314
+// @movie-schedule-app 電影行程 v2026.11.24-2316
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/brand.ts
@@ -4475,8 +4475,10 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .fd-line{font-size:15px;line-height:1.5;overflow-wrap:anywhere;color:var(--fg2)}
 .fd-line button{display:inline;padding:0;font:inherit;font-weight:700;color:var(--fg)}
 .fd-line .nt-score{display:inline-block;margin-left:2px;vertical-align:1px;white-space:nowrap}
-.pf-pills{display:flex;flex-wrap:wrap;gap:8px;padding:0 16px 12px}
-.pf-pill{display:inline-flex;align-items:center;gap:7px;max-width:100%;padding:6px 13px 6px 11px;border-radius:999px;border:1px solid var(--line);color:var(--fg);font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pf-pills{display:flex;flex-wrap:wrap;gap:6px;padding:0 16px 12px}
+.pf-pill{display:inline-flex;align-items:center;gap:5px;max-width:100%;min-width:0;padding:3px 10px 3px 8px;border-radius:999px;border:1px solid var(--line);color:var(--fg2);font-size:12.5px;line-height:1.5}
+.pf-pill>span:last-child{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pf-pill .so{width:13px;height:13px;color:var(--fg2)}
 .fd-line em{font-style:normal;white-space:nowrap}
 .fd-meta{margin-top:2px;font-size:12.5px;color:var(--fg2)}
 .fd-note{display:flex;align-items:flex-end;gap:8px;width:100%;margin-top:8px;padding:9px 12px;border-radius:12px;background:var(--chip);color:var(--fg);font-size:15px;line-height:1.45;text-align:left;overflow-wrap:anywhere}
@@ -5167,7 +5169,7 @@ var App = class {
   }
   /** 最新版本是多少。網頁版問的是自己網站現在上線的版本（重新整理就會拿到的那一版），不是 GitHub 上的 */
   checkVersion() {
-    if (true) return checkLatest("2026.11.24-2314");
+    if (true) return checkLatest("2026.11.24-2316");
     return (async () => {
       try {
         let r = await globalThis.fetch("/version.json?t=" + Date.now(), { cache: "no-store" });
@@ -5175,7 +5177,7 @@ var App = class {
         const latest = String((await r.json()).version || "");
         if (!latest) return null;
         const num = (v) => Number(v.replace(/\D/g, "")) || 0;
-        return { latest, isLatest: num("2026.11.24-2314") >= num(latest) };
+        return { latest, isLatest: num("2026.11.24-2316") >= num(latest) };
       } catch (_) {
         return null;
       }
@@ -6077,7 +6079,7 @@ var App = class {
         return;
       }
       try {
-        await sendFeedback(cat.id, text, false ? this.isStandalone() ? "web-app" : "web" : "scriptable", "2026.11.24-2314");
+        await sendFeedback(cat.id, text, false ? this.isStandalone() ? "web-app" : "web" : "scriptable", "2026.11.24-2316");
         this.fbDraft = "";
         this.fbCat = "";
         await this.ui.toast("已送出，謝謝你的回饋");
@@ -6392,7 +6394,7 @@ var App = class {
       this.settings.seenLog = CHANGELOG_LATEST;
       saveSettings(this.settings);
     }
-    return /* @__PURE__ */ h(Page, { title: "更新內容", subtitle: `目前版本 ${"2026.11.24-2314"}`, onBack: () => this.back() }, CHANGELOG.map((e) => /* @__PURE__ */ h(Section, { title: e.date }, e.items.map((it) => /* @__PURE__ */ h(Item, { title: it.text, tag: { text: it.kind === "new" ? "新功能" : "改進", tone: it.kind === "new" ? "now" : "soon" }, chevron: false })))), /* @__PURE__ */ h(Note, { text: "只列出比較有感的變動；修小錯、調整文字這類不會寫在這裡。" }));
+    return /* @__PURE__ */ h(Page, { title: "更新內容", subtitle: `目前版本 ${"2026.11.24-2316"}`, onBack: () => this.back() }, CHANGELOG.map((e) => /* @__PURE__ */ h(Section, { title: e.date }, e.items.map((it) => /* @__PURE__ */ h(Item, { title: it.text, tag: { text: it.kind === "new" ? "新功能" : "改進", tone: it.kind === "new" ? "now" : "soon" }, chevron: false })))), /* @__PURE__ */ h(Note, { text: "只列出比較有感的變動；修小錯、調整文字這類不會寫在這裡。" }));
   }
   async aboutView() {
     return /* @__PURE__ */ h(Page, { title: "關於", onBack: () => this.back() }, /* @__PURE__ */ h(Section, { hint: "連鎖影城的場次來自場次通（twshowtimes.com），感謝場次通的整理；其他來自開眼電影網，以及誠品、光點、樂聲、內惟戲院官網。實際場次以影城公告為準。" }, /* @__PURE__ */ h(Item, { icon: "ℹ️", title: "關於與資料來源", accent: true, chevron: false, onTap: () => Safari.open(ABOUT_URL) }), /* @__PURE__ */ h(Item, { icon: "🔒", title: "隱私權政策", accent: true, chevron: false, onTap: () => Safari.open(PRIVACY_URL) }), /* @__PURE__ */ h(Item, { icon: "🙏", title: "前往場次通", subtitle: "比較各影城場次、看上映場數排行", accent: true, chevron: false, onTap: () => Safari.open("https://twshowtimes.com/") })));
@@ -6423,11 +6425,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.24-2314"}`);
+          Pasteboard.copy(`版本 ${"2026.11.24-2316"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.24-2314"}`,
+      `版本 ${"2026.11.24-2316"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -7063,7 +7065,7 @@ var App = class {
     if (false) {
       if (!r) return /* @__PURE__ */ h(Note, { text: "（無法確認是否為最新版：連不到網站）" });
       if (r.isLatest) return /* @__PURE__ */ h(Note, { text: "✅ 已是最新版" });
-      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.24-2314"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
+      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.24-2316"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
         globalThis.location.reload();
       } }));
     }

@@ -396,8 +396,10 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .fd-line{font-size:15px;line-height:1.5;overflow-wrap:anywhere;color:var(--fg2)}
 .fd-line button{display:inline;padding:0;font:inherit;font-weight:700;color:var(--fg)}
 .fd-line .nt-score{display:inline-block;margin-left:2px;vertical-align:1px;white-space:nowrap}
-.pf-pills{display:flex;flex-wrap:wrap;gap:8px;padding:0 16px 12px}
-.pf-pill{display:inline-flex;align-items:center;gap:7px;max-width:100%;padding:6px 13px 6px 11px;border-radius:999px;border:1px solid var(--line);color:var(--fg);font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pf-pills{display:flex;flex-wrap:wrap;gap:6px;padding:0 16px 12px}
+.pf-pill{display:inline-flex;align-items:center;gap:5px;max-width:100%;min-width:0;padding:3px 10px 3px 8px;border-radius:999px;border:1px solid var(--line);color:var(--fg2);font-size:12.5px;line-height:1.5}
+.pf-pill>span:last-child{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pf-pill .so{width:13px;height:13px;color:var(--fg2)}
 .fd-line em{font-style:normal;white-space:nowrap}
 .fd-meta{margin-top:2px;font-size:12.5px;color:var(--fg2)}
 .fd-note{display:flex;align-items:flex-end;gap:8px;width:100%;margin-top:8px;padding:9px 12px;border-radius:12px;background:var(--chip);color:var(--fg);font-size:15px;line-height:1.45;text-align:left;overflow-wrap:anywhere}
