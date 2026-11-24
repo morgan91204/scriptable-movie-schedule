@@ -1834,14 +1834,20 @@ export function boxFirstRun(x: BoxOfficeItem, b: BoxOffice | null = boxFullLates
 }
 /** 這一筆之後有沒有再上映（首映那一筆在清單上標「首映」用，跟重映那一筆分得開） */
 export const boxHasLaterRun = (x: BoxOfficeItem, b: BoxOffice | null = boxFullLatest): boolean => boxRuns(x, b).some((r) => r.release > x.release);
+/** 這部片本來的名字：歷次上映裡最短的那個片名（「屍速列車 特別版」「沙丘_經典重映」這些加了字的不算） */
+export function boxRunsName(x: BoxOfficeItem): string {
+  return boxRuns(x).map((r) => r.name).sort((a, c) => plainName(a).length - plainName(c).length)[0] || x.name;
+}
 /** 「歷次上映」的各列：每次上映的日期、是首映還是重映、戲院數、票房；最後一列是合計。只有一次上映就回傳空陣列 */
 export function boxRunRows(x: BoxOfficeItem): { run: BoxOfficeItem | null; title: string; note: string; value: string; current: boolean }[] {
   const runs = boxRuns(x);
   if (runs.length < 2) return [];
+  const base = plainName(boxRunsName(x));
   const rows: { run: BoxOfficeItem | null; title: string; note: string; value: string; current: boolean }[] = runs.map((r, i) => ({
     run: r,
     title: `${r.release.replace(/-/g, "/")}　${i > 0 || boxIsRerun(r) ? "重映" : "首映"}`,
-    note: [r.name !== x.name ? r.name : "", r.theaters ? `${r.theaters} 間戲院` : ""].filter(Boolean).join("｜"),
+    // 別次上映的片名跟這部片本來的名字不一樣（特別版、數位修復版…）才另外寫出來；其餘只寫戲院數
+    note: [plainName(r.name) !== base && !(r.name === x.name && r.release === x.release) ? r.name : "", r.theaters ? `${r.theaters} 間戲院` : ""].filter(Boolean).join("｜"),
     value: money(r.total),
     current: r.name === x.name && r.release === x.release,
   }));

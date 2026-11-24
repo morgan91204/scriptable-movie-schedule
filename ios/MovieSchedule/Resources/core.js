@@ -77,6 +77,7 @@
     boxOrigYear: () => boxOrigYear,
     boxRunRows: () => boxRunRows,
     boxRuns: () => boxRuns,
+    boxRunsName: () => boxRunsName,
     boxSorts: () => boxSorts,
     boxStatus: () => boxStatus,
     boxWeekOptions: () => boxWeekOptions,
@@ -2328,13 +2329,18 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     return first && first.release < x.release && !(first.name === x.name && first.release === x.release) ? first : null;
   }
   var boxHasLaterRun = (x, b = boxFullLatest) => boxRuns(x, b).some((r) => r.release > x.release);
+  function boxRunsName(x) {
+    return boxRuns(x).map((r) => r.name).sort((a, c) => plainName(a).length - plainName(c).length)[0] || x.name;
+  }
   function boxRunRows(x) {
     const runs = boxRuns(x);
     if (runs.length < 2) return [];
+    const base = plainName(boxRunsName(x));
     const rows = runs.map((r, i) => ({
       run: r,
       title: `${r.release.replace(/-/g, "/")}　${i > 0 || boxIsRerun(r) ? "重映" : "首映"}`,
-      note: [r.name !== x.name ? r.name : "", r.theaters ? `${r.theaters} 間戲院` : ""].filter(Boolean).join("｜"),
+      // 別次上映的片名跟這部片本來的名字不一樣（特別版、數位修復版…）才另外寫出來；其餘只寫戲院數
+      note: [plainName(r.name) !== base && !(r.name === x.name && r.release === x.release) ? r.name : "", r.theaters ? `${r.theaters} 間戲院` : ""].filter(Boolean).join("｜"),
       value: money(r.total),
       current: r.name === x.name && r.release === x.release
     }));
@@ -3898,7 +3904,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   var extra = { boxOffice, filmList, soonList, nowShowing, nowShowingMulti, movieBoard: movieBoard2, festivalBoard, festivalFilm, nearby, patchSettings, fillMovie, formatList };
   var BRIDGE_LEVEL = 2;
   globalThis.MS = {
-    version: "2026.11.24-1252",
+    version: "2026.11.24-1255",
     level: BRIDGE_LEVEL,
     init(saved) {
       cache = saved || {};
