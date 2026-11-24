@@ -163,7 +163,7 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .rate .imdb{background:#f5c518;color:#000;font-size:10px;font-weight:800;padding:1.5px 3.5px;border-radius:3.5px;letter-spacing:-.2px}
 .rate .emo{font-size:13.5px}
 .emo{display:inline-flex;align-items:center}
-.emo .ri{width:1.3em;height:1.3em;display:block;flex:none}
+.emo .ri{width:1.3em;height:1.3em;display:block;flex:none;position:relative;top:-1.5px}
 .rate .n{font-size:10px;font-weight:600;opacity:.85}
 .rate:active{opacity:.6}
 .hero-acts{display:flex;align-items:center;gap:8px;margin-top:8px}
