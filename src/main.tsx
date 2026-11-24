@@ -203,6 +203,42 @@ class App {
     );
   }
 
+  issuerQuery = ""; // 發行商頁的搜尋字
+  /** 開某一家發行商歷年發行的片：歷年電影、全部年份、只看這一家、新的在前 */
+  openIssuer(id: string) {
+    this.movieMode = "year"; this.boxYears = Array.from({ length: new Date().getFullYear() - 2014 }, (_, i) => String(2016 + i)); this.boxIssuer = [id]; this.boxCountry = []; this.boxStatus = ""; this.movieQuery = ""; this.sortBy.year = "date"; this.ascBy.year = false;
+    this.go(() => this.movieListView(), `讀取${id}發行的片…`);
+  }
+  /** 發行商頁：管理收藏發行商的地方。上面是已經收藏的，下面是全部的發行商（2016 年至今、依發行的片數排），可以搜尋。
+   *  點名稱看那一家歷年發行的片；點右邊的星號收藏或取消 */
+  async issuerManageView(): Promise<string> {
+    const allYears = Array.from({ length: new Date().getFullYear() - 2014 }, (_, i) => String(2016 + i));
+    const board = await loadMovieBoard({ scope: "year", sort: "total", years: allYears });
+    const favs = this.settings.favIssuers || [];
+    const isFav = (id: string) => favs.indexOf(id) >= 0;
+    const toggle = (id: string) => { this.settings.favIssuers = isFav(id) ? favs.filter((z) => z !== id) : [...favs, id]; saveSettings(this.settings); };
+    const count: Record<string, number> = {};
+    for (const c of board.issuers) count[c.id] = c.count;
+    const k = this.issuerQuery.trim().toLowerCase();
+    const list = board.issuers.filter((c) => !k || c.id.toLowerCase().includes(k)).sort((a, b) => b.count - a.count);
+    const MAX = 60; // 沒搜尋時先列片數最多的 60 家，其餘用搜尋找（全部有好幾百家）
+    const shown = k ? list : list.slice(0, MAX);
+    const row = (id: string) => <Item icon="🏢" title={id} subtitle={count[id] ? `2016 年至今發行 ${count[id]} 部` : "目前的資料裡沒有它發行的片"} onTap={() => this.openIssuer(id)} action={{ label: isFav(id) ? "★" : "☆", hint: isFav(id) ? "取消收藏這家發行商" : "收藏這家發行商", onTap: () => toggle(id) }} />;
+    return (
+      <Page title="收藏發行商" subtitle={favs.length ? `已收藏 ${favs.length} 家` : `共 ${board.issuers.length} 家發行商`} onBack={() => this.back()}>
+        <Search value={this.issuerQuery} placeholder={`搜尋發行商（共 ${board.issuers.length} 家）`} onInput={(t) => { this.issuerQuery = t; }} />
+        {k ? null : (
+          <Section title={`已收藏（${favs.length}）`} hint={favs.length ? "點名稱看它歷年發行的片；點 ★ 取消收藏。" : "還沒有收藏。在下面的清單點 ☆ 就可以收藏，收藏的會出現在首頁。"}>
+            {favs.map(row)}
+          </Section>
+        )}
+        <Section title={k ? `符合「${this.issuerQuery.trim()}」的 ${list.length} 家` : `發行最多片的 ${shown.length} 家`} hint={k ? "" : list.length > MAX ? `其餘 ${list.length - MAX} 家可以用上面的搜尋找。發行商來自官方票房資料；聯合發行的片算第一家。` : "發行商來自官方票房資料；聯合發行的片算第一家。"}>
+          {shown.map((c) => row(c.id))}
+          {shown.length ? null : <Note text="找不到相符的發行商，換個關鍵字試試。" />}
+        </Section>
+      </Page>
+    );
+  }
   /** 清單裡的搜尋只找目前這一類：下面放一列，直接帶到首頁的全域搜尋（電影、影城一起找） */
   searchAllLink(q: string): string {
     return (
@@ -305,13 +341,9 @@ class App {
           <Section hint={this.favIssOpen && favIssuers.length ? "點發行商看它歷年發行的片（新的在前）。要增減收藏：到「歷年電影」的發行商選單點星號。" : ""}>
             <Item head icon="★" title={favIssuers.length ? `收藏發行商（${favIssuers.length} 家）` : "收藏發行商（還沒有）"} subtitle={this.favIssOpen ? "點一下收合" : "點一下展開"} chevron={false} onTap={() => { this.favIssOpen = !this.favIssOpen; }} />
             {this.favIssOpen ? favIssuers.map((id) => (
-              <Item icon="🏢" title={id} onTap={() => {
-                // 歷年電影、所有年份、只看這一家，新的在前
-                this.movieMode = "year"; this.boxYears = Array.from({ length: new Date().getFullYear() - 2014 }, (_, i) => String(2016 + i)); this.boxIssuer = [id]; this.boxCountry = []; this.movieQuery = ""; this.sortBy.year = "date"; this.ascBy.year = false;
-                this.go(() => this.movieListView(), `讀取${id}發行的片…`);
-              }} />
+              <Item icon="🏢" title={id} onTap={() => this.openIssuer(id)} />
             )) : null}
-            {this.favIssOpen && !favIssuers.length ? <Item icon="👉" title="去選發行商來收藏" subtitle="在發行商清單點右邊的星號（☆ 變 ★）。收藏後可以從這裡看它歷年發行的片。" accent onTap={() => { this.movieMode = "year"; this.pickQuery = ""; this.tab = "movies"; this.stack = [() => this.movieListView()]; this.go(() => this.boxPickView("issuer"), "讀取發行商…"); }} /> : null}
+            {this.favIssOpen ? <Item icon={favIssuers.length ? "⚙️" : "👉"} title={favIssuers.length ? "管理收藏發行商" : "去選發行商來收藏"} subtitle={favIssuers.length ? "增加、取消收藏，或搜尋其他發行商" : "搜尋或從清單裡點星號（☆ 變 ★）。收藏後可以從這裡看它歷年發行的片。"} accent onTap={() => { this.issuerQuery = ""; this.go(() => this.issuerManageView(), "讀取發行商…"); }} /> : null}
           </Section>
         )}
         {(
@@ -624,6 +656,9 @@ class App {
             this.settings.maps = this.settings.maps === "google" ? "apple" : "google";
             saveSettings(this.settings);
           }} />
+        </Section>
+        <Section title="收藏">
+          <Item icon="🏢" title="收藏發行商" subtitle="搜尋發行商、增加或取消收藏" right={(this.settings.favIssuers || []).length ? `${(this.settings.favIssuers || []).length} 家` : "還沒有"} onTap={() => { this.issuerQuery = ""; this.go(() => this.issuerManageView(), "讀取發行商…"); }} />
         </Section>
         {await this.notifyLink()}
         {this.syncLink()}
