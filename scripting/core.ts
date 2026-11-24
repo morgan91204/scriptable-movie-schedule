@@ -521,10 +521,11 @@ async function twDay(c: Cinema, date?: string): Promise<TwDay> {
   return twDayLive(c, date);
 }
 
-/** 秀泰影城：官網的完整場次（伺服器每小時整理一次）。場次通只列最近 6、7 天、有時漏掉特別場，
+/** 國賓影城也在同一個檔裡，但只有「場次通還沒列的預售日期」（6 小時整理一次）。
+ *  秀泰影城：官網的完整場次（伺服器每小時整理一次）。場次通只列最近 6、7 天、有時漏掉特別場，
  *  官網那份有全部已經開賣的日期（含預售、特別場），拿來補場次通沒有的日期和場次。不是秀泰、或讀不到就是 null（照舊只用場次通） */
 async function chainDays(c: Cinema): Promise<Record<string, Movie[]> | null> {
-  if (!/^showtimes-/.test(c.id)) return null;
+  if (!/^(showtimes|ambassador)-/.test(c.id)) return null;
   return (await chainAll())?.[c.id]?.schedules || null;
 }
 /** 只有秀泰官網有、場次通還沒有頁面的片（多半是預售中的大片、演唱會轉播）：片單裡給它一個自己的代號，場次全部來自官網 */

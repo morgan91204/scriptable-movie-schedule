@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.24-1732
+// @movie-schedule-app 電影行程 v2026.11.24-1748
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/parsers.gen.ts
@@ -980,7 +980,7 @@ async function twDay(c, date) {
   return twDayLive(c, date);
 }
 async function chainDays(c) {
-  if (!/^showtimes-/.test(c.id)) return null;
+  if (!/^(showtimes|ambassador)-/.test(c.id)) return null;
   return (await chainAll())?.[c.id]?.schedules || null;
 }
 var CHAIN_SLUG = "st:";
@@ -4521,6 +4521,7 @@ var CHANGELOG = [
     id: "2026-11-24",
     date: "2026/11/24",
     items: [
+      { kind: "new", text: "國賓影城的預售場次也查得到了；只在秀泰或國賓預售、還沒正式上片的電影也會出現在即將上映" },
       { kind: "new", text: "設定裡多了「意見回饋」：選分類、寫內容就能回報問題或建議功能，站長的回覆和處理狀態會顯示在同一頁" },
       { kind: "new", text: "評完分可以寫一句短評（最多 60 字），也能看大家寫的；有雷的會摺疊起來，看到劇透或不當內容可以檢舉" },
       { kind: "new", text: "片刻評分多了心得標籤：評完分可以點選看完的感覺（催淚、配樂、有片尾彩蛋…），不用打字、不會暴雷" },
@@ -4756,7 +4757,7 @@ var App = class {
   }
   /** 最新版本是多少。網頁版問的是自己網站現在上線的版本（重新整理就會拿到的那一版），不是 GitHub 上的 */
   checkVersion() {
-    if (true) return checkLatest("2026.11.24-1732");
+    if (true) return checkLatest("2026.11.24-1748");
     return (async () => {
       try {
         let r = await globalThis.fetch("/version.json?t=" + Date.now(), { cache: "no-store" });
@@ -4764,7 +4765,7 @@ var App = class {
         const latest = String((await r.json()).version || "");
         if (!latest) return null;
         const num = (v) => Number(v.replace(/\D/g, "")) || 0;
-        return { latest, isLatest: num("2026.11.24-1732") >= num(latest) };
+        return { latest, isLatest: num("2026.11.24-1748") >= num(latest) };
       } catch (_) {
         return null;
       }
@@ -5195,7 +5196,7 @@ var App = class {
         return;
       }
       try {
-        await sendFeedback(cat.id, text, false ? this.isStandalone() ? "web-app" : "web" : "scriptable", "2026.11.24-1732");
+        await sendFeedback(cat.id, text, false ? this.isStandalone() ? "web-app" : "web" : "scriptable", "2026.11.24-1748");
         this.fbDraft = "";
         this.fbCat = "";
         await this.ui.toast("已送出，謝謝你的回饋");
@@ -5507,7 +5508,7 @@ var App = class {
       this.settings.seenLog = CHANGELOG_LATEST;
       saveSettings(this.settings);
     }
-    return /* @__PURE__ */ h(Page, { title: "更新內容", subtitle: `目前版本 ${"2026.11.24-1732"}`, onBack: () => this.back() }, CHANGELOG.map((e) => /* @__PURE__ */ h(Section, { title: e.date }, e.items.map((it) => /* @__PURE__ */ h(Item, { title: it.text, tag: { text: it.kind === "new" ? "新功能" : "改進", tone: it.kind === "new" ? "now" : "soon" }, chevron: false })))), /* @__PURE__ */ h(Note, { text: "只列出比較有感的變動；修小錯、調整文字這類不會寫在這裡。" }));
+    return /* @__PURE__ */ h(Page, { title: "更新內容", subtitle: `目前版本 ${"2026.11.24-1748"}`, onBack: () => this.back() }, CHANGELOG.map((e) => /* @__PURE__ */ h(Section, { title: e.date }, e.items.map((it) => /* @__PURE__ */ h(Item, { title: it.text, tag: { text: it.kind === "new" ? "新功能" : "改進", tone: it.kind === "new" ? "now" : "soon" }, chevron: false })))), /* @__PURE__ */ h(Note, { text: "只列出比較有感的變動；修小錯、調整文字這類不會寫在這裡。" }));
   }
   async aboutView() {
     return /* @__PURE__ */ h(Page, { title: "關於", onBack: () => this.back() }, /* @__PURE__ */ h(Section, { hint: "連鎖影城的場次來自場次通（twshowtimes.com），感謝場次通的整理；其他來自開眼電影網，以及誠品、光點、樂聲、內惟戲院官網。實際場次以影城公告為準。" }, /* @__PURE__ */ h(Item, { icon: "ℹ️", title: "關於與資料來源", accent: true, chevron: false, onTap: () => Safari.open(ABOUT_URL) }), /* @__PURE__ */ h(Item, { icon: "🔒", title: "隱私權政策", accent: true, chevron: false, onTap: () => Safari.open(PRIVACY_URL) }), /* @__PURE__ */ h(Item, { icon: "🙏", title: "前往場次通", subtitle: "比較各影城場次、看上映場數排行", accent: true, chevron: false, onTap: () => Safari.open("https://twshowtimes.com/") })));
@@ -5538,11 +5539,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.24-1732"}`);
+          Pasteboard.copy(`版本 ${"2026.11.24-1748"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.24-1732"}`,
+      `版本 ${"2026.11.24-1748"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -5997,7 +5998,7 @@ var App = class {
     if (false) {
       if (!r) return /* @__PURE__ */ h(Note, { text: "（無法確認是否為最新版：連不到網站）" });
       if (r.isLatest) return /* @__PURE__ */ h(Note, { text: "✅ 已是最新版" });
-      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.24-1732"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
+      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.24-1748"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
         globalThis.location.reload();
       } }));
     }

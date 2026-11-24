@@ -1251,7 +1251,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     return twDayLive(c, date);
   }
   async function chainDays(c) {
-    if (!/^showtimes-/.test(c.id)) return null;
+    if (!/^(showtimes|ambassador)-/.test(c.id)) return null;
     return (await chainAll())?.[c.id]?.schedules || null;
   }
   var CHAIN_SLUG = "st:";
@@ -4306,7 +4306,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   var extra = { boxOffice, filmList, soonList, nowShowing, nowShowingMulti, movieBoard: movieBoard2, festivalBoard, festivalFilm, nearby, patchSettings, fillMovie, formatList };
   var BRIDGE_LEVEL = 2;
   globalThis.MS = {
-    version: "2026.11.24-1732",
+    version: "2026.11.24-1748",
     level: BRIDGE_LEVEL,
     init(saved) {
       cache = saved || {};
