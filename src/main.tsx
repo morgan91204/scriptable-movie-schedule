@@ -698,13 +698,28 @@ class App {
   /** 設定頁的一列：點進去才是登入、同步、登出這些選項 */
   /** 管理員專區（設定頁「同步與登出」下面那一列點進來）：只有管理員名單裡的 Google 帳號登入後才看得到那一列；
    *  就算有人硬開這一頁，裡面每個動作伺服器都會再驗一次身分 */
-  adminHomeView(): string {
+  adminTodo: { at: number; notes: number; fb: number; users: number } | null = null; // 管理員待處理的數量（幾分鐘內不重讀）
+  /** 管理員待處理的數量：被檢舉或被隱藏的短評、還沒處理的意見回饋、被檢舉的帳號。讀不到的那一項當 0 */
+  async loadAdminTodo(force = false): Promise<{ notes: number; fb: number; users: number }> {
+    if (!force && this.adminTodo && Date.now() - this.adminTodo.at < 180e3) return this.adminTodo;
+    const sy = this.sync();
+    const [n, f, u] = await Promise.all([
+      sy.admin({ op: "flagged" }).then((r: any) => Object.keys(r.flagged || {}).reduce((a, k) => a + (r.flagged[k] || []).filter((x: any) => !x.keep).length, 0), () => 0), // 按過「沒問題」的不算
+      sy.adm("fb", { op: "list" }).then((r: any) => Number(r.open) || 0, () => 0),
+      sy.adm("users", { op: "list" }).then((r: any) => (r.list || []).length, () => 0),
+    ]);
+    this.adminTodo = { at: Date.now(), notes: n, fb: f, users: u };
+    return this.adminTodo;
+  }
+  async adminHomeView(): Promise<string> {
+    const t = await this.loadAdminTodo(true).catch(() => ({ notes: 0, fb: 0, users: 0 }));
+    const due = (n: number, unit: string) => (n ? `● ${n} ${unit}` : "");
     return (
       <Page title="管理員專區" onBack={() => this.back()}>
-        <Section hint="只有管理員名單裡的 Google 帳號登入後才看得到這一區。">
-            <Item icon="💬" title="意見回饋" subtitle="看使用者的回饋、回覆、標處理狀態" onTap={() => { this.adminFbTab = "open"; this.go(() => this.adminFeedbackView(), "讀取回饋…"); }} />
-            <Item icon="🛡" title="短評管理" subtitle="複查被檢舉的短評，或巡一遍最近的短評" onTap={() => { this.adminTab = "flagged"; this.go(() => this.adminNotesView(), "讀取短評…"); }} />
-            <Item icon="🪪" title="帳號管理" subtitle="被檢舉的帳號：停用個人頁、強制改暱稱" onTap={() => { this.adminUserQ = ""; this.go(() => this.adminUsersView(), "讀取帳號…"); }} />
+        <Section hint="只有管理員名單裡的 Google 帳號登入後才看得到這一區。右邊的紅點數字是還沒處理的。">
+            <Item icon="💬" title="意見回饋" subtitle="看使用者的回饋、回覆、標處理狀態" right={due(t.fb, "則待處理")} onTap={() => { this.adminFbTab = "open"; this.go(() => this.adminFeedbackView(), "讀取回饋…"); }} />
+            <Item icon="🛡" title="短評管理" subtitle="複查被檢舉的短評，或巡一遍最近的短評" right={due(t.notes, "則待複查")} onTap={() => { this.adminTab = "flagged"; this.go(() => this.adminNotesView(), "讀取短評…"); }} />
+            <Item icon="🪪" title="帳號管理" subtitle="被檢舉的帳號：停用個人頁、強制改暱稱" right={due(t.users, "個被檢舉")} onTap={() => { this.adminUserQ = ""; this.go(() => this.adminUsersView(), "讀取帳號…"); }} />
             <Item icon="📈" title="用量" subtitle="每天幾台裝置在用、各類請求幾次、離免費額度多遠" onTap={() => this.go(() => this.adminUsageView(), "讀取用量…")} />
             <Item icon="👥" title="管理員名單" subtitle="新增或移除其他管理員" onTap={() => this.go(() => this.adminListView(), "讀取名單…")} />
         </Section>
@@ -724,10 +739,14 @@ class App {
       );
     if (!this.meMem || Date.now() - this.meMem.at > 60e3) {
       // 最多等 0.9 秒，不拖慢設定頁；等不到先顯示「讀取中」，下次重畫就有了
-      const job = social<{ user: Profile | null; counts: SocialCounts; admin?: boolean; unread?: number }>("me").then((d) => { this.meMem = { at: Date.now(), data: d }; this.setUnread(d.unread || 0); }, () => undefined);
+      const job = social<{ user: Profile | null; counts: SocialCounts; admin?: boolean; unread?: number }>("me").then((d) => { this.meMem = { at: Date.now(), data: d }; this.setUnread(d.unread || 0); return d.admin ? this.loadAdminTodo().then(() => undefined, () => undefined) : undefined; }, () => undefined); // 管理員：順便讀還有幾件沒處理
       await Promise.race([job, sleep(900)]);
+      this.late.push(job); // 還沒讀完的話，讀好之後補畫一次
     }
     const me = this.meMem ? this.meMem.data : null;
+    // 管理員：設定頁外面就看得到還有幾件沒處理（背景讀，讀好補畫上去；三分鐘內不重讀）
+    if (me && me.admin && (!this.adminTodo || Date.now() - this.adminTodo.at > 180e3)) this.late.push(this.loadAdminTodo().then(() => undefined, () => undefined));
+    const todoN = me && me.admin && this.adminTodo ? this.adminTodo.notes + this.adminTodo.fb + this.adminTodo.users : 0;
     const email = String((sy.email && sy.email()) || "");
     const open = () => { this.diaryTab = "mine"; this.diaryMem = null; this.go(() => this.diaryView(), "讀取片單…"); };
     const u = me && me.user;
@@ -763,7 +782,7 @@ class App {
           </div>
         ) : <Item icon={u.pub ? "✅" : "⬜️"} title="公開個人頁" subtitle={u.pub ? "任何人都可以看你的片單、追蹤你；短評旁邊顯示暱稱" : "不公開：片單和短評只有你同意追蹤的人看得到"} chevron={false} onTap={() => { this.pubAsk = Date.now(); }} />) : null}
         <Item icon="🔄" title="同步與登出" subtitle="收藏和設定自動同步中" onTap={() => this.go(() => this.syncView())} />
-        {me && me.admin ? <Item icon="🛡" title="管理員專區" subtitle="意見回饋、短評、帳號、管理員名單" onTap={() => this.go(() => this.adminHomeView())} /> : null}
+        {me && me.admin ? <Item icon="🛡" title="管理員專區" subtitle="意見回饋、短評、帳號、管理員名單" right={todoN ? `● ${todoN} 件待處理` : ""} onTap={() => this.go(() => this.adminHomeView(), "讀取中…")} /> : null}
       </Section>
     );
   }
