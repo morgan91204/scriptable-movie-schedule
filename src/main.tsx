@@ -1836,7 +1836,16 @@ class App {
     const seen = e ? e.seen : "", how = (e && e.how) || [];
     const summary = [/^\d{4}-/.test(seen) ? seen.replace(/-/g, "/") : seen === "?" ? "看過" : "", howLabel(how)].filter(Boolean).join("｜");
     const save = async (body: Record<string, unknown>, done: string) => {
-      try { await social("entry", { m: k, title, ...body }); await this.myDiary(true); await this.ui.toast(done); } catch (err) { await this.ui.toast(String((err as Error)?.message || err)); }
+      try {
+        // 以伺服器回的那一筆為準更新畫面（不是「送出去了就當成功」）；觀影方式沒有真的存進去就明講
+        const r = await social<{ entry: DiaryEntry | null }>("entry", { m: k, title, ...body });
+        const list = (this.diaryMem ? this.diaryMem.list : []).filter((x) => x.k !== k);
+        this.diaryMem = { at: Date.now(), list: r.entry ? [r.entry, ...list] : list };
+        const want = Array.isArray(body.how) ? (body.how as string[]).slice().sort().join(",") : null;
+        const got = ((r.entry && r.entry.how) || []).slice().sort().join(",");
+        if (want !== null && want !== got) { await this.ui.toast("觀影方式沒有存進去，請過一分鐘再試一次"); return; }
+        await this.ui.toast(done);
+      } catch (err) { await this.ui.toast(String((err as Error)?.message || err)); }
     };
     return (
       <>
@@ -1846,7 +1855,7 @@ class App {
           this.watchOpenFor = k;
         }}>
           <span>觀影紀錄</span>
-          <em>{open ? "" : this.diaryMem ? summary || "什麼時候看的、在哪裡看的" : "什麼時候看的、在哪裡看的"}</em>
+          <em>{this.diaryMem && summary ? summary : open ? "還沒填" : "什麼時候看的、在哪裡看的"}</em>
           <i>{open ? "收合 ▾" : summary && this.diaryMem ? "修改 ▸" : "填寫 ▸"}</i>
         </button>
         {open ? (
@@ -1864,7 +1873,7 @@ class App {
               </div>
             </div>
             <div class="cm-tagrow">
-              <span class="cm-taghead">觀影方式（可複選）</span>
+              <span class="cm-taghead">觀影方式（可複選）{how.length ? `：已選 ${howLabel(how)}` : ""}</span>
               <div class="cm-tagset">
                 {WATCH_HOW.map((w) => { const on = how.indexOf(w.id) >= 0; return <button class={"cm-tag" + (on ? " on" : "")} aria-pressed={on ? "true" : "false"} onTap={() => save({ how: on ? how.filter((x) => x !== w.id) : [...how, w.id] }, on ? `已取消「${w.label}」` : `已記下：${w.label}`)}>{esc(w.label)}</button>; })}
               </div>
