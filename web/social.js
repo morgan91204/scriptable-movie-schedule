@@ -37,6 +37,8 @@ export function socialInit(sql) {
   sql.exec("CREATE TABLE IF NOT EXISTS entries (uid TEXT NOT NULL, k TEXT NOT NULL, title TEXT NOT NULL DEFAULT '', s INTEGER NOT NULL DEFAULT 0, x TEXT NOT NULL DEFAULT '', sp INTEGER NOT NULL DEFAULT 0, seen TEXT NOT NULL DEFAULT '', priv INTEGER NOT NULL DEFAULT 0, at INTEGER NOT NULL, PRIMARY KEY (uid, k))");
   // how = 觀影方式（後來才加的欄位）：cinema 電影院／second 二輪電影院／stream 串流，可以複選，用逗號接
   if (!sql.exec("SELECT 1 FROM pragma_table_info('entries') WHERE name = 'how'").toArray().length) sql.exec("ALTER TABLE entries ADD COLUMN how TEXT NOT NULL DEFAULT ''");
+  // users.emoji = 頭像用的表情符號（後來才加的欄位）；沒有就用暱稱的第一個字
+  if (!sql.exec("SELECT 1 FROM pragma_table_info('users') WHERE name = 'emoji'").toArray().length) sql.exec("ALTER TABLE users ADD COLUMN emoji TEXT NOT NULL DEFAULT ''");
   sql.exec("CREATE INDEX IF NOT EXISTS entries_at ON entries (at)");
   sql.exec("CREATE INDEX IF NOT EXISTS entries_k ON entries (k)");
   sql.exec("CREATE TABLE IF NOT EXISTS follows (a TEXT NOT NULL, b TEXT NOT NULL, at INTEGER NOT NULL, PRIMARY KEY (a, b))");
@@ -49,7 +51,12 @@ const one = (sql, q, ...a) => sql.exec(q, ...a).toArray()[0] || null;
 const all = (sql, q, ...a) => sql.exec(q, ...a).toArray();
 const HOW = ["cinema", "second", "stream"];
 const entryOut = (r) => ({ k: r.k, title: r.title, s: r.s, x: r.x, sp: r.sp ? 1 : 0, seen: r.seen, at: r.at, ...(r.priv ? { priv: 1 } : {}), ...(r.how ? { how: String(r.how).split(",").filter(Boolean) } : {}) });
-const userOut = (u) => ({ name: u.name, color: u.color });
+const userOut = (u) => ({ name: u.name, color: u.color, ...(u.emoji ? { emoji: u.emoji } : {}) });
+/** 頭像顏色：內建的幾種，或自訂的色號（#rrggbb） */
+const okColor = (c) => typeof c === "string" && (COLORS.indexOf(c) >= 0 || /^#[0-9a-f]{6}$/i.test(c));
+/** 頭像的表情符號：只收「一個」表情符號（含膚色、組合的家人／職業、國旗），不收文字 */
+const EMOJI_RE = /^(?:[\u{1F1E6}-\u{1F1FF}]{2}|(?:\p{Extended_Pictographic}(?:\uFE0F|[\u{1F3FB}-\u{1F3FF}])?)(?:\u200D\p{Extended_Pictographic}(?:\uFE0F|[\u{1F3FB}-\u{1F3FF}])?){0,6})$/u;
+const okEmoji = (e) => e === "" || (typeof e === "string" && e.length <= 32 && EMOJI_RE.test(e));
 
 /** 這個帳號的數字：片單幾部、短評幾則、追蹤幾人、被幾人追蹤 */
 function counts(sql, uid, onlyPublic) {
@@ -151,13 +158,13 @@ export async function social(hub, path, b) {
     return json({ ok: true, list: all(sql, "SELECT * FROM entries WHERE uid = ? ORDER BY at DESC LIMIT 100 OFFSET ?", uid, offset).map(entryOut), total: counts(sql, uid, false).films });
   }
   if (op === "feed") {
-    const rows = all(sql, "SELECT e.*, u.name, u.color FROM follows f JOIN users u ON u.uid = f.b AND u.pub = 1 AND u.hidden = 0 JOIN entries e ON e.uid = f.b AND e.priv = 0 WHERE f.a = ? ORDER BY e.at DESC LIMIT 60", uid);
-    return json({ ok: true, list: rows.map((r) => ({ ...entryOut(r), by: { name: r.name, color: r.color } })), following: counts(sql, uid, false).following });
+    const rows = all(sql, "SELECT e.*, u.name, u.color, u.emoji FROM follows f JOIN users u ON u.uid = f.b AND u.pub = 1 AND u.hidden = 0 JOIN entries e ON e.uid = f.b AND e.priv = 0 WHERE f.a = ? ORDER BY e.at DESC LIMIT 60", uid);
+    return json({ ok: true, list: rows.map((r) => ({ ...entryOut(r), by: userOut(r) })), following: counts(sql, uid, false).following });
   }
   if (op === "friends") {
     if (!okKey(m)) return json({ error: "bad request" }, 400);
-    const rows = all(sql, "SELECT e.*, u.name, u.color FROM follows f JOIN users u ON u.uid = f.b AND u.pub = 1 AND u.hidden = 0 JOIN entries e ON e.uid = f.b AND e.priv = 0 AND e.k = ? WHERE f.a = ? ORDER BY e.at DESC LIMIT 30", m, uid);
-    return json({ ok: true, list: rows.map((r) => ({ ...entryOut(r), by: { name: r.name, color: r.color } })) });
+    const rows = all(sql, "SELECT e.*, u.name, u.color, u.emoji FROM follows f JOIN users u ON u.uid = f.b AND u.pub = 1 AND u.hidden = 0 JOIN entries e ON e.uid = f.b AND e.priv = 0 AND e.k = ? WHERE f.a = ? ORDER BY e.at DESC LIMIT 30", m, uid);
+    return json({ ok: true, list: rows.map((r) => ({ ...entryOut(r), by: userOut(r) })) });
   }
   if (op === "stats") {
     if (!okKey(m) || !rate) return json({ error: "bad request" }, 400);
@@ -169,15 +176,17 @@ export async function social(hub, path, b) {
   if (!quotaOk(sql, uid)) return json({ error: "too many" }, 429);
   if (op === "profile-set") {
     const name = String(b.name || "").trim().normalize("NFC");
-    const color = COLORS.indexOf(b.color) >= 0 ? b.color : me ? me.color : "blue";
+    const color = okColor(b.color) ? String(b.color).toLowerCase() : me ? me.color : "blue";
+    const emoji = b.emoji === undefined ? (me ? me.emoji || "" : "") : String(b.emoji || "").trim();
+    if (!okEmoji(emoji)) return json({ error: "bad emoji" }, 400);
     const pub = b.pub ? 1 : 0;
     if (!NAME_RE.test(name) || RESERVED.test(name)) return json({ error: "bad name" }, 400);
     const taken = one(sql, "SELECT uid FROM users WHERE name = ?", name);
     if (taken && taken.uid !== uid) return json({ error: "name taken" }, 409);
     if (me && me.name !== name && Date.now() - me.named <= RENAME_EVERY) return json({ error: "rename later" }, 429);
-    if (me) sql.exec("UPDATE users SET name = ?, color = ?, pub = ?, named = ? WHERE uid = ?", name, color, pub, me.name !== name ? Date.now() : me.named, uid);
-    else sql.exec("INSERT INTO users (uid, name, color, pub, at, named) VALUES (?, ?, ?, ?, ?, 0)", uid, name, color, pub, Date.now());
-    return json({ ok: true, user: { name, color, pub: !!pub } });
+    if (me) sql.exec("UPDATE users SET name = ?, color = ?, emoji = ?, pub = ?, named = ? WHERE uid = ?", name, color, emoji, pub, me.name !== name ? Date.now() : me.named, uid);
+    else sql.exec("INSERT INTO users (uid, name, color, emoji, pub, at, named) VALUES (?, ?, ?, ?, ?, ?, 0)", uid, name, color, emoji, pub, Date.now());
+    return json({ ok: true, user: { name, color, pub: !!pub, ...(emoji ? { emoji } : {}) } });
   }
   if (op === "follow") {
     const u = one(sql, "SELECT uid, pub, hidden FROM users WHERE name = ?", String(b.name || ""));
@@ -264,8 +273,8 @@ function withAuthors(sql, r, uid, m) {
   if (ids.length) {
     // 帳號代號是識別碼的前 40 個字：用前綴找回是哪個帳號
     for (const a of ids.slice(0, 100)) {
-      const u = one(sql, "SELECT u.uid, u.name, u.color, u.pub, u.hidden, e.priv FROM users u LEFT JOIN entries e ON e.uid = u.uid AND e.k = ? WHERE u.uid >= ? AND u.uid < ? LIMIT 1", m, a, a + "g");
-      if (u && u.pub && !u.hidden && !u.priv) by[a] = { name: u.name, color: u.color, ...(uid && one(sql, "SELECT 1 AS x FROM follows WHERE a = ? AND b = ?", uid, u.uid) ? { f: 1 } : {}) };
+      const u = one(sql, "SELECT u.uid, u.name, u.color, u.emoji, u.pub, u.hidden, e.priv FROM users u LEFT JOIN entries e ON e.uid = u.uid AND e.k = ? WHERE u.uid >= ? AND u.uid < ? LIMIT 1", m, a, a + "g");
+      if (u && u.pub && !u.hidden && !u.priv) by[a] = { ...userOut(u), ...(uid && one(sql, "SELECT 1 AS x FROM follows WHERE a = ? AND b = ?", uid, u.uid) ? { f: 1 } : {}) };
     }
   }
   return { ...r, notes: (r.notes || []).map((n) => { const { a, ...rest } = n; return a && by[a] ? { ...rest, by: by[a] } : rest; }) };

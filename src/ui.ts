@@ -264,6 +264,15 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .fb-reply b{display:block;font-size:12px;color:var(--accent);margin-bottom:3px}
 .av{flex:none;display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;color:#fff;font-size:13px;font-weight:700;line-height:1}
 .av.big{width:56px;height:56px;font-size:26px}
+.av.emo{font-size:14px;font-weight:400}
+.av.big.emo{font-size:32px}
+.nt-by.inline .av.emo{font-size:11px}
+.pf-prev{display:flex;align-items:center;gap:14px;margin:8px 0 12px}
+.em{display:inline-flex;align-items:center;justify-content:center;padding:0;width:40px;height:40px;border-radius:10px;background:var(--chip);font-size:21px;line-height:1;color:var(--fg2)}
+.em.on{box-shadow:0 0 0 2px var(--accent) inset}
+.sw-custom{display:flex;align-items:center;gap:10px;margin-top:10px;font-size:14px;color:var(--fg2)}
+.sw-custom.on{color:var(--fg);font-weight:600}
+.sw-custom input{width:44px;height:34px;padding:0;border:0;border-radius:8px;background:none}
 .pf{display:flex;align-items:center;gap:14px;padding:14px 16px}
 .pf-body{min-width:0;flex:1}
 .pf-name{font-size:20px;font-weight:700;overflow-wrap:anywhere}

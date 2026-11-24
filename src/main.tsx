@@ -12,7 +12,7 @@ import {
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
   loadSettings, saveSettings, settingsStored, setSettingsSavedHook, syncPick, syncApply, syncMerge, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, communityKey, globalSearch, issuerRecent, favSnapGet, favSnapSet, boxIsRerun, boxHasLaterRun, boxRunRows, boxRunsName, loadIntro, rerunDataReady, SITE_URL, TW,
   FORMATS, formatsOf, filterVersions, filterVersionsAny, movieRows, movieDays, nearest, kmLabel, WINDOWS, findShowtimes, findShowtimesMulti, multiLabel, multiDetail, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText,
-  hallOf, tmdbTest, movieExtras, moviePoster, movieRuntime, posterSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxCountries, boxByCountry, boxInfo, boxInfoRows, boxCountryText, BOX_COUNTRY_NOTE, boxCountryTag, boxCountriesPicked, loadMovieBoard, loadSoonBoard, notifyPrefs, notifyPayload, notifyEndScope, notifyEndPick, notifyQuiet, NOTIFY_PRE_STEPS, NOTIFY_KINDS, boxStatus, STATUS_LABEL, boxInfoBy, isFavMovie, toggleFavMovie, favMovieRows, favMovieBox, soonGroups, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityCached, communityVote, communityTags, social, signedIn, WATCH_HOW, howLabel, profileSkipped, setProfileSkipped, setAccount, setSiteBase, setNotesViaSite, adoptRatings, forgetMyVotes, noteMax, profileColor, seenLabel, PROFILE_COLORS, sendFeedback, loadMyFeedback, feedbackSent, feedbackUnread, feedbackMarkSeen, feedbackCat, FEEDBACK_CATS, FEEDBACK_STATUS, FEEDBACK_MAX, loadNotes, notesCached, saveNote, reportNote, noteLooksSpoiler, noteDate, NOTE_MAX, NOTE_PLACEHOLDER, NOTE_RULES, REPORT_REASONS, reviewTagsToggle, REVIEW_TAGS, REVIEW_TAGS_MAX, reviewTagLabel, topReviewTags, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalsReady, festivalNote, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, festivalDefaultDate, festivalStateLabel, festivalState, festivalFooter, linkMovies, nowGroupLine, nowFilter, festivalPick, movieAbout, festivalSearch, festivalSearchLines, festivalTrailer, festivalYears, festivalsAny, festivalGroups, festivalChipNote, festivalStatusLine, movieRatings, ratingTier, tomatoTier, popcornTier, popcornCount,
+  hallOf, tmdbTest, movieExtras, moviePoster, movieRuntime, posterSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxCountries, boxByCountry, boxInfo, boxInfoRows, boxCountryText, BOX_COUNTRY_NOTE, boxCountryTag, boxCountriesPicked, loadMovieBoard, loadSoonBoard, notifyPrefs, notifyPayload, notifyEndScope, notifyEndPick, notifyQuiet, NOTIFY_PRE_STEPS, NOTIFY_KINDS, boxStatus, STATUS_LABEL, boxInfoBy, isFavMovie, toggleFavMovie, favMovieRows, favMovieBox, soonGroups, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityCached, communityVote, communityTags, social, signedIn, profileInk, PROFILE_EMOJI, WATCH_HOW, howLabel, profileSkipped, setProfileSkipped, setAccount, setSiteBase, setNotesViaSite, adoptRatings, forgetMyVotes, noteMax, profileColor, seenLabel, PROFILE_COLORS, sendFeedback, loadMyFeedback, feedbackSent, feedbackUnread, feedbackMarkSeen, feedbackCat, FEEDBACK_CATS, FEEDBACK_STATUS, FEEDBACK_MAX, loadNotes, notesCached, saveNote, reportNote, noteLooksSpoiler, noteDate, NOTE_MAX, NOTE_PLACEHOLDER, NOTE_RULES, REPORT_REASONS, reviewTagsToggle, REVIEW_TAGS, REVIEW_TAGS_MAX, reviewTagLabel, topReviewTags, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalsReady, festivalNote, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, festivalDefaultDate, festivalStateLabel, festivalState, festivalFooter, linkMovies, nowGroupLine, nowFilter, festivalPick, movieAbout, festivalSearch, festivalSearchLines, festivalTrailer, festivalYears, festivalsAny, festivalGroups, festivalChipNote, festivalStatusLine, movieRatings, ratingTier, tomatoTier, popcornTier, popcornCount,
 } from "./core";
 import type { Profile, DiaryEntry, SocialCounts, Feedback, ReviewNote, MovieExtras, Ratings, Community, BoxOfficeItem, BoxSort, MovieEntry, SoonEntry, UpcomingFilm, FavMovie, FavRow, NotifyPrefs, NotifyKind, SyncData, GlobalHits, Festival, FestivalFilm, FestivalSession } from "./core";
 import { setTabBar, setBackGuard, esc } from "./jsx";
@@ -670,7 +670,7 @@ class App {
     return (
       <Section title="帳號">
         <div role="button" onTap={open}>
-          {this.profileCard({ name: u ? u.name : me ? "還沒取暱稱" : "已登入", color: u ? u.color : "gray" }, me ? me.counts : null, [email, status].filter(Boolean).join("｜"))}
+          {this.profileCard({ name: u ? u.name : me ? "還沒取暱稱" : "已登入", color: u ? u.color : "gray", emoji: u ? u.emoji : "" }, me ? me.counts : null, [email, status].filter(Boolean).join("｜"))}
         </div>
         <Item icon="🎞" title="我的片單" subtitle={u ? "看過的片、評分和短評；動態、找人" : "取暱稱、記錄看過的片、追蹤別人"} onTap={open} />
         <Item icon="🔄" title="同步與登出" subtitle="收藏和設定自動同步中" onTap={() => this.go(() => this.syncView())} />
@@ -693,7 +693,7 @@ class App {
   diaryTab = "mine"; // 片單頁看哪一塊：mine 我的片單／feed 動態／people 找人
   peopleQ = ""; // 找人的搜尋字
   diaryMem: { at: number; list: DiaryEntry[] } | null = null; // 自己的片單（一分鐘內不重讀）
-  profileDraft: { name: string; color: string; pub: boolean } | null = null; // 編輯個人檔案時還沒存的內容
+  profileDraft: { name: string; color: string; emoji: string; pub: boolean } | null = null; // 編輯個人檔案時還沒存的內容
   async myDiary(force = false): Promise<DiaryEntry[]> {
     if (!force && this.diaryMem && Date.now() - this.diaryMem.at < 60e3) return this.diaryMem.list;
     const r = await social<{ list: DiaryEntry[] }>("mine");
@@ -706,11 +706,12 @@ class App {
     const row = (await favMovieRows({ ...this.settings, favMovies: [fav] }).catch(() => [] as FavRow[]))[0];
     if (row) this.openFavRow(row); else this.go(() => this.favMovieView(fav), `讀取《${title}》…`);
   }
-  avatar(u: { name: string; color: string }, big = false): string {
-    return <span class={"av" + (big ? " big" : "")} style={`background:${profileColor(u.color)}`} aria-hidden="true">{esc(Array.from(u.name)[0] || "?")}</span>;
+  /** 頭像：底色＋表情符號；沒選表情符號就用暱稱的第一個字 */
+  avatar(u: { name: string; color: string; emoji?: string }, big = false): string {
+    return <span class={"av" + (big ? " big" : "") + (u.emoji ? " emo" : "")} style={`background:${profileColor(u.color)};color:${profileInk(u.color)}`} aria-hidden="true">{esc(u.emoji || Array.from(u.name)[0] || "?")}</span>;
   }
   /** 個人頁最上面那一塊：頭像（顏色＋暱稱第一個字）、暱稱、四個數字 */
-  profileCard(u: { name: string; color: string }, c: SocialCounts | null, note = ""): string {
+  profileCard(u: { name: string; color: string; emoji?: string }, c: SocialCounts | null, note = ""): string {
     return (
       <div class="pf">
         {this.avatar(u, true)}
@@ -787,7 +788,7 @@ class App {
       <Page title="我的片單" onBack={() => this.back()}>
         <Section>
           {user ? this.profileCard(user, me.counts, user.hidden ? "個人頁目前被站長停用" : user.pub ? "個人頁公開中" : "個人頁不公開（只有你看得到）") : <Note kind="warn" text="還沒有設定暱稱：別人找不到你、不能追蹤你，短評也是匿名。你還是可以追蹤別人。" />}
-          <Item icon="✏️" title={user ? "編輯個人檔案" : "設定暱稱"} subtitle="暱稱、顏色、要不要公開" onTap={() => { this.profileDraft = null; this.go(() => this.profileEditView(user)); }} />
+          <Item icon="✏️" title={user ? "編輯個人檔案" : "設定暱稱"} subtitle="暱稱、頭像、要不要公開" onTap={() => { this.profileDraft = null; this.go(() => this.profileEditView(user)); }} />
           {user && user.pub ? <Item icon="🔗" title="複製我的個人頁連結" chevron={false} onTap={async () => { Pasteboard.copy(`${SITE_URL}/?u=${encodeURIComponent(user.name)}`); await this.ui.toast("已複製連結"); }} /> : null}
         </Section>
         <Chips tabs>
@@ -800,7 +801,7 @@ class App {
     );
   }
   /** 清單裡的一個帳號：點名字看個人頁，右邊追蹤／取消追蹤 */
-  userItem(u: { name: string; color: string; films?: number; following?: boolean }): string {
+  userItem(u: { name: string; color: string; emoji?: string; films?: number; following?: boolean }): string {
     return (
       <div class="item">
         <button class="us-main" onTap={() => this.go(() => this.profileView(u.name), "讀取個人頁…")}>
@@ -829,8 +830,13 @@ class App {
   /** first = 第一次設定（有歡迎說明和「稍後再說」）；pushed = 是另外開的一頁（存好、跳過都要退回原本那一頁） */
   profileEditView(user: Profile | null, first = false, pushed = false): string {
     // 第一次設定：預設勾公開（要交朋友得公開；不想公開可以自己取消）
-    const d = this.profileDraft || { name: user ? user.name : "", color: user ? user.color : "blue", pub: user ? !!user.pub : first };
-    const keep = (v?: Record<string, string>) => { this.profileDraft = { ...d, name: v && typeof v.n === "string" ? v.n : d.name }; };
+    const d = this.profileDraft || { name: user ? user.name : "", color: user ? user.color : "blue", emoji: (user && user.emoji) || "", pub: user ? !!user.pub : first };
+    /** 每個按鈕都帶著輸入框目前的內容：暱稱、自己打的表情符號、色盤選的顏色（跟目前的不一樣才算有改） */
+    const keep = (v?: Record<string, string>) => {
+      const picked = v && /^#[0-9a-f]{6}$/i.test(v.c || "") && v.c.toLowerCase() !== profileColor(d.color).toLowerCase() ? v.c.toLowerCase() : d.color;
+      this.profileDraft = { ...d, name: v && typeof v.n === "string" ? v.n : d.name, emoji: v && typeof v.e === "string" ? v.e.trim() : d.emoji, color: picked };
+    };
+    const custom = /^#/.test(d.color);
     return (
       <Page title={user ? "編輯個人檔案" : first ? "先取一個暱稱" : "設定暱稱"} onBack={() => this.back()}>
         {first ? <Note text={(pushed ? "你的評分已經送出了。" : "歡迎使用「我的片單」。") + "取一個暱稱、公開個人頁，別人才找得到你、能追蹤你，你寫的短評旁邊也會顯示暱稱。只會問這一次，之後在「設定 → 我的片單」可以改。\n不想公開也沒關係：取消下面的「公開我的個人頁」，或按最下面的「稍後再說」，片單就只有你自己看得到（還是可以追蹤別人）。"} /> : null}
@@ -839,10 +845,24 @@ class App {
             <input class="field" name="n" maxlength="16" autocomplete="off" autocapitalize="off" value={d.name} placeholder="例如：愛看片的小明" />
           </div>
         </Section>
-        <Section title="頭像顏色" hint="頭像是這個顏色加上暱稱的第一個字（不能上傳照片）。">
-          <div class="nt-form"><div class="fb-cats">
-            {PROFILE_COLORS.map((c) => <button class={"sw" + (c.id === d.color ? " on" : "")} style={`background:${c.hex}`} aria-label={c.id} aria-pressed={c.id === d.color ? "true" : "false"} onTap={(v: Record<string, string>) => { keep(v); this.profileDraft = { ...this.profileDraft!, color: c.id }; }} />)}
-          </div></div>
+        <Section title="頭像" hint="頭像是底色加上一個表情符號；沒選表情符號就用暱稱的第一個字（不能上傳照片）。">
+          <div class="nt-form">
+            <div class="pf-prev">{this.avatar({ name: d.name || "?", color: d.color, emoji: d.emoji }, true)}<button class="cm-tag" onTap={(v: Record<string, string>) => { keep(v); }}>更新預覽</button></div>
+            <span class="cm-taghead">表情符號</span>
+            <div class="fb-cats">
+              <button class={"em" + (!d.emoji ? " on" : "")} aria-label="不用表情符號" onTap={(v: Record<string, string>) => { keep(v); this.profileDraft = { ...this.profileDraft!, emoji: "" }; }}>字</button>
+              {PROFILE_EMOJI.map((e) => <button class={"em" + (e === d.emoji ? " on" : "")} aria-pressed={e === d.emoji ? "true" : "false"} onTap={(v: Record<string, string>) => { keep(v); this.profileDraft = { ...this.profileDraft!, emoji: e }; }}>{e}</button>)}
+            </div>
+            <input class="field" name="e" maxlength="16" autocomplete="off" value={d.emoji} placeholder="或自己輸入一個表情符號" />
+            <span class="cm-taghead" style="margin-top:14px">底色</span>
+            <div class="fb-cats">
+              {PROFILE_COLORS.map((c) => <button class={"sw" + (c.id === d.color ? " on" : "")} style={`background:${c.hex}`} aria-label={c.id} aria-pressed={c.id === d.color ? "true" : "false"} onTap={(v: Record<string, string>) => { keep(v); this.profileDraft = { ...this.profileDraft!, color: c.id }; }} />)}
+            </div>
+            <label class={"sw-custom" + (custom ? " on" : "")}>
+              <input type="color" name="c" value={profileColor(d.color)} />
+              <span>{custom ? `自訂色號 ${d.color.toUpperCase()}` : "自訂顏色（點色塊選任何色號）"}</span>
+            </label>
+          </div>
         </Section>
         <Section title="公開" hint="公開後：別人可以看到你的個人頁（片單、評分、短評）、可以追蹤你，你寫的短評旁邊會顯示暱稱。不公開：片單只有你看得到，短評照樣匿名。每一筆也可以單獨設成只有自己看得到。">
           <div class="nt-form">
@@ -852,7 +872,7 @@ class App {
             <Button label="儲存" onTap={async (v) => {
               keep(v);
               const p = this.profileDraft!;
-              try { await social("profile-set", { name: p.name.trim(), color: p.color, pub: p.pub }); this.profileDraft = null; this.hasProfile = true; this.meMem = null; setProfileSkipped(false); await this.ui.toast(first ? "暱稱設定好了" : "已儲存"); if (!first || pushed) this.back(); } catch (e) { await this.ui.toast(String((e as Error)?.message || e)); }
+              try { await social("profile-set", { name: p.name.trim(), color: p.color, emoji: p.emoji, pub: p.pub }); this.profileDraft = null; this.hasProfile = true; this.meMem = null; setProfileSkipped(false); await this.ui.toast(first ? "暱稱設定好了" : "已儲存"); if (!first || pushed) this.back(); } catch (e) { await this.ui.toast(String((e as Error)?.message || e)); }
             }} />
             {first ? <Button label="稍後再說" kind="secondary" onTap={() => { setProfileSkipped(true); this.profileDraft = null; if (pushed) this.back(); }} /> : null}
           </div>

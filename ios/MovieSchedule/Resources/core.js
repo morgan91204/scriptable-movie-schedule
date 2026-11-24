@@ -43,6 +43,7 @@
     POSTER_TINTS: () => POSTER_TINTS,
     PRIVACY_URL: () => PRIVACY_URL,
     PROFILE_COLORS: () => PROFILE_COLORS,
+    PROFILE_EMOJI: () => PROFILE_EMOJI,
     RATE_SOURCES: () => RATE_SOURCES,
     REPORT_REASONS: () => REPORT_REASONS,
     REVIEW_TAGS: () => REVIEW_TAGS,
@@ -231,6 +232,7 @@
     posterTint: () => posterTint,
     prefetchPosters: () => prefetchPosters,
     profileColor: () => profileColor,
+    profileInk: () => profileInk,
     profileSkipped: () => profileSkipped,
     ratingTier: () => ratingTier,
     ratingsOfIdent: () => ratingsOfIdent,
@@ -3854,7 +3856,8 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     "private": "對方沒有公開個人頁",
     "not found": "找不到這個帳號",
     "too many follows": "追蹤的人數到上限了",
-    "bad date": "日期不對（不能是未來的日期）"
+    "bad date": "日期不對（不能是未來的日期）",
+    "bad emoji": "頭像只能放一個表情符號"
   };
   async function social(op, body = {}) {
     const r = await socialCall(op, body);
@@ -3875,7 +3878,13 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     { id: "teal", hex: "#40c8e0" },
     { id: "gray", hex: "#8e8e93" }
   ];
-  var profileColor = (id) => (PROFILE_COLORS.find((c) => c.id === id) || PROFILE_COLORS[0]).hex;
+  var profileColor = (id) => /^#[0-9a-f]{6}$/i.test(String(id || "")) ? String(id) : (PROFILE_COLORS.find((c) => c.id === id) || PROFILE_COLORS[0]).hex;
+  function profileInk(id) {
+    const h = profileColor(id);
+    const [r, g, b] = [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+    return (r * 299 + g * 587 + b * 114) / 1e3 > 170 ? "#1c1c1e" : "#fff";
+  }
+  var PROFILE_EMOJI = ["🎬", "🍿", "🎞️", "🎥", "⭐", "🌙", "👻", "🐱", "🐶", "🦊", "🐼", "🐧", "😎", "🤓", "🥹", "🫠"];
   var seenLabel = (seen) => !seen ? "" : seen === "?" ? "看過" : `${seen.replace(/-/g, "/")} 看過`;
   async function adoptRatings() {
     const all = readMyVotes();
@@ -4398,7 +4407,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   var extra = { boxOffice, filmList, soonList, nowShowing, nowShowingMulti, movieBoard: movieBoard2, festivalBoard, festivalFilm, nearby, patchSettings, fillMovie, formatList };
   var BRIDGE_LEVEL = 2;
   globalThis.MS = {
-    version: "2026.11.24-1832",
+    version: "2026.11.24-1835",
     level: BRIDGE_LEVEL,
     init(saved) {
       cache = saved || {};

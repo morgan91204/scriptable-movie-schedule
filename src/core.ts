@@ -3612,7 +3612,7 @@ async function socialCall(op: string, body: Record<string, unknown> = {}): Promi
 }
 const SOCIAL_ERR: Record<string, string> = {
   "not signed in": "登入已經失效，請重新登入", "too many": "操作太頻繁，請稍後再試", "bad name": "暱稱要 2～16 個字，只能用中英文、數字和底線", "name taken": "這個暱稱有人用了，換一個",
-  "rename later": "暱稱 14 天內只能改一次", "private": "對方沒有公開個人頁", "not found": "找不到這個帳號", "too many follows": "追蹤的人數到上限了", "bad date": "日期不對（不能是未來的日期）",
+  "rename later": "暱稱 14 天內只能改一次", "private": "對方沒有公開個人頁", "not found": "找不到這個帳號", "too many follows": "追蹤的人數到上限了", "bad date": "日期不對（不能是未來的日期）", "bad emoji": "頭像只能放一個表情符號",
 };
 /** 帳號功能：做不成就丟出看得懂的錯誤 */
 export async function social<T = any>(op: string, body: Record<string, unknown> = {}): Promise<T> {
@@ -3623,17 +3623,26 @@ export async function social<T = any>(op: string, body: Record<string, unknown> 
 /** 問過要不要取暱稱、使用者按了「稍後再說」：記在這台，之後評分、寫短評不再跳出來問（設定 → 我的片單 隨時可以設） */
 export const profileSkipped = (): boolean => cacheGet("profile-skip.txt") === "1";
 export const setProfileSkipped = (on: boolean): void => cacheSet("profile-skip.txt", on ? "1" : "");
-export interface Profile { name: string; color: string; pub?: boolean; hidden?: boolean; canRename?: boolean }
+export interface Profile { name: string; color: string; emoji?: string; pub?: boolean; hidden?: boolean; canRename?: boolean }
 /** 觀影方式（可以複選） */
 export const WATCH_HOW: { id: string; label: string }[] = [{ id: "cinema", label: "電影院" }, { id: "second", label: "二輪電影院" }, { id: "stream", label: "串流" }];
 export const howLabel = (how?: string[]): string => WATCH_HOW.filter((h) => (how || []).indexOf(h.id) >= 0).map((h) => h.label).join("、");
-export interface DiaryEntry { k: string; title: string; s: number; x: string; sp: number; seen: string; at: number; priv?: number; how?: string[]; by?: { name: string; color: string } }
+export interface DiaryEntry { k: string; title: string; s: number; x: string; sp: number; seen: string; at: number; priv?: number; how?: string[]; by?: { name: string; color: string; emoji?: string } }
 export interface SocialCounts { films: number; notes: number; following: number; followers: number }
 export const PROFILE_COLORS: { id: string; hex: string }[] = [
   { id: "blue", hex: "#0a84ff" }, { id: "green", hex: "#30b158" }, { id: "orange", hex: "#ff9f0a" }, { id: "red", hex: "#ff453a" },
   { id: "purple", hex: "#bf5af2" }, { id: "pink", hex: "#ff375f" }, { id: "teal", hex: "#40c8e0" }, { id: "gray", hex: "#8e8e93" },
 ];
-export const profileColor = (id: string): string => (PROFILE_COLORS.find((c) => c.id === id) || PROFILE_COLORS[0]).hex;
+/** 頭像的底色：內建的顏色名稱，或自訂的色號（#rrggbb） */
+export const profileColor = (id: string): string => (/^#[0-9a-f]{6}$/i.test(String(id || "")) ? String(id) : (PROFILE_COLORS.find((c) => c.id === id) || PROFILE_COLORS[0]).hex);
+/** 底色上面的字要用白色還是深色（底色很淺的時候用深色才看得清楚） */
+export function profileInk(id: string): string {
+  const h = profileColor(id);
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+  return (r * 299 + g * 587 + b * 114) / 1000 > 170 ? "#1c1c1e" : "#fff";
+}
+/** 選頭像時列出來的幾個表情符號（也可以自己輸入別的） */
+export const PROFILE_EMOJI = ["🎬", "🍿", "🎞️", "🎥", "⭐", "🌙", "👻", "🐱", "🐶", "🦊", "🐼", "🐧", "😎", "🤓", "🥹", "🫠"];
 /** 片單上「看過」的寫法 */
 export const seenLabel = (seen: string): string => (!seen ? "" : seen === "?" ? "看過" : `${seen.replace(/-/g, "/")} 看過`);
 /** 登入後：把這台裝置原本匿名評過的片併進帳號（一次 20 部，分批送）。回傳併了幾部 */
@@ -3777,7 +3786,7 @@ export async function communityTags(title: string, tags: string[]): Promise<Comm
 
 // ── 短評：評完分可以寫一句話（最多 60 字）。防雷：輸入框提醒不提劇情、作者可以自己標「可能有雷」（預設摺疊）、
 //    送出前偵測常見的劇透字眼提醒一次、其他人可以檢舉（2 人檢舉劇透自動摺疊，3 人檢舉自動隱藏）。
-export interface ReviewNote { id: number; x: string; sp: number; s: number; at: number; mine?: number; hidden?: number; by?: { name: string; color: string; f?: number } }
+export interface ReviewNote { id: number; x: string; sp: number; s: number; at: number; mine?: number; hidden?: number; by?: { name: string; color: string; emoji?: string; f?: number } }
 /** 短評最多幾個字：有登入帳號的人可以寫長一點 */
 export const noteMax = (): number => (signedIn() ? 140 : NOTE_MAX);
 /** 網頁版一律經過自己的伺服器讀短評（才有作者的暱稱）；Scriptable／Scripting 版直接讀評分伺服器（都是匿名） */
