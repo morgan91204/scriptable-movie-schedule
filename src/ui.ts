@@ -409,7 +409,7 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .us-sub2{font-size:12.5px;line-height:1.5;color:var(--fg2);overflow-wrap:anywhere}
 .lb-pick{display:block;position:relative;overflow:hidden;text-align:center}
 .lb-pick input{position:absolute;inset:0;width:100%;height:100%;opacity:0}
-.lb-steps{margin:0;padding:0 16px 4px 34px;font-size:14.5px;line-height:1.6;color:var(--fg)}
+.lb-steps{margin:0;padding:14px 16px 0 34px;font-size:14.5px;line-height:1.6;color:var(--fg)}
 .lb-steps li{margin:4px 0}
 .lb-prog{padding:22px 16px;text-align:center;font-size:15px;color:var(--fg2)}
 .lb-prog b{display:block;margin-bottom:10px;font-size:22px;color:var(--fg);font-variant-numeric:tabular-nums}
