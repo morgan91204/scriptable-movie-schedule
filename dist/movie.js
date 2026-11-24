@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.24-1805
+// @movie-schedule-app 電影行程 v2026.11.24-1812
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/parsers.gen.ts
@@ -4732,6 +4732,8 @@ var App = class {
     this.diaryMem = null;
     // 自己的片單（一分鐘內不重讀）
     this.profileDraft = null;
+    /** 編輯個人檔案：暱稱（唯一）、顏色、要不要公開；最下面可以把片單和個人檔案整個刪掉 */
+    this.skipProfile = false;
     /** 管理員：帳號管理。被檢舉的、被停用的帳號；可以停用個人頁、清掉檢舉、強制改暱稱 */
     this.adminUserQ = "";
     // ── 意見回饋（使用者）──
@@ -4869,7 +4871,7 @@ var App = class {
   }
   /** 最新版本是多少。網頁版問的是自己網站現在上線的版本（重新整理就會拿到的那一版），不是 GitHub 上的 */
   checkVersion() {
-    if (true) return checkLatest("2026.11.24-1805");
+    if (true) return checkLatest("2026.11.24-1812");
     return (async () => {
       try {
         let r = await globalThis.fetch("/version.json?t=" + Date.now(), { cache: "no-store" });
@@ -4877,7 +4879,7 @@ var App = class {
         const latest = String((await r.json()).version || "");
         if (!latest) return null;
         const num = (v) => Number(v.replace(/\D/g, "")) || 0;
-        return { latest, isLatest: num("2026.11.24-1805") >= num(latest) };
+        return { latest, isLatest: num("2026.11.24-1812") >= num(latest) };
       } catch (_) {
         return null;
       }
@@ -5326,6 +5328,7 @@ var App = class {
     }
     if (!me) return /* @__PURE__ */ h(Page, { title: "我的片單", onBack: () => this.back() }, /* @__PURE__ */ h(Note, { kind: "warn", text: failed }));
     const user = me.user;
+    if (!user && !this.skipProfile) return this.profileEditView(null, true);
     let body = "";
     if (this.diaryTab === "feed") {
       const r = await social("feed").catch(() => null);
@@ -5339,7 +5342,7 @@ var App = class {
       const list = await this.myDiary().catch(() => null);
       body = !list ? /* @__PURE__ */ h(Note, { kind: "warn", text: "片單暫時讀不到" }) : list.length ? /* @__PURE__ */ h(Section, { hint: "在電影頁評分、寫短評，或標記看過，就會出現在這裡。點一筆可以改看過的日期，或設成只有自己看得到。" }, /* @__PURE__ */ h("div", { class: "nt-list" }, list.map((e) => this.entryRow(e, () => this.go(() => this.entryView(e.title, e)))))) : /* @__PURE__ */ h(Section, null, /* @__PURE__ */ h(Note, { text: "片單還是空的。到任何一部電影的頁面評分或標記看過，就會記在這裡。" }));
     }
-    return /* @__PURE__ */ h(Page, { title: "我的片單", onBack: () => this.back() }, /* @__PURE__ */ h(Section, null, user ? this.profileCard(user, me.counts, user.hidden ? "個人頁目前被站長停用" : user.pub ? "個人頁公開中" : "個人頁不公開（只有你看得到）") : /* @__PURE__ */ h(Note, { text: "還沒有設定暱稱。設定後才能公開個人頁、讓別人追蹤你。" }), /* @__PURE__ */ h(Item, { icon: "✏️", title: user ? "編輯個人檔案" : "設定暱稱", subtitle: "暱稱、顏色、要不要公開", onTap: () => {
+    return /* @__PURE__ */ h(Page, { title: "我的片單", onBack: () => this.back() }, /* @__PURE__ */ h(Section, null, user ? this.profileCard(user, me.counts, user.hidden ? "個人頁目前被站長停用" : user.pub ? "個人頁公開中" : "個人頁不公開（只有你看得到）") : /* @__PURE__ */ h(Note, { kind: "warn", text: "還沒有設定暱稱：別人找不到你、不能追蹤你，短評也是匿名。你還是可以追蹤別人。" }), /* @__PURE__ */ h(Item, { icon: "✏️", title: user ? "編輯個人檔案" : "設定暱稱", subtitle: "暱稱、顏色、要不要公開", onTap: () => {
       this.profileDraft = null;
       this.go(() => this.profileEditView(user));
     } }), user && user.pub ? /* @__PURE__ */ h(Item, { icon: "🔗", title: "複製我的個人頁連結", chevron: false, onTap: async () => {
@@ -5364,13 +5367,13 @@ var App = class {
       }
     } }, u.following ? "追蹤中" : "追蹤") : null);
   }
-  /** 編輯個人檔案：暱稱（唯一）、顏色、要不要公開；最下面可以把片單和個人檔案整個刪掉 */
-  profileEditView(user) {
-    const d = this.profileDraft || { name: user ? user.name : "", color: user ? user.color : "blue", pub: user ? !!user.pub : false };
+  // 這次開啟按了「稍後再說」：先不設定暱稱
+  profileEditView(user, first = false) {
+    const d = this.profileDraft || { name: user ? user.name : "", color: user ? user.color : "blue", pub: user ? !!user.pub : first };
     const keep = (v) => {
       this.profileDraft = { ...d, name: v && typeof v.n === "string" ? v.n : d.name };
     };
-    return /* @__PURE__ */ h(Page, { title: user ? "編輯個人檔案" : "設定暱稱", onBack: () => this.back() }, /* @__PURE__ */ h(Section, { title: "暱稱", hint: "2～16 個字，只能用中英文、數字和底線；不能跟別人重複。14 天內只能改一次。請不要用真實姓名或冒用他人名義。" }, /* @__PURE__ */ h("div", { class: "nt-form" }, /* @__PURE__ */ h("input", { class: "field", name: "n", maxlength: "16", autocomplete: "off", autocapitalize: "off", value: d.name, placeholder: "例如：愛看片的小明" }))), /* @__PURE__ */ h(Section, { title: "頭像顏色", hint: "頭像是這個顏色加上暱稱的第一個字（不能上傳照片）。" }, /* @__PURE__ */ h("div", { class: "nt-form" }, /* @__PURE__ */ h("div", { class: "fb-cats" }, PROFILE_COLORS.map((c) => /* @__PURE__ */ h("button", { class: "sw" + (c.id === d.color ? " on" : ""), style: `background:${c.hex}`, "aria-label": c.id, "aria-pressed": c.id === d.color ? "true" : "false", onTap: (v) => {
+    return /* @__PURE__ */ h(Page, { title: user ? "編輯個人檔案" : first ? "先取一個暱稱" : "設定暱稱", onBack: () => this.back() }, first ? /* @__PURE__ */ h(Note, { text: "歡迎使用「我的片單」。取一個暱稱、公開個人頁，別人才找得到你、能追蹤你，你寫的短評旁邊也會顯示暱稱。\n不想公開也沒關係：取消下面的「公開我的個人頁」，或按最下面的「稍後再說」，片單就只有你自己看得到（還是可以追蹤別人）。" }) : null, /* @__PURE__ */ h(Section, { title: "暱稱", hint: "2～16 個字，只能用中英文、數字和底線；不能跟別人重複。14 天內只能改一次。請不要用真實姓名或冒用他人名義。" }, /* @__PURE__ */ h("div", { class: "nt-form" }, /* @__PURE__ */ h("input", { class: "field", name: "n", maxlength: "16", autocomplete: "off", autocapitalize: "off", value: d.name, placeholder: "例如：愛看片的小明" }))), /* @__PURE__ */ h(Section, { title: "頭像顏色", hint: "頭像是這個顏色加上暱稱的第一個字（不能上傳照片）。" }, /* @__PURE__ */ h("div", { class: "nt-form" }, /* @__PURE__ */ h("div", { class: "fb-cats" }, PROFILE_COLORS.map((c) => /* @__PURE__ */ h("button", { class: "sw" + (c.id === d.color ? " on" : ""), style: `background:${c.hex}`, "aria-label": c.id, "aria-pressed": c.id === d.color ? "true" : "false", onTap: (v) => {
       keep(v);
       this.profileDraft = { ...this.profileDraft, color: c.id };
     } }))))), /* @__PURE__ */ h(Section, { title: "公開", hint: "公開後：別人可以看到你的個人頁（片單、評分、短評）、可以追蹤你，你寫的短評旁邊會顯示暱稱。不公開：片單只有你看得到，短評照樣匿名。每一筆也可以單獨設成只有自己看得到。" }, /* @__PURE__ */ h("div", { class: "nt-form" }, /* @__PURE__ */ h("button", { class: "nt-check" + (d.pub ? " on" : ""), "aria-pressed": d.pub ? "true" : "false", onTap: (v) => {
@@ -5382,12 +5385,15 @@ var App = class {
       try {
         await social("profile-set", { name: p.name.trim(), color: p.color, pub: p.pub });
         this.profileDraft = null;
-        await this.ui.toast("已儲存");
-        this.back();
+        await this.ui.toast(first ? "設定好了，開始記錄吧" : "已儲存");
+        if (!first) this.back();
       } catch (e) {
         await this.ui.toast(String(e?.message || e));
       }
-    } }))), user ? /* @__PURE__ */ h(Section, { title: "刪除", hint: "會刪掉你的片單、暱稱、追蹤關係，以及你用這個帳號評的分和寫的短評。刪了救不回來。收藏和設定的同步不受影響（那個在「用 Google 帳號同步」裡刪）。" }, /* @__PURE__ */ h(Item, { icon: "🗑", title: "刪除我的片單和個人檔案", chevron: false, onTap: () => this.go(() => this.wipeConfirmView()) })) : null);
+    } }), first ? /* @__PURE__ */ h(Button, { label: "稍後再說", kind: "secondary", onTap: () => {
+      this.skipProfile = true;
+      this.profileDraft = null;
+    } }) : null)), user ? /* @__PURE__ */ h(Section, { title: "刪除", hint: "會刪掉你的片單、暱稱、追蹤關係，以及你用這個帳號評的分和寫的短評。刪了救不回來。收藏和設定的同步不受影響（那個在「用 Google 帳號同步」裡刪）。" }, /* @__PURE__ */ h(Item, { icon: "🗑", title: "刪除我的片單和個人檔案", chevron: false, onTap: () => this.go(() => this.wipeConfirmView()) })) : null);
   }
   wipeConfirmView() {
     return /* @__PURE__ */ h(Page, { title: "確定要刪除？", onBack: () => this.back() }, /* @__PURE__ */ h(Note, { kind: "warn", text: "片單、暱稱、追蹤關係，還有你用這個帳號評的分和寫的短評都會刪掉，救不回來。" }), /* @__PURE__ */ h(Button, { label: "確定刪除", kind: "danger", onTap: async () => {
@@ -5534,7 +5540,7 @@ var App = class {
         return;
       }
       try {
-        await sendFeedback(cat.id, text, false ? this.isStandalone() ? "web-app" : "web" : "scriptable", "2026.11.24-1805");
+        await sendFeedback(cat.id, text, false ? this.isStandalone() ? "web-app" : "web" : "scriptable", "2026.11.24-1812");
         this.fbDraft = "";
         this.fbCat = "";
         await this.ui.toast("已送出，謝謝你的回饋");
@@ -5854,7 +5860,7 @@ var App = class {
       this.settings.seenLog = CHANGELOG_LATEST;
       saveSettings(this.settings);
     }
-    return /* @__PURE__ */ h(Page, { title: "更新內容", subtitle: `目前版本 ${"2026.11.24-1805"}`, onBack: () => this.back() }, CHANGELOG.map((e) => /* @__PURE__ */ h(Section, { title: e.date }, e.items.map((it) => /* @__PURE__ */ h(Item, { title: it.text, tag: { text: it.kind === "new" ? "新功能" : "改進", tone: it.kind === "new" ? "now" : "soon" }, chevron: false })))), /* @__PURE__ */ h(Note, { text: "只列出比較有感的變動；修小錯、調整文字這類不會寫在這裡。" }));
+    return /* @__PURE__ */ h(Page, { title: "更新內容", subtitle: `目前版本 ${"2026.11.24-1812"}`, onBack: () => this.back() }, CHANGELOG.map((e) => /* @__PURE__ */ h(Section, { title: e.date }, e.items.map((it) => /* @__PURE__ */ h(Item, { title: it.text, tag: { text: it.kind === "new" ? "新功能" : "改進", tone: it.kind === "new" ? "now" : "soon" }, chevron: false })))), /* @__PURE__ */ h(Note, { text: "只列出比較有感的變動；修小錯、調整文字這類不會寫在這裡。" }));
   }
   async aboutView() {
     return /* @__PURE__ */ h(Page, { title: "關於", onBack: () => this.back() }, /* @__PURE__ */ h(Section, { hint: "連鎖影城的場次來自場次通（twshowtimes.com），感謝場次通的整理；其他來自開眼電影網，以及誠品、光點、樂聲、內惟戲院官網。實際場次以影城公告為準。" }, /* @__PURE__ */ h(Item, { icon: "ℹ️", title: "關於與資料來源", accent: true, chevron: false, onTap: () => Safari.open(ABOUT_URL) }), /* @__PURE__ */ h(Item, { icon: "🔒", title: "隱私權政策", accent: true, chevron: false, onTap: () => Safari.open(PRIVACY_URL) }), /* @__PURE__ */ h(Item, { icon: "🙏", title: "前往場次通", subtitle: "比較各影城場次、看上映場數排行", accent: true, chevron: false, onTap: () => Safari.open("https://twshowtimes.com/") })));
@@ -5889,11 +5895,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.24-1805"}`);
+          Pasteboard.copy(`版本 ${"2026.11.24-1812"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.24-1805"}`,
+      `版本 ${"2026.11.24-1812"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -6352,7 +6358,7 @@ var App = class {
     if (false) {
       if (!r) return /* @__PURE__ */ h(Note, { text: "（無法確認是否為最新版：連不到網站）" });
       if (r.isLatest) return /* @__PURE__ */ h(Note, { text: "✅ 已是最新版" });
-      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.24-1805"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
+      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.24-1812"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
         globalThis.location.reload();
       } }));
     }

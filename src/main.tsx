@@ -723,6 +723,8 @@ class App {
     try { me = await social("me"); } catch (e) { failed = String((e as Error)?.message || e); }
     if (!me) return <Page title="我的片單" onBack={() => this.back()}><Note kind="warn" text={failed} /></Page>;
     const user = me.user;
+    // 還沒取暱稱：先帶去設定（可以按「稍後再說」跳過，只用不公開的片單）
+    if (!user && !this.skipProfile) return this.profileEditView(null, true);
     let body = "";
     if (this.diaryTab === "feed") {
       const r = await social<{ list: DiaryEntry[]; following: number }>("feed").catch(() => null);
@@ -752,7 +754,7 @@ class App {
     return (
       <Page title="我的片單" onBack={() => this.back()}>
         <Section>
-          {user ? this.profileCard(user, me.counts, user.hidden ? "個人頁目前被站長停用" : user.pub ? "個人頁公開中" : "個人頁不公開（只有你看得到）") : <Note text="還沒有設定暱稱。設定後才能公開個人頁、讓別人追蹤你。" />}
+          {user ? this.profileCard(user, me.counts, user.hidden ? "個人頁目前被站長停用" : user.pub ? "個人頁公開中" : "個人頁不公開（只有你看得到）") : <Note kind="warn" text="還沒有設定暱稱：別人找不到你、不能追蹤你，短評也是匿名。你還是可以追蹤別人。" />}
           <Item icon="✏️" title={user ? "編輯個人檔案" : "設定暱稱"} subtitle="暱稱、顏色、要不要公開" onTap={() => { this.profileDraft = null; this.go(() => this.profileEditView(user)); }} />
           {user && user.pub ? <Item icon="🔗" title="複製我的個人頁連結" chevron={false} onTap={async () => { Pasteboard.copy(`${SITE_URL}/?u=${encodeURIComponent(user.name)}`); await this.ui.toast("已複製連結"); }} /> : null}
         </Section>
@@ -781,11 +783,14 @@ class App {
     );
   }
   /** 編輯個人檔案：暱稱（唯一）、顏色、要不要公開；最下面可以把片單和個人檔案整個刪掉 */
-  profileEditView(user: Profile | null): string {
-    const d = this.profileDraft || { name: user ? user.name : "", color: user ? user.color : "blue", pub: user ? !!user.pub : false };
+  skipProfile = false; // 這次開啟按了「稍後再說」：先不設定暱稱
+  profileEditView(user: Profile | null, first = false): string {
+    // 第一次設定：預設勾公開（要交朋友得公開；不想公開可以自己取消）
+    const d = this.profileDraft || { name: user ? user.name : "", color: user ? user.color : "blue", pub: user ? !!user.pub : first };
     const keep = (v?: Record<string, string>) => { this.profileDraft = { ...d, name: v && typeof v.n === "string" ? v.n : d.name }; };
     return (
-      <Page title={user ? "編輯個人檔案" : "設定暱稱"} onBack={() => this.back()}>
+      <Page title={user ? "編輯個人檔案" : first ? "先取一個暱稱" : "設定暱稱"} onBack={() => this.back()}>
+        {first ? <Note text={"歡迎使用「我的片單」。取一個暱稱、公開個人頁，別人才找得到你、能追蹤你，你寫的短評旁邊也會顯示暱稱。\n不想公開也沒關係：取消下面的「公開我的個人頁」，或按最下面的「稍後再說」，片單就只有你自己看得到（還是可以追蹤別人）。"} /> : null}
         <Section title="暱稱" hint="2～16 個字，只能用中英文、數字和底線；不能跟別人重複。14 天內只能改一次。請不要用真實姓名或冒用他人名義。">
           <div class="nt-form">
             <input class="field" name="n" maxlength="16" autocomplete="off" autocapitalize="off" value={d.name} placeholder="例如：愛看片的小明" />
@@ -804,8 +809,9 @@ class App {
             <Button label="儲存" onTap={async (v) => {
               keep(v);
               const p = this.profileDraft!;
-              try { await social("profile-set", { name: p.name.trim(), color: p.color, pub: p.pub }); this.profileDraft = null; await this.ui.toast("已儲存"); this.back(); } catch (e) { await this.ui.toast(String((e as Error)?.message || e)); }
+              try { await social("profile-set", { name: p.name.trim(), color: p.color, pub: p.pub }); this.profileDraft = null; await this.ui.toast(first ? "設定好了，開始記錄吧" : "已儲存"); if (!first) this.back(); } catch (e) { await this.ui.toast(String((e as Error)?.message || e)); }
             }} />
+            {first ? <Button label="稍後再說" kind="secondary" onTap={() => { this.skipProfile = true; this.profileDraft = null; }} /> : null}
           </div>
         </Section>
         {user ? (
