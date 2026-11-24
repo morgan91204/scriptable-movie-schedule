@@ -735,7 +735,7 @@ class App {
         <div class="pf-body">
           <div class="pf-name">{esc(u.name)}</div>
           {note ? <div class="pf-note">{esc(note)}</div> : null}
-          {c ? <div class="pf-nums"><span><b>{c.films}</b> 部片</span><span><b>{c.notes}</b> 則短評</span><span><b>{c.following}</b> 追蹤中</span><span><b>{c.followers}</b> 粉絲</span></div> : null}
+          {c ? <div class="pf-nums"><span><b>{c.films}</b> 部片</span><span><b>{c.notes}</b> 則短評</span><span><b>{c.followers}</b> 粉絲</span><span><b>{c.following}</b> 追蹤中</span></div> : null}
         </div>
       </div>
     );
