@@ -53,6 +53,30 @@ try {
 /** 這些網址本身允許跨網域，直接抓；其他經過自己的 Worker 轉發 */
 const DIRECT = /^https:\/\/(raw\.githubusercontent\.com|movie-ratings\.[\w-]+\.workers\.dev)\//; // 評分伺服器（子網域換過，不寫死）
 
+// 用量統計用的匿名代號：每天隨機產生一組、隔天就換，只跟著打給自己伺服器（/api/…）的請求送出，讓站長知道「今天大概幾台裝置在用」。
+// 跟帳號、評分用的裝置代號都沒有關係，伺服器過了當天只留人數。
+const dayTag = (): string => {
+  const day = new Date().toISOString().slice(0, 10);
+  try {
+    const cur = String(localStorage.getItem("ms:day") || "");
+    if (cur.slice(0, 10) === day && cur.length > 20) return cur.slice(11);
+    const id = Array.from(crypto.getRandomValues(new Uint8Array(12)), (b) => "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"[b % 62]).join("");
+    localStorage.setItem("ms:day", day + ":" + id);
+    return id;
+  } catch (_) { return ""; }
+};
+{
+  const raw = window.fetch.bind(window);
+  window.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
+    const u = typeof input === "string" ? input : "";
+    if (u.indexOf("/api/") === 0 || u.indexOf(location.origin + "/api/") === 0) {
+      const tag = dayTag();
+      if (tag) { const h = new Headers((init && init.headers) || undefined); h.set("x-day", tag); init = { ...(init || {}), headers: h }; }
+    }
+    return raw(input as any, init);
+  }) as typeof fetch;
+}
+
 export const webPlatform: Platform = {
   async fetchText(url, headers, opts) {
     const method = opts?.method || "GET";

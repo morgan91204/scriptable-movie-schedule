@@ -213,6 +213,9 @@ export class PushHub {
   constructor(state, env) {
     this.state = state; this.env = env; this.data = null; this.dataAt = 0;
     socialInit(state.storage.sql); // 片單、個人頁、追蹤用的資料表（見 social.js）
+    // 用量統計：每天各類請求幾次（usage）、當天出現過的匿名代號（usage_ids，過了當天只留人數、代號刪掉）
+    state.storage.sql.exec("CREATE TABLE IF NOT EXISTS usage (day TEXT NOT NULL, cat TEXT NOT NULL, n INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (day, cat))");
+    state.storage.sql.exec("CREATE TABLE IF NOT EXISTS usage_ids (day TEXT NOT NULL, id TEXT NOT NULL, PRIMARY KEY (day, id))");
   }
   async notifyData() {
     if (this.data && Date.now() - this.dataAt < 10 * 60e3) return this.data;
@@ -227,6 +230,7 @@ export class PushHub {
     if (path === "/run") return json(await this.run());
     let b;
     try { b = await req.json(); } catch (_) { return json({ error: "bad json" }, 400); }
+    if (path === "/__usage") return json(this.usageAdd(b || {})); // 只有 worker.js 自己會打（外面帶 __ 的路徑一律擋掉）
     if (path.startsWith("/sync/")) return this.sync(path, b || {});
     if (path.startsWith("/feedback/")) return this.feedback(path, b || {});
     if (path.startsWith("/social/")) return social(this, path, b || {});
@@ -316,8 +320,9 @@ export class PushHub {
     // 是不是管理員：這張登入憑證登入時的 email 在管理員名單裡，而且現在還在名單裡（被移除就立刻失效）
     const admin = !!sess.adm && (await this.isAdmin(sess.adm));
     if (path === "/sync/who") return json({ ok: true, admin });
-    if (path === "/sync/admins" || path === "/sync/fb" || path === "/sync/users") {
+    if (path === "/sync/admins" || path === "/sync/fb" || path === "/sync/users" || path === "/sync/usage") {
       if (!admin) return json({ error: "forbidden" }, 403);
+      if (path === "/sync/usage") return json({ ok: true, ...this.usageRead() });
       if (path === "/sync/users") return socialAdmin(this, b.body || {});
       return path === "/sync/admins" ? this.adminList(b.body || {}, sess.adm) : this.adminFeedback(b.body || {});
     }
@@ -334,6 +339,34 @@ export class PushHub {
       return json({ ok: true });
     }
     return json({ error: "not found" }, 404);
+  }
+  /** 用量統計：worker.js 每隔一陣子把累積的次數和新出現的匿名代號交過來（日期用 UTC，跟 Cloudflare 的每日額度同一個算法） */
+  usageAdd(b) {
+    const sql = this.state.storage.sql, day = new Date().toISOString().slice(0, 10);
+    for (const [cat, n] of Object.entries(b.n || {}).slice(0, 20)) {
+      if (!/^[a-z-]{2,16}$/.test(cat) || !(Number(n) > 0)) continue;
+      sql.exec("INSERT INTO usage (day, cat, n) VALUES (?, ?, ?) ON CONFLICT(day, cat) DO UPDATE SET n = n + excluded.n", day, cat, Math.min(1e6, Math.round(Number(n))));
+    }
+    for (const id of (Array.isArray(b.ids) ? b.ids : []).slice(0, 3000)) if (/^[A-Za-z0-9]{10,20}$/.test(String(id))) sql.exec("INSERT OR IGNORE INTO usage_ids (day, id) VALUES (?, ?)", day, String(id));
+    // 過了當天：只留「那天幾台裝置」，代號全部刪掉；統計最多留 60 天
+    for (const r of sql.exec("SELECT day, COUNT(*) AS c FROM usage_ids WHERE day < ? GROUP BY day", day).toArray()) {
+      sql.exec("INSERT INTO usage (day, cat, n) VALUES (?, 'devices', ?) ON CONFLICT(day, cat) DO UPDATE SET n = excluded.n", r.day, r.c);
+      sql.exec("DELETE FROM usage_ids WHERE day = ?", r.day);
+    }
+    sql.exec("DELETE FROM usage WHERE day < ?", new Date(Date.now() - 60 * 864e5).toISOString().slice(0, 10));
+    return { ok: true };
+  }
+  /** 管理員專區的「用量」：最近 14 天，每天幾台裝置、各類請求幾次 */
+  usageRead() {
+    const sql = this.state.storage.sql, today = new Date().toISOString().slice(0, 10);
+    const days = {};
+    for (const r of sql.exec("SELECT day, cat, n FROM usage WHERE day >= ? ORDER BY day DESC", new Date(Date.now() - 13 * 864e5).toISOString().slice(0, 10)).toArray()) {
+      const d = days[r.day] || (days[r.day] = { day: r.day, devices: 0, n: {} });
+      if (r.cat === "devices") d.devices = r.n; else d.n[r.cat] = r.n;
+    }
+    const live = sql.exec("SELECT COUNT(*) AS c FROM usage_ids WHERE day = ?", today).toArray()[0].c;
+    if (days[today] || live) (days[today] || (days[today] = { day: today, devices: 0, n: {} })).devices = live;
+    return { today, days: Object.values(days).sort((a, b) => (a.day < b.day ? 1 : -1)) };
   }
   /** 有人回覆、追蹤某個帳號：對那個帳號登入的每一台裝置推一則（那台有開這種通知才推）。
    *  在對方的勿擾時段就先記著（pq:…），等每小時的排程在勿擾時段過後一起送 */

@@ -45,6 +45,8 @@ const FILES = {
 export default {
   async fetch(req, env, ctx) {
     const url = new URL(req.url);
+    if (url.pathname.indexOf("__") >= 0) return new Response("not found", { status: 404 }); // 內部用的路徑（用量統計），外面不能打
+    tally(req, url, env, ctx);
     if (url.pathname === "/version.json") return new Response(JSON.stringify({ version: DEPLOYED }), { headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } });
     if (url.pathname === "/api/version") return new Response(JSON.stringify({ version: DEPLOYED }), { headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } });
     // 防灌爆：同一個來源一分鐘內打太多次就先擋掉（正常使用碰不到），免得一天的請求額度被幾分鐘用完
@@ -83,6 +85,28 @@ export default {
 // 每個來源（IP）一分鐘最多幾次。計數放在這台伺服器的記憶體裡：不花額外的請求、也不存任何東西；
 // 同一個人的請求通常落在同一台，所以擋得住單一來源的狂打（分散在很多地方的攻擊擋不住，那要靠 Cloudflare 後台的規則）。
 // 場次轉發給寬一點：「現在有什麼可以看」一次會查很多間影城
+// ── 用量統計（給管理員專區看的；不記 IP、不記帳號）──
+// 每個請求只記「哪一類」；人數靠網頁每天隨機產生的一組代號（x-day，隔天就換，跟帳號、裝置代號都無關）。
+// 先記在記憶體裡，累積 200 個請求或過 5 分鐘才寫進儲存空間一次，免得每個請求都多一次寫入。數字是約略值（這支程式被回收時，還沒寫的那一點會漏掉）
+const USE = { n: {}, ids: new Set(), sent: new Set(), day: "", pending: 0, at: Date.now() };
+const useAdd = (k) => { USE.n[k] = (USE.n[k] || 0) + 1; };
+function tally(req, url, env, ctx) {
+  const p = url.pathname;
+  const cat = p === "/api/fetch" ? "fetch" : p.startsWith("/api/social/") ? "social" : p.startsWith("/api/sync/") ? "sync" : p.startsWith("/api/push/") ? "push" : p.startsWith("/api/feedback/") ? "feedback"
+    : p === "/api/version" || p === "/version.json" ? "version" : p.startsWith("/api/") ? "api" : "page";
+  useAdd(cat);
+  USE.pending++;
+  const day = new Date().toISOString().slice(0, 10);
+  if (USE.day !== day) { USE.day = day; USE.sent = new Set(); }
+  const id = req.headers.get("x-day") || "";
+  if (/^[A-Za-z0-9]{10,20}$/.test(id) && !USE.sent.has(id) && USE.sent.size < 50000) { USE.sent.add(id); USE.ids.add(id); }
+  const now = Date.now();
+  if (!env.PUSH || (USE.pending < 200 && now - USE.at < 5 * 60e3)) return;
+  const body = JSON.stringify({ n: USE.n, ids: [...USE.ids] });
+  USE.n = {}; USE.ids = new Set(); USE.pending = 0; USE.at = now;
+  const hub = env.PUSH.get(env.PUSH.idFromName("hub"));
+  ctx.waitUntil(hub.fetch(new Request("https://hub/__usage", { method: "POST", body, headers: { "content-type": "application/json" } })).catch(() => null));
+}
 const RATE_FETCH = 300, RATE_API = 150, RATE_WINDOW = 60e3;
 const rateHits = new Map();
 function tooMany(req, kind, max) {
@@ -138,7 +162,7 @@ async function proxy(req, ctx) {
   const key = new Request("https://cache.local/" + encodeURIComponent(target.href));
   if (cacheable) {
     const hit = await cache.match(key);
-    if (hit) return hit;
+    if (hit) { useAdd("fetch-hit"); return hit; } // 快取裡有：不用再去對方網站抓
   }
   let status = 502, body = "";
   try {

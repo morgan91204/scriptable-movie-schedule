@@ -396,6 +396,16 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 @media(prefers-color-scheme:dark){.pf-tag.good{color:#30d158}.pf-tag.warn{color:#ffb340}.pf-tag.bad{color:#ff6961}}
 .pf-sub{margin-top:2px;font-size:13px;color:var(--fg2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .th.focus{margin:8px -8px 0;padding:10px 8px 6px;border-radius:12px;background:rgba(10,132,255,.12);box-shadow:0 0 0 1.5px var(--accent) inset}
+.us-days{padding:4px 16px 10px}
+.us-day{padding:12px 0}
+.us-day+.us-day{border-top:1px solid var(--line)}
+.us-top{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:15px}
+.us-top span{color:var(--fg2);font-size:13.5px;font-variant-numeric:tabular-nums}
+.us-bar{height:6px;margin:8px 0 6px;border-radius:3px;background:var(--chip);overflow:hidden}
+.us-bar i{display:block;height:100%;border-radius:3px;background:var(--accent)}
+.us-bar i.warn{background:#ff9f0a}
+.us-bar i.bad{background:#ff453a}
+.us-sub2{font-size:12.5px;line-height:1.5;color:var(--fg2);overflow-wrap:anywhere}
 .fd-list{padding:4px 16px 6px}
 .fd{display:flex;align-items:flex-start;gap:12px;padding:12px 0}
 .fd+.fd{border-top:1px solid var(--line)}

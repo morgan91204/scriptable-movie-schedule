@@ -702,6 +702,7 @@ class App {
             <Item icon="💬" title="意見回饋" subtitle="看使用者的回饋、回覆、標處理狀態" onTap={() => { this.adminFbTab = "open"; this.go(() => this.adminFeedbackView(), "讀取回饋…"); }} />
             <Item icon="🛡" title="短評管理" subtitle="複查被檢舉的短評，或巡一遍最近的短評" onTap={() => { this.adminTab = "flagged"; this.go(() => this.adminNotesView(), "讀取短評…"); }} />
             <Item icon="🪪" title="帳號管理" subtitle="被檢舉的帳號：停用個人頁、強制改暱稱" onTap={() => { this.adminUserQ = ""; this.go(() => this.adminUsersView(), "讀取帳號…"); }} />
+            <Item icon="📈" title="用量" subtitle="每天幾台裝置在用、各類請求幾次、離免費額度多遠" onTap={() => this.go(() => this.adminUsageView(), "讀取用量…")} />
             <Item icon="👥" title="管理員名單" subtitle="新增或移除其他管理員" onTap={() => this.go(() => this.adminListView(), "讀取名單…")} />
         </Section>
       </Page>
@@ -1415,6 +1416,39 @@ class App {
     );
   }
   /** 管理員名單：站長本人（根管理員）存在伺服器的加密設定裡，這裡改不到；其他管理員可以在這裡新增、移除 */
+  /** 管理員：用量。最近 14 天每天幾台裝置、各類請求幾次（伺服器自己數的約略值；日期是 UTC，跟 Cloudflare 每日額度同一個算法） */
+  async adminUsageView(): Promise<string> {
+    const sy = this.sync();
+    type Day = { day: string; devices: number; n: Record<string, number> };
+    let days: Day[] = [], today = "", failed = "";
+    try { const r = await sy.adm("usage", {}); days = r.days || []; today = r.today || ""; } catch (e) { failed = String((e as Error)?.message || e); }
+    const LIMIT = 100000;
+    const NAMES: [string, string][] = [["fetch", "查場次"], ["social", "社群／短評"], ["sync", "同步／登入"], ["push", "通知"], ["version", "檢查更新"], ["page", "頁面"], ["feedback", "回饋"], ["api", "其他"]];
+    const num = (n: number) => String(Math.round(n)).replace(/\B(?=(\d{3})+$)/g, ",");
+    const row = (d: Day) => {
+      const total = NAMES.reduce((a, [k]) => a + (d.n[k] || 0), 0);
+      const hit = d.n["fetch-hit"] || 0, f = d.n.fetch || 0;
+      const parts = NAMES.filter(([k]) => d.n[k]).map(([k, label]) => `${label} ${num(d.n[k])}`).join("、");
+      const pct = Math.round((total / LIMIT) * 1000) / 10;
+      return (
+        <div class="us-day">
+          <div class="us-top"><b>{esc(d.day.slice(5).replace("-", "/"))}{d.day === today ? "（今天）" : ""}</b><span>{num(total)} 個請求｜{pct}%</span></div>
+          <div class="us-bar"><i style={`width:${Math.min(100, Math.max(1, pct))}%`} class={pct >= 80 ? "bad" : pct >= 50 ? "warn" : ""} /></div>
+          <div class="us-sub2">{d.devices ? `約 ${num(d.devices)} 台裝置，平均每台 ${num(total / d.devices)} 個` : "裝置數還沒有資料"}</div>
+          <div class="us-sub2">{esc(parts)}{f ? `｜查場次有 ${Math.round((hit / f) * 100)}% 直接用暫存` : ""}</div>
+        </div>
+      );
+    };
+    return (
+      <Page title="用量" subtitle="最近 14 天" onBack={() => this.back()}>
+        {failed ? <Section><Note kind="warn" text={failed} /></Section> : !days.length ? <Section><Note text="還沒有資料。這個統計從上線那一刻開始數，過幾分鐘再來看。" /></Section> : (
+          <Section hint="百分比是跟 Cloudflare 免費方案的每日 100,000 個請求比（只算網頁版這一支，評分伺服器另外算，量很小）。日期用世界標準時間：每天台灣時間早上 8 點換日，額度也是那時候重算。數字是約略值，會比 Cloudflare 後台略少。裝置數靠每天隨機更換的匿名代號估算，不含還沒更新到新版的人。">
+            <div class="us-days">{days.map(row)}</div>
+          </Section>
+        )}
+      </Page>
+    );
+  }
   async adminListView(): Promise<string> {
     const sy = this.sync();
     let root: string[] = [], extra: string[] = [], failed = "";
