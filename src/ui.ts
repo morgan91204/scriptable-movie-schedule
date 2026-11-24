@@ -303,13 +303,10 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .pf-btn{text-align:center;flex:1 1 0;min-width:0;height:36px;padding:0 10px;border-radius:10px;background:var(--chip);color:var(--fg);font-size:14.5px;font-weight:600;white-space:nowrap}
 .pf-btn.go{background:var(--accent);color:#fff}
 .pf-btn.icon{flex:none;width:40px;font-size:16px;font-weight:400}
-.pf-btn.so-btn{flex:none;width:36px;padding:0;background:none;display:inline-flex;align-items:center;justify-content:center}
-.pf-btn.so-btn .so{width:32px;height:32px;border-radius:9px}
-.so{flex:none;display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:6px;vertical-align:middle}
-.so svg{width:62%;height:62%;fill:#fff}
-.so-th{background:#000;box-shadow:inset 0 0 0 1px rgba(255,255,255,.28)}
-.so-ig{background:radial-gradient(circle at 30% 107%,#fdf497 0%,#fdf497 5%,#fd5949 45%,#d6249f 60%,#285aeb 90%)}
-.so-tw{background:#1d9bf0}
+.pf-btn.so-btn{flex:none;width:40px;padding:0;display:inline-flex;align-items:center;justify-content:center}
+.pf-btn.so-btn .so{width:21px;height:21px}
+.so{flex:none;display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;vertical-align:middle;color:var(--fg)}
+.so svg{width:100%;height:100%;fill:currentColor}
 .pf-handle{display:flex;align-items:center;gap:8px;margin-top:8px;padding:0 12px;height:44px;border-radius:10px;background:var(--chip)}
 .pf-handle>span:not(.so){flex:none;font-size:14px;color:var(--fg2);white-space:nowrap}
 .pf-handle input{flex:1;min-width:0;height:100%;border:0;background:none;color:var(--fg);font-size:16px;outline:none}
@@ -400,7 +397,7 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .fd-line button{display:inline;padding:0;font:inherit;font-weight:700;color:var(--fg)}
 .fd-line .nt-score{display:inline-block;margin-left:2px;vertical-align:1px;white-space:nowrap}
 .pf-pills{display:flex;flex-wrap:wrap;gap:8px;padding:0 16px 12px}
-.pf-pill{display:inline-flex;align-items:center;gap:7px;max-width:100%;padding:4px 12px 4px 5px;border-radius:999px;border:1px solid var(--line);color:var(--fg);font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pf-pill{display:inline-flex;align-items:center;gap:7px;max-width:100%;padding:6px 13px 6px 11px;border-radius:999px;border:1px solid var(--line);color:var(--fg);font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .fd-line em{font-style:normal;white-space:nowrap}
 .fd-meta{margin-top:2px;font-size:12.5px;color:var(--fg2)}
 .fd-note{display:flex;align-items:flex-end;gap:8px;width:100%;margin-top:8px;padding:9px 12px;border-radius:12px;background:var(--chip);color:var(--fg);font-size:15px;line-height:1.45;text-align:left;overflow-wrap:anywhere}
