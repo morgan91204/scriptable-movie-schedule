@@ -217,6 +217,9 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .cm-tagbar em{flex:1;min-width:0;font-style:normal;font-weight:400;font-size:13px;color:var(--fg2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .cm-tagbar i{flex:none;font-style:normal;font-weight:400;font-size:13px;color:var(--accent)}
 .cm-tags{margin-top:8px}
+.en-watch{margin:0;padding:12px 16px 14px}
+.en-watch .cm-tagrow+.cm-tagrow{margin-top:16px}
+.en-btns{padding-top:10px}
 .cm-tagrow{margin-top:8px}
 .cm-taghead{display:block;font-size:11.5px;color:var(--fg2);margin-bottom:5px}
 .cm-tagset{display:flex;flex-wrap:wrap;gap:6px}

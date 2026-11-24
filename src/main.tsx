@@ -120,7 +120,7 @@ class App {
   checkVersion(): Promise<{ latest: string; isLatest: boolean } | null> {
     if (!IS_WEB) return checkLatest(APP_VERSION);
     return (async () => {
-      try {
+    try {
         // version.json 是靜態檔（不經過 Worker、不算請求額度）；沒有這個檔時退回 /api/version
         let r = await (globalThis as any).fetch("/version.json?t=" + Date.now(), { cache: "no-store" });
         if (!r.ok) r = await (globalThis as any).fetch("/api/version?t=" + Date.now(), { cache: "no-store" });
@@ -179,7 +179,7 @@ class App {
       if (!quick) await this.ui.render(<Page title="片刻"><Loading text={this.loadingText} /></Page>);
       this.loadingText = "讀取中…";
       let html: string;
-      try {
+    try {
         html = await job;
         if (pendingUrl) {
           const u = pendingUrl;
@@ -216,7 +216,7 @@ class App {
       clicked = true;
       if (!hit) break;
       savedY.set(view, hit.y);
-      try {
+    try {
         await hit.handler.call(null, hit.vals);
       } catch (e) {
         this.go(() => this.errorView(e));
@@ -673,7 +673,7 @@ class App {
       await sy.push(syncPick(this.settings));
       const adopted = await adoptRatings().catch(() => 0); // 這台原本匿名評的分、寫的短評併進帳號
       // 登入前按了某個人的「登入後追蹤」：現在追蹤，等一下直接開他的個人頁
-      try {
+    try {
         const G = globalThis as any;
         const who = String(G.sessionStorage.getItem("ms:follow-after-login") || "").slice(0, 16);
         G.sessionStorage.removeItem("ms:follow-after-login");
@@ -1078,37 +1078,19 @@ class App {
   async entryView(title: string, known?: DiaryEntry): Promise<string> {
     const k = communityKey(title);
     const list = await this.myDiary().catch(() => [] as DiaryEntry[]);
-    const e = list.find((x) => x.k === k) || known || null;
-    const seen = e ? e.seen : "";
-    const save = async (body: Record<string, unknown>, done: string) => {
-      try { await social("entry", { m: k, title: title, ...body }); this.diaryMem = null; await this.ui.toast(done); } catch (err) { await this.ui.toast(String((err as Error)?.message || err)); }
-    };
+    const e = list.find((x) => x.k === k) || (this.diaryMem ? null : known) || null;
     return (
-      <Page title="片單" subtitle={`《${title}》`} onBack={() => this.back()}>
+      <Page title="我的紀錄" subtitle={`《${title}》`} onBack={() => this.back()}>
         <Section>
-          {e && (e.s || e.x) ? <div class="nt-list">{this.entryRow(e, () => this.openTitle(title))}</div> : <Note text="還沒有評分。可以先標記看過，之後再到電影頁評分、寫短評。" />}
-          <Item icon="🎬" title="打開這部片的頁面" subtitle="評分、心得標籤、短評都在那裡改" onTap={() => this.openTitle(title)} />
+          {e && (e.s || e.x) ? <div class="nt-list">{this.entryRow(e, () => this.openTitle(title))}</div> : <Note text="還沒有評分。可以先記下什麼時候看的，之後再到電影頁評分、寫短評。" />}
+          <div class="pf-btns en-btns"><button class="pf-btn" onTap={() => this.openTitle(title)}>🎬 電影頁（改評分、短評）</button></div>
         </Section>
-        <Section title="觀影方式（可複選）">
-          <div class="nt-form"><div class="fb-cats">
-            {WATCH_HOW.map((w) => { const how = (e && e.how) || []; const on = how.indexOf(w.id) >= 0; return <button class={"cm-tag" + (on ? " on" : "")} aria-pressed={on ? "true" : "false"} onTap={() => save({ how: on ? how.filter((x) => x !== w.id) : [...how, w.id] }, on ? `已取消「${w.label}」` : `已記下：${w.label}`)}>{esc(w.label)}</button>; })}
-          </div></div>
-        </Section>
-        <Section title="看過的日期" hint="不記得哪一天可以只標「看過」。">
-          <div class="nt-form">
-            <input class="field" name="d" type="date" max={todayTPE()} value={/^\d{4}-/.test(seen) ? seen : ""} />
-            <Button label="儲存日期" onTap={async (v) => { const d = String(v.d || ""); if (!d) { await this.ui.toast("先選日期"); return; } await save({ seen: d }, "已記下看過的日期"); }} />
-            <Button label={seen === "?" ? "已標記看過（沒記日期）" : "看過，但不記日期"} kind="secondary" onTap={() => save({ seen: "?" }, "已標記看過")} />
-            {seen ? <Button label="取消「看過」" kind="danger" onTap={() => save({ seen: "" }, "已取消")} /> : null}
-          </div>
+        <Section title="觀影紀錄">
+          <div class="cm-tags en-watch">{this.watchFields(title, e)}</div>
         </Section>
         {e ? (
-          <Section title="誰看得到" hint="設成只有自己看得到：這一筆不會出現在你的個人頁和別人的動態裡，你在這部片的短評也會顯示成匿名。分數照樣算進這部片的平均。">
-            <div class="nt-form">
-              <button class={"nt-check" + (e.priv ? " on" : "")} aria-pressed={e.priv ? "true" : "false"} onTap={() => save({ priv: !e.priv }, e.priv ? "這一筆恢復公開" : "這一筆只有你看得到了")}>
-                <i>{e.priv ? "✓" : ""}</i><span>只有自己看得到</span>
-              </button>
-            </div>
+          <Section hint="這一筆不會出現在你的個人頁和別人的動態裡，你在這部片的短評也會顯示成匿名。分數照樣算進這部片的平均。">
+            <Item icon={e.priv ? "✅" : "⬜️"} title="只有自己看得到" chevron={false} onTap={() => this.saveWatch(title, { priv: !e.priv }, e.priv ? "這一筆恢復公開" : "這一筆只有你看得到了")} />
           </Section>
         ) : null}
       </Page>
@@ -1243,7 +1225,7 @@ class App {
       const text = this.fbDraft.trim();
       if (!cat) { await this.ui.toast("先選一個分類"); return; }
       if (Array.from(text).length < 5) { await this.ui.toast("內容再多寫一點（至少 5 個字）"); return; }
-      try {
+    try {
         await sendFeedback(cat.id, text, IS_WEB ? (this.isStandalone() ? "web-app" : "web") : "scriptable", APP_VERSION);
         this.fbDraft = ""; this.fbCat = "";
         await this.ui.toast("已送出，謝謝你的回饋");
@@ -2126,40 +2108,26 @@ class App {
     );
   }
   rateOpenFor = ""; // 哪一部片的「你的評分」是展開的（預設收起來，省空間）
-  watchOpenFor = ""; // 哪一部片的「觀影紀錄」是展開的
-  /** 評分卡裡的「觀影紀錄」（登入的人才有）：觀影時間、觀影方式，跟心得標籤一樣在同一頁展開，不用跳頁。
-   *  沒評分也可以填（填了就算看過，會記進我的片單） */
-  watchInline(title: string): string {
+  /** 存觀影紀錄（日期、方式、要不要只給自己看）。以伺服器回的那一筆為準更新畫面；觀影方式沒有真的存進去就明講 */
+  async saveWatch(title: string, body: Record<string, unknown>, done: string): Promise<void> {
     const k = communityKey(title);
-    const open = this.watchOpenFor === k;
-    const e = (this.diaryMem ? this.diaryMem.list : []).find((x) => x.k === k) || null;
+    try {
+      // 以伺服器回的那一筆為準更新畫面（不是「送出去了就當成功」）；觀影方式沒有真的存進去就明講
+      const r = await social<{ entry: DiaryEntry | null }>("entry", { m: k, title, ...body });
+      const list = (this.diaryMem ? this.diaryMem.list : []).filter((x) => x.k !== k);
+      this.diaryMem = { at: Date.now(), list: r.entry ? [r.entry, ...list] : list };
+      const want = Array.isArray(body.how) ? (body.how as string[]).slice().sort().join(",") : null;
+      const got = ((r.entry && r.entry.how) || []).slice().sort().join(",");
+      if (want !== null && want !== got) { await this.ui.toast("觀影方式沒有存進去，請過一分鐘再試一次"); return; }
+      await this.ui.toast(done);
+    } catch (err) { await this.ui.toast(String((err as Error)?.message || err)); }
+  }
+  /** 觀影時間、觀影方式兩列（電影頁的評分卡和片單裡的那一筆共用） */
+  watchFields(title: string, e: DiaryEntry | null): string {
     const seen = e ? e.seen : "", how = (e && e.how) || [];
-    const summary = [/^\d{4}-/.test(seen) ? seen.replace(/-/g, "/") : seen === "?" ? "看過" : "", howLabel(how)].filter(Boolean).join("｜");
-    const save = async (body: Record<string, unknown>, done: string) => {
-      try {
-        // 以伺服器回的那一筆為準更新畫面（不是「送出去了就當成功」）；觀影方式沒有真的存進去就明講
-        const r = await social<{ entry: DiaryEntry | null }>("entry", { m: k, title, ...body });
-        const list = (this.diaryMem ? this.diaryMem.list : []).filter((x) => x.k !== k);
-        this.diaryMem = { at: Date.now(), list: r.entry ? [r.entry, ...list] : list };
-        const want = Array.isArray(body.how) ? (body.how as string[]).slice().sort().join(",") : null;
-        const got = ((r.entry && r.entry.how) || []).slice().sort().join(",");
-        if (want !== null && want !== got) { await this.ui.toast("觀影方式沒有存進去，請過一分鐘再試一次"); return; }
-        await this.ui.toast(done);
-      } catch (err) { await this.ui.toast(String((err as Error)?.message || err)); }
-    };
+    const save = (body: Record<string, unknown>, done: string) => this.saveWatch(title, body, done);
     return (
       <>
-        <button class="cm-tagbar" aria-expanded={open ? "true" : "false"} onTap={async () => {
-          if (open) { this.watchOpenFor = ""; return; }
-          await this.myDiary().catch(() => []); // 先讀自己的片單，才知道這部片填過什麼
-          this.watchOpenFor = k;
-        }}>
-          <span>觀影紀錄</span>
-          <em>{this.diaryMem && summary ? summary : open ? "還沒填" : "什麼時候看的、在哪裡看的"}</em>
-          <i>{open ? "收合 ▾" : summary && this.diaryMem ? "修改 ▸" : "填寫 ▸"}</i>
-        </button>
-        {open ? (
-          <div class="cm-tags">
             <div class="cm-tagrow">
               <span class="cm-taghead">觀影時間{seen === "?" ? "（已標記看過，沒記日期）" : ""}</span>
               {/* 一顆看得懂的按鈕：上面寫「選擇日期」或已經選的日期；真正的日期選單疊在上面（透明），點下去直接開系統的日曆，選了就存，不用再按儲存 */}
@@ -2181,6 +2149,33 @@ class App {
                 {WATCH_HOW.map((w) => { const on = how.indexOf(w.id) >= 0; return <button class={"cm-tag" + (on ? " on" : "")} aria-pressed={on ? "true" : "false"} onTap={() => save({ how: on ? how.filter((x) => x !== w.id) : [...how, w.id] }, on ? `已取消「${w.label}」` : `已記下：${w.label}`)}>{esc(w.label)}</button>; })}
               </div>
             </div>
+      </>
+    );
+  }
+  watchOpenFor = ""; // 哪一部片的「觀影紀錄」是展開的
+  /** 評分卡裡的「觀影紀錄」（登入的人才有）：觀影時間、觀影方式，跟心得標籤一樣在同一頁展開，不用跳頁。
+   *  沒評分也可以填（填了就算看過，會記進我的片單） */
+  watchInline(title: string): string {
+    const k = communityKey(title);
+    const open = this.watchOpenFor === k;
+    const e = (this.diaryMem ? this.diaryMem.list : []).find((x) => x.k === k) || null;
+    const seen = e ? e.seen : "", how = (e && e.how) || [];
+    const summary = [/^\d{4}-/.test(seen) ? seen.replace(/-/g, "/") : seen === "?" ? "看過" : "", howLabel(how)].filter(Boolean).join("｜");
+    const save = (body: Record<string, unknown>, done: string) => this.saveWatch(title, body, done);
+    return (
+      <>
+        <button class="cm-tagbar" aria-expanded={open ? "true" : "false"} onTap={async () => {
+          if (open) { this.watchOpenFor = ""; return; }
+          await this.myDiary().catch(() => []); // 先讀自己的片單，才知道這部片填過什麼
+          this.watchOpenFor = k;
+        }}>
+          <span>觀影紀錄</span>
+          <em>{this.diaryMem && summary ? summary : open ? "還沒填" : "什麼時候看的、在哪裡看的"}</em>
+          <i>{open ? "收合 ▾" : summary && this.diaryMem ? "修改 ▸" : "填寫 ▸"}</i>
+        </button>
+        {open ? (
+          <div class="cm-tags">
+            {this.watchFields(title, e)}
             <div class="cm-tagnote">會記進「設定 → 我的片單」。個人頁公開的話別人也看得到；要單獨隱藏這一筆，到我的片單裡設定。</div>
           </div>
         ) : null}
@@ -2198,7 +2193,7 @@ class App {
     const pickTag = async (id: string) => {
       const next = reviewTagsToggle(myTags, id);
       if (!next) { await this.ui.toast(`最多選 ${REVIEW_TAGS_MAX} 個，先取消一個再選`); return; }
-      try {
+    try {
         await communityTags(title, next);
       } catch (e) {
         await this.ui.toast(String((e as Error)?.message || e));
@@ -2210,7 +2205,7 @@ class App {
     const status = c === undefined ? "讀取中…" : c === false ? "片刻評分暫時讀不到" : n ? `${n} 人評分` : "還沒有人評分，來當第一個";
     const max = c ? Math.max(1, ...c.dist) : 1;
     const vote = async (s: number) => {
-      try {
+    try {
         await communityVote(title, s === mine ? 0 : s);
         await this.ui.toast(s === mine ? "已取消你的評分" : `已送出 ${s} 分`);
         if (s !== mine) await this.askNickname();
@@ -2486,7 +2481,7 @@ class App {
     const prompt = w.__installPrompt;
     const done = this.isStandalone() || w.__installed;
     const install = async () => {
-      try {
+    try {
         await prompt.prompt();
         const r = await prompt.userChoice;
         w.__installPrompt = null;
