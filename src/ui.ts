@@ -152,7 +152,7 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .hero-info{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
 .hero-line{font-size:14px;color:var(--fg2)}
 .ratings{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px;overflow:visible}
-.rate{display:flex;align-items:center;gap:3px;padding:3px 5px;border-radius:7px;font-size:12px;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap;flex:none;line-height:1.2}
+.rate{display:flex;align-items:center;gap:3px;padding:4px 6px;border-radius:8px;font-size:13.5px;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap;flex:none;line-height:1.2}
 .rate.good{background:rgba(48,209,88,.18);color:#1f9d45}
 .rate.mid{background:rgba(255,159,10,.2);color:#c77700}
 .rate.bad{background:rgba(255,69,58,.18);color:#d63a31}
@@ -160,8 +160,8 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .rate.none .emo{filter:grayscale(1);opacity:.7}
 .rate.none .imdb{opacity:.55}
 @media(prefers-color-scheme:dark){.rate.good{color:#30d158}.rate.mid{color:#ffb340}.rate.bad{color:#ff6961}}
-.rate .imdb{background:#f5c518;color:#000;font-size:9px;font-weight:800;padding:1px 3px;border-radius:3px;letter-spacing:-.2px}
-.rate .emo{font-size:12px}
+.rate .imdb{background:#f5c518;color:#000;font-size:10px;font-weight:800;padding:1.5px 3.5px;border-radius:3.5px;letter-spacing:-.2px}
+.rate .emo{font-size:13.5px}
 .emo{display:inline-flex;align-items:center}
 .emo .ri{width:1.3em;height:1.3em;display:block;flex:none}
 .rate .n{font-size:10px;font-weight:600;opacity:.85}
