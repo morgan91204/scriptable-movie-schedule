@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.24-1901
+// @movie-schedule-app 電影行程 v2026.11.24-1905
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/parsers.gen.ts
@@ -4745,6 +4745,7 @@ var App = class {
       { id: "cinemas", label: "影城", icon: "building" },
       { id: "settings", label: "設定", icon: "gear" }
     ];
+    this.lastTabTap = { id: "", at: 0 };
     // ── 事件迴圈 ──
     // 背景查 GitHub 上的最新版本（首頁顯示是否為最新版）
     this.latest = this.checkVersion();
@@ -4928,6 +4929,24 @@ var App = class {
     this.loadingText = loading;
     this.stack.push(view);
   }
+  // 上一次點的是哪個頁籤、什麼時候（用來認「連點兩下」）
+  /** 點下面的頁籤。連點同一個兩下（0.6 秒內）＝重新整理：整頁重新載入，資料重抓，有新版也會順便換上，並回到同一個頁籤 */
+  tapTab(id) {
+    const now = Date.now();
+    const twice = false;
+    this.lastTabTap = { id, at: now };
+    if (twice) {
+      const G = globalThis;
+      try {
+        G.sessionStorage.setItem("ms:reload-tab", id);
+      } catch (_) {
+      }
+      this.ui.toast("重新整理中…").catch(() => void 0);
+      G.setTimeout(() => G.location.reload(), 150);
+      return;
+    }
+    this.switchTab(id);
+  }
   switchTab(id) {
     this.tab = id;
     const root = {
@@ -4948,7 +4967,7 @@ var App = class {
   }
   /** 最新版本是多少。網頁版問的是自己網站現在上線的版本（重新整理就會拿到的那一版），不是 GitHub 上的 */
   checkVersion() {
-    if (true) return checkLatest("2026.11.24-1901");
+    if (true) return checkLatest("2026.11.24-1905");
     return (async () => {
       try {
         let r = await globalThis.fetch("/version.json?t=" + Date.now(), { cache: "no-store" });
@@ -4956,7 +4975,7 @@ var App = class {
         const latest = String((await r.json()).version || "");
         if (!latest) return null;
         const num = (v) => Number(v.replace(/\D/g, "")) || 0;
-        return { latest, isLatest: num("2026.11.24-1901") >= num(latest) };
+        return { latest, isLatest: num("2026.11.24-1905") >= num(latest) };
       } catch (_) {
         return null;
       }
@@ -4966,13 +4985,24 @@ var App = class {
     this.settings = await loadSettings();
     await this.syncStart().catch(() => void 0);
     if (!settingsStored && this.settings.seenLog === void 0) this.settings.seenLog = CHANGELOG_LATEST;
-    setTabBar(() => ({ active: this.tab, items: this.TABS.map((t) => t.id === "settings" && this.logUnread() ? { ...t, dot: true } : t), onTap: (id) => this.switchTab(id) }));
+    setTabBar(() => ({ active: this.tab, items: this.TABS.map((t) => t.id === "settings" && this.logUnread() ? { ...t, dot: true } : t), onTap: (id) => this.tapTab(id) }));
     setBackGuard(() => this.stack.length > 1);
     this.go(() => this.homeView(), "讀取影城清單…");
     const startTab = false ? (/[?&]tab=(soon|fest)\b/.exec(String(globalThis.location?.search || "")) || [])[1] : "";
     if (startTab) {
       this.movieMode = startTab;
       this.switchTab("movies");
+    }
+    if (false) {
+      try {
+        const G = globalThis;
+        const t = G.sessionStorage.getItem("ms:reload-tab");
+        if (t) {
+          G.sessionStorage.removeItem("ms:reload-tab");
+          if (/^(movies|cinemas|settings)$/.test(t)) this.switchTab(t);
+        }
+      } catch (_) {
+      }
     }
     await this.openShared().catch(() => void 0);
     if (this.syncNote) {
@@ -5675,7 +5705,7 @@ var App = class {
         return;
       }
       try {
-        await sendFeedback(cat.id, text, false ? this.isStandalone() ? "web-app" : "web" : "scriptable", "2026.11.24-1901");
+        await sendFeedback(cat.id, text, false ? this.isStandalone() ? "web-app" : "web" : "scriptable", "2026.11.24-1905");
         this.fbDraft = "";
         this.fbCat = "";
         await this.ui.toast("已送出，謝謝你的回饋");
@@ -5997,7 +6027,7 @@ var App = class {
       this.settings.seenLog = CHANGELOG_LATEST;
       saveSettings(this.settings);
     }
-    return /* @__PURE__ */ h(Page, { title: "更新內容", subtitle: `目前版本 ${"2026.11.24-1901"}`, onBack: () => this.back() }, CHANGELOG.map((e) => /* @__PURE__ */ h(Section, { title: e.date }, e.items.map((it) => /* @__PURE__ */ h(Item, { title: it.text, tag: { text: it.kind === "new" ? "新功能" : "改進", tone: it.kind === "new" ? "now" : "soon" }, chevron: false })))), /* @__PURE__ */ h(Note, { text: "只列出比較有感的變動；修小錯、調整文字這類不會寫在這裡。" }));
+    return /* @__PURE__ */ h(Page, { title: "更新內容", subtitle: `目前版本 ${"2026.11.24-1905"}`, onBack: () => this.back() }, CHANGELOG.map((e) => /* @__PURE__ */ h(Section, { title: e.date }, e.items.map((it) => /* @__PURE__ */ h(Item, { title: it.text, tag: { text: it.kind === "new" ? "新功能" : "改進", tone: it.kind === "new" ? "now" : "soon" }, chevron: false })))), /* @__PURE__ */ h(Note, { text: "只列出比較有感的變動；修小錯、調整文字這類不會寫在這裡。" }));
   }
   async aboutView() {
     return /* @__PURE__ */ h(Page, { title: "關於", onBack: () => this.back() }, /* @__PURE__ */ h(Section, { hint: "連鎖影城的場次來自場次通（twshowtimes.com），感謝場次通的整理；其他來自開眼電影網，以及誠品、光點、樂聲、內惟戲院官網。實際場次以影城公告為準。" }, /* @__PURE__ */ h(Item, { icon: "ℹ️", title: "關於與資料來源", accent: true, chevron: false, onTap: () => Safari.open(ABOUT_URL) }), /* @__PURE__ */ h(Item, { icon: "🔒", title: "隱私權政策", accent: true, chevron: false, onTap: () => Safari.open(PRIVACY_URL) }), /* @__PURE__ */ h(Item, { icon: "🙏", title: "前往場次通", subtitle: "比較各影城場次、看上映場數排行", accent: true, chevron: false, onTap: () => Safari.open("https://twshowtimes.com/") })));
@@ -6028,15 +6058,16 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.24-1901"}`);
+          Pasteboard.copy(`版本 ${"2026.11.24-1905"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.24-1901"}`,
+      `版本 ${"2026.11.24-1905"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
-  citiesView() {
+  async citiesView() {
+    if (!this.cinemas.length) this.cinemas = await loadCinemas();
     const cities = Array.from(new Set(this.cinemas.map((c) => c.city))).sort(
       (a, b) => (CITY_ORDER.indexOf(a) + 1 || 99) - (CITY_ORDER.indexOf(b) + 1 || 99)
     );
@@ -6574,7 +6605,7 @@ var App = class {
     if (false) {
       if (!r) return /* @__PURE__ */ h(Note, { text: "（無法確認是否為最新版：連不到網站）" });
       if (r.isLatest) return /* @__PURE__ */ h(Note, { text: "✅ 已是最新版" });
-      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.24-1901"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
+      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.24-1905"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
         globalThis.location.reload();
       } }));
     }

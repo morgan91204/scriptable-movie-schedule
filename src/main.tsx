@@ -72,6 +72,21 @@ class App {
     { id: "cinemas", label: "影城", icon: "building" },
     { id: "settings", label: "設定", icon: "gear" },
   ];
+  lastTabTap = { id: "", at: 0 }; // 上一次點的是哪個頁籤、什麼時候（用來認「連點兩下」）
+  /** 點下面的頁籤。連點同一個兩下（0.6 秒內）＝重新整理：整頁重新載入，資料重抓，有新版也會順便換上，並回到同一個頁籤 */
+  tapTab(id: string) {
+    const now = Date.now();
+    const twice = IS_WEB && this.lastTabTap.id === id && now - this.lastTabTap.at < 600;
+    this.lastTabTap = { id, at: now };
+    if (twice) {
+      const G = globalThis as any;
+      try { G.sessionStorage.setItem("ms:reload-tab", id); } catch (_) {}
+      this.ui.toast("重新整理中…").catch(() => undefined);
+      G.setTimeout(() => G.location.reload(), 150);
+      return;
+    }
+    this.switchTab(id);
+  }
   switchTab(id: string) {
     this.tab = id;
     const root: Record<string, [View, string]> = {
@@ -118,12 +133,14 @@ class App {
     await this.syncStart().catch(() => undefined);
     // 更新內容：第一次使用的人沒有「舊版」可以比，直接當成看過，不亮紅點
     if (!settingsStored && this.settings.seenLog === undefined) this.settings.seenLog = CHANGELOG_LATEST;
-    setTabBar(() => ({ active: this.tab, items: this.TABS.map((t) => (t.id === "settings" && this.logUnread() ? { ...t, dot: true } : t)), onTap: (id) => this.switchTab(id) }));
+    setTabBar(() => ({ active: this.tab, items: this.TABS.map((t) => (t.id === "settings" && this.logUnread() ? { ...t, dot: true } : t)), onTap: (id) => this.tapTab(id) }));
     setBackGuard(() => this.stack.length > 1);
     this.go(() => this.homeView(), "讀取影城清單…");
     // 從通知點進來（?tab=soon／?tab=fest）：直接開電影分頁的那一類
     const startTab = IS_WEB ? (/[?&]tab=(soon|fest)\b/.exec(String((globalThis as any).location?.search || "")) || [])[1] : "";
     if (startTab) { this.movieMode = startTab as "soon" | "fest"; this.switchTab("movies"); }
+    // 連點頁籤重新整理之後：回到剛才那個頁籤
+    if (IS_WEB) { try { const G = globalThis as any; const t = G.sessionStorage.getItem("ms:reload-tab"); if (t) { G.sessionStorage.removeItem("ms:reload-tab"); if (/^(movies|cinemas|settings)$/.test(t)) this.switchTab(t); } } catch (_) {} }
     await this.openShared().catch(() => undefined);
     if (this.syncNote) { this.switchTab("settings"); this.go(() => this.syncView()); } // 剛從 Google 登入回來：直接到同步那一頁看結果
     loadFestivals().catch(() => []); // 背景先看有沒有影展（有才會在電影分頁多出「影展」）
@@ -1539,7 +1556,8 @@ class App {
   // ── 依縣市找影院 ──
   // 搜尋欄直接放在這一頁最上面：有打字就即時顯示符合的影城（不另開一頁），清空就回到縣市清單
   query = "";
-  citiesView(): string {
+  async citiesView(): Promise<string> {
+    if (!this.cinemas.length) this.cinemas = await loadCinemas(); // 重新整理後直接回到這個頁籤時，影城清單還沒讀過
     const cities = Array.from(new Set(this.cinemas.map((c) => c.city))).sort(
       (a, b) => (CITY_ORDER.indexOf(a) + 1 || 99) - (CITY_ORDER.indexOf(b) + 1 || 99)
     );
