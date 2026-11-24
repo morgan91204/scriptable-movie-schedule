@@ -22,6 +22,7 @@ import MANIFEST from "./public/manifest.webmanifest";
 import ICON_180 from "./public/icon-180.png";
 import ICON_192 from "./public/icon-192.png";
 import ICON_512 from "./public/icon-512.png";
+import OG_IMAGE from "./public/og.png";
 // 收藏電影通知：背景接收程式（sw.js）與推送（push.js）
 import SW_JS from "./public/sw.js.txt";
 import { handlePush, runPush, PushHub, handleSync, handleFeedback, handleSocial } from "./push.js";
@@ -38,6 +39,7 @@ const FILES = {
   "/icon-180.png": [ICON_180, "image/png", "public, max-age=86400"],
   "/icon-192.png": [ICON_192, "image/png", "public, max-age=86400"],
   "/icon-512.png": [ICON_512, "image/png", "public, max-age=86400"],
+  "/og.png": [OG_IMAGE, "image/png", "public, max-age=86400"], // 連結貼到 Threads、LINE 時的預覽圖
 };
 
 export default {
@@ -45,6 +47,10 @@ export default {
     const url = new URL(req.url);
     if (url.pathname === "/version.json") return new Response(JSON.stringify({ version: DEPLOYED }), { headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } });
     if (url.pathname === "/api/version") return new Response(JSON.stringify({ version: DEPLOYED }), { headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } });
+    // 防灌爆：同一個來源一分鐘內打太多次就先擋掉（正常使用碰不到），免得一天的請求額度被幾分鐘用完
+    if (url.pathname.startsWith("/api/") && url.pathname !== "/api/version" && tooMany(req, url.pathname === "/api/fetch" ? "f" : "a", url.pathname === "/api/fetch" ? RATE_FETCH : RATE_API)) {
+      return new Response(JSON.stringify({ error: "too many requests", status: 429, body: "" }), { status: 429, headers: { "content-type": "application/json; charset=utf-8", "retry-after": "60", "cache-control": "no-store" } });
+    }
     if (url.pathname === "/api/fetch" && req.method === "POST") return proxy(req, ctx);
     if (url.pathname.startsWith("/api/push/")) return handlePush(req, env, url.pathname);
     if (url.pathname.startsWith("/api/sync/")) return handleSync(req, env, url.pathname);
@@ -73,6 +79,24 @@ export default {
     else ctx.waitUntil(runPush(env).catch(() => null));
   },
 };
+
+// 每個來源（IP）一分鐘最多幾次。計數放在這台伺服器的記憶體裡：不花額外的請求、也不存任何東西；
+// 同一個人的請求通常落在同一台，所以擋得住單一來源的狂打（分散在很多地方的攻擊擋不住，那要靠 Cloudflare 後台的規則）。
+// 場次轉發給寬一點：「現在有什麼可以看」一次會查很多間影城
+const RATE_FETCH = 300, RATE_API = 150, RATE_WINDOW = 60e3;
+const rateHits = new Map();
+function tooMany(req, kind, max) {
+  const ip = req.headers.get("cf-connecting-ip");
+  if (!ip) return false;
+  const now = Date.now(), key = kind + ip;
+  let e = rateHits.get(key);
+  if (!e || now - e.start > RATE_WINDOW) {
+    if (rateHits.size > 5000) for (const [k, v] of rateHits) if (now - v.start > RATE_WINDOW) rateHits.delete(k); // 順手清掉過期的
+    e = { start: now, n: 0 };
+    rateHits.set(key, e);
+  }
+  return ++e.n > max;
+}
 
 const EXPORT_CRON = "9,39 * * * *"; // 要跟 wrangler.toml 裡的一模一樣
 const REPO = "morgan91204/scriptable-movie-schedule";

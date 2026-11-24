@@ -127,6 +127,22 @@ async function sameText(a, b) {
 // 這個時間點以前投的票：每部片第一次被讀到時刪掉，總表也清空一次。之後投的不受影響
 const RESET_BEFORE = 1795418236644;
 
+// 所有公開接口：同一個 IP 一分鐘最多 180 次（計數放在記憶體裡，不花額外的請求；正常使用碰不到，擋的是程式狂打）
+const READ_MAX = 180, READ_WINDOW = 60e3;
+const readHits = new Map();
+function tooMany(req) {
+  const ip = req.headers.get("cf-connecting-ip");
+  if (!ip) return false;
+  const now = Date.now();
+  let e = readHits.get(ip);
+  if (!e || now - e.start > READ_WINDOW) {
+    if (readHits.size > 5000) for (const [k, v] of readHits) if (now - v.start > READ_WINDOW) readHits.delete(k);
+    e = { start: now, n: 0 };
+    readHits.set(ip, e);
+  }
+  return ++e.n > READ_MAX;
+}
+
 // 同一個 IP 10 分鐘內最多投 60 次（擋灌票，一般人不會碰到）
 const LIMIT_MAX = 60;
 const LIMIT_WINDOW = 600e3;
@@ -135,6 +151,7 @@ export default {
   async fetch(req, env) {
     const url = new URL(req.url);
     if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: HEADERS });
+    if (tooMany(req)) return json({ error: "too many requests, try later" }, 429);
     try {
       if (url.pathname === "/") return json({ ok: true, service: "movie-ratings" });
 

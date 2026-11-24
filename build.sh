@@ -55,7 +55,7 @@ cp web/public/app.js web/public/app.js.txt  # Worker 把這份當文字打包進
 # 靜態檔另外整理一份到 web/site/：部署時當成 Cloudflare 的靜態資源上傳，由 Cloudflare 直接送出，
 # 不經過 Worker、不算每天的請求額度（使用者再多，首頁、程式本體、圖示都不會吃到額度）。這個資料夾每次重建，不進版本庫
 rm -rf web/site && mkdir -p web/site/about web/site/privacy
-cp web/public/index.html web/public/app.js web/public/manifest.webmanifest web/public/icon-180.png web/public/icon-192.png web/public/icon-512.png web/site/
+cp web/public/index.html web/public/app.js web/public/manifest.webmanifest web/public/icon-180.png web/public/icon-192.png web/public/icon-512.png web/public/og.png web/site/
 cp web/public/sw.js.txt web/site/sw.js
 cp web/pages/about.html.txt web/site/about/index.html
 cp web/pages/privacy.html.txt web/site/privacy/index.html
