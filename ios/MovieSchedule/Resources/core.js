@@ -2717,13 +2717,20 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
       footer: `標「可查場次」的已經可以找場次（資料來自場次通）；標「尚未開放場次」的是之後要上映、戲院還沒排場次的片${upcoming.length ? "（片單與上映日期來自開眼電影網，日期可能再調整）" : ""}。`
     };
   }
-  var searchKey = (s) => String(s || "").toLowerCase().replace(/臺/g, "台").replace(/[\s:：．.・·,，、!！?？'"「」《》()（）\-—_]/g, "");
+  var CN_NUM = { "〇": "0", 零: "0", 一: "1", 二: "2", 三: "3", 四: "4", 五: "5", 六: "6", 七: "7", 八: "8", 九: "9" };
+  var searchKey = (s) => {
+    let t = String(s || "");
+    try {
+      t = t.normalize("NFKC");
+    } catch (_) {
+    }
+    return t.toLowerCase().replace(/臺/g, "台").replace(/[〇零一二三四五六七八九]/g, (c) => CN_NUM[c]).replace(/[\s:：．.。・·,，、!！?？'"「」《》()（）\-—_]/g, "");
+  };
   async function globalSearch(query, cinemas) {
-    const k = searchKey(query);
-    const out = { cinemas: [], now: [], soon: [], year: [], fest: [] };
-    if (!k) return out;
-    const hit = (...parts) => parts.some((p) => p && searchKey(p).includes(k));
-    out.cinemas = cinemas.filter((c) => hit(c.name, c.city, c.district, c.id, c.aliases));
+    const terms = String(query || "").split(/\s+/).map(searchKey).filter(Boolean);
+    const whole = terms.join("");
+    const out = { cinemas: [], now: [], soon: [], year: [], fest: [], best: [], loose: false };
+    if (!terms.length) return out;
     const [movies, upcoming, box, fests] = await Promise.all([
       loadMovies().catch(() => []),
       loadUpcoming().catch(() => []),
@@ -2732,28 +2739,64 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
       loadYearRatings().catch(() => null)
       // 裡面有每部片的首映年：結果要標「重映」
     ]);
-    out.now = movies.filter((m) => !m.comingSoon && hit(m.title, m.en));
-    out.soon = soonBoard(movies, upcoming, "").groups.flatMap((g) => g.items).filter((e) => hit(e.title, e.m ? e.m.en : e.u ? e.u.en : ""));
-    const shown = {};
-    for (const m of movies) shown[communityKey(m.title)] = true;
-    const seen = {};
-    const years = box && box.years || {};
-    for (const y of Object.keys(years).sort().reverse()) {
-      for (const x of years[y]) {
-        if (!hit(x.name)) continue;
-        const key = communityKey(x.name), id = `${key}|${String(x.release || "").slice(0, 4)}`;
-        if (shown[key] || seen[id]) continue;
-        seen[id] = true;
-        out.year.push(x);
-      }
-    }
-    out.year.sort((a, b) => String(b.release || "").localeCompare(String(a.release || "")));
     const allFests = [...fests];
     const thisYear = Number(todayTPE().slice(0, 4));
     const older = await Promise.all(festivalYears().filter((y) => !fests.some((f) => Number(f.start.slice(0, 4)) === y) && y !== thisYear).map((y) => loadFestivals(y).catch(() => [])));
     for (const list of older) for (const f of list) if (!allFests.some((x) => x.id === f.id)) allFests.push(f);
     allFests.sort((a, b) => b.start.localeCompare(a.start));
-    for (const f of allFests) for (const film of f.films || []) if (hit(film.title)) out.fest.push({ f, film });
+    const cand = (v, name, ...more) => ({ v, name: searchKey(name), hay: searchKey([name, ...more].filter(Boolean).join(" ")) });
+    const shown = {};
+    for (const m of movies) shown[communityKey(m.title)] = true;
+    const seen = {};
+    const years = box && box.years || {};
+    const yearCands = [];
+    for (const y of Object.keys(years).sort().reverse()) {
+      for (const x of years[y]) {
+        const key = communityKey(x.name), id = `${key}|${String(x.release || "").slice(0, 4)}`;
+        if (shown[key] || seen[id]) continue;
+        seen[id] = true;
+        yearCands.push(cand(x, x.name, String(x.release || "").slice(0, 4), boxMainCountry(x.country)));
+      }
+    }
+    yearCands.sort((a, c) => String(c.v.release || "").localeCompare(String(a.v.release || "")));
+    const pools = {
+      cinemas: cinemas.map((c) => cand(c, c.name, c.city, c.district, c.id, c.aliases)),
+      now: movies.filter((m) => !m.comingSoon).map((m) => cand(m, m.title, m.en, (m.release || "").slice(0, 4))),
+      soon: soonBoard(movies, upcoming, "").groups.flatMap((g) => g.items).map((e) => cand(e, e.title, e.m ? e.m.en : e.u ? e.u.en : "", ((e.m ? e.m.release : e.u ? e.u.release : "") || "").slice(0, 4))),
+      year: yearCands,
+      fest: allFests.flatMap((f) => (f.films || []).map((film) => cand({ f, film }, film.title, f.name, f.start.slice(0, 4))))
+    };
+    const score = (c) => {
+      if (!terms.every((t) => c.hay.includes(t))) return 0;
+      return c.name === whole ? 3 : c.name.startsWith(whole) || c.name.startsWith(terms[0]) ? 2 : 1;
+    };
+    const chars = Array.from(new Set(Array.from(whole)));
+    const looseScore = (c) => {
+      if (chars.length < 2) return 0;
+      const n = chars.filter((ch) => c.name.includes(ch)).length;
+      return n >= Math.ceil(chars.length * 0.8) ? n : 0;
+    };
+    const pick = (pool, fn, max = Infinity) => pool.map((c, i) => ({ v: c.v, s: fn(c), i })).filter((r) => r.s > 0).sort((p, q) => q.s - p.s || p.i - q.i).slice(0, max);
+    let got = { cinemas: pick(pools.cinemas, score), now: pick(pools.now, score), soon: pick(pools.soon, score), year: pick(pools.year, score), fest: pick(pools.fest, score) };
+    if (!(got.cinemas.length + got.now.length + got.soon.length + got.year.length + got.fest.length)) {
+      out.loose = true;
+      got = { cinemas: pick(pools.cinemas, looseScore, 5), now: pick(pools.now, looseScore, 8), soon: pick(pools.soon, looseScore, 8), year: pick(pools.year, looseScore, 12), fest: pick(pools.fest, looseScore, 8) };
+    }
+    out.cinemas = got.cinemas.map((r) => r.v);
+    out.now = got.now.map((r) => r.v);
+    out.soon = got.soon.map((r) => r.v);
+    out.year = got.year.map((r) => r.v);
+    out.fest = got.fest.map((r) => r.v);
+    if (!out.loose) {
+      const best = [
+        ...got.now.filter((r) => r.s === 3).map((r) => ({ kind: "now", m: r.v })),
+        ...got.soon.filter((r) => r.s === 3).map((r) => ({ kind: "soon", e: r.v })),
+        ...got.cinemas.filter((r) => r.s === 3).map((r) => ({ kind: "cinema", c: r.v })),
+        ...got.year.filter((r) => r.s === 3).map((r) => ({ kind: "year", x: r.v })),
+        ...got.fest.filter((r) => r.s === 3).map((r) => ({ kind: "fest", f: r.v.f, film: r.v.film }))
+      ];
+      out.best = best.slice(0, 3);
+    }
     return out;
   }
   async function loadSoonBoard(query, opt = {}) {
@@ -3904,7 +3947,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   var extra = { boxOffice, filmList, soonList, nowShowing, nowShowingMulti, movieBoard: movieBoard2, festivalBoard, festivalFilm, nearby, patchSettings, fillMovie, formatList };
   var BRIDGE_LEVEL = 2;
   globalThis.MS = {
-    version: "2026.11.24-1255",
+    version: "2026.11.24-1301",
     level: BRIDGE_LEVEL,
     init(saved) {
       cache = saved || {};

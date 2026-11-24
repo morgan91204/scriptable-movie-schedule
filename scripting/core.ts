@@ -2267,16 +2267,36 @@ export function soonBoard(movies: TwMovie[], upcoming: UpcomingFilm[], query?: s
   };
 }
 // ── 首頁的全域搜尋：影城、現正上映、即將上映、歷年電影、影展片一起找 ──
-export interface GlobalHits { cinemas: Cinema[]; now: TwMovie[]; soon: SoonEntry[]; year: BoxOfficeItem[]; fest: { f: Festival; film: FestivalFilm }[] }
-/** 搜尋用的比對字：小寫、臺→台、去掉空白和常見標點 */
-const searchKey = (s: string) => String(s || "").toLowerCase().replace(/臺/g, "台").replace(/[\s:：．.・·,，、!！?？'"「」《》()（）\-—_]/g, "");
-/** 一次找五類。歷年電影（七千多部）和影展片單要到這時候才讀；同一部片已經在現正上映／即將上映的，歷年電影那一組不重複列 */
+/** 最符合的一筆（片名或影城名跟搜尋字完全一樣）：不分類別集中放在最上面 */
+export type BestHit =
+  | { kind: "cinema"; c: Cinema }
+  | { kind: "now"; m: TwMovie }
+  | { kind: "soon"; e: SoonEntry }
+  | { kind: "year"; x: BoxOfficeItem }
+  | { kind: "fest"; f: Festival; film: FestivalFilm };
+export interface GlobalHits {
+  cinemas: Cinema[]; now: TwMovie[]; soon: SoonEntry[]; year: BoxOfficeItem[]; fest: { f: Festival; film: FestivalFilm }[];
+  best: BestHit[]; // 名稱完全相同的（最多 3 筆）
+  loose: boolean; // true = 照原本的字找不到，這些是「每個字各自比對」找出來的（你是不是要找…）
+}
+const CN_NUM: Record<string, string> = { "〇": "0", 零: "0", 一: "1", 二: "2", 三: "3", 四: "4", 五: "5", 六: "6", 七: "7", 八: "8", 九: "9" };
+/** 搜尋用的比對字：全形轉半形、小寫、臺→台、國字數字換成阿拉伯數字、去掉空白和常見標點。
+ *  兩邊（搜尋字、片名）都這樣轉過再比，所以「玩具總動員５」「玩具總動員五」「玩具總動員5」都算同一個 */
+const searchKey = (s: string) => {
+  let t = String(s || "");
+  try { t = t.normalize("NFKC"); } catch (_) {}
+  return t.toLowerCase().replace(/臺/g, "台").replace(/[〇零一二三四五六七八九]/g, (c) => CN_NUM[c]).replace(/[\s:：．.。・·,，、!！?？'"「」《》()（）\-—_]/g, "");
+};
+/** 一次找五類。歷年電影（七千多部）和影展片單要到這時候才讀；同一部片已經在現正上映／即將上映的，歷年電影那一組不重複列。
+ *  - 可以打好幾個關鍵字（用空白隔開），每一個都要符合：「哥吉拉 2016」「威秀 台中」
+ *  - 每一組裡照符合程度排：名稱完全相同 → 開頭相同 → 中間包含；同一層維持原本的順序
+ *  - 名稱完全相同的另外集中在 best（最多 3 筆）
+ *  - 照原本的字完全找不到時，改成「每個字各自比對」再找一次（loose = true） */
 export async function globalSearch(query: string, cinemas: Cinema[]): Promise<GlobalHits> {
-  const k = searchKey(query);
-  const out: GlobalHits = { cinemas: [], now: [], soon: [], year: [], fest: [] };
-  if (!k) return out;
-  const hit = (...parts: (string | undefined)[]) => parts.some((p) => p && searchKey(p).includes(k));
-  out.cinemas = cinemas.filter((c) => hit(c.name, c.city, c.district, c.id, c.aliases));
+  const terms = String(query || "").split(/\s+/).map(searchKey).filter(Boolean);
+  const whole = terms.join("");
+  const out: GlobalHits = { cinemas: [], now: [], soon: [], year: [], fest: [], best: [], loose: false };
+  if (!terms.length) return out;
   const [movies, upcoming, box, fests] = await Promise.all([
     loadMovies().catch(() => [] as TwMovie[]),
     loadUpcoming().catch(() => [] as UpcomingFilm[]),
@@ -2284,29 +2304,71 @@ export async function globalSearch(query: string, cinemas: Cinema[]): Promise<Gl
     loadFestivals().catch(() => [] as Festival[]),
     loadYearRatings().catch(() => null), // 裡面有每部片的首映年：結果要標「重映」
   ]);
-  out.now = movies.filter((m) => !m.comingSoon && hit(m.title, m.en));
-  out.soon = soonBoard(movies, upcoming, "").groups.flatMap((g) => g.items).filter((e) => hit(e.title, e.m ? e.m.en : e.u ? e.u.en : ""));
-  const shown: Record<string, boolean> = {};
-  for (const m of movies) shown[communityKey(m.title)] = true;
-  const seen: Record<string, boolean> = {};
-  const years = (box && box.years) || {};
-  for (const y of Object.keys(years).sort().reverse()) {
-    for (const x of years[y]) {
-      if (!hit(x.name)) continue;
-      const key = communityKey(x.name), id = `${key}|${String(x.release || "").slice(0, 4)}`;
-      if (shown[key] || seen[id]) continue;
-      seen[id] = true;
-      out.year.push(x);
-    }
-  }
-  out.year.sort((a, b) => String(b.release || "").localeCompare(String(a.release || "")));
   // 影展：今年的加上往年每一屆（往年的片單是各年一個小檔，這時候才讀）
   const allFests: Festival[] = [...fests];
   const thisYear = Number(todayTPE().slice(0, 4));
   const older = await Promise.all(festivalYears().filter((y) => !fests.some((f) => Number(f.start.slice(0, 4)) === y) && y !== thisYear).map((y) => loadFestivals(y).catch(() => [] as Festival[])));
   for (const list of older) for (const f of list) if (!allFests.some((x) => x.id === f.id)) allFests.push(f);
   allFests.sort((a, b) => b.start.localeCompare(a.start));
-  for (const f of allFests) for (const film of f.films || []) if (hit(film.title)) out.fest.push({ f, film });
+
+  // 候選：每一筆有「名稱」（算符合程度用）和「可以比對的全部文字」（名稱、英文片名、年份、縣市…）
+  type Cand<T> = { v: T; name: string; hay: string };
+  const cand = <T,>(v: T, name: string, ...more: (string | undefined)[]): Cand<T> => ({ v, name: searchKey(name), hay: searchKey([name, ...more].filter(Boolean).join(" ")) });
+  const shown: Record<string, boolean> = {};
+  for (const m of movies) shown[communityKey(m.title)] = true;
+  const seen: Record<string, boolean> = {};
+  const years = (box && box.years) || {};
+  const yearCands: Cand<BoxOfficeItem>[] = [];
+  for (const y of Object.keys(years).sort().reverse()) {
+    for (const x of years[y]) {
+      const key = communityKey(x.name), id = `${key}|${String(x.release || "").slice(0, 4)}`;
+      if (shown[key] || seen[id]) continue;
+      seen[id] = true;
+      yearCands.push(cand(x, x.name, String(x.release || "").slice(0, 4), boxMainCountry(x.country)));
+    }
+  }
+  yearCands.sort((a, c) => String(c.v.release || "").localeCompare(String(a.v.release || ""))); // 新的在前
+  const pools = {
+    cinemas: cinemas.map((c) => cand(c, c.name, c.city, c.district, c.id, c.aliases)),
+    now: movies.filter((m) => !m.comingSoon).map((m) => cand(m, m.title, m.en, (m.release || "").slice(0, 4))),
+    soon: soonBoard(movies, upcoming, "").groups.flatMap((g) => g.items).map((e) => cand(e, e.title, e.m ? e.m.en : e.u ? e.u.en : "", ((e.m ? e.m.release : e.u ? e.u.release : "") || "").slice(0, 4))),
+    year: yearCands,
+    fest: allFests.flatMap((f) => (f.films || []).map((film) => cand({ f, film }, film.title, f.name, f.start.slice(0, 4)))),
+  };
+  /** 符合程度：3 名稱完全相同、2 名稱開頭相同、1 其他（中間包含，或是靠年份、縣市這些符合的）；0 = 不符合 */
+  const score = (c: Cand<unknown>): number => {
+    if (!terms.every((t) => c.hay.includes(t))) return 0;
+    return c.name === whole ? 3 : c.name.startsWith(whole) || c.name.startsWith(terms[0]) ? 2 : 1;
+  };
+  /** 寬鬆比對（照原本的字找不到時用）：搜尋字裡的每個字，有八成以上出現在名稱裡（順序不拘） */
+  const chars = Array.from(new Set(Array.from(whole)));
+  const looseScore = (c: Cand<unknown>): number => {
+    if (chars.length < 2) return 0;
+    const n = chars.filter((ch) => c.name.includes(ch)).length;
+    return n >= Math.ceil(chars.length * 0.8) ? n : 0;
+  };
+  const pick = <T,>(pool: Cand<T>[], fn: (c: Cand<unknown>) => number, max = Infinity): { v: T; s: number }[] =>
+    pool.map((c, i) => ({ v: c.v, s: fn(c), i })).filter((r) => r.s > 0).sort((p, q) => q.s - p.s || p.i - q.i).slice(0, max);
+  let got = { cinemas: pick(pools.cinemas, score), now: pick(pools.now, score), soon: pick(pools.soon, score), year: pick(pools.year, score), fest: pick(pools.fest, score) };
+  if (!(got.cinemas.length + got.now.length + got.soon.length + got.year.length + got.fest.length)) {
+    out.loose = true;
+    got = { cinemas: pick(pools.cinemas, looseScore, 5), now: pick(pools.now, looseScore, 8), soon: pick(pools.soon, looseScore, 8), year: pick(pools.year, looseScore, 12), fest: pick(pools.fest, looseScore, 8) };
+  }
+  out.cinemas = got.cinemas.map((r) => r.v);
+  out.now = got.now.map((r) => r.v);
+  out.soon = got.soon.map((r) => r.v);
+  out.year = got.year.map((r) => r.v);
+  out.fest = got.fest.map((r) => r.v);
+  if (!out.loose) {
+    const best: BestHit[] = [
+      ...got.now.filter((r) => r.s === 3).map((r): BestHit => ({ kind: "now", m: r.v })),
+      ...got.soon.filter((r) => r.s === 3).map((r): BestHit => ({ kind: "soon", e: r.v })),
+      ...got.cinemas.filter((r) => r.s === 3).map((r): BestHit => ({ kind: "cinema", c: r.v })),
+      ...got.year.filter((r) => r.s === 3).map((r): BestHit => ({ kind: "year", x: r.v })),
+      ...got.fest.filter((r) => r.s === 3).map((r): BestHit => ({ kind: "fest", f: r.v.f, film: r.v.film })),
+    ];
+    out.best = best.slice(0, 3);
+  }
   return out;
 }
 /** 「即將上映」要的資料一次讀好 */
