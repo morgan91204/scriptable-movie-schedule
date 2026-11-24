@@ -169,6 +169,17 @@ class App {
       this.ui.toast(`已登入，並追蹤了 ${who}`).catch(() => undefined);
       await this.askNickname().catch(() => undefined);
     } else if (this.syncNote) { this.switchTab("settings"); this.go(() => this.syncView()); } // 剛從 Google 登入回來：直接到同步那一頁看結果
+    // 網頁版的新手引導（從分享連結、通知點進來的不打擾，只在停在首頁時才出現）
+    if (IS_WEB && this.tab === "home" && this.stack.length === 1 && !/[?&](u|tab|fav|c|m)=/.test(String((globalThis as any).location?.search || ""))) {
+      if (this.isStandalone()) {
+        // 第一次從主畫面的圖示開啟：問要不要開通知（只問這一次；之後寫短評、追蹤別人時還會再問）
+        if (!this.settings.firstRunAsked) { this.settings.firstRunAsked = true; saveSettings(this.settings); await this.askNotify(true).catch(() => undefined); }
+      } else if (!this.settings.installSeen) {
+        // 第一次用瀏覽器打開：先告訴他可以加到主畫面（可以跳過，之後首頁最上面還有一條提醒）
+        this.settings.installSeen = Date.now(); saveSettings(this.settings);
+        this.go(() => this.installView(true));
+      }
+    }
     loadFestivals().catch(() => []); // 背景先看有沒有影展（有才會在電影分頁多出「影展」）
     const input = String(args.shortcutParameter || (args.urls && args.urls[0]) || (args.plainTexts && args.plainTexts[0]) || "");
     let pendingUrl = input;
@@ -608,6 +619,14 @@ class App {
     }
     return (
       <Page title="🎬 片刻" subtitle={`全台 ${this.cinemas.length} 間影城場次一次查`}>
+        {IS_WEB && !this.isStandalone() && !this.settings.installOff && !(globalThis as any).__installed ? (
+          <div class="nb nb-top">
+            <span class="nb-i" aria-hidden="true">📲</span>
+            <span class="nb-t">把片刻加到主畫面：像 App 一樣開啟，還能收到通知。</span>
+            <button class="nb-go" onTap={() => this.go(() => this.installView())}>怎麼加</button>
+            <button class="nb-x" aria-label="不再提醒" onTap={() => { this.settings.installOff = true; saveSettings(this.settings); }}>✕</button>
+          </div>
+        ) : null}
         <Search value={this.homeQuery} placeholder="搜尋電影、影城（可以用空白隔開好幾個字）" onInput={(t) => { this.homeQuery = t; }} />
         <Section>
           <Item icon="🕘" title="現在有什麼可以看" subtitle="依時段找收藏、附近或各縣市的場次" onTap={() => this.go(() => this.nowView())} />
@@ -1185,22 +1204,24 @@ class App {
     }}>{esc(label)}</button>;
   }
   /** 寫了短評、回覆或追蹤別人之後：還沒開通知的話問一次要不要開（只問一次；之後社群頁籤上還是有一條提醒） */
-  async askNotify(): Promise<void> {
+  async askNotify(first = false): Promise<void> {
     const p = this.push();
     // 問過之後兩個禮拜內不再問（選了「稍後再說」的人，之後追蹤別人、寫短評時還會再問一次）
     const last = Number(this.settings.notifyAsked) || 0;
-    if (!p || !signedIn() || Date.now() - last < 14 * 864e5) return;
+    if (!p || (!first && !signedIn()) || Date.now() - last < 14 * 864e5) return;
     const st: string = await p.refresh().catch(() => "");
     this.pushSt = st;
     if (st !== "off" && st !== "needs-install") return;
     this.settings.notifyAsked = Date.now(); saveSettings(this.settings);
     this.go(() => (
-      <Page title="要開通知嗎？" onBack={() => this.back()}>
+      <Page title={first ? "歡迎使用片刻" : "要開通知嗎？"} onBack={() => this.back()}>
         <Section>
           <div class="nb-ask">
             <div class="nb-ico" aria-hidden="true">🔔</div>
-            <b>有人回覆你的時候，馬上知道</b>
-            <p>開了通知，有人回覆或提到你、追蹤你，手機會跳通知，主畫面的片刻圖示也會顯示數字。推和噓不會吵你，只會列在「社群」裡。</p>
+            <b>{first ? "要開啟通知嗎？" : "有人回覆你的時候，馬上知道"}</b>
+            <p>{first
+              ? "開了通知，你收藏的電影開放場次、上映、快下檔時會通知你；登入之後，有人回覆、提到或追蹤你也會通知。每一種都可以各別關掉。"
+              : "開了通知，有人回覆或提到你、追蹤你，手機會跳通知，主畫面的片刻圖示也會顯示數字。推和噓不會吵你，只會列在「社群」裡。"}</p>
             {this.pushSt === "needs-install" ? <p class="nb-warn">iPhone 要先把片刻「加入主畫面」，從主畫面打開才能開通知。</p> : null}
           </div>
           <div class="nt-form">
@@ -2964,7 +2985,7 @@ class App {
     );
   }
   /** 圖示教學：依瀏覽器給對應的步驟。Android／電腦的 Chrome 有安裝事件時，直接給一顆安裝按鈕 */
-  installView(): string {
+  installView(welcome = false): string {
     const w = globalThis as any;
     const ua = String(w.navigator?.userAgent || "");
     const ios = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && (w.navigator?.maxTouchPoints || 0) > 1); // iPadOS 會自稱 Mac
@@ -3030,8 +3051,18 @@ class App {
       );
     }
     return (
-      <Page title="加到主畫面" subtitle="像 App 一樣從主畫面開啟" onBack={() => this.back()}>
+      <Page title={welcome && !done ? "歡迎使用片刻" : "加到主畫面"} subtitle={welcome && !done ? "先花十秒加到主畫面" : "像 App 一樣從主畫面開啟"} onBack={() => this.back()}>
+        {welcome && !done ? (
+          <Section>
+            <div class="nb-ask">
+              <div class="nb-ico" aria-hidden="true">📲</div>
+              <b>建議先把片刻加到主畫面</b>
+              <p>加了之後，從主畫面的圖示開啟就像一般的 App：沒有網址列、開得比較快，而且才能開啟通知（收藏的電影開賣、有人回覆你）。{ios ? "iPhone 規定要這樣才能收通知。" : ""}</p>
+            </div>
+          </Section>
+        ) : null}
         {body}
+        {welcome && !done ? <Section><div class="nt-form"><Button label="先不用，直接開始用" kind="secondary" onTap={() => this.back()} /></div></Section> : null}
       </Page>
     );
   }
