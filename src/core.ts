@@ -1764,13 +1764,14 @@ export async function boxInfoBy(title: string): Promise<{ x: BoxOfficeItem; info
   const k = communityKey(title);
   const x = b ? b.list.find((i) => communityKey(i.name) === k) : null;
   if (!x) return null;
-  if (!boxFullLatest) await Promise.race([loadBoxOfficeFull().catch(() => null), delay(1500)]);
+  if (!boxFullLatest || !yearRatingsLatest) await Promise.race([Promise.all([loadBoxOfficeFull().catch(() => null), loadYearRatings().catch(() => null)]), delay(1500)]);
   return { x, info: await boxInfo(x).catch(() => null) };
 }
 // ── 重映 ──
 // 官方票房資料把每一次重映都算成新的一筆：有自己的上映日期，累計票房也只算那一次重映，不含首輪。
 // 所以同一部片會有好幾筆，重映那一筆的「累計票房」看起來會少得不合理。這裡找出它更早的那一筆（首輪），畫面上標「重映」並把首輪的數字一起列出來。
 let boxFullLatest: BoxOffice | null = null; // 最近一次讀到的完整票房資料（2016 年至今各年）
+let yearRatingsLatest: YearRatings | null = null; // 最近一次讀到的年度評分總表（裡面有每部片的首映年）
 const rerunIndex = new WeakMap<object, Record<string, BoxOfficeItem[]>>();
 /** 片名本身就寫明是重映的（首輪在 2016 年以前、資料裡找不到首輪時靠這個）。「莎翁經典劇集」這種是另一部作品，不算 */
 export const rerunByName = (name: string): boolean => /重映|修復|週年|周年|[紀記]念版|數位經典|經典劇場|特別版/.test(name || "");
@@ -1795,8 +1796,16 @@ export function boxFirstRun(x: BoxOfficeItem, b: BoxOffice | null = boxFullLates
   }
   return null;
 }
-/** 這一筆是不是重映（找得到首輪，或片名自己寫了重映） */
-export const boxIsRerun = (x: BoxOfficeItem, b: BoxOffice | null = boxFullLatest): boolean => !!boxFirstRun(x, b) || rerunByName(x.name);
+/** 這部片原本是哪一年的（伺服器用 TMDB 查的首映年）。比這次上映早五年以上才回傳：
+ *  首輪在 2016 年以前、片名又沒寫「重映」的老片（《魔戒三部曲：王者再臨》2003 年的片、2021 年重映）靠這個認出來。
+ *  差不到五年的不算，因為外國片晚一兩年才在台灣上映很常見 */
+export function boxOrigYear(x: BoxOfficeItem): number {
+  const r = yearRatingsLatest && x && x.release ? yearRatingsLatest.ratings[yearRatingKey(x.name, x.release)] : null;
+  const y = r && r.y ? r.y : 0, shown = Number(String(x.release || "").slice(0, 4)) || 0;
+  return y && shown && shown - y >= 5 ? y : 0;
+}
+/** 這一筆是不是重映（資料裡找得到先前上映的那一筆、片名自己寫了重映，或這部片比這次上映早了五年以上） */
+export const boxIsRerun = (x: BoxOfficeItem, b: BoxOffice | null = boxFullLatest): boolean => !!boxFirstRun(x, b) || rerunByName(x.name) || !!boxOrigYear(x);
 /** 票房頁「個別資訊」的各列：[標題, 內容]。跟官方網站列的欄位一樣（國別、發行、出品、上映日期、上映院數、累計票數、累計金額），沒有的不列 */
 export function boxInfoRows(x: BoxOfficeItem, info: BoxInfo | null): [string, string][] {
   const num = (n: number) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
@@ -1808,10 +1817,10 @@ export function boxInfoRows(x: BoxOfficeItem, info: BoxInfo | null): [string, st
   if (x.theaters) rows.push(["上映戲院", `${x.theaters} 間`]);
   if (x.week !== null && !x.since) rows.push(["本週票房", money(x.week)]);
   // 重映的片：官方的累計只算這一次重映，寫清楚，並把首輪的票房列在下面（資料從 2016 年開始，更早的首輪沒有數字）
-  const first = boxFirstRun(x), rerun = !!first || rerunByName(x.name);
+  const first = boxFirstRun(x), orig = boxOrigYear(x), rerun = !!first || rerunByName(x.name) || !!orig;
   rows.push([rerun ? "這次重映累計" : "累計票房", `${money(x.total)}（${num(x.total)} 元）`]);
   if (first) rows.push(["先前上映票房", `${money(first.total)}（${first.release.slice(0, 4)} 年上映）`]);
-  else if (rerun) rows.push(["先前上映票房", "官方資料從 2016 年開始，沒有更早的紀錄"]);
+  else if (rerun) rows.push(["先前上映票房", `${orig ? `${orig} 年的片；` : ""}官方資料從 2016 年開始，沒有更早的紀錄`]);
   const tickets = (info && info.tickets) || x.tickets || 0;
   if (tickets) {
     rows.push(["累計票數", `${num(tickets)} 張`]);
@@ -2095,7 +2104,7 @@ export async function loadMovieBoard(opt: { scope?: string; sort?: string; years
     loadBoxFor(year ? "year" : "now", opt.sort || "week", opt.week || "").catch(() => null),
     loadMovies().catch(() => [] as TwMovie[]),
     needCommunity ? loadCommunitySummary() : Promise.resolve(null),
-    needYearRatings ? loadYearRatings() : Promise.resolve(null),
+    needYearRatings || opt.scope === "year" ? loadYearRatings() : Promise.resolve(null),
   ]);
   if (!b && !all.length) throw new Error("讀不到電影清單，請稍後再試");
   return movieBoard(b, all, { ...opt, community, yearRatings });
@@ -2201,6 +2210,7 @@ export async function globalSearch(query: string, cinemas: Cinema[]): Promise<Gl
     loadUpcoming().catch(() => [] as UpcomingFilm[]),
     loadBoxOfficeFull().catch(() => null),
     loadFestivals().catch(() => [] as Festival[]),
+    loadYearRatings().catch(() => null), // 裡面有每部片的首映年：結果要標「重映」
   ]);
   out.now = movies.filter((m) => !m.comingSoon && hit(m.title, m.en));
   out.soon = soonBoard(movies, upcoming, "").groups.flatMap((g) => g.items).filter((e) => hit(e.title, e.m ? e.m.en : e.u ? e.u.en : ""));
@@ -2235,7 +2245,7 @@ export async function loadSoonBoard(query?: string, opt: SoonOpt = {}): Promise<
 // ───────────────────────── 年度排行的三大評分（伺服器慢慢建立的總表） ─────────────────────────
 export const YEAR_RATINGS_URL = "https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/data/ratings-years.json";
 /** 一部片的紀錄：i = IMDb 分數、v = 評分人數、t = 番茄指數、c = 1 新鮮認證、p = 爆米花指數、id = IMDb 編號、u = 爛番茄網址的片名代稱 */
-export interface YearRating { id?: string; i?: number; v?: number; t?: number; c?: number; p?: number; h?: number /* 1 = 爆米花認證熱門 */; u?: string }
+export interface YearRating { id?: string; i?: number; v?: number; t?: number; c?: number; p?: number; h?: number /* 1 = 爆米花認證熱門 */; u?: string; y?: number /* 這部片原本是哪一年的（TMDB 的首映年） */ }
 export interface YearRatings { total: number; missed: number; ratings: Record<string, YearRating> }
 /** 總表的鍵：去掉標點空白的片名｜上映年（跟 tools/ratings-years.mjs 同一把） */
 export const yearRatingKey = (name: string, release: string): string => `${normTitle(name)}|${String(release || "").slice(0, 4)}`;
@@ -2246,7 +2256,7 @@ export function loadYearRatings(): Promise<YearRatings | null> {
   const job = (async (): Promise<YearRatings | null> => {
     let disk: { at: number; data: YearRatings } | null = null;
     try {
-      disk = JSON.parse(cacheGet("ratings-years2.json") || "null");
+      disk = JSON.parse(cacheGet("ratings-years3.json") || "null");
     } catch (_) {}
     if (disk && disk.data && Date.now() - disk.at < 6 * 3600e3) return disk.data;
     try {
@@ -2254,12 +2264,12 @@ export function loadYearRatings(): Promise<YearRatings | null> {
       const d = r.status === 200 ? JSON.parse(r.body) : null;
       if (d && d.ratings && typeof d.ratings === "object") {
         const data: YearRatings = { total: Number(d.total) || 0, missed: Object.keys(d.miss || {}).length, ratings: d.ratings };
-        try { cacheSet("ratings-years2.json", JSON.stringify({ at: Date.now(), data })); } catch (_) {}
+        try { cacheSet("ratings-years3.json", JSON.stringify({ at: Date.now(), data })); } catch (_) {}
         return data;
       }
     } catch (_) {}
     return disk && disk.data ? disk.data : null;
-  })();
+  })().then((d) => { if (d) yearRatingsLatest = d; return d; }); // 記下來：判斷重映時要查首映年
   yearRatingsMem = { at: Date.now(), job };
   return job;
 }

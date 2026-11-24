@@ -107,7 +107,7 @@ await Promise.all(Array.from({ length: LANES }, async (_, lane) => {
       const r = await core.ratingsOfIdent(who);
       if (r.err && !(r.imdb || r.tomato || r.popcorn)) { failed++; streak++; continue; } // 連線問題：不記，下次再查
       streak = 0;
-      const rec = { id: who.id, a: today, x: 1 };
+      const rec = { id: who.id, a: today, x: 1, ...(who.year ? { y: who.year } : {}) }; // y = 這部片原本是哪一年的（重映片看得出來）
       if (r.imdb) { rec.i = r.imdb.score; rec.v = r.imdb.votes; }
       if (r.tomato) { rec.t = r.tomato.score; if (r.tomato.certified) rec.c = 1; }
       if (r.popcorn) { rec.p = r.popcorn.score; if (r.popcorn.certified) rec.h = 1; }
@@ -121,6 +121,24 @@ await Promise.all(Array.from({ length: LANES }, async (_, lane) => {
   }
 }));
 if (stopped) console.log(`這一輪提早結束：${stopped}；剩下的下一輪再查`);
+// 補「原本是哪一年的片」（y）：這一欄是後來才加的。已經知道 IMDb 編號的片只要問 TMDB 一次（不用再查 IMDb、爛番茄），一輪最多補 8 分鐘
+{
+  const need = Object.keys(ratings).filter((k) => ratings[k].id && !ratings[k].y && !ratings[k].yq);
+  const until = Date.now() + 8 * 60e3;
+  let filled = 0, asked = 0;
+  for (const k of need) {
+    if (Date.now() > until) break;
+    try {
+      asked++;
+      const d = await tmdb(`/find/${ratings[k].id}?external_source=imdb_id`);
+      const hit = (d.movie_results || [])[0] || (d.tv_results || [])[0];
+      const y = hit ? Number(String(hit.release_date || hit.first_air_date || "").slice(0, 4)) || 0 : 0;
+      if (y) { ratings[k].y = y; filled++; } else ratings[k].yq = 1; // 問過了、TMDB 沒有年份：不再問
+    } catch (_) { /* 連線出錯：下一輪再補 */ }
+    await new Promise((r) => setTimeout(r, 40));
+  }
+  if (need.length) console.log(`補首映年：還缺 ${need.length} 部，這一輪問了 ${asked} 部、補上 ${filled} 部`);
+}
 for (const k of Object.keys(miss)) if (!seen.has(k)) delete miss[k];
 for (const k of Object.keys(ratings)) if (!seen.has(k)) delete ratings[k];
 const sorted = (o) => Object.fromEntries(Object.keys(o).sort().map((k) => [k, o[k]]));
