@@ -10,11 +10,11 @@ import { scriptablePlatform } from "./platform-scriptable";
 import {
   Cinema, Settings, Movie, Version, EXTRA, CITY_ORDER, AD_STEPS,
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
-  loadSettings, saveSettings, setSettingsSavedHook, syncPick, syncApply, syncMerge, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, communityKey, SITE_URL, TW,
+  loadSettings, saveSettings, setSettingsSavedHook, syncPick, syncApply, syncMerge, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, communityKey, globalSearch, SITE_URL, TW,
   FORMATS, formatsOf, filterVersions, filterVersionsAny, movieRows, movieDays, nearest, kmLabel, WINDOWS, findShowtimes, findShowtimesMulti, multiLabel, multiDetail, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText,
   hallOf, tmdbTest, movieExtras, moviePoster, movieRuntime, posterSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxCountries, boxByCountry, boxInfo, boxInfoRows, boxCountryText, BOX_COUNTRY_NOTE, boxCountryTag, boxCountriesPicked, loadMovieBoard, loadSoonBoard, notifyPrefs, notifyPayload, notifyEndScope, notifyEndPick, notifyQuiet, NOTIFY_PRE_STEPS, NOTIFY_KINDS, boxStatus, STATUS_LABEL, boxInfoBy, isFavMovie, toggleFavMovie, favMovieRows, favMovieBox, soonGroups, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityCached, communityVote, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalsReady, festivalNote, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, festivalDefaultDate, festivalStateLabel, festivalState, festivalFooter, linkMovies, nowGroupLine, nowFilter, festivalPick, movieAbout, festivalSearch, festivalSearchLines, festivalTrailer, festivalYears, festivalsAny, festivalGroups, festivalChipNote, festivalStatusLine, movieRatings, ratingTier, tomatoTier, popcornTier, popcornCount,
 } from "./core";
-import type { MovieExtras, Ratings, Community, BoxOfficeItem, BoxSort, MovieEntry, SoonEntry, UpcomingFilm, FavMovie, FavRow, NotifyPrefs, NotifyKind, SyncData, Festival, FestivalFilm, FestivalSession } from "./core";
+import type { MovieExtras, Ratings, Community, BoxOfficeItem, BoxSort, MovieEntry, SoonEntry, UpcomingFilm, FavMovie, FavRow, NotifyPrefs, NotifyKind, SyncData, GlobalHits, Festival, FestivalFilm, FestivalSession } from "./core";
 import { setTabBar, setBackGuard, esc } from "./jsx";
 import type { TwMovie, TwMovieCinema, Format, LatLng, Hit } from "./core";
 
@@ -198,7 +198,17 @@ class App {
     );
   }
 
+  /** 清單裡的搜尋只找目前這一類：下面放一列，直接帶到首頁的全域搜尋（電影、影城一起找） */
+  searchAllLink(q: string): string {
+    return (
+      <Section>
+        <Item icon="🔎" title={`在全部電影和影城裡找「${q}」`} subtitle="現正上映、即將上映、歷年電影、影展、影城一起找" accent onTap={() => { this.homeQuery = q; this.switchTab("home"); }} />
+      </Section>
+    );
+  }
   // ── 首頁 ──
+  homeQuery = ""; // 首頁的全域搜尋
+  gsJob: { q: string; job: Promise<GlobalHits> } | null = null; // 目前這個搜尋字的結果（重畫時不用再找一次）
   async homeView(): Promise<string> {
     if (!this.cinemas.length) this.cinemas = await loadCinemas();
     this.calendarName = (await currentCalendar(this.settings)).title;
@@ -208,8 +218,67 @@ class App {
     const favIssuers = this.settings.favIssuers || [];
     const favRows = this.favMovOpen && favMovies.length ? await favMovieRows(this.settings).catch(() => [] as FavRow[]) : [];
     const openFav = (r: FavRow) => this.openFavRow(r);
+    // 全域搜尋：有打字就把下面的入口和收藏換成分組的結果（影城、現正上映、即將上映、歷年電影、影展），清空就恢復
+    const q = this.homeQuery.trim();
+    if (q) {
+      // 歷年電影和影展片單第一次要下載（一兩秒）：超過 0.15 秒就先畫已經有的（影城），讀好再在原地補上。
+      // 不能讓整頁換成「讀取中」，不然搜尋欄會不見、鍵盤會收起來
+      if (!this.gsJob || this.gsJob.q !== q) this.gsJob = { q, job: globalSearch(q, this.cinemas) };
+      const gs = this.gsJob.job;
+      const got = await Promise.race([gs, sleep(this.rerendering ? 0 : 150).then(() => null)]);
+      const pendingGs = !got;
+      if (pendingGs) this.late = [gs];
+      const k0 = q.toLowerCase().replace(/臺/g, "台");
+      const hits: GlobalHits = got || { cinemas: this.cinemas.filter((c) => `${c.name} ${c.city} ${c.district} ${c.id} ${c.aliases || ""}`.toLowerCase().replace(/臺/g, "台").includes(k0)), now: [], soon: [], year: [], fest: [] };
+      const total = hits.cinemas.length + hits.now.length + hits.soon.length + hits.year.length + hits.fest.length;
+      const MAX = 5;
+      const toMovies = (mode: "box" | "soon" | "year" | "fest") => {
+        this.movieMode = mode;
+        if (mode === "fest") { this.festQuery = q; this.festYear = hits.fest.length ? Number(hits.fest[0].f.start.slice(0, 4)) : 0; } else this.movieQuery = q;
+        if (mode === "year") { this.boxYears = Array.from({ length: new Date().getFullYear() - 2014 }, (_, i) => String(2016 + i)); this.boxIssuer = []; this.boxCountry = []; this.boxStatus = ""; this.sortBy.year = "date"; this.ascBy.year = false; }
+        this.switchTab("movies");
+      };
+      const more = (n: number, unit: string, onTap: () => void) => (n > MAX ? <Item title={`看全部 ${n} ${unit}`} accent onTap={onTap} /> : null);
+      return (
+        <Page title="🎬 片刻" subtitle={pendingGs ? `正在找「${q}」…` : `「${q}」找到 ${total} 筆`}>
+          <Search value={this.homeQuery} placeholder="搜尋電影、影城" onInput={(t) => { this.homeQuery = t; }} />
+          {hits.cinemas.length ? (
+            <Section title={`影城（${hits.cinemas.length}）`}>
+              {hits.cinemas.slice(0, MAX).map((c) => this.cinemaItem(c))}
+              {more(hits.cinemas.length, "間", () => { this.query = q; this.switchTab("cinemas"); })}
+            </Section>
+          ) : null}
+          {hits.now.length ? (
+            <Section title={`現正上映（${hits.now.length}）`}>
+              {hits.now.slice(0, MAX).map((m) => <Item title={m.title} subtitle={movieLines(m).filter(Boolean).join("\n")} tag={{ text: "上映中", tone: "now" }} onTap={() => this.go(() => this.movieView(m, ""), `讀取《${m.title}》的放映影城…`)} />)}
+              {more(hits.now.length, "部", () => toMovies("box"))}
+            </Section>
+          ) : null}
+          {hits.soon.length ? (
+            <Section title={`即將上映（${hits.soon.length}）`}>
+              {hits.soon.slice(0, MAX).map((e) => <Item title={e.title} subtitle={e.lines.filter(Boolean).join("\n")} onTap={e.m ? () => this.go(() => this.movieView(e.m!, ""), `讀取《${e.title}》的放映影城…`) : e.u ? () => this.go(() => this.soonMovieView(e.u!), `讀取《${e.title}》…`) : undefined} />)}
+              {more(hits.soon.length, "部", () => toMovies("soon"))}
+            </Section>
+          ) : null}
+          {hits.year.length ? (
+            <Section title={`歷年電影（${hits.year.length}）`}>
+              {hits.year.slice(0, MAX).map((x) => <Item title={x.name} subtitle={[String(x.release || "").slice(0, 10).replace(/-/g, "/") + " 上映", `票房 ${money(x.total)}`].join("｜")} tag={{ text: "已下檔", tone: "off" }} onTap={() => this.go(() => this.boxMovieView(x), `讀取《${x.name}》…`)} />)}
+              {more(hits.year.length, "部", () => toMovies("year"))}
+            </Section>
+          ) : null}
+          {hits.fest.length ? (
+            <Section title={`影展（${hits.fest.length}）`}>
+              {hits.fest.slice(0, MAX).map(({ f, film }) => <Item title={film.title} subtitle={`${f.start.slice(0, 4)} ${f.name}`} onTap={() => this.go(() => this.festivalFilmView(f, film))} />)}
+              {more(hits.fest.length, "部", () => toMovies("fest"))}
+            </Section>
+          ) : null}
+          {pendingGs ? <Note text="正在找電影…" /> : total ? null : <Empty icon="🔎" text="找不到相符的電影或影城，換個關鍵字試試。" />}
+        </Page>
+      );
+    }
     return (
       <Page title="🎬 片刻" subtitle={`全台 ${this.cinemas.length} 間影城場次一次查`}>
+        <Search value={this.homeQuery} placeholder="搜尋電影、影城" onInput={(t) => { this.homeQuery = t; }} />
         <Section>
           <Item icon="🕘" title="現在有什麼可以看" subtitle="依時段找收藏、附近或各縣市的場次" onTap={() => this.go(() => this.nowView())} />
           <Item icon="🎞️" title="依電影找場次" subtitle="先選電影，再看哪些影城有放映" onTap={() => this.go(() => this.movieListView(), "讀取電影清單…")} />
@@ -1469,7 +1538,7 @@ class App {
       <Page title="依電影找場次" subtitle={board.title} onBack={() => this.back()}>
         {this.movieModeChips()}
         {/* 搜尋放最上面；下面一排是排序（兩種範圍各自的排法） */}
-        <Search value={this.movieQuery} placeholder="搜尋片名（中文或英文）" onInput={(t) => { this.movieQuery = t; }} />
+        <Search value={this.movieQuery} placeholder={board.scope === "year" ? `在 ${selYears.length > 2 ? selYears.length + " 個年份" : selYears.join("、") + " 年"}的電影裡搜尋` : "在現正上映裡搜尋片名"} onInput={(t) => { this.movieQuery = t; }} />
         {/* 排序：前面標「排序」，最右邊一顆按鈕寫出方向（高→低），點一下反過來；再點一次選中的排法也會反向 */}
         {board.orders.length > 1 ? (
           <div class="sortbar">
@@ -1515,6 +1584,7 @@ class App {
           </Section>
         ) : null}
         {every.length ? null : <Empty icon="🎞" text="找不到相符的電影" />}
+        {this.movieQuery.trim() ? this.searchAllLink(this.movieQuery.trim()) : null}
         {rows.length ? <Section title={board.title} hint={board.footer}>{rows.map(item)}</Section> : null}
         {paged && board.entries.length > rows.length ? (
           // 不用按：快滑到底時自動接著載入下一批（一次全部畫出好幾千列會卡住，所以還是分批，只是自動）
@@ -1583,7 +1653,7 @@ class App {
     return (
       <Page title="依電影找場次" subtitle={`即將上映 ${board.total} 部｜${board.open} 部可查場次`} onBack={() => this.back()}>
         {this.movieModeChips()}
-        <Search value={this.movieQuery} placeholder="搜尋片名（中文或英文）" onInput={(t) => { this.movieQuery = t; }} />
+        <Search value={this.movieQuery} placeholder="在即將上映裡搜尋片名" onInput={(t) => { this.movieQuery = t; }} />
         <Section hint={this.soonOpen === "when" && board.whens.length > 4 ? "可以左右滑動" : ""}>
           {fold("when", "上映時間", board.whenLabel)}
           {this.soonOpen === "when" ? (
@@ -1609,6 +1679,7 @@ class App {
           );
         })}
         {list.length ? null : <Empty icon="🎞" text="找不到相符的電影" />}
+        {this.movieQuery.trim() ? this.searchAllLink(this.movieQuery.trim()) : null}
       </Page>
     );
   }

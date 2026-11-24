@@ -2150,6 +2150,48 @@ export function soonBoard(movies: TwMovie[], upcoming: UpcomingFilm[], query?: s
     footer: `標「可查場次」的已經可以找場次（資料來自場次通）；標「尚未開放場次」的是之後要上映、戲院還沒排場次的片${upcoming.length ? "（片單與上映日期來自開眼電影網，日期可能再調整）" : ""}。`,
   };
 }
+// ── 首頁的全域搜尋：影城、現正上映、即將上映、歷年電影、影展片一起找 ──
+export interface GlobalHits { cinemas: Cinema[]; now: TwMovie[]; soon: SoonEntry[]; year: BoxOfficeItem[]; fest: { f: Festival; film: FestivalFilm }[] }
+/** 搜尋用的比對字：小寫、臺→台、去掉空白和常見標點 */
+const searchKey = (s: string) => String(s || "").toLowerCase().replace(/臺/g, "台").replace(/[\s:：．.・·,，、!！?？'"「」《》()（）\-—_]/g, "");
+/** 一次找五類。歷年電影（七千多部）和影展片單要到這時候才讀；同一部片已經在現正上映／即將上映的，歷年電影那一組不重複列 */
+export async function globalSearch(query: string, cinemas: Cinema[]): Promise<GlobalHits> {
+  const k = searchKey(query);
+  const out: GlobalHits = { cinemas: [], now: [], soon: [], year: [], fest: [] };
+  if (!k) return out;
+  const hit = (...parts: (string | undefined)[]) => parts.some((p) => p && searchKey(p).includes(k));
+  out.cinemas = cinemas.filter((c) => hit(c.name, c.city, c.district, c.id, c.aliases));
+  const [movies, upcoming, box, fests] = await Promise.all([
+    loadMovies().catch(() => [] as TwMovie[]),
+    loadUpcoming().catch(() => [] as UpcomingFilm[]),
+    loadBoxOfficeFull().catch(() => null),
+    loadFestivals().catch(() => [] as Festival[]),
+  ]);
+  out.now = movies.filter((m) => !m.comingSoon && hit(m.title, m.en));
+  out.soon = soonBoard(movies, upcoming, "").groups.flatMap((g) => g.items).filter((e) => hit(e.title, e.m ? e.m.en : e.u ? e.u.en : ""));
+  const shown: Record<string, boolean> = {};
+  for (const m of movies) shown[communityKey(m.title)] = true;
+  const seen: Record<string, boolean> = {};
+  const years = (box && box.years) || {};
+  for (const y of Object.keys(years).sort().reverse()) {
+    for (const x of years[y]) {
+      if (!hit(x.name)) continue;
+      const key = communityKey(x.name), id = `${key}|${String(x.release || "").slice(0, 4)}`;
+      if (shown[key] || seen[id]) continue;
+      seen[id] = true;
+      out.year.push(x);
+    }
+  }
+  out.year.sort((a, b) => String(b.release || "").localeCompare(String(a.release || "")));
+  // 影展：今年的加上往年每一屆（往年的片單是各年一個小檔，這時候才讀）
+  const allFests: Festival[] = [...fests];
+  const thisYear = Number(todayTPE().slice(0, 4));
+  const older = await Promise.all(festivalYears().filter((y) => !fests.some((f) => Number(f.start.slice(0, 4)) === y) && y !== thisYear).map((y) => loadFestivals(y).catch(() => [] as Festival[])));
+  for (const list of older) for (const f of list) if (!allFests.some((x) => x.id === f.id)) allFests.push(f);
+  allFests.sort((a, b) => b.start.localeCompare(a.start));
+  for (const f of allFests) for (const film of f.films || []) if (hit(film.title)) out.fest.push({ f, film });
+  return out;
+}
 /** 「即將上映」要的資料一次讀好 */
 export async function loadSoonBoard(query?: string, opt: SoonOpt = {}): Promise<SoonBoard> {
   const [movies, upcoming] = await Promise.all([loadMovies(), loadUpcoming().catch(() => [] as UpcomingFilm[])]);
