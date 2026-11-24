@@ -76,7 +76,7 @@ if (base) {
 const year = end.slice(0, 4);
 const showing = new Set(mode === "week" ? list.map(key) : []);
 const names = (v) => String(v || "").split("##").map((t) => t.trim()).filter(Boolean).join("、"); // 多家公司官方用 ## 隔開
-const everything = src.List.filter((x) => x.Name && day(x.ReleaseDate)).map((x) => ({
+const fromSource = src.List.filter((x) => x.Name && day(x.ReleaseDate)).map((x) => ({
   name: String(x.Name).trim(),
   country: String(x.Country || "").trim(),
   release: day(x.ReleaseDate),
@@ -86,6 +86,26 @@ const everything = src.List.filter((x) => x.Name && day(x.ReleaseDate)).map((x) 
   issue: names(x.Issue), // 發行
   produce: names(x.Produce), // 出品
 }));
+// ── 自己留一份完整的存檔（data/boxoffice-archive.json）──
+// 官方的開放資料哪天把舊的年份下架（例如只留近十年），我們這裡的紀錄也不會跟著不見：
+// 每次都把官方現在有的寫進存檔（數字以官方最新的為準），官方已經沒有、但存檔裡有的舊片照樣留著，年度排行從存檔產生。
+// 只有「上映超過兩年」的才這樣留：近兩年的資料官方還會修正（改片名、改上映日），那種留著反而會變成重複的兩筆。
+const ARCHIVE = "data/boxoffice-archive.json";
+let archive = {};
+try { archive = JSON.parse(fs.readFileSync(ARCHIVE, "utf8")).films || {}; } catch (_) {}
+// 存檔的鍵：片名|上映日；官方偶爾有片名和上映日都一樣的兩筆（不同版本），第二筆起加 #2、#3 分開存
+const dupCount = {};
+const archiveKeys = fromSource.map((f) => { const k = key(f); dupCount[k] = (dupCount[k] || 0) + 1; return dupCount[k] > 1 ? `${k}#${dupCount[k]}` : k; });
+const inSource = new Set(archiveKeys);
+const keepBefore = addDays(end, -730);
+let kept = 0;
+for (const k of Object.keys(archive)) {
+  if (inSource.has(k)) continue;
+  if (archive[k].release < keepBefore) kept++; else delete archive[k]; // 近兩年的、官方拿掉了：當作官方修正，不留
+}
+fromSource.forEach((f, i) => { archive[archiveKeys[i]] = { ...f, seen: end }; }); // seen = 官方最後一次有這一筆是哪一週
+const everything = Object.values(archive).map(({ seen: _s, ...f }) => f);
+if (kept) console.log(`官方資料裡已經沒有、從存檔保留下來的舊片：${kept} 部`);
 // 國別：年度排行每一筆只存編號（c），名稱放在檔案開頭的 countries，檔案才不會多出一大截
 const countries = Array.from(new Set(everything.map((f) => f.country).filter(Boolean))).sort();
 // 發行商：一樣只存編號（d），名稱放在檔案開頭的 issuers；累計票數存在 k。清單要能依發行商篩選、依票數和平均票價排序
@@ -148,6 +168,7 @@ fs.mkdirSync("data", { recursive: true });
 // 快照：這週的累計，順便記住上一份（同一週重跑時用）
 fs.writeFileSync(SNAP, JSON.stringify({ end, films, prev: base ? { end: base.end, films: base.films } : null }) + "\n");
 fs.writeFileSync(OUT, JSON.stringify(result, null, 1) + "\n");
+fs.writeFileSync(ARCHIVE, JSON.stringify({ updated: new Date().toISOString(), end, films: Object.fromEntries(Object.keys(archive).sort().map((k) => [k, archive[k]])) }) + "\n");
 fs.writeFileSync(YEARS_OUT, JSON.stringify({ updated: result.updated, end, countries, issuers, years }) + "\n");
 // 每部片的個別資訊（發行、出品、累計票數）：只有點進去才看，所以依上映年份另外存（dist/boxoffice-info-<年>.json），要看才下載。
 // 格式：「片名|上映日」→ [發行, 出品, 累計票數]
