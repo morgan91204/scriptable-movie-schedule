@@ -5075,7 +5075,7 @@ var App = class {
     if (!r && e.loading) lines = [...lines, "評分讀取中…"];
     else if (!r) lines = [...lines, "評分讀不到"];
     if (r?.err && !(r.imdb || r.tomato || r.popcorn)) lines = [...lines, `評分讀不到：${r.err}`];
-    if (x?.err) lines = [...lines, `預告：${x.err}`];
+    if (x?.err) lines = [...lines, "預告會開 YouTube 搜尋結果"];
     return /* @__PURE__ */ h(
       Hero,
       {

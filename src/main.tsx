@@ -1151,7 +1151,8 @@ class App {
     if (!r && e.loading) lines = [...lines, "評分讀取中…"];
     else if (!r) lines = [...lines, "評分讀不到"];
     if (r?.err && !(r.imdb || r.tomato || r.popcorn)) lines = [...lines, `評分讀不到：${r.err}`];
-    if (x?.err) lines = [...lines, `預告：${x.err}`];
+    // 沒找到確定的預告片：不列原因（太多字），只說按鈕會開 YouTube 的搜尋結果
+    if (x?.err) lines = [...lines, "預告會開 YouTube 搜尋結果"];
     return (
       <Hero
         title={title}

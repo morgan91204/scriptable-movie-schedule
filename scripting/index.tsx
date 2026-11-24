@@ -685,7 +685,7 @@ function MovieHero({ title, slug, lines, en, poster, fest }: { title: string; sl
             <Image systemName={"square.and.arrow.up"} font={"subheadline"} />
           </Button>
         </HStack>
-        {x.data?.err ? <Text font={"caption2"} foregroundStyle={"tertiaryLabel"}>{`預告：${x.data.err}`}</Text> : null}
+        {x.data?.err ? <Text font={"caption2"} foregroundStyle={"tertiaryLabel"}>{"預告會開 YouTube 搜尋結果"}</Text> : null}
         {x.error ? <Text font={"caption2"} foregroundStyle={"tertiaryLabel"}>{`預告讀不到：${x.error}`}</Text> : null}
       </VStack>
       <Spacer />
