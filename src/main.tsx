@@ -1885,12 +1885,31 @@ class App {
   async adminUsageView(): Promise<string> {
     const sy = this.sync();
     type Day = { day: string; devices: number; accounts?: number; n: Record<string, number> };
-    type Totals = { accounts: number; sessions: number; named: number; pub: number; diary: number; subs: number; linked: number };
+    type Totals = { accounts: number; sessions: number; named: number; pub: number; diary: number; subs: number; linked: number; size?: { bytes: number; entries: number; follows: number; reqs: number; activity: number; notes: number; feedback: number } };
     let days: Day[] = [], today = "", failed = "", totals: Totals | null = null;
     try { const r = await sy.adm("usage", {}); days = r.days || []; today = r.today || ""; totals = r.totals || null; } catch (e) { failed = String((e as Error)?.message || e); }
     const LIMIT = 100000;
     const NAMES: [string, string][] = [["fetch", "查場次"], ["social", "社群／短評"], ["sync", "同步／登入"], ["push", "通知"], ["version", "檢查更新"], ["page", "頁面"], ["feedback", "回饋"], ["api", "其他"]];
     const num = (n: number) => String(Math.round(n)).replace(/\B(?=(\d{3})+$)/g, ",");
+    const pick = (d: Day, list: [string, string][]) => list.filter(([k]) => d.n[k]).map(([k, label]) => `${label} ${num(d.n[k])}`).join("、");
+    // 使用者做了什麼
+    const acts = (d: Day) => pick(d, [["login", "登入"], ["act-vote", "評分"], ["act-note", "短評／回覆"], ["act-updown", "推噓"], ["act-follow", "追蹤"], ["act-import", "匯入（批）"], ["act-report", "檢舉"]]);
+    // 伺服器那邊的狀況
+    const extra = (d: Day) => [pick(d, [["push-fav", "收藏通知"], ["push-social", "社群通知"], ["push-admin", "管理員通知"]]) && "送出通知：" + pick(d, [["push-fav", "收藏"], ["push-social", "社群"], ["push-admin", "管理員"]]), pick(d, [["fh-tw", "場次通"], ["fh-atm", "開眼"], ["fh-tmdb", "TMDB"], ["fh-rate", "評分網站"], ["fh-other", "其他"]]) && "實際對外抓取：" + pick(d, [["fh-tw", "場次通"], ["fh-atm", "開眼"], ["fh-tmdb", "TMDB"], ["fh-rate", "評分網站"], ["fh-other", "其他"]]), d.n["fetch-fail"] ? `抓取失敗 ${num(d.n["fetch-fail"])}` : "", d.n.blocked ? `打太快被擋 ${num(d.n.blocked)}` : ""].filter(Boolean).join("｜");
+    // 今天各小時的請求數（資料是 UTC 的鐘點，換成台灣時間；一天從早上 8 點開始）
+    const hours = (d: Day) => {
+      const hs = Array.from({ length: 24 }, (_, i) => { const utc = i, tpe = (utc + 8) % 24; return { tpe, n: d.n["h" + String(utc).padStart(2, "0")] || 0 }; });
+      const max = Math.max(1, ...hs.map((x) => x.n));
+      if (!hs.some((x) => x.n)) return "";
+      const peak = hs.reduce((a, b) => (b.n > a.n ? b : a));
+      return (
+        <>
+          <div class="us-hours" aria-hidden="true">{hs.map((x) => <i style={`height:${Math.max(4, Math.round((x.n / max) * 100))}%`} class={x.n === peak.n && x.n ? "peak" : ""} />)}</div>
+          <div class="us-hax"><span>8 點</span><span>14 點</span><span>20 點</span><span>2 點</span><span>7 點</span></div>
+          <div class="us-sub2">各小時的請求數（台灣時間）。最多的是 {peak.tpe} 點，{num(peak.n)} 個。</div>
+        </>
+      );
+    };
     const row = (d: Day) => {
       const total = NAMES.reduce((a, [k]) => a + (d.n[k] || 0), 0);
       const hit = d.n["fetch-hit"] || 0, f = d.n.fetch || 0;
@@ -1902,6 +1921,9 @@ class App {
           <div class="us-bar"><i style={`width:${Math.min(100, Math.max(1, pct))}%`} class={pct >= 80 ? "bad" : pct >= 50 ? "warn" : ""} /></div>
           <div class="us-sub2">{d.devices ? `約 ${num(d.devices)} 台裝置，平均每台 ${num(total / d.devices)} 個` : "裝置數還沒有資料"}{d.accounts ? `｜其中登入的帳號 ${num(d.accounts)} 個` : ""}</div>
           <div class="us-sub2">{esc(parts)}{f ? `｜查場次有 ${Math.round((hit / f) * 100)}% 直接用暫存` : ""}</div>
+          {acts(d) ? <div class="us-sub2">{esc(acts(d))}</div> : null}
+          {extra(d) ? <div class="us-sub2">{esc(extra(d))}</div> : null}
+          {d.day === today ? hours(d) : null}
         </div>
       );
     };
@@ -1914,6 +1936,15 @@ class App {
             <Item kv title="取了暱稱" right={`${num(totals.named)} 個（公開 ${num(totals.pub)}）`} chevron={false} />
             <Item kv title="有片單" right={`${num(totals.diary)} 個`} chevron={false} />
             <Item kv title="開了通知的裝置" right={`${num(totals.subs)} 台（有登入 ${num(totals.linked)}）`} chevron={false} />
+          </Section>
+        ) : null}
+        {totals && totals.size ? (
+          <Section title="資料量" hint="儲存空間的免費額度是 5 GB（所有帳號、片單、追蹤、通知都算在這裡；各部片的評分和短評存在另一支伺服器，量很小）。">
+            <Item kv title="儲存空間" right={`${totals.size.bytes >= 1048576 ? (totals.size.bytes / 1048576).toFixed(1) + " MB" : Math.max(1, Math.round(totals.size.bytes / 1024)) + " KB"}（${(totals.size.bytes / 5368709120 * 100).toFixed(2)}%）`} chevron={false} />
+            <Item kv title="片單紀錄" right={`${num(totals.size.entries)} 筆（有短評 ${num(totals.size.notes)}）`} chevron={false} />
+            <Item kv title="追蹤關係" right={`${num(totals.size.follows)} 筆（等待同意 ${num(totals.size.reqs)}）`} chevron={false} />
+            <Item kv title="通知紀錄" right={`${num(totals.size.activity)} 筆`} chevron={false} />
+            <Item kv title="意見回饋" right={`${num(totals.size.feedback)} 則`} chevron={false} />
           </Section>
         ) : null}
         {failed ? <Section><Note kind="warn" text={failed} /></Section> : !days.length ? <Section><Note text="還沒有資料。這個統計從上線那一刻開始數，過幾分鐘再來看。" /></Section> : (

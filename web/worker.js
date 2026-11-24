@@ -51,6 +51,7 @@ export default {
     if (url.pathname === "/api/version") return new Response(JSON.stringify({ version: DEPLOYED }), { headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } });
     // 防灌爆：同一個來源一分鐘內打太多次就先擋掉（正常使用碰不到），免得一天的請求額度被幾分鐘用完
     if (url.pathname.startsWith("/api/") && url.pathname !== "/api/version" && tooMany(req, url.pathname === "/api/fetch" ? "f" : "a", url.pathname === "/api/fetch" ? RATE_FETCH : RATE_API)) {
+      useAdd("blocked"); // 同一個來源打太快被擋下的次數
       return new Response(JSON.stringify({ error: "too many requests", status: 429, body: "" }), { status: 429, headers: { "content-type": "application/json; charset=utf-8", "retry-after": "60", "cache-control": "no-store" } });
     }
     if (url.pathname === "/api/fetch" && req.method === "POST") return proxy(req, ctx);
@@ -95,6 +96,7 @@ function tally(req, url, env, ctx) {
   const cat = p === "/api/fetch" ? "fetch" : p.startsWith("/api/social/") ? "social" : p.startsWith("/api/sync/") ? "sync" : p.startsWith("/api/push/") ? "push" : p.startsWith("/api/feedback/") ? "feedback"
     : p === "/api/version" || p === "/version.json" ? "version" : p.startsWith("/api/") ? "api" : "page";
   useAdd(cat);
+  useAdd("h" + String(new Date().getUTCHours()).padStart(2, "0")); // 每個小時幾個請求（UTC 的鐘點，畫面上換成台灣時間）
   USE.pending++;
   const day = new Date().toISOString().slice(0, 10);
   if (USE.day !== day) { USE.day = day; USE.sent = new Set(); }
@@ -173,6 +175,8 @@ async function proxy(req, ctx) {
   const res = new Response(JSON.stringify({ status, body }), {
     headers: { "content-type": "application/json; charset=utf-8", "cache-control": "public, max-age=300" },
   });
+  if (status !== 200) useAdd("fetch-fail"); // 對方網站沒有正常回應
+  useAdd("fh-" + (/twshowtimes/.test(target.hostname) ? "tw" : /atmovies/.test(target.hostname) ? "atm" : /themoviedb|tmdb/.test(target.hostname) ? "tmdb" : /imdb|rottentomatoes/.test(target.hostname) ? "rate" : "other")); // 實際去哪個網站抓（不含用暫存的）
   if (cacheable && status === 200) ctx.waitUntil(cache.put(key, res.clone()));
   return res;
 }

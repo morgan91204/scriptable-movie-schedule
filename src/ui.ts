@@ -418,6 +418,10 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .us-bar i.warn{background:#ff9f0a}
 .us-bar i.bad{background:#ff453a}
 .us-sub2{font-size:12.5px;line-height:1.5;color:var(--fg2);overflow-wrap:anywhere}
+.us-hours{display:flex;align-items:flex-end;gap:2px;height:54px;margin-top:10px}
+.us-hours i{flex:1 1 0;min-width:0;border-radius:2px 2px 0 0;background:var(--accent);opacity:.55}
+.us-hours i.peak{opacity:1}
+.us-hax{display:flex;justify-content:space-between;margin:3px 0 4px;font-size:10.5px;color:var(--fg2)}
 .lb-pick{display:block;position:relative;overflow:hidden;text-align:center;text-decoration:none;box-sizing:border-box}
 .lb-pick input{position:absolute;inset:0;width:100%;height:100%;opacity:0}
 .lb-steps{margin:0;padding:14px 16px 0 34px;font-size:14.5px;line-height:1.6;color:var(--fg)}

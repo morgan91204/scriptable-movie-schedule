@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.25-0147
+// @movie-schedule-app 電影行程 v2026.11.25-0151
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/brand.ts
@@ -4675,6 +4675,10 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .us-bar i.warn{background:#ff9f0a}
 .us-bar i.bad{background:#ff453a}
 .us-sub2{font-size:12.5px;line-height:1.5;color:var(--fg2);overflow-wrap:anywhere}
+.us-hours{display:flex;align-items:flex-end;gap:2px;height:54px;margin-top:10px}
+.us-hours i{flex:1 1 0;min-width:0;border-radius:2px 2px 0 0;background:var(--accent);opacity:.55}
+.us-hours i.peak{opacity:1}
+.us-hax{display:flex;justify-content:space-between;margin:3px 0 4px;font-size:10.5px;color:var(--fg2)}
 .lb-pick{display:block;position:relative;overflow:hidden;text-align:center;text-decoration:none;box-sizing:border-box}
 .lb-pick input{position:absolute;inset:0;width:100%;height:100%;opacity:0}
 .lb-steps{margin:0;padding:14px 16px 0 34px;font-size:14.5px;line-height:1.6;color:var(--fg)}
@@ -5449,7 +5453,7 @@ var App = class {
   }
   /** 最新版本是多少。網頁版問的是自己網站現在上線的版本（重新整理就會拿到的那一版），不是 GitHub 上的 */
   checkVersion() {
-    if (true) return checkLatest("2026.11.25-0147");
+    if (true) return checkLatest("2026.11.25-0151");
     return (async () => {
       try {
         let r = await globalThis.fetch("/version.json?t=" + Date.now(), { cache: "no-store" });
@@ -5457,7 +5461,7 @@ var App = class {
         const latest = String((await r.json()).version || "");
         if (!latest) return null;
         const num = (v) => Number(v.replace(/\D/g, "")) || 0;
-        return { latest, isLatest: num("2026.11.25-0147") >= num(latest) };
+        return { latest, isLatest: num("2026.11.25-0151") >= num(latest) };
       } catch (_) {
         return null;
       }
@@ -6732,7 +6736,7 @@ var App = class {
         return;
       }
       try {
-        await sendFeedback(cat.id, text, false ? this.isStandalone() ? "web-app" : "web" : "scriptable", "2026.11.25-0147");
+        await sendFeedback(cat.id, text, false ? this.isStandalone() ? "web-app" : "web" : "scriptable", "2026.11.25-0151");
         this.fbDraft = "";
         this.fbCat = "";
         await this.ui.toast("已送出，謝謝你的回饋");
@@ -6816,14 +6820,27 @@ var App = class {
     const LIMIT = 1e5;
     const NAMES = [["fetch", "查場次"], ["social", "社群／短評"], ["sync", "同步／登入"], ["push", "通知"], ["version", "檢查更新"], ["page", "頁面"], ["feedback", "回饋"], ["api", "其他"]];
     const num = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+$)/g, ",");
+    const pick = (d, list) => list.filter(([k]) => d.n[k]).map(([k, label]) => `${label} ${num(d.n[k])}`).join("、");
+    const acts = (d) => pick(d, [["login", "登入"], ["act-vote", "評分"], ["act-note", "短評／回覆"], ["act-updown", "推噓"], ["act-follow", "追蹤"], ["act-import", "匯入（批）"], ["act-report", "檢舉"]]);
+    const extra = (d) => [pick(d, [["push-fav", "收藏通知"], ["push-social", "社群通知"], ["push-admin", "管理員通知"]]) && "送出通知：" + pick(d, [["push-fav", "收藏"], ["push-social", "社群"], ["push-admin", "管理員"]]), pick(d, [["fh-tw", "場次通"], ["fh-atm", "開眼"], ["fh-tmdb", "TMDB"], ["fh-rate", "評分網站"], ["fh-other", "其他"]]) && "實際對外抓取：" + pick(d, [["fh-tw", "場次通"], ["fh-atm", "開眼"], ["fh-tmdb", "TMDB"], ["fh-rate", "評分網站"], ["fh-other", "其他"]]), d.n["fetch-fail"] ? `抓取失敗 ${num(d.n["fetch-fail"])}` : "", d.n.blocked ? `打太快被擋 ${num(d.n.blocked)}` : ""].filter(Boolean).join("｜");
+    const hours = (d) => {
+      const hs = Array.from({ length: 24 }, (_, i) => {
+        const utc = i, tpe = (utc + 8) % 24;
+        return { tpe, n: d.n["h" + String(utc).padStart(2, "0")] || 0 };
+      });
+      const max = Math.max(1, ...hs.map((x) => x.n));
+      if (!hs.some((x) => x.n)) return "";
+      const peak = hs.reduce((a, b) => b.n > a.n ? b : a);
+      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h("div", { class: "us-hours", "aria-hidden": "true" }, hs.map((x) => /* @__PURE__ */ h("i", { style: `height:${Math.max(4, Math.round(x.n / max * 100))}%`, class: x.n === peak.n && x.n ? "peak" : "" }))), /* @__PURE__ */ h("div", { class: "us-hax" }, /* @__PURE__ */ h("span", null, "8 點"), /* @__PURE__ */ h("span", null, "14 點"), /* @__PURE__ */ h("span", null, "20 點"), /* @__PURE__ */ h("span", null, "2 點"), /* @__PURE__ */ h("span", null, "7 點")), /* @__PURE__ */ h("div", { class: "us-sub2" }, "各小時的請求數（台灣時間）。最多的是 ", peak.tpe, " 點，", num(peak.n), " 個。"));
+    };
     const row = (d) => {
       const total = NAMES.reduce((a, [k]) => a + (d.n[k] || 0), 0);
       const hit = d.n["fetch-hit"] || 0, f = d.n.fetch || 0;
       const parts = NAMES.filter(([k]) => d.n[k]).map(([k, label]) => `${label} ${num(d.n[k])}`).join("、");
       const pct = Math.round(total / LIMIT * 1e3) / 10;
-      return /* @__PURE__ */ h("div", { class: "us-day" }, /* @__PURE__ */ h("div", { class: "us-top" }, /* @__PURE__ */ h("b", null, esc(d.day.slice(5).replace("-", "/")), d.day === today ? "（今天）" : ""), /* @__PURE__ */ h("span", null, num(total), " 個請求｜", pct, "%")), /* @__PURE__ */ h("div", { class: "us-bar" }, /* @__PURE__ */ h("i", { style: `width:${Math.min(100, Math.max(1, pct))}%`, class: pct >= 80 ? "bad" : pct >= 50 ? "warn" : "" })), /* @__PURE__ */ h("div", { class: "us-sub2" }, d.devices ? `約 ${num(d.devices)} 台裝置，平均每台 ${num(total / d.devices)} 個` : "裝置數還沒有資料", d.accounts ? `｜其中登入的帳號 ${num(d.accounts)} 個` : ""), /* @__PURE__ */ h("div", { class: "us-sub2" }, esc(parts), f ? `｜查場次有 ${Math.round(hit / f * 100)}% 直接用暫存` : ""));
+      return /* @__PURE__ */ h("div", { class: "us-day" }, /* @__PURE__ */ h("div", { class: "us-top" }, /* @__PURE__ */ h("b", null, esc(d.day.slice(5).replace("-", "/")), d.day === today ? "（今天）" : ""), /* @__PURE__ */ h("span", null, num(total), " 個請求｜", pct, "%")), /* @__PURE__ */ h("div", { class: "us-bar" }, /* @__PURE__ */ h("i", { style: `width:${Math.min(100, Math.max(1, pct))}%`, class: pct >= 80 ? "bad" : pct >= 50 ? "warn" : "" })), /* @__PURE__ */ h("div", { class: "us-sub2" }, d.devices ? `約 ${num(d.devices)} 台裝置，平均每台 ${num(total / d.devices)} 個` : "裝置數還沒有資料", d.accounts ? `｜其中登入的帳號 ${num(d.accounts)} 個` : ""), /* @__PURE__ */ h("div", { class: "us-sub2" }, esc(parts), f ? `｜查場次有 ${Math.round(hit / f * 100)}% 直接用暫存` : ""), acts(d) ? /* @__PURE__ */ h("div", { class: "us-sub2" }, esc(acts(d))) : null, extra(d) ? /* @__PURE__ */ h("div", { class: "us-sub2" }, esc(extra(d))) : null, d.day === today ? hours(d) : null);
     };
-    return /* @__PURE__ */ h(Page, { title: "用量", subtitle: "最近 14 天", onBack: () => this.back() }, totals ? /* @__PURE__ */ h(Section, { title: "帳號總數", hint: "登入過的帳號：目前登入中、同步過設定、取過暱稱或有片單的帳號合起來算（登出後又沒留任何資料的不算）。「每天有幾個登入的帳號打開」列在下面每一天裡，從這一版上線開始數。" }, /* @__PURE__ */ h(Item, { kv: true, title: "登入過 Google 的帳號", right: `${num(totals.accounts)} 個`, chevron: false }), /* @__PURE__ */ h(Item, { kv: true, title: "目前登入中的裝置", right: `${num(totals.sessions)} 台`, chevron: false }), /* @__PURE__ */ h(Item, { kv: true, title: "取了暱稱", right: `${num(totals.named)} 個（公開 ${num(totals.pub)}）`, chevron: false }), /* @__PURE__ */ h(Item, { kv: true, title: "有片單", right: `${num(totals.diary)} 個`, chevron: false }), /* @__PURE__ */ h(Item, { kv: true, title: "開了通知的裝置", right: `${num(totals.subs)} 台（有登入 ${num(totals.linked)}）`, chevron: false })) : null, failed ? /* @__PURE__ */ h(Section, null, /* @__PURE__ */ h(Note, { kind: "warn", text: failed })) : !days.length ? /* @__PURE__ */ h(Section, null, /* @__PURE__ */ h(Note, { text: "還沒有資料。這個統計從上線那一刻開始數，過幾分鐘再來看。" })) : /* @__PURE__ */ h(Section, { hint: "百分比是跟 Cloudflare 免費方案的每日 100,000 個請求比（只算網頁版這一支，評分伺服器另外算，量很小）。日期用世界標準時間：每天台灣時間早上 8 點換日，額度也是那時候重算。數字是約略值，會比 Cloudflare 後台略少。裝置數靠每天隨機更換的匿名代號估算，不含還沒更新到新版的人。" }, /* @__PURE__ */ h("div", { class: "us-days" }, days.map(row))));
+    return /* @__PURE__ */ h(Page, { title: "用量", subtitle: "最近 14 天", onBack: () => this.back() }, totals ? /* @__PURE__ */ h(Section, { title: "帳號總數", hint: "登入過的帳號：目前登入中、同步過設定、取過暱稱或有片單的帳號合起來算（登出後又沒留任何資料的不算）。「每天有幾個登入的帳號打開」列在下面每一天裡，從這一版上線開始數。" }, /* @__PURE__ */ h(Item, { kv: true, title: "登入過 Google 的帳號", right: `${num(totals.accounts)} 個`, chevron: false }), /* @__PURE__ */ h(Item, { kv: true, title: "目前登入中的裝置", right: `${num(totals.sessions)} 台`, chevron: false }), /* @__PURE__ */ h(Item, { kv: true, title: "取了暱稱", right: `${num(totals.named)} 個（公開 ${num(totals.pub)}）`, chevron: false }), /* @__PURE__ */ h(Item, { kv: true, title: "有片單", right: `${num(totals.diary)} 個`, chevron: false }), /* @__PURE__ */ h(Item, { kv: true, title: "開了通知的裝置", right: `${num(totals.subs)} 台（有登入 ${num(totals.linked)}）`, chevron: false })) : null, totals && totals.size ? /* @__PURE__ */ h(Section, { title: "資料量", hint: "儲存空間的免費額度是 5 GB（所有帳號、片單、追蹤、通知都算在這裡；各部片的評分和短評存在另一支伺服器，量很小）。" }, /* @__PURE__ */ h(Item, { kv: true, title: "儲存空間", right: `${totals.size.bytes >= 1048576 ? (totals.size.bytes / 1048576).toFixed(1) + " MB" : Math.max(1, Math.round(totals.size.bytes / 1024)) + " KB"}（${(totals.size.bytes / 5368709120 * 100).toFixed(2)}%）`, chevron: false }), /* @__PURE__ */ h(Item, { kv: true, title: "片單紀錄", right: `${num(totals.size.entries)} 筆（有短評 ${num(totals.size.notes)}）`, chevron: false }), /* @__PURE__ */ h(Item, { kv: true, title: "追蹤關係", right: `${num(totals.size.follows)} 筆（等待同意 ${num(totals.size.reqs)}）`, chevron: false }), /* @__PURE__ */ h(Item, { kv: true, title: "通知紀錄", right: `${num(totals.size.activity)} 筆`, chevron: false }), /* @__PURE__ */ h(Item, { kv: true, title: "意見回饋", right: `${num(totals.size.feedback)} 則`, chevron: false })) : null, failed ? /* @__PURE__ */ h(Section, null, /* @__PURE__ */ h(Note, { kind: "warn", text: failed })) : !days.length ? /* @__PURE__ */ h(Section, null, /* @__PURE__ */ h(Note, { text: "還沒有資料。這個統計從上線那一刻開始數，過幾分鐘再來看。" })) : /* @__PURE__ */ h(Section, { hint: "百分比是跟 Cloudflare 免費方案的每日 100,000 個請求比（只算網頁版這一支，評分伺服器另外算，量很小）。日期用世界標準時間：每天台灣時間早上 8 點換日，額度也是那時候重算。數字是約略值，會比 Cloudflare 後台略少。裝置數靠每天隨機更換的匿名代號估算，不含還沒更新到新版的人。" }, /* @__PURE__ */ h("div", { class: "us-days" }, days.map(row))));
   }
   async adminListView() {
     const sy = this.sync();
@@ -7077,7 +7094,7 @@ var App = class {
       this.settings.seenLog = CHANGELOG_LATEST;
       saveSettings(this.settings);
     }
-    return /* @__PURE__ */ h(Page, { title: "更新內容", subtitle: `目前版本 ${"2026.11.25-0147"}`, onBack: () => this.back() }, CHANGELOG.map((e) => /* @__PURE__ */ h(Section, { title: e.date }, e.items.map((it) => /* @__PURE__ */ h(Item, { title: it.text, tag: { text: it.kind === "new" ? "新功能" : "改進", tone: it.kind === "new" ? "now" : "soon" }, chevron: false })))), /* @__PURE__ */ h(Note, { text: "只列出比較有感的變動；修小錯、調整文字這類不會寫在這裡。" }));
+    return /* @__PURE__ */ h(Page, { title: "更新內容", subtitle: `目前版本 ${"2026.11.25-0151"}`, onBack: () => this.back() }, CHANGELOG.map((e) => /* @__PURE__ */ h(Section, { title: e.date }, e.items.map((it) => /* @__PURE__ */ h(Item, { title: it.text, tag: { text: it.kind === "new" ? "新功能" : "改進", tone: it.kind === "new" ? "now" : "soon" }, chevron: false })))), /* @__PURE__ */ h(Note, { text: "只列出比較有感的變動；修小錯、調整文字這類不會寫在這裡。" }));
   }
   async aboutView() {
     return /* @__PURE__ */ h(Page, { title: "關於", onBack: () => this.back() }, /* @__PURE__ */ h(Section, { hint: "連鎖影城的場次來自場次通（twshowtimes.com），感謝場次通的整理；其他來自開眼電影網，以及誠品、光點、樂聲、內惟戲院官網。實際場次以影城公告為準。" }, /* @__PURE__ */ h(Item, { icon: "ℹ️", title: "關於與資料來源", accent: true, chevron: false, onTap: () => Safari.open(ABOUT_URL) }), /* @__PURE__ */ h(Item, { icon: "🔒", title: "隱私權政策", accent: true, chevron: false, onTap: () => Safari.open(PRIVACY_URL) }), /* @__PURE__ */ h(Item, { icon: "🙏", title: "前往場次通", subtitle: "比較各影城場次、看上映場數排行", accent: true, chevron: false, onTap: () => Safari.open("https://twshowtimes.com/") })));
@@ -7108,11 +7125,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.25-0147"}`);
+          Pasteboard.copy(`版本 ${"2026.11.25-0151"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.25-0147"}`,
+      `版本 ${"2026.11.25-0151"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -7757,7 +7774,7 @@ var App = class {
     if (false) {
       if (!r) return /* @__PURE__ */ h(Note, { text: "（無法確認是否為最新版：連不到網站）" });
       if (r.isLatest) return /* @__PURE__ */ h(Note, { text: "✅ 已是最新版" });
-      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.25-0147"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
+      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.25-0151"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
         globalThis.location.reload();
       } }));
     }

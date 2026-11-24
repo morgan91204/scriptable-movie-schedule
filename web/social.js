@@ -201,6 +201,8 @@ export async function social(hub, path, b) {
   const sql = hub.state.storage.sql;
   const rate = hub.env.RATE;
   const op = path.replace("/social/", "");
+  // 用量統計：各種動作今天各幾次（只有次數）
+  { const c = { vote: "act-vote", note: "act-note", "note-add": "act-note", "note-reply": "act-note", "note-vote": "act-updown", report: "act-report", "report-user": "act-report", "lbx-match": "act-import", "lbx-import": "act-import" }[op] || (op === "follow" && b.on ? "act-follow" : ""); if (c) hub.bump(c); }
   // 登入的人是誰（沒帶憑證就是 null；憑證不對回 401）
   let uid = "", isAdmin = false;
   if (b.token) {

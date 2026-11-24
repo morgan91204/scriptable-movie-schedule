@@ -295,6 +295,7 @@ export class PushHub {
       let claims;
       try { claims = await verifyGoogle(b.id_token, String(b.nonce || ""), this.env.GOOGLE_KEYS_TEST ? () => JSON.parse(this.env.GOOGLE_KEYS_TEST) : null, true); } catch (e) { return json({ error: "登入沒有通過驗證" }, 401); }
       const uid = await sha256hex("片刻|" + claims.sub);
+      this.bump("login");
       // 登入時帶的 email（Google 驗證過的）：在管理員名單裡才記在這張登入憑證上，不在名單裡的不存
       const email = claims.email && (claims.email_verified === true || claims.email_verified === "true") ? normEmail(claims.email) : "";
       const adm = email && (await this.isAdmin(email)) ? email : "";
@@ -344,7 +345,7 @@ export class PushHub {
   usageAdd(b) {
     const sql = this.state.storage.sql, day = new Date().toISOString().slice(0, 10);
     for (const [cat, n] of Object.entries(b.n || {}).slice(0, 20)) {
-      if (!/^[a-z-]{2,16}$/.test(cat) || !(Number(n) > 0)) continue;
+      if (!/^[a-z0-9-]{2,16}$/.test(cat) || cat === "devices" || cat === "accounts" || !(Number(n) > 0)) continue;
       sql.exec("INSERT INTO usage (day, cat, n) VALUES (?, ?, ?) ON CONFLICT(day, cat) DO UPDATE SET n = n + excluded.n", day, cat, Math.min(1e6, Math.round(Number(n))));
     }
     for (const id of (Array.isArray(b.ids) ? b.ids : []).slice(0, 3000)) if (/^[A-Za-z0-9]{10,20}$/.test(String(id))) sql.exec("INSERT OR IGNORE INTO usage_ids (day, id) VALUES (?, ?)", day, String(id));
@@ -359,6 +360,10 @@ export class PushHub {
     return { ok: true };
   }
   /** 管理員專區的「用量」：最近 14 天，每天幾台裝置、各類請求幾次 */
+  /** 伺服器自己數的事件（登入、評分、短評、追蹤、送出的通知…）：直接加在今天的統計上 */
+  bump(cat, n = 1) {
+    try { this.state.storage.sql.exec("INSERT INTO usage (day, cat, n) VALUES (?, ?, ?) ON CONFLICT(day, cat) DO UPDATE SET n = n + excluded.n", new Date().toISOString().slice(0, 10), cat, n); } catch (_) {}
+  }
   /** 記一筆「這個登入帳號今天有打開片刻」（社群的 me 每次開啟會打一次）。跟裝置代號一樣，過了當天只留人數 */
   usageAccount(uid) {
     this.state.storage.sql.exec("INSERT OR IGNORE INTO usage_ids (day, id) VALUES (?, ?)", new Date().toISOString().slice(0, 10), "a:" + String(uid).slice(0, 40));
@@ -374,7 +379,8 @@ export class PushHub {
     for (const r of sql.exec("SELECT uid FROM users UNION SELECT DISTINCT uid FROM entries").toArray()) ids.add(r.uid);
     await scan("s:", (_k, v) => { subs++; if (v && v.u) linked++; });
     const one = (q) => sql.exec(q).toArray()[0].c;
-    return { accounts: ids.size, sessions, named: one("SELECT COUNT(*) AS c FROM users"), pub: one("SELECT COUNT(*) AS c FROM users WHERE pub = 1 AND hidden = 0"), diary: one("SELECT COUNT(DISTINCT uid) AS c FROM entries"), subs, linked };
+    const size = { bytes: Number(sql.databaseSize) || 0, entries: one("SELECT COUNT(*) AS c FROM entries"), follows: one("SELECT COUNT(*) AS c FROM follows"), reqs: one("SELECT COUNT(*) AS c FROM follow_reqs"), activity: one("SELECT COUNT(*) AS c FROM activity"), notes: one("SELECT COUNT(*) AS c FROM entries WHERE x != ''"), feedback: Number(await st.get("fn")) || 0 };
+    return { size, accounts: ids.size, sessions, named: one("SELECT COUNT(*) AS c FROM users"), pub: one("SELECT COUNT(*) AS c FROM users WHERE pub = 1 AND hidden = 0"), diary: one("SELECT COUNT(DISTINCT uid) AS c FROM entries"), subs, linked };
   }
   async usageRead() {
     const sql = this.state.storage.sql, today = new Date().toISOString().slice(0, 10);
@@ -403,6 +409,7 @@ export class PushHub {
         continue;
       }
       const status = await send(sub, note, this.env).catch(() => 0);
+      if (status >= 200 && status < 300) this.bump(kind === "admin" ? "push-admin" : "push-social");
       if (status === 404 || status === 410) await this.state.storage.delete(id);
     }
   }
@@ -532,7 +539,7 @@ export class PushHub {
     // 一輪最多送幾則：免費方案一次執行只能對外連 50 次（扣掉讀資料的），超過的會整批失敗。
     // 到上限就先停，沒送的不記成送過，下一個小時接著送。付費方案可以在環境變數 PUSH_MAX 調高
     let quota = Math.max(1, Number(this.env.PUSH_MAX) || 40);
-    const push = async (sub, payload) => { if (quota <= 0) { held++; return -1; } quota--; return send(sub, payload, this.env).catch(() => 0); };
+    const push = async (sub, payload) => { if (quota <= 0) { held++; return -1; } quota--; const st = await send(sub, payload, this.env).catch(() => 0); if (st >= 200 && st < 300) this.bump("push-fav"); return st; };
     // 每一輪從不同的人開始（照小時輪流），到上限時才不會永遠是排前面的人先收到
     const all = Array.from(subs);
     const start = all.length ? Math.floor(Date.now() / 3600e3) % all.length : 0;
