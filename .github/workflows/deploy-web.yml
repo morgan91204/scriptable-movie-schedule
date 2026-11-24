@@ -1,0 +1,42 @@
+# 部署網頁版（Cloudflare Worker「app」）：程式有變動推到 main 就自動建置、部署。
+# 靜態檔（首頁、程式本體、圖示、關於頁）當成 Cloudflare 的靜態資源上傳：不經過 Worker、不算每天的請求額度。
+# 金鑰放在這個程式庫的 Actions secret（CLOUDFLARE_API_TOKEN），只給這個排程用。
+name: 部署網頁版
+on:
+  push:
+    branches: [main]
+    # 只有會影響網頁版的檔案變了才部署；每小時更新資料的提交（dist/、data/）不會觸發
+    paths:
+      - "src/**"
+      - "web/**"
+      - "build.sh"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/deploy-web.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+# 一次只跑一個；新的推送進來就取消還沒跑完的舊部署（最後上線的一定是最新的程式）
+concurrency:
+  group: deploy-web
+  cancel-in-progress: true
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      # 測試（npm test）會連真實的網站、半夜又跟日期有關，偶爾會無故失敗，所以不放在部署裡；型別檢查在建置時就會擋
+      - name: 建置（型別檢查、產生 web/public/app.js 與 web/site/）
+        run: ./build.sh
+      - name: 部署到 Cloudflare
+        working-directory: web
+        run: npx wrangler@4 deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: 817e94b26f15cb4cedfde46021b6f0fe
