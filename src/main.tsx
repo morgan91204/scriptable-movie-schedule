@@ -1927,7 +1927,7 @@ class App {
   async boxMovieView(x: BoxOfficeItem): Promise<string> {
     const [e, info] = await Promise.all([this.extras(x.name), boxInfo(x).catch(() => null)]);
     // 劇情簡介（伺服器向 TMDB 查的）：讀太久就先畫其他的，讀好再補上
-    const introJob = loadIntro(x.name, x.release).catch(() => "");
+    const introJob = loadIntro(x.name, x.release).catch(() => ({ intro: "", director: "", cast: "" }));
     const introGot = await Promise.race([introJob, sleep(this.rerendering ? 0 : 800).then(() => undefined)]);
     // 重映的判斷要另外兩份資料（從分享連結、收藏直接進來時還沒讀）：同樣是讀好再補上
     const rr = rerunDataReady();
@@ -1936,15 +1936,15 @@ class App {
     if (introGot === undefined) waiting.push(introJob);
     if (rr && !rrDone) waiting.push(rr);
     if (waiting.length) this.late = waiting;
-    const intro = introGot || "";
+    const about = movieAbout(introGot || null); // 簡介本文，加上導演、演員各一行（跟有場次的電影頁同一種排法）
     const date = x.release.replace(/-/g, "/");
     return (
       <Page title={x.name} subtitle={`票房第 ${x.rank} 名`} onBack={() => this.back()}>
         {this.hero(e, x.name, [boxCountryText(x.country), `${date} 上映`])}
         {/* 個別資訊：跟官方網站列的欄位一樣（國別、發行、出品、上映日期、院數、票數、金額） */}
-        {intro ? (
-          <Section title="劇情簡介" hint="簡介來自 TMDB。">
-            <Para text={intro} />
+        {about.text || about.credits ? (
+          <Section title={about.text ? "劇情簡介" : "導演與演員"} hint="資料來自 TMDB。">
+            <Para text={about.text || about.credits} dim={about.text ? about.credits : ""} />
           </Section>
         ) : null}
         <Section title="票房資訊" hint="資料來源：國家電影及視聽文化中心「全國電影票房統計」。">
@@ -2033,12 +2033,13 @@ class App {
   async soonMovieView(u: UpcomingFilm): Promise<string> {
     const e = await this.extras(u.title, undefined, u.en);
     const date = u.release.replace(/-/g, "/");
+    const soonAbout = movieAbout(u);
     return (
       <Page title={u.title} subtitle={`${date} 上映`} onBack={() => this.back()}>
         {this.hero(e, u.title, [u.en, [`${date} ${u.approx ? "當週" : ""}上映`, u.rating, u.runtime ? `${u.runtime} 分` : ""].filter(Boolean).join("｜")].filter(Boolean), { en: u.en, poster: u.poster })}
-        {u.intro ? (
-          <Section title="劇情簡介" hint="簡介來自 TMDB。">
-            <Para text={u.intro} />
+        {soonAbout.text || soonAbout.credits ? (
+          <Section title={soonAbout.text ? "劇情簡介" : "導演與演員"} hint="資料來自 TMDB。">
+            <Para text={soonAbout.text || soonAbout.credits} dim={soonAbout.text ? soonAbout.credits : ""} />
           </Section>
         ) : null}
         <Note text="戲院還沒有排這部片的場次。通常上映前一到兩週會開放，到時候這裡會自動變成可以查場次。上映日期可能再調整。" />

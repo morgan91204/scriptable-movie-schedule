@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.24-1329
+// @movie-schedule-app 電影行程 v2026.11.24-1351
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/parsers.gen.ts
@@ -2562,8 +2562,9 @@ function loadYearRatings() {
 }
 var introMem = {};
 function loadIntro(name, release) {
+  const none = { intro: "", director: "", cast: "" };
   const year = String(release || "").slice(0, 4);
-  if (!/^20\d{2}$/.test(year)) return Promise.resolve("");
+  if (!/^20\d{2}$/.test(year)) return Promise.resolve(none);
   const job = introMem[year] ||= (async () => {
     const file = `intro-${year}.json`;
     try {
@@ -2586,7 +2587,11 @@ function loadIntro(name, release) {
     delete introMem[year];
     return {};
   });
-  return job.then((m) => String(m[yearRatingKey(name, release)] || ""));
+  return job.then((m) => {
+    const v = m[yearRatingKey(name, release)];
+    if (!v) return none;
+    return typeof v === "string" ? { ...none, intro: v } : { intro: String(v.t || ""), director: String(v.d || ""), cast: String(v.c || "") };
+  });
 }
 var isFavMovie = (s, title) => (s.favMovies || []).some((f) => f.key === communityKey(title));
 function toggleFavMovie(s, m) {
@@ -4210,7 +4215,7 @@ var CHANGELOG = [
       { kind: "new", text: "通知多了幾種：特殊廳有場次、上映前提醒、收藏影城開始放映、評分出爐、每週新片、影展片單公布，也可以自訂勿擾時段" },
       { kind: "better", text: "番茄和爆米花指數改成三級顯示（認證／及格／不及格），圖示也換新" },
       { kind: "better", text: "「觀眾評分」改名「片刻評分」，評分方式改成一排 1 到 10 分" },
-      { kind: "new", text: "已下檔的片也有劇情簡介了" },
+      { kind: "new", text: "已下檔的片、即將上映的片也有劇情簡介和導演、演員了" },
       { kind: "better", text: "重映的片會標「重映」；票房資訊多了「歷次上映」，首映和每次重映的票房分開列、也有合計" },
       { kind: "better", text: "「現在有什麼可以看」的選項重新整理，一頁就看得完" },
       { kind: "better", text: "狀態分成三種：上映中（查得到場次）、少數戲院（查不到場次但還有票房）、已下檔" },
@@ -4407,7 +4412,7 @@ var App = class {
   }
   /** 最新版本是多少。網頁版問的是自己網站現在上線的版本（重新整理就會拿到的那一版），不是 GitHub 上的 */
   checkVersion() {
-    if (true) return checkLatest("2026.11.24-1329");
+    if (true) return checkLatest("2026.11.24-1351");
     return (async () => {
       try {
         let r = await globalThis.fetch("/version.json?t=" + Date.now(), { cache: "no-store" });
@@ -4415,7 +4420,7 @@ var App = class {
         const latest = String((await r.json()).version || "");
         if (!latest) return null;
         const num = (v) => Number(v.replace(/\D/g, "")) || 0;
-        return { latest, isLatest: num("2026.11.24-1329") >= num(latest) };
+        return { latest, isLatest: num("2026.11.24-1351") >= num(latest) };
       } catch (_) {
         return null;
       }
@@ -4985,7 +4990,7 @@ var App = class {
       this.settings.seenLog = CHANGELOG_LATEST;
       saveSettings(this.settings);
     }
-    return /* @__PURE__ */ h(Page, { title: "更新內容", subtitle: `目前版本 ${"2026.11.24-1329"}`, onBack: () => this.back() }, CHANGELOG.map((e) => /* @__PURE__ */ h(Section, { title: e.date }, e.items.map((it) => /* @__PURE__ */ h(Item, { title: it.text, tag: { text: it.kind === "new" ? "新功能" : "改進", tone: it.kind === "new" ? "now" : "soon" }, chevron: false })))), /* @__PURE__ */ h(Note, { text: "只列出比較有感的變動；修小錯、調整文字這類不會寫在這裡。" }));
+    return /* @__PURE__ */ h(Page, { title: "更新內容", subtitle: `目前版本 ${"2026.11.24-1351"}`, onBack: () => this.back() }, CHANGELOG.map((e) => /* @__PURE__ */ h(Section, { title: e.date }, e.items.map((it) => /* @__PURE__ */ h(Item, { title: it.text, tag: { text: it.kind === "new" ? "新功能" : "改進", tone: it.kind === "new" ? "now" : "soon" }, chevron: false })))), /* @__PURE__ */ h(Note, { text: "只列出比較有感的變動；修小錯、調整文字這類不會寫在這裡。" }));
   }
   async aboutView() {
     return /* @__PURE__ */ h(Page, { title: "關於", onBack: () => this.back() }, /* @__PURE__ */ h(Section, { hint: "連鎖影城的場次來自場次通（twshowtimes.com），感謝場次通的整理；其他來自開眼電影網，以及誠品、光點、樂聲、內惟戲院官網。實際場次以影城公告為準。" }, /* @__PURE__ */ h(Item, { icon: "ℹ️", title: "關於與資料來源", accent: true, chevron: false, onTap: () => Safari.open(ABOUT_URL) }), /* @__PURE__ */ h(Item, { icon: "🔒", title: "隱私權政策", accent: true, chevron: false, onTap: () => Safari.open(PRIVACY_URL) }), /* @__PURE__ */ h(Item, { icon: "🙏", title: "前往場次通", subtitle: "比較各影城場次、看上映場數排行", accent: true, chevron: false, onTap: () => Safari.open("https://twshowtimes.com/") })));
@@ -5009,11 +5014,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.24-1329"}`);
+          Pasteboard.copy(`版本 ${"2026.11.24-1351"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.24-1329"}`,
+      `版本 ${"2026.11.24-1351"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -5357,7 +5362,7 @@ var App = class {
     if (false) {
       if (!r) return /* @__PURE__ */ h(Note, { text: "（無法確認是否為最新版：連不到網站）" });
       if (r.isLatest) return /* @__PURE__ */ h(Note, { text: "✅ 已是最新版" });
-      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.24-1329"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
+      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.24-1351"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
         globalThis.location.reload();
       } }));
     }
@@ -5677,7 +5682,7 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
   }
   async boxMovieView(x) {
     const [e, info] = await Promise.all([this.extras(x.name), boxInfo(x).catch(() => null)]);
-    const introJob = loadIntro(x.name, x.release).catch(() => "");
+    const introJob = loadIntro(x.name, x.release).catch(() => ({ intro: "", director: "", cast: "" }));
     const introGot = await Promise.race([introJob, sleep(this.rerendering ? 0 : 800).then(() => void 0)]);
     const rr = rerunDataReady();
     const rrDone = rr ? await Promise.race([rr.then(() => true), sleep(this.rerendering ? 0 : 800).then(() => false)]) : true;
@@ -5685,9 +5690,9 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
     if (introGot === void 0) waiting.push(introJob);
     if (rr && !rrDone) waiting.push(rr);
     if (waiting.length) this.late = waiting;
-    const intro = introGot || "";
+    const about = movieAbout(introGot || null);
     const date = x.release.replace(/-/g, "/");
-    return /* @__PURE__ */ h(Page, { title: x.name, subtitle: `票房第 ${x.rank} 名`, onBack: () => this.back() }, this.hero(e, x.name, [boxCountryText(x.country), `${date} 上映`]), intro ? /* @__PURE__ */ h(Section, { title: "劇情簡介", hint: "簡介來自 TMDB。" }, /* @__PURE__ */ h(Para, { text: intro })) : null, /* @__PURE__ */ h(Section, { title: "票房資訊", hint: "資料來源：國家電影及視聽文化中心「全國電影票房統計」。" }, /* @__PURE__ */ h(Item, { kv: true, title: "狀態", tag: { text: STATUS_LABEL[boxStatus(x)], tone: boxStatus(x) } }), boxInfoRows(x, info).map(([label, value]) => /* @__PURE__ */ h(Item, { kv: true, title: label, right: value }))), this.runsSection(x), /* @__PURE__ */ h(Note, { text: boxStatus(x) === "few" ? "官方票房資料顯示這部片最近一週還有賣出票，但場次通目前查不到場次：可能只剩少數戲院（二輪、獨立戲院）在放，或這幾天剛下檔。" : "這部片已經下檔，場次通目前沒有它的場次。" }));
+    return /* @__PURE__ */ h(Page, { title: x.name, subtitle: `票房第 ${x.rank} 名`, onBack: () => this.back() }, this.hero(e, x.name, [boxCountryText(x.country), `${date} 上映`]), about.text || about.credits ? /* @__PURE__ */ h(Section, { title: about.text ? "劇情簡介" : "導演與演員", hint: "資料來自 TMDB。" }, /* @__PURE__ */ h(Para, { text: about.text || about.credits, dim: about.text ? about.credits : "" })) : null, /* @__PURE__ */ h(Section, { title: "票房資訊", hint: "資料來源：國家電影及視聽文化中心「全國電影票房統計」。" }, /* @__PURE__ */ h(Item, { kv: true, title: "狀態", tag: { text: STATUS_LABEL[boxStatus(x)], tone: boxStatus(x) } }), boxInfoRows(x, info).map(([label, value]) => /* @__PURE__ */ h(Item, { kv: true, title: label, right: value }))), this.runsSection(x), /* @__PURE__ */ h(Note, { text: boxStatus(x) === "few" ? "官方票房資料顯示這部片最近一週還有賣出票，但場次通目前查不到場次：可能只剩少數戲院（二輪、獨立戲院）在放，或這幾天剛下檔。" : "這部片已經下檔，場次通目前沒有它的場次。" }));
   }
   async movieListView() {
     if (this.movieMode === "fest") return this.festivalListView();
@@ -5745,7 +5750,8 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
   async soonMovieView(u) {
     const e = await this.extras(u.title, void 0, u.en);
     const date = u.release.replace(/-/g, "/");
-    return /* @__PURE__ */ h(Page, { title: u.title, subtitle: `${date} 上映`, onBack: () => this.back() }, this.hero(e, u.title, [u.en, [`${date} ${u.approx ? "當週" : ""}上映`, u.rating, u.runtime ? `${u.runtime} 分` : ""].filter(Boolean).join("｜")].filter(Boolean), { en: u.en, poster: u.poster }), u.intro ? /* @__PURE__ */ h(Section, { title: "劇情簡介", hint: "簡介來自 TMDB。" }, /* @__PURE__ */ h(Para, { text: u.intro })) : null, /* @__PURE__ */ h(Note, { text: "戲院還沒有排這部片的場次。通常上映前一到兩週會開放，到時候這裡會自動變成可以查場次。上映日期可能再調整。" }), /* @__PURE__ */ h(Button, { label: "🌐 開眼電影網的介紹", kind: "secondary", onTap: () => Safari.open(u.url) }));
+    const soonAbout = movieAbout(u);
+    return /* @__PURE__ */ h(Page, { title: u.title, subtitle: `${date} 上映`, onBack: () => this.back() }, this.hero(e, u.title, [u.en, [`${date} ${u.approx ? "當週" : ""}上映`, u.rating, u.runtime ? `${u.runtime} 分` : ""].filter(Boolean).join("｜")].filter(Boolean), { en: u.en, poster: u.poster }), soonAbout.text || soonAbout.credits ? /* @__PURE__ */ h(Section, { title: soonAbout.text ? "劇情簡介" : "導演與演員", hint: "資料來自 TMDB。" }, /* @__PURE__ */ h(Para, { text: soonAbout.text || soonAbout.credits, dim: soonAbout.text ? soonAbout.credits : "" })) : null, /* @__PURE__ */ h(Note, { text: "戲院還沒有排這部片的場次。通常上映前一到兩週會開放，到時候這裡會自動變成可以查場次。上映日期可能再調整。" }), /* @__PURE__ */ h(Button, { label: "🌐 開眼電影網的介紹", kind: "secondary", onTap: () => Safari.open(u.url) }));
   }
   // 只看收藏影城
   async movieView(m, date) {

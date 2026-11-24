@@ -2205,7 +2205,7 @@ export async function loadMovieBoard(opt: { scope?: string; sort?: string; years
 // ───────────────────────── 即將上映：場次通（已經排了場次）＋開眼的近期上映（還沒有場次） ─────────────────────────
 export const UPCOMING_URL = "https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/data/upcoming.json";
 /** 還沒有場次的即將上映片（伺服器每六小時從開眼電影網的「近期上映」整理，海報用 TMDB 查好；見 tools/upcoming.mjs） */
-export interface UpcomingFilm { title: string; release: string; rating: string; runtime: number; en: string; poster: string; url: string; approx?: boolean /* 只知道是哪一週上映，日期是大約的 */; intro?: string /* 劇情簡介（TMDB 的中文簡介，沒有就沒有這一欄） */ }
+export interface UpcomingFilm { title: string; release: string; rating: string; runtime: number; en: string; poster: string; url: string; approx?: boolean /* 只知道是哪一週上映，日期是大約的 */; intro?: string /* 劇情簡介（TMDB 的中文簡介，沒有就沒有這一欄） */; director?: string; cast?: string /* 導演、演員（TMDB，用頓號接） */ }
 let upcomingMem: { at: number; job: Promise<UpcomingFilm[]> } | null = null;
 /** 讀即將上映的片單（記憶體 30 分鐘、手機 6 小時）；讀不到回傳空的（清單就只剩場次通有場次的片） */
 export function loadUpcoming(): Promise<UpcomingFilm[]> {
@@ -2430,12 +2430,14 @@ export function loadYearRatings(): Promise<YearRatings | null> {
 }
 
 // ── 已下檔的片的劇情簡介（伺服器向 TMDB 查的中文簡介，每個上映年一個檔；進到那部片的頁面才讀那一年的）──
-const introMem: Record<string, Promise<Record<string, string>>> = {};
-/** 這部片的簡介；沒有（TMDB 沒有中文簡介、或那一年的檔讀不到）回傳空字串 */
-export function loadIntro(name: string, release: string): Promise<string> {
+type IntroEntry = string | { t?: string; d?: string; c?: string }; // 舊格式是只有簡介的字串
+const introMem: Record<string, Promise<Record<string, IntroEntry>>> = {};
+/** 這部片的簡介、導演、演員（伺服器向 TMDB 查的）；沒有的那一項是空字串 */
+export function loadIntro(name: string, release: string): Promise<{ intro: string; director: string; cast: string }> {
+  const none = { intro: "", director: "", cast: "" };
   const year = String(release || "").slice(0, 4);
-  if (!/^20\d{2}$/.test(year)) return Promise.resolve("");
-  const job = (introMem[year] ||= (async (): Promise<Record<string, string>> => {
+  if (!/^20\d{2}$/.test(year)) return Promise.resolve(none);
+  const job = (introMem[year] ||= (async (): Promise<Record<string, IntroEntry>> => {
     const file = `intro-${year}.json`;
     try {
       const c = JSON.parse(cacheGet(file) || "null");
@@ -2447,7 +2449,11 @@ export function loadIntro(name: string, release: string): Promise<string> {
     try { cacheSet(file, JSON.stringify({ at: Date.now(), data: d })); } catch (_) {}
     return d;
   })().catch(() => { delete introMem[year]; return {}; }));
-  return job.then((m) => String(m[yearRatingKey(name, release)] || ""));
+  return job.then((m) => {
+    const v = m[yearRatingKey(name, release)];
+    if (!v) return none;
+    return typeof v === "string" ? { ...none, intro: v } : { intro: String(v.t || ""), director: String(v.d || ""), cast: String(v.c || "") };
+  });
 }
 
 // ───────────────────────── 收藏電影 ─────────────────────────

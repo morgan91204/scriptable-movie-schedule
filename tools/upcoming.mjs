@@ -5,7 +5,7 @@
 // 一天只抓四次（六小時內抓過就沿用上一份）。
 // 用法：TMDB_TOKEN=… node tools/upcoming.mjs <上一份 upcoming.json> <輸出 upcoming.json>
 import fs from "node:fs";
-import { cleanIntro } from "./intro-text.mjs";
+import { cleanIntro, creditsOf } from "./intro-text.mjs";
 
 const [prevPath, outPath = "upcoming.json"] = process.argv.slice(2);
 const TOKEN = (process.env.TMDB_TOKEN || "").trim();
@@ -113,21 +113,27 @@ if (process.argv[1] && process.argv[1].endsWith("upcoming.mjs")) {
       const num = (f.id.match(/^f[a-z]{3}(\d{7,8})$/) || [])[1];
       const old = tmdb[f.id];
       // 簡介（o）是後來才加的：舊的紀錄沒有這一欄，重查一次
-      if (!num || (old && old.o !== undefined && (old.p || now - old.at < 7 * DAY))) continue;
+      // 導演、演員（d、c）也是後來才加的：沒有 d 這一欄的重查一次
+      if (!num || (old && old.o !== undefined && old.d !== undefined && (old.p || now - old.at < 7 * DAY))) continue;
       try {
         asked++;
         const r = await fetch(`https://api.themoviedb.org/3/find/tt${num}?external_source=imdb_id&language=zh-TW`, { headers: { accept: "application/json", Authorization: "Bearer " + TOKEN }, signal: AbortSignal.timeout(20000) });
         if (!r.ok) throw new Error("TMDB " + r.status);
         const hit = ((await r.json()).movie_results || [])[0];
         const p = hit && /^\/[\w.-]+$/.test(hit.poster_path || "") ? hit.poster_path : "";
-        tmdb[f.id] = { p, en: hit ? String(hit.original_title || "").slice(0, 120) : "", o: cleanIntro(hit ? hit.overview : ""), at: now };
+        let cr = { director: "", cast: "" };
+        if (hit && hit.id) {
+          const c = await fetch(`https://api.themoviedb.org/3/movie/${hit.id}/credits?language=zh-TW`, { headers: { accept: "application/json", Authorization: "Bearer " + TOKEN }, signal: AbortSignal.timeout(20000) });
+          if (c.ok) cr = creditsOf(await c.json());
+        }
+        tmdb[f.id] = { p, en: hit ? String(hit.original_title || "").slice(0, 120) : "", o: cleanIntro(hit ? hit.overview : ""), d: cr.director, c: cr.cast, at: now };
       } catch (_) { /* 連線出錯：下次再查 */ }
       await new Promise((r) => setTimeout(r, 60));
     }
   }
   for (const k of Object.keys(tmdb)) if (!byId.has(k) && now - tmdb[k].at > 30 * DAY) delete tmdb[k];
   const films = list
-    .map((f) => ({ title: f.title, release: f.release, rating: f.rating || "", runtime: f.runtime || 0, approx: !!f.approx, en: enOf(tmdb[f.id]), poster: tmdb[f.id] && tmdb[f.id].p ? "https://image.tmdb.org/t/p/w342" + tmdb[f.id].p : "", ...(tmdb[f.id] && tmdb[f.id].o ? { intro: tmdb[f.id].o } : {}), url: `${AT}/movie/${f.id}/` }))
+    .map((f) => ({ title: f.title, release: f.release, rating: f.rating || "", runtime: f.runtime || 0, approx: !!f.approx, en: enOf(tmdb[f.id]), poster: tmdb[f.id] && tmdb[f.id].p ? "https://image.tmdb.org/t/p/w342" + tmdb[f.id].p : "", ...(tmdb[f.id] && tmdb[f.id].o ? { intro: tmdb[f.id].o } : {}), ...(tmdb[f.id] && tmdb[f.id].d ? { director: tmdb[f.id].d } : {}), ...(tmdb[f.id] && tmdb[f.id].c ? { cast: tmdb[f.id].c } : {}), url: `${AT}/movie/${f.id}/` }))
     .sort((a, b) => a.release.localeCompare(b.release) || a.title.localeCompare(b.title, "zh-Hant"));
   fs.writeFileSync(outPath, JSON.stringify({ at: now, source: "開眼電影網", films, tmdb, dates }) + "\n");
   console.log(`即將上映 ${films.length} 部（未來八週 ${weeks.length}、重點片 ${featured.length}），到 ${films.length ? films[films.length - 1].release : "-"}；有海報 ${films.filter((f) => f.poster).length}；這次問了 TMDB ${asked} 次、查了 ${looked} 部的電影頁；只知道哪一週的還有 ${films.filter((f) => f.approx).length} 部`);

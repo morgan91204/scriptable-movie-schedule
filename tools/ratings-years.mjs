@@ -8,7 +8,7 @@
 import fs from "node:fs";
 import { buildSync } from "esbuild";
 import { DOMParser } from "linkedom";
-import { cleanIntro } from "./intro-text.mjs";
+import { cleanIntro, creditsOf } from "./intro-text.mjs";
 
 const [prevPath, outPath = "ratings-years.json"] = process.argv.slice(2);
 const TOKEN = (process.env.TMDB_TOKEN || "").trim();
@@ -125,14 +125,15 @@ await Promise.all(Array.from({ length: LANES }, async (_, lane) => {
 if (stopped) console.log(`這一輪提早結束：${stopped}；剩下的下一輪再查`);
 // 補「原本是哪一年的片」（y）和中文簡介：這兩樣是後來才加的。已經知道 IMDb 編號的片只要問 TMDB 一次（不用再查 IMDb、爛番茄），一輪最多補 8 分鐘。
 // 簡介不放進評分總表（會讓它變得很大）：每個上映年一個檔（INTRO_DIR 底下的 intro-<年>.json，片名鍵 → 簡介），App 進到那部片的頁面才下載那一年的。
-// 紀錄裡的 o = 1 表示簡介問過了（有沒有都算）；yq = 1 表示年份問過、TMDB 沒有
+// 導演、演員也一起存在同一個檔：每一筆是 { t: 簡介, d: 導演, c: 演員 }（沒有的那一項就不寫；舊格式是只有簡介的字串）。
+// 紀錄裡的 o = 2 表示簡介和導演、演員都問過了（o = 1 是舊的，只問過簡介，要補問導演演員）；yq = 1 表示年份問過、TMDB 沒有
 const INTRO_DIR = process.env.INTRO_DIR || "";
 const intros = {}; // 年 → { 片名鍵|年 : 簡介 }
 const introOf = (year) => (intros[year] ||= (INTRO_DIR ? read(`${INTRO_DIR}/intro-${year}.json`, {}) : {}));
 {
-  const need = Object.keys(ratings).filter((k) => ratings[k].id && ((!ratings[k].y && !ratings[k].yq) || (INTRO_DIR && !ratings[k].o)));
+  const need = Object.keys(ratings).filter((k) => ratings[k].id && ((!ratings[k].y && !ratings[k].yq) || (INTRO_DIR && ratings[k].o !== 2)));
   const until = Date.now() + 8 * 60e3;
-  let years = 0, texts = 0, asked = 0;
+  let years = 0, texts = 0, people = 0, asked = 0;
   for (const k of need) {
     if (Date.now() > until) break;
     const rec = ratings[k];
@@ -146,18 +147,28 @@ const introOf = (year) => (intros[year] ||= (INTRO_DIR ? read(`${INTRO_DIR}/intr
       }
       if (INTRO_DIR) {
         const text = cleanIntro(hit ? hit.overview : ""); // 太短、不是中文、簡體字寫的都不收（見 tools/intro-text.mjs）
-        if (text) { introOf(k.split("|").pop())[k] = text; texts++; }
-        rec.o = 1;
+        // 導演、演員：電影才有（TMDB 上被歸成影集的不查）
+        const isMovie = hit && (d.movie_results || [])[0] === hit;
+        const cr = isMovie && hit.id ? creditsOf(await tmdb(`/movie/${hit.id}/credits?language=zh-TW`)) : { director: "", cast: "" };
+        const entry = { ...(text ? { t: text } : {}), ...(cr.director ? { d: cr.director } : {}), ...(cr.cast ? { c: cr.cast } : {}) };
+        const year = k.split("|").pop();
+        if (Object.keys(entry).length) { introOf(year)[k] = entry; if (text) texts++; if (cr.director || cr.cast) people++; } else delete introOf(year)[k];
+        rec.o = 2;
       }
     } catch (_) { /* 連線出錯：下一輪再補 */ }
     await new Promise((r) => setTimeout(r, 40));
   }
-  if (need.length) console.log(`補首映年與簡介：還缺 ${need.length} 部，這一輪問了 ${asked} 部；補上年份 ${years}、簡介 ${texts}`);
+  if (need.length) console.log(`補首映年與簡介：還缺 ${need.length} 部，這一輪問了 ${asked} 部；補上年份 ${years}、簡介 ${texts}、導演演員 ${people}`);
   if (INTRO_DIR) {
     fs.mkdirSync(INTRO_DIR, { recursive: true });
     for (const year of Object.keys(intros)) {
       // 已經存著的也重新把關一次（規則改嚴之後，舊的不合格的要拿掉）
-      for (const k of Object.keys(intros[year])) { const t = seen.has(k) ? cleanIntro(intros[year][k]) : ""; if (t) intros[year][k] = t; else delete intros[year][k]; }
+      for (const k of Object.keys(intros[year])) {
+        const v = intros[year][k], old = typeof v === "string" ? { t: v } : v || {}; // 舊格式（只有簡介的字串）換成新格式
+        const t = seen.has(k) ? cleanIntro(old.t) : "";
+        const e = seen.has(k) ? { ...(t ? { t } : {}), ...(old.d ? { d: String(old.d).slice(0, 120) } : {}), ...(old.c ? { c: String(old.c).slice(0, 240) } : {}) } : {};
+        if (Object.keys(e).length) intros[year][k] = e; else delete intros[year][k];
+      }
       fs.writeFileSync(`${INTRO_DIR}/intro-${year}.json`, JSON.stringify(sorted(intros[year])) + "\n");
     }
   }

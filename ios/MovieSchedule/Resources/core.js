@@ -2858,8 +2858,9 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   }
   var introMem = {};
   function loadIntro(name, release) {
+    const none = { intro: "", director: "", cast: "" };
     const year = String(release || "").slice(0, 4);
-    if (!/^20\d{2}$/.test(year)) return Promise.resolve("");
+    if (!/^20\d{2}$/.test(year)) return Promise.resolve(none);
     const job = introMem[year] ||= (async () => {
       const file = `intro-${year}.json`;
       try {
@@ -2882,7 +2883,11 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
       delete introMem[year];
       return {};
     });
-    return job.then((m) => String(m[yearRatingKey(name, release)] || ""));
+    return job.then((m) => {
+      const v = m[yearRatingKey(name, release)];
+      if (!v) return none;
+      return typeof v === "string" ? { ...none, intro: v } : { intro: String(v.t || ""), director: String(v.d || ""), cast: String(v.c || "") };
+    });
   }
   var isFavMovie = (s, title) => (s.favMovies || []).some((f) => f.key === communityKey(title));
   function toggleFavMovie(s, m) {
@@ -4008,7 +4013,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   var extra = { boxOffice, filmList, soonList, nowShowing, nowShowingMulti, movieBoard: movieBoard2, festivalBoard, festivalFilm, nearby, patchSettings, fillMovie, formatList };
   var BRIDGE_LEVEL = 2;
   globalThis.MS = {
-    version: "2026.11.24-1329",
+    version: "2026.11.24-1351",
     level: BRIDGE_LEVEL,
     init(saved) {
       cache = saved || {};

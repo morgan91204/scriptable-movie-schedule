@@ -1113,9 +1113,10 @@ function BoxOfficeMoviePage({ item: x }: { item: BoxOfficeItem }) {
       </HStack>)}
     </Section>
     <RunsSection item={x} />
-    {intro.data ? <Section header={<Text>劇情簡介</Text>} footer={<Text>簡介來自 TMDB。</Text>}>
-      <Text font={"subheadline"}>{intro.data}</Text>
-    </Section> : null}
+    {(() => { const a = movieAbout(intro.data || null); return a.text || a.credits ? <Section header={<Text>{a.text ? "劇情簡介" : "導演與演員"}</Text>} footer={<Text>資料來自 TMDB。</Text>}>
+      {a.text ? <Text font={"subheadline"}>{a.text}</Text> : null}
+      {a.credits ? <Text font={"footnote"} foregroundStyle={"secondaryLabel"}>{a.credits}</Text> : null}
+    </Section> : null })()}
   </List>
 }
 
@@ -1124,9 +1125,10 @@ function SoonMoviePage({ film: u }: { film: UpcomingFilm }) {
   const date = u.release.replace(/-/g, "/")
   return <List navigationTitle={u.title} navigationBarTitleDisplayMode={"inline"}>
     <MovieHero title={u.title} en={u.en} lines={[u.en, [`${date} ${u.approx ? "當週" : ""}上映`, u.rating, u.runtime ? `${u.runtime} 分` : ""].filter(Boolean).join("｜")].filter(Boolean)} />
-    {u.intro ? <Section header={<Text>劇情簡介</Text>} footer={<Text>簡介來自 TMDB。</Text>}>
-      <Text font={"subheadline"}>{u.intro}</Text>
-    </Section> : null}
+    {(() => { const a = movieAbout(u); return a.text || a.credits ? <Section header={<Text>{a.text ? "劇情簡介" : "導演與演員"}</Text>} footer={<Text>資料來自 TMDB。</Text>}>
+      {a.text ? <Text font={"subheadline"}>{a.text}</Text> : null}
+      {a.credits ? <Text font={"footnote"} foregroundStyle={"secondaryLabel"}>{a.credits}</Text> : null}
+    </Section> : null })()}
     <Section footer={<Text>戲院還沒有排這部片的場次。通常上映前一到兩週會開放，到時候這裡會自動變成可以查場次。上映日期可能再調整。</Text>}>
       <Button title={"開眼電影網的介紹"} systemImage={"safari"} action={() => Safari.openURL(u.url)} />
     </Section>
