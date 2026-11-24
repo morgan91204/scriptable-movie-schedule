@@ -35,7 +35,7 @@ declare const IS_WEB: boolean;
 
 type View = () => string | Promise<string>;
 
-/** 電影頁頂端要用的資料：預告／海報（x）、三大評分（r）、海報網址（p）、觀眾評分（c：undefined 讀取中、false 讀不到） */
+/** 電影頁頂端要用的資料：預告／海報（x）、三大評分（r）、海報網址（p）、片刻評分（c：undefined 讀取中、false 讀不到） */
 type Extras = { x: MovieExtras | null; r: Ratings | null; p: string; px: Promise<MovieExtras | null>; loading: boolean; c: Community | false | undefined };
 const sleep = (ms: number) => new Promise<void>((r) => Timer.schedule(ms, false, () => r()));
 
@@ -744,7 +744,7 @@ class App {
     const px = foregroundTask(movieExtras(title, slug).catch(() => null));
     const pr = foregroundTask(movieRatings(title, en, slug).catch(() => null));
     const pp = foregroundTask(moviePoster(title, slug, en).catch(() => ""));
-    // 觀眾評分：剛投過票或 5 秒內讀過就直接用；失敗回傳 false（顯示讀不到）
+    // 片刻評分：剛投過票或 5 秒內讀過就直接用；失敗回傳 false（顯示讀不到）
     const pc = communityStats(title).catch(() => false as const);
     const wait = this.rerendering ? 0 : 400;
     const quick = <T,>(p: Promise<T>) => Promise.race([p, sleep(wait).then(() => undefined)]);
@@ -755,12 +755,12 @@ class App {
     return { x: x ?? null, r: r ?? null, p: p || "", px, loading, c: c === undefined ? communityCached(title) || undefined : c };
   }
 
-  /** 觀眾評分卡片：平均、人數、分布，以及「你的評分」五顆星（點已選的那顆可以取消） */
+  /** 片刻評分卡片：平均、人數、分布，以及「你的評分」一排 1～10 的格子（點已選的那一格可以取消） */
   community(title: string, c: Community | false | undefined): string {
     const n = c ? c.n : 0;
     const avg = c && n ? c.avg : 0;
     const mine = c ? c.mine : 0;
-    const status = c === undefined ? "讀取中…" : c === false ? "觀眾評分暫時讀不到" : n ? `${n} 人評分` : "還沒有人評分，來當第一個";
+    const status = c === undefined ? "讀取中…" : c === false ? "片刻評分暫時讀不到" : n ? `${n} 人評分` : "還沒有人評分，來當第一個";
     const max = c ? Math.max(1, ...c.dist) : 1;
     const vote = async (s: number) => {
       try {
@@ -770,39 +770,40 @@ class App {
         await this.ui.toast(String((e as Error)?.message || e));
       }
     };
+    // 平均分數的色塊跟 IMDb 同一套（綠／黃／紅）；分布縮成一個小長條圖；自己的評分是一排 1～10 的格子，選幾分就亮到幾分
+    const tier = n ? ratingTier("imdb", avg) : "none";
     return (
-      <Section title="觀眾評分" hint="滿分 10 分。匿名評分，一台手機一票，可以隨時更改；再點一次已選的分數可以取消。各版本的評分會一起統計。">
+      <Section title="片刻評分" hint="匿名評分，一台裝置一票，可以隨時更改；再點一次已選的分數可以取消。各版本的評分會一起統計。">
         <div class="cm">
-          <div class="cm-top">
-            <div class="cm-avg">{n ? avg.toFixed(1) : "-"}<small>／10</small></div>
-            <div class="cm-meta">
-              <span class="cm-stars" aria-label={n ? `平均 ${avg} 分，滿分 10 分` : "還沒有評分"}>
-                <span class="bg">★★★★★</span>
-                <span class="fg" style={`width:${(avg / 10) * 100}%`}>★★★★★</span>
-              </span>
-              <span class="cm-n">{esc(status)}</span>
-            </div>
-            {c && n ? (
-              <div class="cm-dist">
-                {[10, 9, 8, 7, 6, 5, 4, 3, 2, 1].map((s) => (
-                  <div class="cm-row">
-                    <span>{s}</span>
-                    <i style={`width:${Math.round(((c.dist[s - 1] || 0) / max) * 100)}%`} />
-                  </div>
-                ))}
+          {n ? (
+            <div class="cm-top">
+              <div class={"cm-avg " + tier} aria-label={`平均 ${avg.toFixed(1)} 分，滿分 10 分`}>{avg.toFixed(1)}<small>／10</small></div>
+              <div class="cm-meta">
+                <span class="cm-n">{esc(status)}</span>
+                <span class="cm-by">片刻使用者的評分</span>
               </div>
-            ) : null}
-          </div>
-          <div class="cm-mine">
-            <span>{mine ? `你給 ${mine} 分` : "點一個分數評分（滿分 10）"}</span>
+              {c ? (
+                <div class="cm-hist" aria-hidden="true">
+                  <div class="bars">{[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((v) => <i class={c.dist[v - 1] ? "" : "zero"} style={`height:${Math.max(8, Math.round(((c.dist[v - 1] || 0) / max) * 100))}%`} />)}</div>
+                  <div class="axis"><span>1</span><span>10</span></div>
+                </div>
+              ) : null}
+            </div>
+          ) : (
+            <div class="cm-empty">{esc(status)}</div>
+          )}
+          <div class={"cm-mine" + (n ? " line" : "")}>
+            <span>你的評分</span>
+            {mine ? <b>{mine} 分</b> : <em>點一個分數</em>}
           </div>
           <div class="cm-pick">
-            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((s) => (
-              <button class={"cm-num" + (s === mine ? " on" : s < mine ? " below" : "")} aria-label={`${s} 分`} onTap={() => vote(s)}>
-                {s}
+            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((v) => (
+              <button class={"cm-num" + (v <= mine ? " on" : "")} aria-label={`${v} 分`} aria-pressed={v === mine ? "true" : "false"} onTap={() => vote(v)}>
+                {v}
               </button>
             ))}
           </div>
+          <div class="cm-ends"><span>不推薦</span><span>必看</span></div>
         </div>
       </Section>
     );
@@ -1311,7 +1312,7 @@ class App {
   }
   /** 影展的一部片：列出還沒演的所有場次，點一場加入行事曆 */
   async festivalFilmView(f: Festival, film: FestivalFilm): Promise<string> {
-    // 觀眾評分：跟院線片共用同一套（片名相同就是同一部片的分數）
+    // 片刻評分：跟院線片共用同一套（片名相同就是同一部片的分數）
     const rated: Community | false = communityCached(film.title) || (await communityStats(film.title).catch(() => false as const));
     const sessions = festivalFilmSessions(f, film.id);
     // 三大評分：用影展的片名查，跟院線片同一套（最多等 0.4 秒，還沒好就先畫、好了再補上）
@@ -1412,7 +1413,7 @@ class App {
   boxPageKey = "";
   /** 「電影」清單：上映中與票房排行合成一份（範圍、排序、出品國別都在這裡選） */
   async boxOfficeView(): Promise<string> {
-    // 票房、片單（依觀眾評分排時再加評分總表）一次讀好；票房讀不到時清單照樣出來，只是少了依票房排的選項
+    // 票房、片單（依片刻評分排時再加評分總表）一次讀好；票房讀不到時清單照樣出來，只是少了依票房排的選項
     const k = this.movieQuery.trim().toLowerCase();
     const sc = this.movieMode === "year" ? "year" : "now"; // 看哪些片由頁籤決定
     const board = await loadMovieBoard({ scope: sc, sort: this.sortBy[sc], years: this.boxYears, week: this.boxWeek, countries: this.boxCountry, query: k, asc: this.ascBy[sc], rate: this.boxRate, fewLast: this.boxFewLast, issuers: this.boxIssuer, status: this.boxStatus });
@@ -1485,7 +1486,7 @@ class App {
         ) : null}
         {/* 評分來源、週次、出品國別預設收合成一行，點了才展開 */}
         {board.weeks.length > 1 || countries.length > 1 || board.rates.length > 1 || board.issuers.length > 1 ? (
-          <Section hint={this.boxOpen === "week" ? "可以回頭看過去幾週的排行。" : this.boxOpen === "rate" ? "番茄指數是影評的分數、爆米花指數是觀眾的分數（都來自爛番茄）；觀眾評分是這個 App 的使用者打的。" : ""}>
+          <Section hint={this.boxOpen === "week" ? "可以回頭看過去幾週的排行。" : this.boxOpen === "rate" ? "番茄指數是影評的分數、爆米花指數是觀眾的分數（都來自爛番茄）；片刻評分是這個 App 的使用者打的。" : ""}>
             {/* 年份、出品國別、發行商都是點了進一頁清單（可複選） */}
             {board.scope === "year" && years.length > 1 ? <Item kv title="年份" right={selYears.length === years.length ? `全部（${years[years.length - 1]}–${years[0]}）` : selYears.length > 4 ? `已選 ${selYears.length} 年` : selYears.join("、")} onTap={() => this.go(() => this.boxPickView("year"))} /> : null}
             {board.rates.length > 1 ? fold("rate", "評分來源", board.rateSummary) : null}
@@ -1524,7 +1525,7 @@ class App {
     );
   }
 
-  /** 票房排行上、場次通已經沒有場次的片：海報、評分、預告、觀眾評分與票房 */
+  /** 票房排行上、場次通已經沒有場次的片：海報、評分、預告、片刻評分與票房 */
   async boxMovieView(x: BoxOfficeItem): Promise<string> {
     const [e, info] = await Promise.all([this.extras(x.name), boxInfo(x).catch(() => null)]);
     const date = x.release.replace(/-/g, "/");

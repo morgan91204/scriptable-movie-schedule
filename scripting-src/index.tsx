@@ -347,7 +347,7 @@ function HiCell({ hi }: { hi: EntryHi }) {
   </VStack>
 }
 
-/** 觀眾評分（大家一起統計）：平均、人數，以及「你的評分」五顆星；點已選的那顆可以取消 */
+/** 片刻評分（大家一起統計）：平均、人數，以及「你的評分」五顆星；點已選的那顆可以取消 */
 function CommunitySection({ title }: { title: string }) {
   const load = useLoad(() => communityStats(title), [title])
   const [voted, setVoted] = useState<Community | null>(null)
@@ -371,8 +371,8 @@ function CommunitySection({ title }: { title: string }) {
   }
   // 平均是 10 分制，五顆星各代表 2 分
   const starIcon = (i: number) => (avg / 2 >= i - 0.25 ? "star.fill" : avg / 2 >= i - 0.75 ? "star.leadinghalf.filled" : "star")
-  const status = c ? (n ? `${n} 人評分` : "還沒有人評分，來當第一個") : load.error ? "觀眾評分暫時讀不到" : "讀取中…"
-  return <Section header={<Text>觀眾評分</Text>} footer={<Text>滿分 10 分。匿名評分，一台手機一票，可以隨時更改；再點一次已選的分數可以取消。各版本的評分會一起統計。</Text>}>
+  const status = c ? (n ? `${n} 人評分` : "還沒有人評分，來當第一個") : load.error ? "片刻評分暫時讀不到" : "讀取中…"
+  return <Section header={<Text>片刻評分</Text>} footer={<Text>滿分 10 分。匿名評分，一台手機一票，可以隨時更改；再點一次已選的分數可以取消。各版本的評分會一起統計。</Text>}>
     <HStack spacing={14}>
       <HStack alignment={"lastTextBaseline"} spacing={2}>
         <Text font={"largeTitle"} fontWeight={"bold"} monospacedDigit>{n ? avg.toFixed(1) : "-"}</Text>
@@ -960,7 +960,7 @@ function ConfirmPage({ pick }: { pick: Pick }) {
 
 // ───────────────────────── 依電影找 ─────────────────────────
 
-/** 票房排行上、場次通已經沒有場次的片：海報、評分、預告、觀眾評分與票房 */
+/** 票房排行上、場次通已經沒有場次的片：海報、評分、預告、片刻評分與票房 */
 /** 狀態標籤：上映中（綠底）／已下檔（紅底）／即將上映（橘底） */
 function StatusPill({ status }: { status: string }) {
   const c = status === "now" ? { bg: "rgba(48,209,88,0.2)", fg: "systemGreen" } : status === "off" ? { bg: "rgba(255,69,58,0.18)", fg: "systemRed" } : { bg: "rgba(255,159,10,0.2)", fg: "systemOrange" }
@@ -1012,7 +1012,7 @@ function BoxOfficeSections({ movies, query, scope: pickedScope }: { movies: TwMo
   const [pickedIssuer, setPickedIssuer] = useState<string[]>([]) // 只看哪幾家發行商（可以複選；空 = 全部）
   const [issuerOpen, setIssuerOpen] = useState(false)
   const [fewLast, setFewLast] = useState(true) // 依 IMDb 排時，評分人數少的片排在後面（關掉就照分數一起排）
-  // 依觀眾評分排時才讀評分總表
+  // 依片刻評分排時才讀評分總表
   const needCommunity = pickedSort === "rating" && pickedRate === "community"
   const community = useLoad(() => (needCommunity ? loadCommunitySummary() : Promise.resolve(null)), [needCommunity])
   // 年度依三大評分排時才讀伺服器的年度評分總表

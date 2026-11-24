@@ -2300,7 +2300,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     const scope = `只排上映中的電影：這一週有賣出票的共 ${b.list.length} 部，已經下檔的不在裡面（看「年度」）。`;
     return by === "total" ? `${scope}${src}` : `${scope}${boxOfficeNote(b)}${src}`;
   }
-  var RATE_SOURCES = [{ id: "imdb", label: "IMDb" }, { id: "tomato", label: "番茄指數（影評）" }, { id: "popcorn", label: "爆米花指數（觀眾）" }, { id: "community", label: "觀眾評分（本 App）" }];
+  var RATE_SOURCES = [{ id: "imdb", label: "IMDb" }, { id: "tomato", label: "番茄指數（影評）" }, { id: "popcorn", label: "爆米花指數（觀眾）" }, { id: "community", label: "片刻評分（本 App）" }];
   var COMMUNITY_MIN = 5;
   function loadBoxFor(scope, sort, week) {
     return scope === "year" ? loadBoxOfficeFull() : sort === "week" && week ? loadBoxOfficeWeeks() : loadBoxOffice();
@@ -3390,7 +3390,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
       }
     }
     const r = await platform().fetchText(`${COMMUNITY_API}/v2/stats?m=${encodeURIComponent(k)}&d=${encodeURIComponent(deviceId())}`, { accept: "application/json" });
-    if (r.status !== 200) throw new Error("觀眾評分暫時讀不到");
+    if (r.status !== 200) throw new Error("片刻評分暫時讀不到");
     const c = JSON.parse(r.body);
     communityMem[k] = { ...c, at: Date.now() };
     saveMyVote(k, c, false);
@@ -3727,7 +3727,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   var extra = { boxOffice, filmList, soonList, nowShowing, nowShowingMulti, movieBoard: movieBoard2, festivalBoard, festivalFilm, nearby, patchSettings, fillMovie, formatList };
   var BRIDGE_LEVEL = 2;
   globalThis.MS = {
-    version: "2026.11.24-0837",
+    version: "2026.11.24-0841",
     level: BRIDGE_LEVEL,
     init(saved) {
       cache = saved || {};

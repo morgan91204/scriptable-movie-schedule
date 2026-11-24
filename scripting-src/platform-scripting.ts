@@ -262,7 +262,7 @@ export const scriptingPlatform: Platform = {
   },
   cacheGet(name) {
     const v = asText(Storage.get("cache:" + name))
-    // 觀眾評分的裝置代號也要保住，不然更新後會變成新手機、可以再投一票
+    // 片刻評分的裝置代號也要保住，不然更新後會變成新手機、可以再投一票
     if (!v && name === "device-id.txt") return readKeep("device-id.txt")
     return v
   },

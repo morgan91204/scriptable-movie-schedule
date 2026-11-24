@@ -102,7 +102,7 @@ export const notifyQuiet = (p: NotifyPrefs): { on: boolean; from: number; to: nu
 /** 交給通知伺服器的收藏清單：只有片名鍵、片名、影展代碼（海報、收藏時間這些不傳） */
 export const notifyFavs = (s: Settings): { key: string; title: string; fest?: { id: string; name: string } }[] =>
   (s.favMovies || []).map((f) => ({ key: f.key, title: f.title, ...(f.fest ? { fest: { id: f.fest.id, name: f.fest.name } } : {}) }));
-/** 收藏的一部電影：key = 去掉裝飾字的片名（跟觀眾評分同一把鍵，所以片名帶「重映」「特別場」也算同一部）。
+/** 收藏的一部電影：key = 去掉裝飾字的片名（跟片刻評分同一把鍵，所以片名帶「重映」「特別場」也算同一部）。
  *  記下片名、英文片名、海報，下檔後清單上還是看得到；fest = 從哪個影展收藏的（影展結束後也連得回去） */
 export interface FavMovie { key: string; title: string; en?: string; poster?: string; fest?: { id: string; film: string; name: string }; at: number }
 
@@ -1814,8 +1814,8 @@ export function boxOfficeFooter(b: BoxOffice, by: BoxSort, years?: string[], wee
 // 範圍選「上映中」（預設）或「年度」（含已下檔）；上映中可以依本週票房、累計票房、上映日期、評分、影城數排。
 // 依票房排的時候，還在上映但沒進榜的片接在榜單後面（rest），所以上映中的片不會漏。
 /** 依評分排時可以選的評分來源 */
-export const RATE_SOURCES = [{ id: "imdb", label: "IMDb" }, { id: "tomato", label: "番茄指數（影評）" }, { id: "popcorn", label: "爆米花指數（觀眾）" }, { id: "community", label: "觀眾評分（本 App）" }];
-/** 觀眾評分至少要幾個人評過才列入排序 */
+export const RATE_SOURCES = [{ id: "imdb", label: "IMDb" }, { id: "tomato", label: "番茄指數（影評）" }, { id: "popcorn", label: "爆米花指數（觀眾）" }, { id: "community", label: "片刻評分（本 App）" }];
+/** 片刻評分至少要幾個人評過才列入排序 */
 export const COMMUNITY_MIN = 5;
 export type MovieScope = "now" | "year";
 export type MovieSort = "week" | "total" | "date" | "rating" | "cinemas" | "tickets" | "price";
@@ -2051,7 +2051,7 @@ export function movieBoard(b: BoxOffice | null, movies: TwMovie[], opt: { scope?
     paged: false,
   };
 }
-/** 「電影」清單要的資料一次讀好（票房、場次通的片單；依觀眾評分排時才多讀評分總表）。票房讀不到時清單照樣出來 */
+/** 「電影」清單要的資料一次讀好（票房、場次通的片單；依片刻評分排時才多讀評分總表）。票房讀不到時清單照樣出來 */
 export async function loadMovieBoard(opt: { scope?: string; sort?: string; years?: string[]; week?: string; countries?: string[]; query?: string; asc?: boolean; rate?: string; fewLast?: boolean; issuers?: string[]; status?: string }): Promise<MovieBoard> {
   const year = opt.scope === "year" || opt.sort === "year";
   const needCommunity = opt.sort === "rating" && opt.rate === "community";
@@ -3079,7 +3079,7 @@ export function ratingTier(kind: "imdb" | "pct", v: number): "good" | "mid" | "b
   return x >= 75 ? "good" : x >= 60 ? "mid" : "bad";
 }
 
-// ───────────────────────── 觀眾評分（大家一起統計） ─────────────────────────
+// ───────────────────────── 片刻評分（大家一起統計） ─────────────────────────
 // 後端是 Cloudflare Worker（worker/ 資料夾）：每部片一個計數器，一台手機一票，可以改票或取消。
 // 片名鍵用去掉裝飾字、重映字樣後的片名，所以兩個 App、同一部片的不同場次條目都算在一起。
 
@@ -3107,7 +3107,7 @@ function deviceId(): string {
 }
 export const communityKey = (title: string) => normTitle(baseTitle(title)).slice(0, 120);
 const communityMem: Record<string, Community & { at: number }> = {};
-/** 已經讀過的觀眾評分（畫面重畫時用，不用再等網路） */
+/** 已經讀過的片刻評分（畫面重畫時用，不用再等網路） */
 export function communityCached(title: string): Community | null {
   return communityMem[communityKey(title)] || null;
 }
@@ -3133,7 +3133,7 @@ function loadSummary(): Promise<Summary | null> {
   summaryMem = { at: Date.now(), job };
   return job;
 }
-/** 所有片的觀眾評分總表（片名鍵 → 1～10 分各幾人）；讀不到回傳 null */
+/** 所有片的片刻評分總表（片名鍵 → 1～10 分各幾人）；讀不到回傳 null */
 export const loadCommunitySummary = (): Promise<Record<string, number[]> | null> => loadSummary();
 /** 這支手機的投票紀錄：s = 我給的分數，at = 上次跟伺服器確認的時間；dist／dat = 伺服器最近回的統計（剛投完票時比靜態檔新） */
 interface MyVote { s: number; at: number; dist?: number[]; dat?: number }
@@ -3156,7 +3156,7 @@ const fromDist = (dist: number[], mine: number): Community => {
   const sum = d.reduce((a, c, i) => a + c * (i + 1), 0);
   return { n, avg: n ? Math.round((sum / n) * 10) / 10 : 0, dist: d, mine };
 };
-/** 讀觀眾評分（5 秒內讀過或剛投過票就直接用） */
+/** 讀片刻評分（5 秒內讀過或剛投過票就直接用） */
 export async function communityStats(title: string): Promise<Community> {
   const k = communityKey(title);
   const hit = communityMem[k];
@@ -3172,7 +3172,7 @@ export async function communityStats(title: string): Promise<Community> {
     }
   }
   const r = await platform().fetchText(`${COMMUNITY_API}/v2/stats?m=${encodeURIComponent(k)}&d=${encodeURIComponent(deviceId())}`, { accept: "application/json" });
-  if (r.status !== 200) throw new Error("觀眾評分暫時讀不到");
+  if (r.status !== 200) throw new Error("片刻評分暫時讀不到");
   const c = JSON.parse(r.body) as Community;
   communityMem[k] = { ...c, at: Date.now() };
   saveMyVote(k, c, false);

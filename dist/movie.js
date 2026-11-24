@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.24-0837
+// @movie-schedule-app 電影行程 v2026.11.24-0841
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/parsers.gen.ts
@@ -2031,7 +2031,7 @@ function boxOfficeFooter(b, by, years, week) {
   const scope = `只排上映中的電影：這一週有賣出票的共 ${b.list.length} 部，已經下檔的不在裡面（看「年度」）。`;
   return by === "total" ? `${scope}${src}` : `${scope}${boxOfficeNote(b)}${src}`;
 }
-var RATE_SOURCES = [{ id: "imdb", label: "IMDb" }, { id: "tomato", label: "番茄指數（影評）" }, { id: "popcorn", label: "爆米花指數（觀眾）" }, { id: "community", label: "觀眾評分（本 App）" }];
+var RATE_SOURCES = [{ id: "imdb", label: "IMDb" }, { id: "tomato", label: "番茄指數（影評）" }, { id: "popcorn", label: "爆米花指數（觀眾）" }, { id: "community", label: "片刻評分（本 App）" }];
 var COMMUNITY_MIN = 5;
 function loadBoxFor(scope, sort, week) {
   return scope === "year" ? loadBoxOfficeFull() : sort === "week" && week ? loadBoxOfficeWeeks() : loadBoxOffice();
@@ -3098,7 +3098,7 @@ async function communityStats(title) {
     }
   }
   const r = await platform().fetchText(`${COMMUNITY_API}/v2/stats?m=${encodeURIComponent(k)}&d=${encodeURIComponent(deviceId())}`, { accept: "application/json" });
-  if (r.status !== 200) throw new Error("觀眾評分暫時讀不到");
+  if (r.status !== 200) throw new Error("片刻評分暫時讀不到");
   const c = JSON.parse(r.body);
   communityMem[k] = { ...c, at: Date.now() };
   saveMyVote(k, c, false);
@@ -3607,24 +3607,30 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .trailer:active{opacity:.7}
 .cm{padding:14px 16px}
 .cm-top{display:flex;align-items:center;gap:12px}
-.cm-avg{font-size:40px;font-weight:700;line-height:1;font-variant-numeric:tabular-nums;min-width:58px;text-align:center;white-space:nowrap}
-.cm-avg small{font-size:13px;font-weight:600;color:var(--fg2);margin-left:1px}
-.cm-meta{display:flex;flex-direction:column;gap:4px;min-width:0}
-.cm-stars{position:relative;display:inline-block;font-size:17px;letter-spacing:1px;line-height:1}
-.cm-stars .bg{color:var(--line)}
-@media(prefers-color-scheme:dark){.cm-stars .bg{color:#3a3a3c}}
-.cm-stars .fg{position:absolute;left:0;top:0;overflow:hidden;white-space:nowrap;color:#ff9f0a}
-.cm-n{font-size:13px;color:var(--fg2)}
-.cm-dist{flex:1;display:flex;flex-direction:column;gap:2px;min-width:70px;max-width:130px;margin-left:auto}
-.cm-row{display:flex;align-items:center;gap:5px;font-size:8px;color:var(--fg2);line-height:1}
-.cm-row span{width:10px;text-align:right;flex:none}
-.cm-row i{display:block;height:3px;border-radius:2px;background:var(--fg2);opacity:.55;min-width:2px}
-.cm-mine{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:12px;padding-top:10px;border-top:1px solid var(--line);font-size:15px}
+.cm-avg{flex:none;font-size:28px;font-weight:800;line-height:1.1;font-variant-numeric:tabular-nums;white-space:nowrap;padding:6px 11px;border-radius:12px;background:var(--chip);color:var(--fg)}
+.cm-avg small{font-size:12px;font-weight:600;opacity:.8;margin-left:2px}
+.cm-avg.good{background:rgba(48,209,88,.18);color:#1f9d45}
+.cm-avg.mid{background:rgba(255,159,10,.2);color:#c77700}
+.cm-avg.bad{background:rgba(255,69,58,.18);color:#d63a31}
+@media(prefers-color-scheme:dark){.cm-avg.good{color:#30d158}.cm-avg.mid{color:#ffb340}.cm-avg.bad{color:#ff6961}}
+.cm-meta{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1}
+.cm-n{font-size:15px;font-weight:600}
+.cm-by{font-size:12px;color:var(--fg2)}
+.cm-hist{flex:none;width:96px}
+.cm-hist .bars{display:flex;align-items:flex-end;gap:3px;height:32px}
+.cm-hist .bars i{flex:1;display:block;border-radius:2px;background:var(--accent);opacity:.85}
+.cm-hist .bars i.zero{opacity:.18}
+.cm-hist .axis{display:flex;justify-content:space-between;font-size:10px;color:var(--fg2);margin-top:2px}
+.cm-empty{font-size:15px;font-weight:600}
+.cm-mine{display:flex;align-items:baseline;gap:10px;margin-top:10px;font-size:15px;font-weight:600}
+.cm-mine.line{margin-top:13px;padding-top:11px;border-top:1px solid var(--line)}
+.cm-mine b{color:var(--accent);font-weight:700}
+.cm-mine em{font-style:normal;font-weight:400;font-size:13px;color:var(--fg2)}
 .cm-pick{display:flex;gap:4px;margin-top:8px}
-.cm-num{flex:1 1 0;min-width:0;height:36px;padding:0;text-align:center;border-radius:9px;font-size:15px;font-weight:700;font-variant-numeric:tabular-nums;background:var(--chip);color:var(--fg2)}
-.cm-num.below{background:rgba(255,159,10,.22);color:#c77700}
-.cm-num.on{background:#ff9f0a;color:#fff}
+.cm-num{flex:1 1 0;min-width:0;height:38px;padding:0;text-align:center;border-radius:9px;font-size:15px;font-weight:700;font-variant-numeric:tabular-nums;background:var(--chip);color:var(--fg2)}
+.cm-num.on{background:var(--accent);color:#fff}
 .cm-num:active{transform:scale(.92)}
+.cm-ends{display:flex;justify-content:space-between;margin-top:5px;font-size:11.5px;color:var(--fg2)}
 .cm-star{font-size:28px;line-height:1;padding:2px 3px;color:var(--line)}
 @media(prefers-color-scheme:dark){.cm-star{color:#48484a}}
 .cm-star.on{color:#ff9f0a}
@@ -4083,14 +4089,14 @@ var App = class {
   }
   /** 最新版本是多少。網頁版問的是自己網站現在上線的版本（重新整理就會拿到的那一版），不是 GitHub 上的 */
   checkVersion() {
-    if (true) return checkLatest("2026.11.24-0837");
+    if (true) return checkLatest("2026.11.24-0841");
     return (async () => {
       try {
         const r = await globalThis.fetch("/api/version?t=" + Date.now(), { cache: "no-store" });
         const latest = String((await r.json()).version || "");
         if (!latest) return null;
         const num = (v) => Number(v.replace(/\D/g, "")) || 0;
-        return { latest, isLatest: num("2026.11.24-0837") >= num(latest) };
+        return { latest, isLatest: num("2026.11.24-0841") >= num(latest) };
       } catch (_) {
         return null;
       }
@@ -4434,11 +4440,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.24-0837"}`);
+          Pasteboard.copy(`版本 ${"2026.11.24-0841"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.24-0837"}`,
+      `版本 ${"2026.11.24-0841"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -4574,12 +4580,12 @@ var App = class {
     if (late.length) this.late = late;
     return { x: x ?? null, r: r ?? null, p: p || "", px, loading, c: c === void 0 ? communityCached(title) || void 0 : c };
   }
-  /** 觀眾評分卡片：平均、人數、分布，以及「你的評分」五顆星（點已選的那顆可以取消） */
+  /** 片刻評分卡片：平均、人數、分布，以及「你的評分」一排 1～10 的格子（點已選的那一格可以取消） */
   community(title, c) {
     const n = c ? c.n : 0;
     const avg = c && n ? c.avg : 0;
     const mine = c ? c.mine : 0;
-    const status = c === void 0 ? "讀取中…" : c === false ? "觀眾評分暫時讀不到" : n ? `${n} 人評分` : "還沒有人評分，來當第一個";
+    const status = c === void 0 ? "讀取中…" : c === false ? "片刻評分暫時讀不到" : n ? `${n} 人評分` : "還沒有人評分，來當第一個";
     const max = c ? Math.max(1, ...c.dist) : 1;
     const vote = async (s) => {
       try {
@@ -4589,7 +4595,8 @@ var App = class {
         await this.ui.toast(String(e?.message || e));
       }
     };
-    return /* @__PURE__ */ h(Section, { title: "觀眾評分", hint: "滿分 10 分。匿名評分，一台手機一票，可以隨時更改；再點一次已選的分數可以取消。各版本的評分會一起統計。" }, /* @__PURE__ */ h("div", { class: "cm" }, /* @__PURE__ */ h("div", { class: "cm-top" }, /* @__PURE__ */ h("div", { class: "cm-avg" }, n ? avg.toFixed(1) : "-", /* @__PURE__ */ h("small", null, "／10")), /* @__PURE__ */ h("div", { class: "cm-meta" }, /* @__PURE__ */ h("span", { class: "cm-stars", "aria-label": n ? `平均 ${avg} 分，滿分 10 分` : "還沒有評分" }, /* @__PURE__ */ h("span", { class: "bg" }, "★★★★★"), /* @__PURE__ */ h("span", { class: "fg", style: `width:${avg / 10 * 100}%` }, "★★★★★")), /* @__PURE__ */ h("span", { class: "cm-n" }, esc(status))), c && n ? /* @__PURE__ */ h("div", { class: "cm-dist" }, [10, 9, 8, 7, 6, 5, 4, 3, 2, 1].map((s) => /* @__PURE__ */ h("div", { class: "cm-row" }, /* @__PURE__ */ h("span", null, s), /* @__PURE__ */ h("i", { style: `width:${Math.round((c.dist[s - 1] || 0) / max * 100)}%` })))) : null), /* @__PURE__ */ h("div", { class: "cm-mine" }, /* @__PURE__ */ h("span", null, mine ? `你給 ${mine} 分` : "點一個分數評分（滿分 10）")), /* @__PURE__ */ h("div", { class: "cm-pick" }, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((s) => /* @__PURE__ */ h("button", { class: "cm-num" + (s === mine ? " on" : s < mine ? " below" : ""), "aria-label": `${s} 分`, onTap: () => vote(s) }, s)))));
+    const tier = n ? ratingTier("imdb", avg) : "none";
+    return /* @__PURE__ */ h(Section, { title: "片刻評分", hint: "匿名評分，一台裝置一票，可以隨時更改；再點一次已選的分數可以取消。各版本的評分會一起統計。" }, /* @__PURE__ */ h("div", { class: "cm" }, n ? /* @__PURE__ */ h("div", { class: "cm-top" }, /* @__PURE__ */ h("div", { class: "cm-avg " + tier, "aria-label": `平均 ${avg.toFixed(1)} 分，滿分 10 分` }, avg.toFixed(1), /* @__PURE__ */ h("small", null, "／10")), /* @__PURE__ */ h("div", { class: "cm-meta" }, /* @__PURE__ */ h("span", { class: "cm-n" }, esc(status)), /* @__PURE__ */ h("span", { class: "cm-by" }, "片刻使用者的評分")), c ? /* @__PURE__ */ h("div", { class: "cm-hist", "aria-hidden": "true" }, /* @__PURE__ */ h("div", { class: "bars" }, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((v) => /* @__PURE__ */ h("i", { class: c.dist[v - 1] ? "" : "zero", style: `height:${Math.max(8, Math.round((c.dist[v - 1] || 0) / max * 100))}%` }))), /* @__PURE__ */ h("div", { class: "axis" }, /* @__PURE__ */ h("span", null, "1"), /* @__PURE__ */ h("span", null, "10"))) : null) : /* @__PURE__ */ h("div", { class: "cm-empty" }, esc(status)), /* @__PURE__ */ h("div", { class: "cm-mine" + (n ? " line" : "") }, /* @__PURE__ */ h("span", null, "你的評分"), mine ? /* @__PURE__ */ h("b", null, mine, " 分") : /* @__PURE__ */ h("em", null, "點一個分數")), /* @__PURE__ */ h("div", { class: "cm-pick" }, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((v) => /* @__PURE__ */ h("button", { class: "cm-num" + (v <= mine ? " on" : ""), "aria-label": `${v} 分`, "aria-pressed": v === mine ? "true" : "false", onTap: () => vote(v) }, v))), /* @__PURE__ */ h("div", { class: "cm-ends" }, /* @__PURE__ */ h("span", null, "不推薦"), /* @__PURE__ */ h("span", null, "必看"))));
   }
   /** 海報旁邊那顆收藏的愛心：電影頁、影展片、即將上映、已下檔的片都用同一顆 */
   favOf(m) {
@@ -4781,7 +4788,7 @@ var App = class {
     if (false) {
       if (!r) return /* @__PURE__ */ h(Note, { text: "（無法確認是否為最新版：連不到網站）" });
       if (r.isLatest) return /* @__PURE__ */ h(Note, { text: "✅ 已是最新版" });
-      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.24-0837"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
+      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.24-0841"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
         globalThis.location.reload();
       } }));
     }
@@ -5060,7 +5067,7 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
         this.sortBy[sc] = x.id;
         this.ascBy[sc] = false;
       }
-    } }))), /* @__PURE__ */ h("span", { class: "more-hint", "aria-hidden": "true" }, "›")) : null, board.weeks.length > 1 || countries.length > 1 || board.rates.length > 1 || board.issuers.length > 1 ? /* @__PURE__ */ h(Section, { hint: this.boxOpen === "week" ? "可以回頭看過去幾週的排行。" : this.boxOpen === "rate" ? "番茄指數是影評的分數、爆米花指數是觀眾的分數（都來自爛番茄）；觀眾評分是這個 App 的使用者打的。" : "" }, board.scope === "year" && years.length > 1 ? /* @__PURE__ */ h(Item, { kv: true, title: "年份", right: selYears.length === years.length ? `全部（${years[years.length - 1]}–${years[0]}）` : selYears.length > 4 ? `已選 ${selYears.length} 年` : selYears.join("、"), onTap: () => this.go(() => this.boxPickView("year")) }) : null, board.rates.length > 1 ? fold("rate", "評分來源", board.rateSummary) : null, board.rates.length > 1 && this.boxOpen === "rate" ? /* @__PURE__ */ h(Chips, { scroll: true }, board.rates.map((r) => /* @__PURE__ */ h(Chip, { label: r.label, muted: board.rate !== r.id, onTap: () => {
+    } }))), /* @__PURE__ */ h("span", { class: "more-hint", "aria-hidden": "true" }, "›")) : null, board.weeks.length > 1 || countries.length > 1 || board.rates.length > 1 || board.issuers.length > 1 ? /* @__PURE__ */ h(Section, { hint: this.boxOpen === "week" ? "可以回頭看過去幾週的排行。" : this.boxOpen === "rate" ? "番茄指數是影評的分數、爆米花指數是觀眾的分數（都來自爛番茄）；片刻評分是這個 App 的使用者打的。" : "" }, board.scope === "year" && years.length > 1 ? /* @__PURE__ */ h(Item, { kv: true, title: "年份", right: selYears.length === years.length ? `全部（${years[years.length - 1]}–${years[0]}）` : selYears.length > 4 ? `已選 ${selYears.length} 年` : selYears.join("、"), onTap: () => this.go(() => this.boxPickView("year")) }) : null, board.rates.length > 1 ? fold("rate", "評分來源", board.rateSummary) : null, board.rates.length > 1 && this.boxOpen === "rate" ? /* @__PURE__ */ h(Chips, { scroll: true }, board.rates.map((r) => /* @__PURE__ */ h(Chip, { label: r.label, muted: board.rate !== r.id, onTap: () => {
       this.boxRate = r.id;
     } }))) : null, board.fewOption ? /* @__PURE__ */ h(Item, { kv: true, title: "評分人數少的片", right: board.fewLast ? "排在後面 ⇄" : "照分數一起排 ⇄", chevron: false, onTap: () => {
       this.boxFewLast = !this.boxFewLast;
@@ -5082,7 +5089,7 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
       } }, `載入中…已顯示 ${rows.length}／${board.entries.length} 部`)
     ) : null, board.rest.length ? /* @__PURE__ */ h(Section, { title: board.restTitle, hint: board.restFooter }, board.rest.map((e, i) => item(e, rows.length + i))) : null);
   }
-  /** 票房排行上、場次通已經沒有場次的片：海報、評分、預告、觀眾評分與票房 */
+  /** 票房排行上、場次通已經沒有場次的片：海報、評分、預告、片刻評分與票房 */
   async boxMovieView(x) {
     const [e, info] = await Promise.all([this.extras(x.name), boxInfo(x).catch(() => null)]);
     const date = x.release.replace(/-/g, "/");

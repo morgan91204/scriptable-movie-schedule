@@ -1,4 +1,4 @@
-// 觀眾評分總表：把 Worker 的 /v1/all 存成靜態檔，App 平常讀這個檔，不用每開一部片就打一次伺服器。
+// 片刻評分總表：把 Worker 的 /v1/all 存成靜態檔，App 平常讀這個檔，不用每開一部片就打一次伺服器。
 // 用法：node tools/community.mjs <輸出檔>（GitHub Actions 每 30 分鐘跑一次，內容有變才提交到 data 分支）
 import fs from "node:fs";
 // 兩份都匯出：10 分制（/v2/all，新版 App 讀）和 5 星制（/v1/all，還沒更新的舊版 App 讀）
