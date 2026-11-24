@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.25-0012
+// @movie-schedule-app 電影行程 v2026.11.25-0016
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/brand.ts
@@ -4662,17 +4662,28 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .lb-list{padding:0 16px 6px}
 .lb{display:flex;gap:11px;padding:12px 0}
 .lb+.lb{border-top:1px solid var(--line)}
-.lb.off .lb-body{opacity:.45}
+.lb.off .lb-top,.lb.off .lb-sub,.lb.off .lb-x{opacity:.45}
 .lb-ck{flex:none;width:26px;height:26px;margin-top:1px;padding:0;border-radius:8px;border:1.5px solid var(--line);color:#fff;font-size:15px;line-height:1}
 .lb-ck.on{background:var(--accent);border-color:var(--accent)}
 .lb-body{flex:1;min-width:0}
 .lb-top{display:flex;align-items:baseline;gap:8px}
 .lb-top b{flex:1;min-width:0;font-size:16px;overflow-wrap:anywhere}
 .lb-sub{margin-top:2px;font-size:12.5px;color:var(--fg2);overflow-wrap:anywhere}
-.lb-x{margin-top:7px;padding:8px 10px;border-radius:10px;background:var(--chip);font-size:14px;line-height:1.45;overflow-wrap:anywhere}
+.lb-x{display:block;width:100%;margin-top:7px;padding:9px 11px;border-radius:10px;background:var(--chip);color:var(--fg);font-size:14.5px;line-height:1.5;text-align:left;overflow-wrap:anywhere}
+.lb-x.clamp span{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden}
+.lb-x i{display:block;margin-top:4px;font-style:normal;font-size:12.5px;color:var(--accent)}
+.lb-x.dim{opacity:.5}
+.lb-have{margin-top:9px;padding:9px 11px;border-radius:10px;border:1px solid var(--line)}
+.lb-haveline{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--fg2)}
+.lb-havex{margin-top:5px;font-size:13.5px;line-height:1.45;color:var(--fg2);overflow-wrap:anywhere}
+.lb-seg{display:flex;margin-top:9px;padding:2px;border-radius:9px;background:var(--chip)}
+.lb-seg button{flex:1 1 0;min-width:0;padding:6px 4px;border-radius:7px;font-size:13px;color:var(--fg2);white-space:nowrap}
+.lb-seg button.on{background:var(--card);color:var(--fg);font-weight:600;box-shadow:0 1px 2px rgba(0,0,0,.25)}
+.lb-edit{margin-top:8px}
+.lb-edit textarea{display:block;width:100%;box-sizing:border-box;min-height:120px;margin:0}
 .lb-opts{display:flex;flex-wrap:wrap;gap:6px;margin-top:7px}
 .lb-opts .cm-tag{padding:4px 10px;font-size:12.5px}
-.lb-bar{display:flex;flex-wrap:wrap;gap:6px;padding:0 16px 12px}
+.lb-bar{display:flex;flex-wrap:wrap;gap:6px;padding:12px 16px 2px}
 .fd-list{padding:4px 16px 6px}
 .fd{display:flex;align-items:flex-start;gap:12px;padding:12px 0}
 .fd+.fd{border-top:1px solid var(--line)}
@@ -5386,7 +5397,7 @@ var App = class {
   }
   /** 最新版本是多少。網頁版問的是自己網站現在上線的版本（重新整理就會拿到的那一版），不是 GitHub 上的 */
   checkVersion() {
-    if (true) return checkLatest("2026.11.25-0012");
+    if (true) return checkLatest("2026.11.25-0016");
     return (async () => {
       try {
         let r = await globalThis.fetch("/version.json?t=" + Date.now(), { cache: "no-store" });
@@ -5394,7 +5405,7 @@ var App = class {
         const latest = String((await r.json()).version || "");
         if (!latest) return null;
         const num = (v) => Number(v.replace(/\D/g, "")) || 0;
-        return { latest, isLatest: num("2026.11.25-0012") >= num(latest) };
+        return { latest, isLatest: num("2026.11.25-0016") >= num(latest) };
       } catch (_) {
         return null;
       }
@@ -6001,7 +6012,7 @@ var App = class {
     const st = this.lbx = { stage: "match", rows: [], miss: [], done: 0, total: items.length, ticks, bump: () => {
       const f = fire[at++];
       if (f) f();
-    }, result: { ok: 0, have: 0, noNote: 0, fail: 0, why: [] }, err: "", all: false };
+    }, result: { ok: 0, have: 0, noNote: 0, fail: 0, why: [] }, err: "", all: false, edit: "" };
     void (async () => {
       try {
         const [years, mine] = await Promise.all([loadYearRatings().catch(() => null), this.myDiary().catch(() => [])]);
@@ -6025,9 +6036,10 @@ var App = class {
             const title = known && known !== normTitle(m.zh) ? known : m.zh;
             const k = communityKey(title);
             if (st.rows.some((x) => x.k === k)) return;
-            const have = (mine.find((e) => e.k === k) || { s: 0 }).s || 0;
+            const old = mine.find((e) => e.k === k);
+            const have = old && old.s || 0, haveX = old && old.x || "";
             const n = it.x ? lbxNote(it.x, max) : { x: "", cut: false };
-            st.rows.push({ it, title, k, note: n.x, cut: n.cut, on: !have, noteOn: !!n.x && !n.cut && it.s > 0, sp: false, have, plain: !/[\u3400-\u9fff]/.test(title) });
+            st.rows.push({ it, title, k, note: n.x, cut: n.cut, on: !have, noteOn: !!n.x && !n.cut && n.x !== haveX && (it.s > 0 || have > 0), sp: false, have, haveX, keep: true, open: false, plain: !/[\u3400-\u9fff]/.test(title) });
           });
           st.done = Math.min(items.length, i + BATCH);
           st.bump();
@@ -6062,7 +6074,7 @@ var App = class {
         for (let i = 0; i < todo.length; i += BATCH) {
           if (this.lbx !== st) return;
           const part = todo.slice(i, i + BATCH);
-          const r = await social("lbx-import", { items: part.map((p) => ({ m: p.k, title: p.title, s: p.it.s, seen: p.it.seen, ...p.noteOn && p.note ? { x: p.note, sp: p.sp ? 1 : 0 } : {} })) });
+          const r = await social("lbx-import", { items: part.map((p) => ({ m: p.k, title: p.title, s: p.have && p.keep ? 0 : p.it.s, seen: p.it.seen, ...p.have ? { over: 1 } : {}, ...p.noteOn && p.note ? { x: p.note, sp: p.sp ? 1 : 0 } : {} })) });
           part.forEach((p, j) => {
             const code = r.list[j] || "fail";
             if (code === "ok") st.result.ok++;
@@ -6106,26 +6118,60 @@ var App = class {
       } }))));
     }
     const picked = st.rows.filter((r) => r.on), notes = picked.filter((r) => r.noteOn && r.note).length;
-    const LIMIT = 150, shown = st.all ? st.rows : st.rows.slice(0, LIMIT);
-    const row = (r) => /* @__PURE__ */ h("div", { class: "lb" + (r.on ? "" : " off") }, /* @__PURE__ */ h("button", { class: "lb-ck" + (r.on ? " on" : ""), "aria-pressed": r.on ? "true" : "false", "aria-label": `匯入《${r.title}》`, onTap: () => {
-      r.on = !r.on;
-    } }, r.on ? "✓" : ""), /* @__PURE__ */ h("div", { class: "lb-body" }, /* @__PURE__ */ h("div", { class: "lb-top" }, /* @__PURE__ */ h("b", null, esc(r.title)), r.it.s ? /* @__PURE__ */ h("span", { class: "nt-score " + ratingTier("imdb", r.it.s) }, r.it.s, " 分") : /* @__PURE__ */ h("span", { class: "fb-tag" }, "只標看過")), /* @__PURE__ */ h("div", { class: "lb-sub" }, esc([`${r.it.name}${r.it.year ? `（${r.it.year}）` : ""}`, /^\d{4}-/.test(r.it.seen) ? r.it.seen.replace(/-/g, "/") + " 看的" : "", r.have ? `片刻已經評 ${r.have} 分，預設不匯` : "", r.plain ? "沒有台灣片名" : ""].filter(Boolean).join("｜"))), r.note && r.it.s ? /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h("div", { class: "lb-x", style: r.noteOn ? "" : "opacity:.45" }, esc(r.note)), /* @__PURE__ */ h("div", { class: "lb-opts" }, /* @__PURE__ */ h("button", { class: "cm-tag" + (r.noteOn ? " on" : ""), "aria-pressed": r.noteOn ? "true" : "false", onTap: () => {
-      r.noteOn = !r.noteOn;
-    } }, r.noteOn ? "匯入影評 ✓" : "匯入影評"), r.noteOn ? /* @__PURE__ */ h("button", { class: "cm-tag" + (r.sp ? " on" : ""), "aria-pressed": r.sp ? "true" : "false", onTap: () => {
-      r.sp = !r.sp;
-    } }, r.sp ? "有雷 ✓" : "有雷？") : null, r.cut ? /* @__PURE__ */ h("span", { class: "lb-sub", style: "align-self:center" }, "原文太長，只留前 ", LBX_NOTE_MAX, " 字") : null)) : null));
-    return /* @__PURE__ */ h(Page, { title: "確認要匯入的", subtitle: `${st.rows.length} 部`, onBack: back, right: picked.length ? /* @__PURE__ */ h("button", { class: "bar-save", onTap: () => this.lbxSend() }, "匯入") : void 0 }, st.err ? /* @__PURE__ */ h(Section, null, /* @__PURE__ */ h(Note, { kind: "warn", text: st.err === "no tmdb" || /503/.test(st.err) ? "片名對照的服務還沒設定好，暫時不能匯入。" : `對照片名時停下來了：${st.err}。下面是已經對到的。` })) : null, st.rows.length ? /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Section, { title: `要匯入 ${picked.length} 部、影評 ${notes} 則`, hint: "勾掉不想匯入的。影評會變成公開的短評：有提到劇情的請點「有雷？」，別人要點開才看得到。太長被截掉的影評預設不匯。" }, /* @__PURE__ */ h("div", { class: "lb-bar" }, /* @__PURE__ */ h("button", { class: "cm-tag", onTap: () => {
-      const on = picked.length < st.rows.length;
-      for (const r of st.rows) r.on = on;
-    } }, picked.length < st.rows.length ? "全選" : "全不選"), /* @__PURE__ */ h("button", { class: "cm-tag", onTap: () => {
-      for (const r of st.rows) if (r.note) r.noteOn = false;
-    } }, "影評全部不匯"), /* @__PURE__ */ h("button", { class: "cm-tag", onTap: () => {
-      for (const r of st.rows) if (r.note) r.sp = true;
-    } }, "影評全部標有雷")), /* @__PURE__ */ h("div", { class: "lb-list" }, shown.map(row)), st.rows.length > shown.length ? /* @__PURE__ */ h(Item, { title: `顯示全部 ${st.rows.length} 部`, accent: true, chevron: false, onTap: () => {
-      st.all = true;
-    } }) : null), /* @__PURE__ */ h(Section, null, /* @__PURE__ */ h("div", { class: "nt-form" }, /* @__PURE__ */ h(Button, { label: picked.length ? `匯入這 ${picked.length} 部` : "先勾選要匯入的", onTap: () => {
+    const fresh = st.rows.filter((r) => !r.have), dup = st.rows.filter((r) => r.have);
+    const LIMIT = 120;
+    const keepEdit = (v) => {
+      const r = st.rows.find((x) => x.k === st.edit);
+      if (r && v && typeof v.lbx === "string") {
+        const n = lbxNote(v.lbx, LBX_NOTE_MAX);
+        r.note = n.x;
+        r.cut = false;
+        if (!n.x) r.noteOn = false;
+      }
+    };
+    const tap = (fn) => (v) => {
+      keepEdit(v);
+      fn();
+    };
+    const row = (r) => {
+      const editing = st.edit === r.k;
+      const canNote = !!r.note && (r.it.s > 0 || r.have > 0);
+      const sameNote = !!r.note && r.note === r.haveX;
+      const long = Array.from(r.note).length > 90;
+      return /* @__PURE__ */ h("div", { class: "lb" + (r.on ? "" : " off") }, /* @__PURE__ */ h("button", { class: "lb-ck" + (r.on ? " on" : ""), "aria-pressed": r.on ? "true" : "false", "aria-label": `匯入《${r.title}》`, onTap: tap(() => {
+        r.on = !r.on;
+      }) }, r.on ? "✓" : ""), /* @__PURE__ */ h("div", { class: "lb-body" }, /* @__PURE__ */ h("div", { class: "lb-top" }, /* @__PURE__ */ h("b", null, esc(r.title)), r.it.s ? /* @__PURE__ */ h("span", { class: "nt-score " + ratingTier("imdb", r.it.s) }, r.it.s, " 分") : /* @__PURE__ */ h("span", { class: "fb-tag" }, "只標看過")), /* @__PURE__ */ h("div", { class: "lb-sub" }, esc([`${r.it.name}${r.it.year ? `（${r.it.year}）` : ""}`, /^\d{4}-/.test(r.it.seen) ? r.it.seen.replace(/-/g, "/") + " 看的" : "", r.plain ? "沒有台灣片名" : ""].filter(Boolean).join("｜"))), r.have ? /* @__PURE__ */ h("div", { class: "lb-have" }, /* @__PURE__ */ h("div", { class: "lb-haveline" }, /* @__PURE__ */ h("span", null, "片刻現在"), /* @__PURE__ */ h("b", { class: "nt-score " + ratingTier("imdb", r.have) }, r.have, " 分")), r.haveX ? /* @__PURE__ */ h("div", { class: "lb-havex" }, esc(r.haveX)) : null, r.on && r.it.s && r.it.s !== r.have ? /* @__PURE__ */ h("div", { class: "lb-seg", role: "group", "aria-label": "分數用哪一個" }, /* @__PURE__ */ h("button", { class: r.keep ? "on" : "", "aria-pressed": r.keep ? "true" : "false", onTap: tap(() => {
+        r.keep = true;
+      }) }, "分數維持 ", r.have, " 分"), /* @__PURE__ */ h("button", { class: r.keep ? "" : "on", "aria-pressed": r.keep ? "false" : "true", onTap: tap(() => {
+        r.keep = false;
+      }) }, "改成 ", r.it.s, " 分")) : r.on && r.it.s === r.have ? /* @__PURE__ */ h("div", { class: "lb-sub" }, "分數一樣，不會變。") : null) : null, canNote && editing ? /* @__PURE__ */ h("div", { class: "lb-edit" }, /* @__PURE__ */ h("textarea", { class: "fb-area note", name: "lbx", maxlength: String(LBX_NOTE_MAX), "aria-label": "修改影評" }, esc(r.note)), /* @__PURE__ */ h("div", { class: "lb-opts" }, /* @__PURE__ */ h("button", { class: "cm-tag on", onTap: (v) => {
+        keepEdit(v);
+        st.edit = "";
+      } }, "改好了"), /* @__PURE__ */ h("span", { class: "lb-sub", style: "align-self:center" }, "最多 ", LBX_NOTE_MAX, " 字，換行會變成空白"))) : canNote ? /* @__PURE__ */ h(Fragment, null, r.have ? /* @__PURE__ */ h("div", { class: "lb-sub", style: "margin-top:8px" }, "Letterboxd 的影評", sameNote ? "（跟片刻的一樣，不用再匯）" : r.haveX ? "（會多一則，原本那則留著）" : "") : null, /* @__PURE__ */ h("button", { class: "lb-x" + (r.open || !long ? "" : " clamp") + (r.noteOn && r.on ? "" : " dim"), "aria-label": long ? "展開或收合影評" : void 0, onTap: tap(() => {
+        r.open = !r.open;
+      }) }, /* @__PURE__ */ h("span", null, esc(r.note)), long ? /* @__PURE__ */ h("i", null, r.open ? "收合" : "展開") : null), r.on && !sameNote ? /* @__PURE__ */ h("div", { class: "lb-opts" }, /* @__PURE__ */ h("button", { class: "cm-tag" + (r.noteOn ? " on" : ""), "aria-pressed": r.noteOn ? "true" : "false", onTap: tap(() => {
+        r.noteOn = !r.noteOn;
+      }) }, r.noteOn ? "匯入影評 ✓" : "匯入影評"), r.noteOn ? /* @__PURE__ */ h("button", { class: "cm-tag" + (r.sp ? " on" : ""), "aria-pressed": r.sp ? "true" : "false", onTap: tap(() => {
+        r.sp = !r.sp;
+      }) }, r.sp ? "有雷 ✓" : "有雷？") : null, r.noteOn ? /* @__PURE__ */ h("button", { class: "cm-tag", onTap: tap(() => {
+        st.edit = r.k;
+      }) }, "✎ 修改") : null) : null, r.cut && r.on ? /* @__PURE__ */ h("div", { class: "lb-sub", style: "margin-top:6px" }, "原文超過 ", LBX_NOTE_MAX, " 字，後面截掉了；可以按「修改」自己調整。") : null) : null));
+    };
+    const list = (rows) => {
+      const shown = st.all ? rows : rows.slice(0, LIMIT);
+      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h("div", { class: "lb-list" }, shown.map(row)), rows.length > shown.length ? /* @__PURE__ */ h(Item, { title: `顯示全部 ${rows.length} 部`, accent: true, chevron: false, onTap: tap(() => {
+        st.all = true;
+      }) }) : null);
+    };
+    const go = (v) => {
+      keepEdit(v);
+      st.edit = "";
       if (picked.length) this.lbxSend();
-    } })))) : !st.err ? /* @__PURE__ */ h(Section, null, /* @__PURE__ */ h(Note, { text: "沒有對到任何一部片。" })) : null, st.miss.length ? /* @__PURE__ */ h(Section, { title: `對不到台灣片名（${st.miss.length} 部，不會匯入）` }, /* @__PURE__ */ h("div", { class: "lb-list" }, st.miss.slice(0, 60).map((m) => /* @__PURE__ */ h("div", { class: "lb-sub", style: "padding:5px 0" }, esc(m.name), m.year ? `（${m.year}）` : "")))) : null);
+    };
+    return /* @__PURE__ */ h(Page, { title: "確認要匯入的", subtitle: `已選 ${picked.length} 部、影評 ${notes} 則`, onBack: back, right: picked.length ? /* @__PURE__ */ h("button", { class: "bar-save", onTap: go }, "匯入") : void 0 }, st.err ? /* @__PURE__ */ h(Section, null, /* @__PURE__ */ h(Note, { kind: "warn", text: st.err === "no tmdb" || /503/.test(st.err) ? "片名對照的服務還沒設定好，暫時不能匯入。" : `對照片名時停下來了：${st.err}。下面是已經對到的。` })) : null, fresh.length ? /* @__PURE__ */ h(Section, { title: `新的（${fresh.length} 部）`, hint: "勾掉不想匯入的。影評會變成公開的短評：有提到劇情的請點「有雷？」，別人要點開才看得到；想改寫可以按「修改」。" }, /* @__PURE__ */ h("div", { class: "lb-bar" }, /* @__PURE__ */ h("button", { class: "cm-tag", onTap: tap(() => {
+      const on = fresh.some((r) => !r.on);
+      for (const r of fresh) r.on = on;
+    }) }, fresh.some((r) => !r.on) ? "全部勾選" : "全部取消")), list(fresh)) : null, dup.length ? /* @__PURE__ */ h(Section, { title: `片刻已經有的（${dup.length} 部）`, hint: "這幾部你在片刻已經評過分。預設不動；想處理哪一部就勾哪一部，再各自決定分數要不要改、影評要不要加進去。" }, list(dup)) : null, !st.rows.length && !st.err ? /* @__PURE__ */ h(Section, null, /* @__PURE__ */ h(Note, { text: "沒有對到任何一部片。" })) : null, st.rows.length ? /* @__PURE__ */ h(Section, null, /* @__PURE__ */ h("div", { class: "nt-form" }, /* @__PURE__ */ h(Button, { label: picked.length ? `匯入這 ${picked.length} 部` : "先勾選要匯入的", onTap: go }))) : null, st.miss.length ? /* @__PURE__ */ h(Section, { title: `對不到台灣片名（${st.miss.length} 部，不會匯入）` }, /* @__PURE__ */ h("div", { class: "lb-list" }, st.miss.slice(0, 60).map((m) => /* @__PURE__ */ h("div", { class: "lb-sub", style: "padding:5px 0" }, esc(m.name), m.year ? `（${m.year}）` : "")))) : null);
   }
   /** 清單裡的一個帳號：點名字看個人頁，右邊追蹤／取消追蹤 */
   userItem(u) {
@@ -6459,7 +6505,7 @@ var App = class {
         return;
       }
       try {
-        await sendFeedback(cat.id, text, false ? this.isStandalone() ? "web-app" : "web" : "scriptable", "2026.11.25-0012");
+        await sendFeedback(cat.id, text, false ? this.isStandalone() ? "web-app" : "web" : "scriptable", "2026.11.25-0016");
         this.fbDraft = "";
         this.fbCat = "";
         await this.ui.toast("已送出，謝謝你的回饋");
@@ -6797,7 +6843,7 @@ var App = class {
       this.settings.seenLog = CHANGELOG_LATEST;
       saveSettings(this.settings);
     }
-    return /* @__PURE__ */ h(Page, { title: "更新內容", subtitle: `目前版本 ${"2026.11.25-0012"}`, onBack: () => this.back() }, CHANGELOG.map((e) => /* @__PURE__ */ h(Section, { title: e.date }, e.items.map((it) => /* @__PURE__ */ h(Item, { title: it.text, tag: { text: it.kind === "new" ? "新功能" : "改進", tone: it.kind === "new" ? "now" : "soon" }, chevron: false })))), /* @__PURE__ */ h(Note, { text: "只列出比較有感的變動；修小錯、調整文字這類不會寫在這裡。" }));
+    return /* @__PURE__ */ h(Page, { title: "更新內容", subtitle: `目前版本 ${"2026.11.25-0016"}`, onBack: () => this.back() }, CHANGELOG.map((e) => /* @__PURE__ */ h(Section, { title: e.date }, e.items.map((it) => /* @__PURE__ */ h(Item, { title: it.text, tag: { text: it.kind === "new" ? "新功能" : "改進", tone: it.kind === "new" ? "now" : "soon" }, chevron: false })))), /* @__PURE__ */ h(Note, { text: "只列出比較有感的變動；修小錯、調整文字這類不會寫在這裡。" }));
   }
   async aboutView() {
     return /* @__PURE__ */ h(Page, { title: "關於", onBack: () => this.back() }, /* @__PURE__ */ h(Section, { hint: "連鎖影城的場次來自場次通（twshowtimes.com），感謝場次通的整理；其他來自開眼電影網，以及誠品、光點、樂聲、內惟戲院官網。實際場次以影城公告為準。" }, /* @__PURE__ */ h(Item, { icon: "ℹ️", title: "關於與資料來源", accent: true, chevron: false, onTap: () => Safari.open(ABOUT_URL) }), /* @__PURE__ */ h(Item, { icon: "🔒", title: "隱私權政策", accent: true, chevron: false, onTap: () => Safari.open(PRIVACY_URL) }), /* @__PURE__ */ h(Item, { icon: "🙏", title: "前往場次通", subtitle: "比較各影城場次、看上映場數排行", accent: true, chevron: false, onTap: () => Safari.open("https://twshowtimes.com/") })));
@@ -6828,11 +6874,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.25-0012"}`);
+          Pasteboard.copy(`版本 ${"2026.11.25-0016"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.25-0012"}`,
+      `版本 ${"2026.11.25-0016"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -7473,7 +7519,7 @@ var App = class {
     if (false) {
       if (!r) return /* @__PURE__ */ h(Note, { text: "（無法確認是否為最新版：連不到網站）" });
       if (r.isLatest) return /* @__PURE__ */ h(Note, { text: "✅ 已是最新版" });
-      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.25-0012"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
+      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.25-0016"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
         globalThis.location.reload();
       } }));
     }

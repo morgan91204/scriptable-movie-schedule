@@ -899,7 +899,9 @@ class App {
   // ── 從 Letterboxd 匯入（只有網頁版）──
   lbx: {
     stage: "match" | "review" | "import" | "done";
-    rows: { it: LbxItem; title: string; k: string; note: string; cut: boolean; on: boolean; noteOn: boolean; sp: boolean; have: number; plain: boolean }[];
+    /** on = 這一筆要不要匯；noteOn = 影評要不要匯；sp = 有雷；have／haveX = 片刻裡已經有的分數、短評；keep = 已經有分數時保留片刻的（不改成 Letterboxd 的） */
+    rows: { it: LbxItem; title: string; k: string; note: string; cut: boolean; on: boolean; noteOn: boolean; sp: boolean; have: number; haveX: string; keep: boolean; open: boolean; plain: boolean }[];
+    edit: string; // 正在修改哪一筆的影評（片名鍵）
     miss: LbxItem[];
     done: number; total: number; ticks: Promise<void>[]; bump: () => void;
     result: { ok: number; have: number; noNote: number; fail: number; why: string[] };
@@ -917,7 +919,7 @@ class App {
     const fire: (() => void)[] = [];
     const ticks = Array.from({ length: steps }, () => new Promise<void>((ok) => fire.push(ok)));
     let at = 0;
-    const st = (this.lbx = { stage: "match" as const, rows: [], miss: [], done: 0, total: items.length, ticks, bump: () => { const f = fire[at++]; if (f) f(); }, result: { ok: 0, have: 0, noNote: 0, fail: 0, why: [] }, err: "", all: false }) as NonNullable<App["lbx"]>;
+    const st = (this.lbx = { stage: "match" as const, rows: [], miss: [], done: 0, total: items.length, ticks, bump: () => { const f = fire[at++]; if (f) f(); }, result: { ok: 0, have: 0, noNote: 0, fail: 0, why: [] }, err: "", all: false, edit: "" }) as NonNullable<App["lbx"]>;
     void (async () => {
       try {
         const [years, mine] = await Promise.all([loadYearRatings().catch(() => null), this.myDiary().catch(() => [] as DiaryEntry[])]);
@@ -937,9 +939,11 @@ class App {
             const title = known && known !== lbxNorm(m.zh) ? known : m.zh;
             const k = communityKey(title);
             if (st.rows.some((x) => x.k === k)) return; // 兩筆對到同一部片：留第一筆
-            const have = (mine.find((e) => e.k === k) || { s: 0 }).s || 0;
+            const old = mine.find((e) => e.k === k);
+            const have = (old && old.s) || 0, haveX = (old && old.x) || "";
             const n = it.x ? lbxNote(it.x, max) : { x: "", cut: false };
-            st.rows.push({ it, title, k, note: n.x, cut: n.cut, on: !have, noteOn: !!n.x && !n.cut && it.s > 0, sp: false, have, plain: !/[\u3400-\u9fff]/.test(title) });
+            // 片刻已經有的那幾筆：預設不匯，由使用者一筆一筆決定；影評跟片刻的一模一樣就不用再匯
+            st.rows.push({ it, title, k, note: n.x, cut: n.cut, on: !have, noteOn: !!n.x && !n.cut && n.x !== haveX && (it.s > 0 || have > 0), sp: false, have, haveX, keep: true, open: false, plain: !/[\u3400-\u9fff]/.test(title) });
           });
           st.done = Math.min(items.length, i + BATCH);
           st.bump();
@@ -965,7 +969,7 @@ class App {
         for (let i = 0; i < todo.length; i += BATCH) {
           if (this.lbx !== st) return;
           const part = todo.slice(i, i + BATCH);
-          const r = await social<{ list: string[] }>("lbx-import", { items: part.map((p) => ({ m: p.k, title: p.title, s: p.it.s, seen: p.it.seen, ...(p.noteOn && p.note ? { x: p.note, sp: p.sp ? 1 : 0 } : {}) })) });
+          const r = await social<{ list: string[] }>("lbx-import", { items: part.map((p) => ({ m: p.k, title: p.title, s: p.have && p.keep ? 0 : p.it.s, seen: p.it.seen, ...(p.have ? { over: 1 } : {}), ...(p.noteOn && p.note ? { x: p.note, sp: p.sp ? 1 : 0 } : {}) })) });
           part.forEach((p, j) => {
             const code = r.list[j] || "fail";
             if (code === "ok") st.result.ok++;
@@ -1029,45 +1033,79 @@ class App {
         </Page>
       );
     }
-    // 確認清單
+    // 確認清單：分成「新的」和「片刻已經有的」兩段；每一筆各自決定，沒有一次全部套用的選項
     const picked = st.rows.filter((r) => r.on), notes = picked.filter((r) => r.noteOn && r.note).length;
-    const LIMIT = 150, shown = st.all ? st.rows : st.rows.slice(0, LIMIT);
-    const row = (r: (typeof st.rows)[number]) => (
-      <div class={"lb" + (r.on ? "" : " off")}>
-        <button class={"lb-ck" + (r.on ? " on" : "")} aria-pressed={r.on ? "true" : "false"} aria-label={`匯入《${r.title}》`} onTap={() => { r.on = !r.on; }}>{r.on ? "✓" : ""}</button>
-        <div class="lb-body">
-          <div class="lb-top"><b>{esc(r.title)}</b>{r.it.s ? <span class={"nt-score " + ratingTier("imdb", r.it.s)}>{r.it.s} 分</span> : <span class="fb-tag">只標看過</span>}</div>
-          <div class="lb-sub">{esc([`${r.it.name}${r.it.year ? `（${r.it.year}）` : ""}`, /^\d{4}-/.test(r.it.seen) ? r.it.seen.replace(/-/g, "/") + " 看的" : "", r.have ? `片刻已經評 ${r.have} 分，預設不匯` : "", r.plain ? "沒有台灣片名" : ""].filter(Boolean).join("｜"))}</div>
-          {r.note && r.it.s ? (
-            <>
-              <div class="lb-x" style={r.noteOn ? "" : "opacity:.45"}>{esc(r.note)}</div>
-              <div class="lb-opts">
-                <button class={"cm-tag" + (r.noteOn ? " on" : "")} aria-pressed={r.noteOn ? "true" : "false"} onTap={() => { r.noteOn = !r.noteOn; }}>{r.noteOn ? "匯入影評 ✓" : "匯入影評"}</button>
-                {r.noteOn ? <button class={"cm-tag" + (r.sp ? " on" : "")} aria-pressed={r.sp ? "true" : "false"} onTap={() => { r.sp = !r.sp; }}>{r.sp ? "有雷 ✓" : "有雷？"}</button> : null}
-                {r.cut ? <span class="lb-sub" style="align-self:center">原文太長，只留前 {LBX_NOTE_MAX} 字</span> : null}
+    const fresh = st.rows.filter((r) => !r.have), dup = st.rows.filter((r) => r.have);
+    const LIMIT = 120;
+    const keepEdit = (v?: Record<string, string>) => { const r = st.rows.find((x) => x.k === st.edit); if (r && v && typeof v.lbx === "string") { const n = lbxNote(v.lbx, LBX_NOTE_MAX); r.note = n.x; r.cut = false; if (!n.x) r.noteOn = false; } };
+    const tap = (fn: () => void) => (v: Record<string, string>) => { keepEdit(v); fn(); };
+    const row = (r: (typeof st.rows)[number]) => {
+      const editing = st.edit === r.k;
+      const canNote = !!r.note && (r.it.s > 0 || r.have > 0);
+      const sameNote = !!r.note && r.note === r.haveX;
+      const long = Array.from(r.note).length > 90;
+      return (
+        <div class={"lb" + (r.on ? "" : " off")}>
+          <button class={"lb-ck" + (r.on ? " on" : "")} aria-pressed={r.on ? "true" : "false"} aria-label={`匯入《${r.title}》`} onTap={tap(() => { r.on = !r.on; })}>{r.on ? "✓" : ""}</button>
+          <div class="lb-body">
+            <div class="lb-top"><b>{esc(r.title)}</b>{r.it.s ? <span class={"nt-score " + ratingTier("imdb", r.it.s)}>{r.it.s} 分</span> : <span class="fb-tag">只標看過</span>}</div>
+            <div class="lb-sub">{esc([`${r.it.name}${r.it.year ? `（${r.it.year}）` : ""}`, /^\d{4}-/.test(r.it.seen) ? r.it.seen.replace(/-/g, "/") + " 看的" : "", r.plain ? "沒有台灣片名" : ""].filter(Boolean).join("｜"))}</div>
+            {r.have ? (
+              <div class="lb-have">
+                <div class="lb-haveline"><span>片刻現在</span><b class={"nt-score " + ratingTier("imdb", r.have)}>{r.have} 分</b></div>
+                {r.haveX ? <div class="lb-havex">{esc(r.haveX)}</div> : null}
+                {r.on && r.it.s && r.it.s !== r.have ? (
+                  <div class="lb-seg" role="group" aria-label="分數用哪一個">
+                    <button class={r.keep ? "on" : ""} aria-pressed={r.keep ? "true" : "false"} onTap={tap(() => { r.keep = true; })}>分數維持 {r.have} 分</button>
+                    <button class={r.keep ? "" : "on"} aria-pressed={r.keep ? "false" : "true"} onTap={tap(() => { r.keep = false; })}>改成 {r.it.s} 分</button>
+                  </div>
+                ) : r.on && r.it.s === r.have ? <div class="lb-sub">分數一樣，不會變。</div> : null}
               </div>
-            </>
-          ) : null}
+            ) : null}
+            {canNote && editing ? (
+              <div class="lb-edit">
+                <textarea class="fb-area note" name="lbx" maxlength={String(LBX_NOTE_MAX)} aria-label="修改影評">{esc(r.note)}</textarea>
+                <div class="lb-opts">
+                  <button class="cm-tag on" onTap={(v: Record<string, string>) => { keepEdit(v); st.edit = ""; }}>改好了</button>
+                  <span class="lb-sub" style="align-self:center">最多 {LBX_NOTE_MAX} 字，換行會變成空白</span>
+                </div>
+              </div>
+            ) : canNote ? (
+              <>
+                {r.have ? <div class="lb-sub" style="margin-top:8px">Letterboxd 的影評{sameNote ? "（跟片刻的一樣，不用再匯）" : r.haveX ? "（會多一則，原本那則留著）" : ""}</div> : null}
+                <button class={"lb-x" + (r.open || !long ? "" : " clamp") + (r.noteOn && r.on ? "" : " dim")} aria-label={long ? "展開或收合影評" : undefined} onTap={tap(() => { r.open = !r.open; })}><span>{esc(r.note)}</span>{long ? <i>{r.open ? "收合" : "展開"}</i> : null}</button>
+                {r.on && !sameNote ? (
+                  <div class="lb-opts">
+                    <button class={"cm-tag" + (r.noteOn ? " on" : "")} aria-pressed={r.noteOn ? "true" : "false"} onTap={tap(() => { r.noteOn = !r.noteOn; })}>{r.noteOn ? "匯入影評 ✓" : "匯入影評"}</button>
+                    {r.noteOn ? <button class={"cm-tag" + (r.sp ? " on" : "")} aria-pressed={r.sp ? "true" : "false"} onTap={tap(() => { r.sp = !r.sp; })}>{r.sp ? "有雷 ✓" : "有雷？"}</button> : null}
+                    {r.noteOn ? <button class="cm-tag" onTap={tap(() => { st.edit = r.k; })}>✎ 修改</button> : null}
+                  </div>
+                ) : null}
+                {r.cut && r.on ? <div class="lb-sub" style="margin-top:6px">原文超過 {LBX_NOTE_MAX} 字，後面截掉了；可以按「修改」自己調整。</div> : null}
+              </>
+            ) : null}
+          </div>
         </div>
-      </div>
-    );
+      );
+    };
+    const list = (rows: typeof st.rows) => { const shown = st.all ? rows : rows.slice(0, LIMIT); return <><div class="lb-list">{shown.map(row)}</div>{rows.length > shown.length ? <Item title={`顯示全部 ${rows.length} 部`} accent chevron={false} onTap={tap(() => { st.all = true; })} /> : null}</>; };
+    const go = (v: Record<string, string>) => { keepEdit(v); st.edit = ""; if (picked.length) this.lbxSend(); };
     return (
-      <Page title="確認要匯入的" subtitle={`${st.rows.length} 部`} onBack={back} right={picked.length ? <button class="bar-save" onTap={() => this.lbxSend()}>匯入</button> : undefined}>
+      <Page title="確認要匯入的" subtitle={`已選 ${picked.length} 部、影評 ${notes} 則`} onBack={back} right={picked.length ? <button class="bar-save" onTap={go}>匯入</button> : undefined}>
         {st.err ? <Section><Note kind="warn" text={st.err === "no tmdb" || /503/.test(st.err) ? "片名對照的服務還沒設定好，暫時不能匯入。" : `對照片名時停下來了：${st.err}。下面是已經對到的。`} /></Section> : null}
-        {st.rows.length ? (
-          <>
-            <Section title={`要匯入 ${picked.length} 部、影評 ${notes} 則`} hint="勾掉不想匯入的。影評會變成公開的短評：有提到劇情的請點「有雷？」，別人要點開才看得到。太長被截掉的影評預設不匯。">
-              <div class="lb-bar">
-                <button class="cm-tag" onTap={() => { const on = picked.length < st.rows.length; for (const r of st.rows) r.on = on; }}>{picked.length < st.rows.length ? "全選" : "全不選"}</button>
-                <button class="cm-tag" onTap={() => { for (const r of st.rows) if (r.note) r.noteOn = false; }}>影評全部不匯</button>
-                <button class="cm-tag" onTap={() => { for (const r of st.rows) if (r.note) r.sp = true; }}>影評全部標有雷</button>
-              </div>
-              <div class="lb-list">{shown.map(row)}</div>
-              {st.rows.length > shown.length ? <Item title={`顯示全部 ${st.rows.length} 部`} accent chevron={false} onTap={() => { st.all = true; }} /> : null}
-            </Section>
-            <Section><div class="nt-form"><Button label={picked.length ? `匯入這 ${picked.length} 部` : "先勾選要匯入的"} onTap={() => { if (picked.length) this.lbxSend(); }} /></div></Section>
-          </>
-        ) : !st.err ? <Section><Note text="沒有對到任何一部片。" /></Section> : null}
+        {fresh.length ? (
+          <Section title={`新的（${fresh.length} 部）`} hint="勾掉不想匯入的。影評會變成公開的短評：有提到劇情的請點「有雷？」，別人要點開才看得到；想改寫可以按「修改」。">
+            <div class="lb-bar"><button class="cm-tag" onTap={tap(() => { const on = fresh.some((r) => !r.on); for (const r of fresh) r.on = on; })}>{fresh.some((r) => !r.on) ? "全部勾選" : "全部取消"}</button></div>
+            {list(fresh)}
+          </Section>
+        ) : null}
+        {dup.length ? (
+          <Section title={`片刻已經有的（${dup.length} 部）`} hint="這幾部你在片刻已經評過分。預設不動；想處理哪一部就勾哪一部，再各自決定分數要不要改、影評要不要加進去。">
+            {list(dup)}
+          </Section>
+        ) : null}
+        {!st.rows.length && !st.err ? <Section><Note text="沒有對到任何一部片。" /></Section> : null}
+        {st.rows.length ? <Section><div class="nt-form"><Button label={picked.length ? `匯入這 ${picked.length} 部` : "先勾選要匯入的"} onTap={go} /></div></Section> : null}
         {st.miss.length ? <Section title={`對不到台灣片名（${st.miss.length} 部，不會匯入）`}><div class="lb-list">{st.miss.slice(0, 60).map((m) => <div class="lb-sub" style="padding:5px 0">{esc(m.name)}{m.year ? `（${m.year}）` : ""}</div>)}</div></Section> : null}
       </Page>
     );

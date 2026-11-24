@@ -376,21 +376,23 @@ export async function social(hub, path, b) {
     for (const it of items) {
       const k = String((it && it.m) || ""), title = cleanTitle(it && it.title), s = Math.round(Number(it && it.s)) || 0;
       if (!okKey(k) || !title || s < 0 || s > 10) { out.push("bad"); continue; }
-      const old = one(sql, "SELECT s, x FROM entries WHERE uid = ? AND k = ?", uid, k);
-      if (old && old.s && !b.over) { out.push("have"); continue; }
+      const old = one(sql, "SELECT s, x, seen FROM entries WHERE uid = ? AND k = ?", uid, k);
+      // 片刻已經評過的：要那一筆自己帶 over 才動（一筆一筆決定）。over 而 s = 0 → 分數維持原本的，只加影評
+      if (old && old.s && !it.over) { out.push("have"); continue; }
       const seen = /^\d{4}-\d{2}-\d{2}$/.test(String(it.seen || "")) && String(it.seen) <= new Date(Date.now() + 8 * 3600e3).toISOString().slice(0, 10) ? String(it.seen) : "?";
+      const voted = s || (old && old.s) || 0;
       let x = "", sp = 0, note = "";
       try {
-        if (s) { const r = await rate.vote(k, udev(uid), s); if (r && r.error) { out.push("fail"); continue; } }
-        const text = s ? String(it.x || "").replace(/[\u0000-\u001f\u007f-\u009f]/g, " ").replace(/\s+/g, " ").trim().slice(0, 1200) : "";
+        if (s && !(old && old.s === s)) { const r = await rate.vote(k, udev(uid), s); if (r && r.error) { out.push("fail"); continue; } }
+        const text = voted ? String(it.x || "").replace(/[\u0000-\u001f\u007f-\u009f]/g, " ").replace(/\s+/g, " ").trim().slice(0, 1200) : "";
         if (text && !(old && old.x === text)) {
           const r = await rate.noteAdd(k, udev(uid), text, it.sp ? 1 : 0, 0, true); // true = 匯入的影評，字數上限比較寬
           if (r && r.error) note = r.error; else { x = text; sp = it.sp ? 1 : 0; }
-        } else if (old && old.x) { x = old.x; }
+        }
       } catch (_) { out.push("fail"); continue; }
-      // 記錄時間用觀影日期（沒有日期的排到三個月前），免得一次匯入幾百筆把追蹤者的動態洗掉
+      // 新的一筆：記錄時間用觀影日期（沒有日期的排到三個月前），免得一次匯入幾百筆把追蹤者的動態洗掉。原本就有的那一筆：時間、看過的日期不動
       const at = seen !== "?" ? Math.min(Date.now(), Date.parse(seen + "T12:00:00+08:00")) : Date.now() - 90 * 864e5;
-      upsertEntry(sql, uid, k, title, { ...(s ? { s } : {}), ...(x ? { x, sp } : {}), seen, at });
+      upsertEntry(sql, uid, k, title, { ...(s ? { s } : {}), ...(x ? { x, sp } : {}), ...(old && old.seen && old.seen !== "?" ? {} : { seen }), ...(old ? {} : { at }) });
       out.push(note ? "note:" + note : "ok");
     }
     return json({ ok: true, list: out });

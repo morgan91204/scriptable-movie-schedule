@@ -416,17 +416,28 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .lb-list{padding:0 16px 6px}
 .lb{display:flex;gap:11px;padding:12px 0}
 .lb+.lb{border-top:1px solid var(--line)}
-.lb.off .lb-body{opacity:.45}
+.lb.off .lb-top,.lb.off .lb-sub,.lb.off .lb-x{opacity:.45}
 .lb-ck{flex:none;width:26px;height:26px;margin-top:1px;padding:0;border-radius:8px;border:1.5px solid var(--line);color:#fff;font-size:15px;line-height:1}
 .lb-ck.on{background:var(--accent);border-color:var(--accent)}
 .lb-body{flex:1;min-width:0}
 .lb-top{display:flex;align-items:baseline;gap:8px}
 .lb-top b{flex:1;min-width:0;font-size:16px;overflow-wrap:anywhere}
 .lb-sub{margin-top:2px;font-size:12.5px;color:var(--fg2);overflow-wrap:anywhere}
-.lb-x{margin-top:7px;padding:8px 10px;border-radius:10px;background:var(--chip);font-size:14px;line-height:1.45;overflow-wrap:anywhere}
+.lb-x{display:block;width:100%;margin-top:7px;padding:9px 11px;border-radius:10px;background:var(--chip);color:var(--fg);font-size:14.5px;line-height:1.5;text-align:left;overflow-wrap:anywhere}
+.lb-x.clamp span{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden}
+.lb-x i{display:block;margin-top:4px;font-style:normal;font-size:12.5px;color:var(--accent)}
+.lb-x.dim{opacity:.5}
+.lb-have{margin-top:9px;padding:9px 11px;border-radius:10px;border:1px solid var(--line)}
+.lb-haveline{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--fg2)}
+.lb-havex{margin-top:5px;font-size:13.5px;line-height:1.45;color:var(--fg2);overflow-wrap:anywhere}
+.lb-seg{display:flex;margin-top:9px;padding:2px;border-radius:9px;background:var(--chip)}
+.lb-seg button{flex:1 1 0;min-width:0;padding:6px 4px;border-radius:7px;font-size:13px;color:var(--fg2);white-space:nowrap}
+.lb-seg button.on{background:var(--card);color:var(--fg);font-weight:600;box-shadow:0 1px 2px rgba(0,0,0,.25)}
+.lb-edit{margin-top:8px}
+.lb-edit textarea{display:block;width:100%;box-sizing:border-box;min-height:120px;margin:0}
 .lb-opts{display:flex;flex-wrap:wrap;gap:6px;margin-top:7px}
 .lb-opts .cm-tag{padding:4px 10px;font-size:12.5px}
-.lb-bar{display:flex;flex-wrap:wrap;gap:6px;padding:0 16px 12px}
+.lb-bar{display:flex;flex-wrap:wrap;gap:6px;padding:12px 16px 2px}
 .fd-list{padding:4px 16px 6px}
 .fd{display:flex;align-items:flex-start;gap:12px;padding:12px 0}
 .fd+.fd{border-top:1px solid var(--line)}
