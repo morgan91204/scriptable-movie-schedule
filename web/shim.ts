@@ -135,10 +135,8 @@ g.ShareSheet = {
     const text = items.join("\n");
     if (navigator.share) {
       try {
-        // 最後一項是網址的話另外交給系統（分享到訊息、社群時會變成可以點的連結，有預覽圖）
-        const last = items[items.length - 1] || "";
-        if (items.length > 1 && /^https?:\/\/\S+$/.test(last)) await navigator.share({ text: items.slice(0, -1).join("\n"), url: last });
-        else await navigator.share({ text });
+        // 文字和網址合成一段、網址自己一行：分開交給系統的話，多數 App 會把兩個接在同一行
+        await navigator.share({ text });
         return;
       } catch (e) {
         if ((e as any)?.name === "AbortError") return; // 使用者自己關掉分享選單：不用再複製
