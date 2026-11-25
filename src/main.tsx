@@ -2344,6 +2344,14 @@ class App {
     return (
       <Page title="設定">
         {await this.accountSection()}
+        {/* 分享片刻：放在帳號下面、其他設定上面，做成一張有底色的卡片（原本夾在最下面的「關於」裡，很少人看到） */}
+        {IS_WEB ? (
+          <button class="sc" aria-label="分享片刻給朋友" onTap={() => { this.sharePick = 0; this.go(() => this.shareAppView()); }}>
+            <span class="sc-ico" aria-hidden="true">📣</span>
+            <span class="sc-body"><b>把片刻分享給朋友</b><span>約電影更方便，還能互相追蹤、看彼此看了什麼</span></span>
+            <span class="sc-go">分享</span>
+          </button>
+        ) : null}
         <Section title="加入行事曆時" hint={`廣告預告：${ADS_NOTE}`}>
           <Item icon="📅" title="寫入的行事曆" subtitle={this.calendarName} onTap={() => this.go(() => this.calendarView())} />
           <Item icon="📺" title="廣告預告" subtitle={`預計散場時間會加上 ${this.settings.ads} 分鐘`} right="點一下切換" chevron={false} onTap={() => this.cycleAds()} />
@@ -2359,7 +2367,6 @@ class App {
         </Section>
         {await this.notifyLink()}
         <Section title="關於">
-          {IS_WEB ? <Item icon="📣" title="分享片刻給朋友" subtitle="選一段話，連同片刻的網址傳給朋友" onTap={() => { this.sharePick = 0; this.go(() => this.shareAppView()); }} /> : null}
           {IS_WEB && !this.isStandalone() ? <Item icon="📲" title="加到主畫面" subtitle="像 App 一樣從主畫面開啟，看圖示教學" onTap={() => this.go(() => this.installView())} /> : null}
           <Item icon="ℹ️" title="關於" subtitle="資料來源、隱私權政策、場次通" onTap={() => this.go(() => this.aboutView())} />
           <Item icon="💬" title="意見回饋" subtitle={fbNew ? "站長回覆你了，點進來看" : "回報問題、資料有誤，或建議新功能"} right={fbNew ? "● 新回覆" : ""} onTap={() => { this.fbCat = ""; this.fbDraft = ""; this.fbForce = true; this.go(() => this.feedbackView(), "讀取中…"); }} />

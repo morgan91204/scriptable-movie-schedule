@@ -465,6 +465,14 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .nb-ask b{display:block;margin-top:12px;font-size:19px}
 .nb-ask p{margin:10px 0 0;font-size:14.5px;line-height:1.55;color:var(--fg2)}
 .nb-ask .nb-warn{color:#ff9f0a}
+.sc{display:flex;align-items:center;gap:13px;box-sizing:border-box;width:100%;margin:18px 0 0;padding:14px 14px 14px 16px;border-radius:16px;text-align:left;color:var(--fg);background:linear-gradient(135deg,rgba(10,132,255,.22),rgba(94,92,230,.18));box-shadow:0 0 0 1px rgba(10,132,255,.28) inset}
+.sc:active{opacity:.7}
+.sc-ico{flex:none;display:inline-flex;align-items:center;justify-content:center;width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,.14);font-size:22px;line-height:1}
+.sc-body{flex:1;min-width:0;display:block}
+.sc-body b{display:block;font-size:16.5px;font-weight:700}
+.sc-body span{display:block;margin-top:2px;font-size:13px;line-height:1.4;color:var(--fg2)}
+.sc-go{flex:none;padding:8px 17px;border-radius:999px;background:var(--accent);color:#fff;font-size:15px;font-weight:700;white-space:nowrap}
+@media(prefers-color-scheme:light){.sc{background:linear-gradient(135deg,rgba(10,132,255,.12),rgba(94,92,230,.1))}.sc-ico{background:rgba(10,132,255,.14)}}
 .sp-list{padding:6px 16px 2px}
 .sp{display:flex;align-items:flex-start;gap:12px;width:100%;padding:13px 0;text-align:left;color:var(--fg)}
 .sp+.sp{border-top:1px solid var(--line)}
