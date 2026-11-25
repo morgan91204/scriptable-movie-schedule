@@ -836,6 +836,37 @@ class App {
     const row = (await favMovieRows({ ...this.settings, favMovies: [fav] }).catch(() => [] as FavRow[]))[0];
     if (row) this.openFavRow(row); else this.go(() => this.favMovieView(fav), `讀取《${title}》…`);
   }
+  sharePick = 0; // 「分享片刻給朋友」選了哪一段文字
+  /** 分享片刻給朋友：先選一段文字（預選第一段），按「分享」才開系統的分享選單。
+   *  送出去的是「選中的那段文字、換行、片刻的網址」；短標籤、字數、「預設」只是給選的人看的 */
+  shareAppView(): string {
+    const n = this.cinemas.length || 106; // 影城間數跟著實際的清單走（還沒讀到就用 106）
+    const OPTIONS = [
+      { label: "省去切 App", text: `每次查電影都要開好幾個 App，後來我都用片刻一次查全台 ${n} 間影城的場次。` },
+      { label: "順手排行程", text: `我最近都用片刻查電影，全台 ${n} 間影城的場次一次看。選好還能直接加到行事曆。` },
+      { label: "一句話分享", text: `片刻一次查全台 ${n} 間影城的場次。` },
+      { label: "揪朋友一起用", text: `下次約電影用片刻，一次查全台 ${n} 間影城的場次。也可以互追，看看對方最近看了哪幾部。` },
+    ];
+    const pick = OPTIONS[this.sharePick] || OPTIONS[0];
+    return (
+      <Page title="分享片刻給朋友" onBack={() => this.back()}>
+        <Section title="選一段分享文字" hint="按「分享」後會送出你選的那段文字，下一行接片刻的網址。">
+          <div class="sp-list" role="radiogroup" aria-label="分享文字">
+            {OPTIONS.map((o, i) => (
+              <button class={"sp" + (i === this.sharePick ? " on" : "")} role="radio" aria-checked={i === this.sharePick ? "true" : "false"} onTap={() => { this.sharePick = i; }}>
+                <i aria-hidden="true" />
+                <span class="sp-body">
+                  <span class="sp-head"><b>{esc(o.label)}</b>{i === 0 ? <em>預設</em> : null}<small>{Array.from(o.text).length} 字</small></span>
+                  <span class="sp-text">{esc(o.text)}</span>
+                </span>
+              </button>
+            ))}
+          </div>
+          <div class="nt-form"><Button label="分享" onTap={async () => { await (ShareSheet as any).present([pick.text, SITE_URL + "/"], "已複製分享文字"); }} /></div>
+        </Section>
+      </Page>
+    );
+  }
   /** 分享個人頁：跳出系統的分享選單（不支援的瀏覽器改成複製連結） */
   async shareProfile(name: string, mine: boolean, code = ""): Promise<void> {
     // 有短代號就用短代號（網址乾淨）；沒有才退回用暱稱（中文會變成一長串 %E5…）
@@ -2328,7 +2359,7 @@ class App {
         </Section>
         {await this.notifyLink()}
         <Section title="關於">
-          {IS_WEB ? <Item icon="📣" title="分享片刻給朋友" subtitle="把片刻的網址傳給朋友" chevron={false} onTap={async () => { await ShareSheet.present(["片刻：全台電影場次一次查，還能記片單、寫短評、追蹤朋友。免費、沒有廣告、不用安裝。", SITE_URL]); }} /> : null}
+          {IS_WEB ? <Item icon="📣" title="分享片刻給朋友" subtitle="選一段話，連同片刻的網址傳給朋友" onTap={() => { this.sharePick = 0; this.go(() => this.shareAppView()); }} /> : null}
           {IS_WEB && !this.isStandalone() ? <Item icon="📲" title="加到主畫面" subtitle="像 App 一樣從主畫面開啟，看圖示教學" onTap={() => this.go(() => this.installView())} /> : null}
           <Item icon="ℹ️" title="關於" subtitle="資料來源、隱私權政策、場次通" onTap={() => this.go(() => this.aboutView())} />
           <Item icon="💬" title="意見回饋" subtitle={fbNew ? "站長回覆你了，點進來看" : "回報問題、資料有誤，或建議新功能"} right={fbNew ? "● 新回覆" : ""} onTap={() => { this.fbCat = ""; this.fbDraft = ""; this.fbForce = true; this.go(() => this.feedbackView(), "讀取中…"); }} />

@@ -131,7 +131,8 @@ g.Pasteboard = {
 };
 
 g.ShareSheet = {
-  async present(items: string[]) {
+  /** copied = 這台裝置開不了分享選單、改成複製時要顯示的話 */
+  async present(items: string[], copied = "已複製，可以貼給朋友") {
     const text = items.join("\n");
     if (navigator.share) {
       try {
@@ -143,7 +144,7 @@ g.ShareSheet = {
       }
     }
     await navigator.clipboard?.writeText(text).catch(() => {});
-    (window as any).__toast?.("已複製，可以貼給朋友");
+    (window as any).__toast?.(copied);
   },
 };
 

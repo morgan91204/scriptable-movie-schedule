@@ -465,6 +465,18 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .nb-ask b{display:block;margin-top:12px;font-size:19px}
 .nb-ask p{margin:10px 0 0;font-size:14.5px;line-height:1.55;color:var(--fg2)}
 .nb-ask .nb-warn{color:#ff9f0a}
+.sp-list{padding:6px 16px 2px}
+.sp{display:flex;align-items:flex-start;gap:12px;width:100%;padding:13px 0;text-align:left;color:var(--fg)}
+.sp+.sp{border-top:1px solid var(--line)}
+.sp>i{flex:none;box-sizing:border-box;width:22px;height:22px;margin-top:2px;border-radius:50%;border:1.5px solid var(--fg2)}
+.sp.on>i{border:6.5px solid var(--accent)}
+.sp-body{flex:1;min-width:0;display:block}
+.sp-head{display:flex;align-items:center;gap:8px}
+.sp-head b{font-size:16px;font-weight:700}
+.sp-head em{font-style:normal;font-size:11.5px;font-weight:600;padding:1px 7px;border-radius:999px;background:var(--chip);color:var(--fg2)}
+.sp-head small{margin-left:auto;font-size:12px;color:var(--fg2);font-variant-numeric:tabular-nums}
+.sp-text{display:block;margin-top:5px;font-size:14.5px;line-height:1.5;color:var(--fg2);overflow-wrap:anywhere}
+.sp.on .sp-text{color:var(--fg)}
 .fd-list{padding:4px 16px 6px}
 .fd{display:flex;align-items:flex-start;gap:12px;padding:12px 0}
 .fd+.fd{border-top:1px solid var(--line)}

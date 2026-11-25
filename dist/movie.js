@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.25-0814
+// @movie-schedule-app 電影行程 v2026.11.25-0819
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/brand.ts
@@ -4723,6 +4723,18 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .nb-ask b{display:block;margin-top:12px;font-size:19px}
 .nb-ask p{margin:10px 0 0;font-size:14.5px;line-height:1.55;color:var(--fg2)}
 .nb-ask .nb-warn{color:#ff9f0a}
+.sp-list{padding:6px 16px 2px}
+.sp{display:flex;align-items:flex-start;gap:12px;width:100%;padding:13px 0;text-align:left;color:var(--fg)}
+.sp+.sp{border-top:1px solid var(--line)}
+.sp>i{flex:none;box-sizing:border-box;width:22px;height:22px;margin-top:2px;border-radius:50%;border:1.5px solid var(--fg2)}
+.sp.on>i{border:6.5px solid var(--accent)}
+.sp-body{flex:1;min-width:0;display:block}
+.sp-head{display:flex;align-items:center;gap:8px}
+.sp-head b{font-size:16px;font-weight:700}
+.sp-head em{font-style:normal;font-size:11.5px;font-weight:600;padding:1px 7px;border-radius:999px;background:var(--chip);color:var(--fg2)}
+.sp-head small{margin-left:auto;font-size:12px;color:var(--fg2);font-variant-numeric:tabular-nums}
+.sp-text{display:block;margin-top:5px;font-size:14.5px;line-height:1.5;color:var(--fg2);overflow-wrap:anywhere}
+.sp.on .sp-text{color:var(--fg)}
 .fd-list{padding:4px 16px 6px}
 .fd{display:flex;align-items:flex-start;gap:12px;padding:12px 0}
 .fd+.fd{border-top:1px solid var(--line)}
@@ -5255,6 +5267,7 @@ var App = class {
     this.diaryMem = null;
     // 自己的片單（一分鐘內不重讀）
     this.profileDraft = null;
+    this.sharePick = 0;
     // ── 匯出我的資料（只有網頁版）：做成 Letterboxd 匯入用的 CSV ──
     this.exp = null;
     // ── 從 Letterboxd 匯入（只有網頁版）──
@@ -5454,7 +5467,7 @@ var App = class {
   }
   /** 最新版本是多少。網頁版問的是自己網站現在上線的版本（重新整理就會拿到的那一版），不是 GitHub 上的 */
   checkVersion() {
-    if (true) return checkLatest("2026.11.25-0814");
+    if (true) return checkLatest("2026.11.25-0819");
     return (async () => {
       try {
         let r = await globalThis.fetch("/version.json?t=" + Date.now(), { cache: "no-store" });
@@ -5462,7 +5475,7 @@ var App = class {
         const latest = String((await r.json()).version || "");
         if (!latest) return null;
         const num = (v) => Number(v.replace(/\D/g, "")) || 0;
-        return { latest, isLatest: num("2026.11.25-0814") >= num(latest) };
+        return { latest, isLatest: num("2026.11.25-0819") >= num(latest) };
       } catch (_) {
         return null;
       }
@@ -6030,6 +6043,24 @@ var App = class {
     const row = (await favMovieRows({ ...this.settings, favMovies: [fav] }).catch(() => []))[0];
     if (row) this.openFavRow(row);
     else this.go(() => this.favMovieView(fav), `讀取《${title}》…`);
+  }
+  // 「分享片刻給朋友」選了哪一段文字
+  /** 分享片刻給朋友：先選一段文字（預選第一段），按「分享」才開系統的分享選單。
+   *  送出去的是「選中的那段文字、換行、片刻的網址」；短標籤、字數、「預設」只是給選的人看的 */
+  shareAppView() {
+    const n = this.cinemas.length || 106;
+    const OPTIONS = [
+      { label: "省去切 App", text: `每次查電影都要開好幾個 App，後來我都用片刻一次查全台 ${n} 間影城的場次。` },
+      { label: "順手排行程", text: `我最近都用片刻查電影，全台 ${n} 間影城的場次一次看。選好還能直接加到行事曆。` },
+      { label: "一句話分享", text: `片刻一次查全台 ${n} 間影城的場次。` },
+      { label: "揪朋友一起用", text: `下次約電影用片刻，一次查全台 ${n} 間影城的場次。也可以互追，看看對方最近看了哪幾部。` }
+    ];
+    const pick = OPTIONS[this.sharePick] || OPTIONS[0];
+    return /* @__PURE__ */ h(Page, { title: "分享片刻給朋友", onBack: () => this.back() }, /* @__PURE__ */ h(Section, { title: "選一段分享文字", hint: "按「分享」後會送出你選的那段文字，下一行接片刻的網址。" }, /* @__PURE__ */ h("div", { class: "sp-list", role: "radiogroup", "aria-label": "分享文字" }, OPTIONS.map((o, i) => /* @__PURE__ */ h("button", { class: "sp" + (i === this.sharePick ? " on" : ""), role: "radio", "aria-checked": i === this.sharePick ? "true" : "false", onTap: () => {
+      this.sharePick = i;
+    } }, /* @__PURE__ */ h("i", { "aria-hidden": "true" }), /* @__PURE__ */ h("span", { class: "sp-body" }, /* @__PURE__ */ h("span", { class: "sp-head" }, /* @__PURE__ */ h("b", null, esc(o.label)), i === 0 ? /* @__PURE__ */ h("em", null, "預設") : null, /* @__PURE__ */ h("small", null, Array.from(o.text).length, " 字")), /* @__PURE__ */ h("span", { class: "sp-text" }, esc(o.text)))))), /* @__PURE__ */ h("div", { class: "nt-form" }, /* @__PURE__ */ h(Button, { label: "分享", onTap: async () => {
+      await ShareSheet.present([pick.text, SITE_URL + "/"], "已複製分享文字");
+    } }))));
   }
   /** 分享個人頁：跳出系統的分享選單（不支援的瀏覽器改成複製連結） */
   async shareProfile(name, mine, code = "") {
@@ -6740,7 +6771,7 @@ var App = class {
         return;
       }
       try {
-        await sendFeedback(cat.id, text, false ? this.isStandalone() ? "web-app" : "web" : "scriptable", "2026.11.25-0814");
+        await sendFeedback(cat.id, text, false ? this.isStandalone() ? "web-app" : "web" : "scriptable", "2026.11.25-0819");
         this.fbDraft = "";
         this.fbCat = "";
         await this.ui.toast("已送出，謝謝你的回饋");
@@ -7098,7 +7129,7 @@ var App = class {
       this.settings.seenLog = CHANGELOG_LATEST;
       saveSettings(this.settings);
     }
-    return /* @__PURE__ */ h(Page, { title: "更新內容", subtitle: `目前版本 ${"2026.11.25-0814"}`, onBack: () => this.back() }, CHANGELOG.map((e) => /* @__PURE__ */ h(Section, { title: e.date }, e.items.map((it) => /* @__PURE__ */ h(Item, { title: it.text, tag: { text: it.kind === "new" ? "新功能" : "改進", tone: it.kind === "new" ? "now" : "soon" }, chevron: false })))), /* @__PURE__ */ h(Note, { text: "只列出比較有感的變動；修小錯、調整文字這類不會寫在這裡。" }));
+    return /* @__PURE__ */ h(Page, { title: "更新內容", subtitle: `目前版本 ${"2026.11.25-0819"}`, onBack: () => this.back() }, CHANGELOG.map((e) => /* @__PURE__ */ h(Section, { title: e.date }, e.items.map((it) => /* @__PURE__ */ h(Item, { title: it.text, tag: { text: it.kind === "new" ? "新功能" : "改進", tone: it.kind === "new" ? "now" : "soon" }, chevron: false })))), /* @__PURE__ */ h(Note, { text: "只列出比較有感的變動；修小錯、調整文字這類不會寫在這裡。" }));
   }
   async aboutView() {
     return /* @__PURE__ */ h(Page, { title: "關於", onBack: () => this.back() }, /* @__PURE__ */ h(Section, { hint: "連鎖影城的場次來自場次通（twshowtimes.com），感謝場次通的整理；其他來自開眼電影網，以及誠品、光點、樂聲、內惟戲院官網。實際場次以影城公告為準。" }, /* @__PURE__ */ h(Item, { icon: "ℹ️", title: "關於與資料來源", accent: true, chevron: false, onTap: () => Safari.open(ABOUT_URL) }), /* @__PURE__ */ h(Item, { icon: "🔒", title: "隱私權政策", accent: true, chevron: false, onTap: () => Safari.open(PRIVACY_URL) }), /* @__PURE__ */ h(Item, { icon: "🙏", title: "前往場次通", subtitle: "比較各影城場次、看上映場數排行", accent: true, chevron: false, onTap: () => Safari.open("https://twshowtimes.com/") })));
@@ -7119,8 +7150,9 @@ var App = class {
     } }), /* @__PURE__ */ h(Item, { icon: "🏢", title: "收藏發行商", subtitle: "搜尋發行商、增加或取消收藏", right: (this.settings.favIssuers || []).length ? `${(this.settings.favIssuers || []).length} 家` : "還沒有", onTap: () => {
       this.issuerQuery = "";
       this.go(() => this.issuerManageView(), "讀取發行商…");
-    } })), await this.notifyLink(), /* @__PURE__ */ h(Section, { title: "關於" }, false ? /* @__PURE__ */ h(Item, { icon: "📣", title: "分享片刻給朋友", subtitle: "把片刻的網址傳給朋友", chevron: false, onTap: async () => {
-      await ShareSheet.present(["片刻：全台電影場次一次查，還能記片單、寫短評、追蹤朋友。免費、沒有廣告、不用安裝。", SITE_URL]);
+    } })), await this.notifyLink(), /* @__PURE__ */ h(Section, { title: "關於" }, false ? /* @__PURE__ */ h(Item, { icon: "📣", title: "分享片刻給朋友", subtitle: "選一段話，連同片刻的網址傳給朋友", onTap: () => {
+      this.sharePick = 0;
+      this.go(() => this.shareAppView());
     } }) : null, false ? /* @__PURE__ */ h(Item, { icon: "📲", title: "加到主畫面", subtitle: "像 App 一樣從主畫面開啟，看圖示教學", onTap: () => this.go(() => this.installView()) }) : null, /* @__PURE__ */ h(Item, { icon: "ℹ️", title: "關於", subtitle: "資料來源、隱私權政策、場次通", onTap: () => this.go(() => this.aboutView()) }), /* @__PURE__ */ h(Item, { icon: "💬", title: "意見回饋", subtitle: fbNew ? "站長回覆你了，點進來看" : "回報問題、資料有誤，或建議新功能", right: fbNew ? "● 新回覆" : "", onTap: () => {
       this.fbCat = "";
       this.fbDraft = "";
@@ -7131,11 +7163,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.25-0814"}`);
+          Pasteboard.copy(`版本 ${"2026.11.25-0819"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.25-0814"}`,
+      `版本 ${"2026.11.25-0819"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -7780,7 +7812,7 @@ var App = class {
     if (false) {
       if (!r) return /* @__PURE__ */ h(Note, { text: "（無法確認是否為最新版：連不到網站）" });
       if (r.isLatest) return /* @__PURE__ */ h(Note, { text: "✅ 已是最新版" });
-      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.25-0814"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
+      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.25-0819"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
         globalThis.location.reload();
       } }));
     }
