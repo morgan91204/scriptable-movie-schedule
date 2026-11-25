@@ -6,7 +6,7 @@ import { SOCIALS, socialIcon } from "./brand";
 import { readLetterboxd, lbxNote, LBX_NOTE_MAX, letterboxdCsv } from "./lbx";
 import type { LbxItem } from "./lbx";
 import { loadYearRatings, normTitle as lbxNorm } from "./core";
-import { h, Fragment, Page, Section, Item, Chips, Chip, Button, Search, PickRow, Note, Para, Loading, Empty, Hero, Steps } from "./jsx";
+import { h, Fragment, GenPoster, Page, Section, Item, Chips, Chip, Button, Search, PickRow, Note, Para, Loading, Empty, Hero, Steps } from "./jsx";
 import type { RatingBadge } from "./jsx";
 import { UI } from "./ui";
 import { setPlatform } from "./platform";
@@ -888,11 +888,12 @@ class App {
     const who = name || (r && r.user ? r.user.name : "我");
     if (!r) return <Page title={TITLE[kind]} subtitle={who} onBack={() => this.back()}><Section><Note kind="warn" text={failed} /></Section></Page>;
     const people = r.people || [], entries = r.entries || [];
+    const listThumb = entries.length ? await this.diaryThumbs(entries) : () => undefined;
     return (
       <Page title={`${TITLE[kind]}（${r.total}）`} subtitle={who} onBack={() => this.back()}>
         {kind === "films" || kind === "notes" ? (
           <Section hint={r.total > entries.length ? `只列最近 ${entries.length} 筆。` : r.self ? "含你設成只有自己看得到的那幾筆。" : ""}>
-            {entries.length ? <div class="nt-list">{entries.map((e) => this.entryRow(e, () => (r!.self ? this.go(() => this.entryView(e.title, e)) : this.openTitle(e.title))))}</div> : <Note text={kind === "notes" ? "還沒有寫過短評。" : "片單還是空的。"} />}
+            {entries.length ? <div class="en-list">{entries.map((e) => this.entryRow(e, () => (r!.self ? this.go(() => this.entryView(e.title, e)) : this.openTitle(e.title)), listThumb(e.k), !!r!.self))}</div> : <Note text={kind === "notes" ? "還沒有寫過短評。" : "片單還是空的。"} />}
           </Section>
         ) : (
           <Section hint={r.unlisted ? `另外有 ${r.unlisted} 位沒有公開個人頁，不會列出來。` : "只會列出有公開個人頁的帳號。"}>
@@ -925,26 +926,53 @@ class App {
     );
   }
   /** 片單上的一筆：片名、分數、看過的日期、短評（有雷的摺疊）。by = 動態裡是誰的紀錄 */
-  entryRow(e: DiaryEntry, onTap: () => void, onUser?: (name: string) => void): string {
-    const open = !e.sp || this.noteShown.indexOf(-e.at) >= 0;
+  /** 片單上幾筆紀錄的海報（先等一下，還沒好的讀好再補畫）。回傳 片名鍵 → 海報 */
+  diaryThumbs(list: DiaryEntry[]): Promise<(key: string) => { src: string; url?: string; pending?: boolean } | undefined> {
+    return this.listThumbs(list.map((e) => ({ key: e.k, job: () => posterLight(e.title) })), 250);
+  }
+  /** 片單上的一筆：左邊海報，右邊 片名＋分數／哪天看的、怎麼看的／短評（最多兩行）。
+   *  own = 自己的片單：有雷的短評直接顯示（前面標「有雷」）；別人的要點一下才顯示 */
+  entryRow(e: DiaryEntry, onTap: () => void, thumb?: { src: string; url?: string; pending?: boolean }, own = false): string {
+    const shown = own || !e.sp || this.noteShown.indexOf(-e.at) >= 0;
+    const fallback = "if(this.dataset.url&&this.src!==this.dataset.url){this.src=this.dataset.url}else{this.remove()}";
+    const meta = [seenLabel(e.seen), howLabel(e.how)].filter(Boolean).join("｜") || `${noteDate(e.at)}記錄`;
     return (
-      <div class="nt">
-        {e.by ? <button class="nt-by" onTap={() => onUser && onUser(e.by!.name)}>{this.avatar(e.by)}<span>{esc(e.by.name)}</span></button> : null}
-        <div class="nt-head" role="button" onTap={onTap}>
-          <span class="en-title">{esc(e.title)}</span>
-          {e.s ? <span class={"nt-score " + ratingTier("imdb", e.s)}>{e.s} 分</span> : null}
-          {e.priv ? <span class="fb-tag">只有自己看得到</span> : null}
-          <span class="nt-rep">›</span>
+      <div class="en">
+        <button class="en-poster" aria-label={`《${e.title}》`} onTap={onTap}>
+          {thumb && thumb.pending && !thumb.src ? <span class="thumb none" /> : (
+            <GenPoster cls="thumb" title={e.title}>
+              {thumb && thumb.src ? <img src={thumb.src} data-url={thumb.url && thumb.url !== thumb.src ? thumb.url : undefined} alt="" loading="lazy" onerror={fallback} /> : null}
+            </GenPoster>
+          )}
+        </button>
+        <div class="en-body">
+          <div class="en-top" role="button" onTap={onTap}>
+            <span class="en-title">{esc(e.title)}</span>
+            {e.s ? <span class={"nt-score " + ratingTier("imdb", e.s)}>{e.s} 分</span> : null}
+            <span class="nt-rep">›</span>
+          </div>
+          <div class="en-meta">{esc(meta)}{e.priv ? <span class="fb-tag">只有自己看得到</span> : null}</div>
+          {/* 點短評的內容：直接到那部片的討論區（可以回覆、推噓）；點上面的片名或海報則是開這一筆／這部片 */}
+          {e.x ? (shown ? (
+            <button class="en-note" aria-label={`到《${e.title}》的討論區`} onTap={() => { this.noteReset(); this.noteFocus = { x: e.x, at: Date.now() }; this.go(() => this.notesView(e.title), "讀取短評…"); }}>
+              {e.sp ? <em class="nt-sp">有雷</em> : null}{esc(e.x)}
+            </button>
+          ) : <button class="en-cover" onTap={() => { this.noteShown = [...this.noteShown, -e.at]; }}>有雷的短評，點一下顯示</button>) : null}
         </div>
-        <div class="nt-meta">{esc([seenLabel(e.seen), howLabel(e.how), `${noteDate(e.at)}記錄`].filter(Boolean).join("｜"))}</div>
-        {/* 點短評的內容：直接到那部片的討論區（可以回覆、推噓）；點上面的片名則是開那部片的頁面 */}
-        {e.x ? (open ? (
-          <button class="nt-text go" aria-label={`到《${e.title}》的討論區`} onTap={() => { this.noteReset(); this.noteFocus = { x: e.x, at: Date.now() }; this.go(() => this.notesView(e.title), "讀取短評…"); }}>
-            <span>{esc(e.x)}</span><i aria-hidden="true">💬 ›</i>
-          </button>
-        ) : <button class="nt-cover" onTap={() => { this.noteShown = [...this.noteShown, -e.at]; }}>這則可能有雷，點一下顯示</button>) : null}
       </div>
     );
+  }
+  /** 一份片單依月份分組（有觀影日期的照那一天，沒有的照記錄的時間）；新的月份在前 */
+  diaryGroups(list: DiaryEntry[]): { label: string; rows: DiaryEntry[] }[] {
+    const when = (e: DiaryEntry): string => (/^\d{4}-\d{2}-\d{2}$/.test(e.seen) ? e.seen : new Date(e.at + 8 * 3600e3).toISOString().slice(0, 10));
+    const sorted = list.slice().sort((a, b) => when(b).localeCompare(when(a)) || b.at - a.at);
+    const out: { label: string; rows: DiaryEntry[] }[] = [];
+    for (const e of sorted) {
+      const d = when(e), label = `${d.slice(0, 4)} 年 ${Number(d.slice(5, 7))} 月`;
+      if (!out.length || out[out.length - 1].label !== label) out.push({ label, rows: [] });
+      out[out.length - 1].rows.push(e);
+    }
+    return out;
   }
   /** 設定 → 我的片單：自己看過、評過的片（追蹤對象的動態、找人在底部的「社群」頁籤） */
   async diaryView(): Promise<string> {
@@ -967,10 +995,17 @@ class App {
     let body = "";
     {
       const list = await this.myDiary().catch(() => null);
+      const thumb = list && list.length ? await this.diaryThumbs(list) : () => undefined;
+      const groups = list ? this.diaryGroups(list) : [];
       body = !list ? <Note kind="warn" text="片單暫時讀不到" /> : list.length ? (
-        <Section hint="在電影頁評分、寫短評，或標記看過，就會出現在這裡。點一筆可以改看過的日期，或設成只有自己看得到。">
-          <div class="nt-list">{list.map((e) => this.entryRow(e, () => this.go(() => this.entryView(e.title, e))))}</div>
-        </Section>
+        <>
+          {groups.map((g) => (
+            <Section title={`${g.label}（${g.rows.length} 部）`}>
+              <div class="en-list">{g.rows.map((e) => this.entryRow(e, () => this.go(() => this.entryView(e.title, e)), thumb(e.k), true))}</div>
+            </Section>
+          ))}
+          <p class="hint">在電影頁評分、寫短評，或標記看過，就會出現在這裡。點海報或片名可以改看過的日期，或設成只有自己看得到；點短評會到那部片的討論區。</p>
+        </>
       ) : <Section><Note text="片單還是空的。到任何一部電影的頁面評分或標記看過，就會記在這裡。" /></Section>;
     }
     return (
@@ -1530,6 +1565,7 @@ class App {
       </button>
     ) : "";
     const list = p.list || [];
+    const pThumb = list.length ? await this.diaryThumbs(list) : () => undefined;
     return (
       <Page title={u.name} subtitle="個人頁" onBack={() => this.back()}>
         <Section>
@@ -1566,7 +1602,7 @@ class App {
           </Section>
         ) : null}
         <Section title={`片單（${p.counts ? p.counts.films : list.length}）`} hint={list.length >= 50 ? "只列最近 50 筆。" : ""}>
-          {list.length ? <div class="nt-list">{list.map((e) => this.entryRow(e, () => this.openTitle(e.title)))}</div> : <Note text="還沒有公開的紀錄。" />}
+          {list.length ? <div class="en-list">{list.map((e) => this.entryRow(e, () => this.openTitle(e.title), pThumb(e.k), !!p!.self))}</div> : <Note text="還沒有公開的紀錄。" />}
         </Section>
       </Page>
     );
@@ -1589,10 +1625,11 @@ class App {
     const k = communityKey(title);
     const list = await this.myDiary().catch(() => [] as DiaryEntry[]);
     const e = list.find((x) => x.k === k) || (this.diaryMem ? null : known) || null;
+    const eThumb = e ? await this.diaryThumbs([e]) : () => undefined;
     return (
       <Page title="我的紀錄" subtitle={`《${title}》`} onBack={() => this.back()}>
         <Section>
-          {e && (e.s || e.x) ? <div class="nt-list">{this.entryRow(e, () => this.openTitle(title))}</div> : <Note text="還沒有評分。可以先記下什麼時候看的，之後再到電影頁評分、寫短評。" />}
+          {e && (e.s || e.x) ? <div class="en-list">{this.entryRow(e, () => this.openTitle(title), eThumb(e.k), true)}</div> : <Note text="還沒有評分。可以先記下什麼時候看的，之後再到電影頁評分、寫短評。" />}
           <div class="pf-btns en-btns"><button class="pf-btn" onTap={() => this.openTitle(title)}>🎬 電影頁（改評分、短評）</button></div>
         </Section>
         <Section title="觀影紀錄">

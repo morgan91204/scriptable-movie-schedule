@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.25-0821
+// @movie-schedule-app 電影行程 v2026.11.25-0827
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/brand.ts
@@ -4606,6 +4606,21 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .nt-by.inline span:not(.av){overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:9em}
 .nt-by em{font-style:normal;font-weight:400;color:var(--accent)}
 .en-title{flex:1;min-width:0;font-size:16px;font-weight:600;color:var(--fg);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.en-list{padding:2px 16px}
+.en{display:flex;align-items:flex-start;gap:13px;padding:13px 0}
+.en+.en{border-top:1px solid var(--line)}
+.en-poster{flex:none;padding:0;width:52px;height:78px;border-radius:7px;overflow:hidden;background:var(--chip)}
+.en-poster .thumb{display:block;width:52px;height:78px;border-radius:7px;object-fit:cover}
+.en-poster .thumb.none{background:var(--chip)}
+.en-body{flex:1;min-width:0}
+.en-top{display:flex;align-items:center;gap:8px;min-height:26px}
+.en-top .nt-score{flex:none}
+.en-top .nt-rep{flex:none}
+.en-meta{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;margin-top:3px;font-size:12.5px;color:var(--fg2)}
+.en-note{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;width:100%;margin-top:7px;padding:0;text-align:left;font-size:14.5px;line-height:1.45;color:var(--fg);overflow-wrap:anywhere}
+.en-note .nt-sp{margin-right:6px;font-style:normal;font-size:11.5px}
+.en-note:active{opacity:.6}
+.en-cover{display:inline-block;margin-top:7px;padding:4px 10px;border-radius:8px;background:var(--chip);color:var(--fg2);font-size:12.5px}
 .cm-hist.wide{width:100%}
 .cm-hist.wide .bars{height:56px}
 .cmt-new{display:flex;align-items:center;gap:10px;width:100%;padding:12px 16px;text-align:left}
@@ -5143,6 +5158,7 @@ var CHANGELOG = [
     id: "2026-11-25",
     date: "2026/11/25",
     items: [
+      { kind: "better", text: "片單重新排版：每一筆左邊有海報，依月份分組，只留哪天看、怎麼看的和短評；自己片單上有雷的短評不用再點開" },
       { kind: "new", text: "可以匯出自己的資料（設定 → 我的片單 → 匯出我的資料，網頁版）：片單、分數、觀影日期、短評下載成表格檔，格式可以直接匯進 Letterboxd" },
       { kind: "better", text: "第一次用瀏覽器打開會先說明怎麼加到主畫面；第一次從主畫面開啟會問要不要開通知" },
       { kind: "new", text: "不公開的帳號也有個人頁了：別人看得到暱稱、頭像和自我介紹，可以送出追蹤要求；你同意之後對方才看得到你的片單和短評，並會收到「接受了你的追蹤要求」" },
@@ -5475,7 +5491,7 @@ var App = class {
   }
   /** 最新版本是多少。網頁版問的是自己網站現在上線的版本（重新整理就會拿到的那一版），不是 GitHub 上的 */
   checkVersion() {
-    if (true) return checkLatest("2026.11.25-0821");
+    if (true) return checkLatest("2026.11.25-0827");
     return (async () => {
       try {
         let r = await globalThis.fetch("/version.json?t=" + Date.now(), { cache: "no-store" });
@@ -5483,7 +5499,7 @@ var App = class {
         const latest = String((await r.json()).version || "");
         if (!latest) return null;
         const num = (v) => Number(v.replace(/\D/g, "")) || 0;
-        return { latest, isLatest: num("2026.11.25-0821") >= num(latest) };
+        return { latest, isLatest: num("2026.11.25-0827") >= num(latest) };
       } catch (_) {
         return null;
       }
@@ -6096,7 +6112,8 @@ var App = class {
     const who = name || (r && r.user ? r.user.name : "我");
     if (!r) return /* @__PURE__ */ h(Page, { title: TITLE[kind], subtitle: who, onBack: () => this.back() }, /* @__PURE__ */ h(Section, null, /* @__PURE__ */ h(Note, { kind: "warn", text: failed })));
     const people = r.people || [], entries = r.entries || [];
-    return /* @__PURE__ */ h(Page, { title: `${TITLE[kind]}（${r.total}）`, subtitle: who, onBack: () => this.back() }, kind === "films" || kind === "notes" ? /* @__PURE__ */ h(Section, { hint: r.total > entries.length ? `只列最近 ${entries.length} 筆。` : r.self ? "含你設成只有自己看得到的那幾筆。" : "" }, entries.length ? /* @__PURE__ */ h("div", { class: "nt-list" }, entries.map((e) => this.entryRow(e, () => r.self ? this.go(() => this.entryView(e.title, e)) : this.openTitle(e.title)))) : /* @__PURE__ */ h(Note, { text: kind === "notes" ? "還沒有寫過短評。" : "片單還是空的。" })) : /* @__PURE__ */ h(Section, { hint: r.unlisted ? `另外有 ${r.unlisted} 位沒有公開個人頁，不會列出來。` : "只會列出有公開個人頁的帳號。" }, people.length ? people.map((u) => u.me ? /* @__PURE__ */ h("div", { class: "item" }, /* @__PURE__ */ h("span", { class: "us-main" }, this.avatar(u), /* @__PURE__ */ h("span", { class: "us-name" }, esc(u.name)), /* @__PURE__ */ h("span", { class: "us-sub" }, "你自己"))) : this.userItem(u)) : /* @__PURE__ */ h(Note, { text: r.total ? "他們都沒有公開個人頁。" : kind === "followers" ? "還沒有粉絲。" : "還沒有追蹤任何人。" })));
+    const listThumb = entries.length ? await this.diaryThumbs(entries) : () => void 0;
+    return /* @__PURE__ */ h(Page, { title: `${TITLE[kind]}（${r.total}）`, subtitle: who, onBack: () => this.back() }, kind === "films" || kind === "notes" ? /* @__PURE__ */ h(Section, { hint: r.total > entries.length ? `只列最近 ${entries.length} 筆。` : r.self ? "含你設成只有自己看得到的那幾筆。" : "" }, entries.length ? /* @__PURE__ */ h("div", { class: "en-list" }, entries.map((e) => this.entryRow(e, () => r.self ? this.go(() => this.entryView(e.title, e)) : this.openTitle(e.title), listThumb(e.k), !!r.self))) : /* @__PURE__ */ h(Note, { text: kind === "notes" ? "還沒有寫過短評。" : "片單還是空的。" })) : /* @__PURE__ */ h(Section, { hint: r.unlisted ? `另外有 ${r.unlisted} 位沒有公開個人頁，不會列出來。` : "只會列出有公開個人頁的帳號。" }, people.length ? people.map((u) => u.me ? /* @__PURE__ */ h("div", { class: "item" }, /* @__PURE__ */ h("span", { class: "us-main" }, this.avatar(u), /* @__PURE__ */ h("span", { class: "us-name" }, esc(u.name)), /* @__PURE__ */ h("span", { class: "us-sub" }, "你自己"))) : this.userItem(u)) : /* @__PURE__ */ h(Note, { text: r.total ? "他們都沒有公開個人頁。" : kind === "followers" ? "還沒有粉絲。" : "還沒有追蹤任何人。" })));
   }
   /** onNum：有給的話，四個數字可以點（點了看清單） */
   /** note = 卡片最下面的一行小字；onNum = 數字可以點；extra = 接在最下面的內容（共同追蹤）；
@@ -6106,15 +6123,35 @@ var App = class {
     return /* @__PURE__ */ h("div", { class: "pf" }, /* @__PURE__ */ h("div", { class: "pf-top" }, this.avatar(u, true), /* @__PURE__ */ h("div", { class: "pf-body" }, /* @__PURE__ */ h("div", { class: "pf-name" }, esc(u.name), tag ? /* @__PURE__ */ h("span", { class: "pf-tag " + tag.tone }, esc(tag.text)) : null), sub ? /* @__PURE__ */ h("div", { class: "pf-sub" }, esc(sub)) : null, c ? /* @__PURE__ */ h("div", { class: "pf-nums" }, num("films", c.films, "部片"), num("notes", c.notes, "短評"), num("followers", c.followers, "粉絲"), num("following", c.following, "追蹤中")) : null)), u.bio ? /* @__PURE__ */ h("div", { class: "pf-bio" }, esc(u.bio)) : null, note ? /* @__PURE__ */ h("div", { class: "pf-note" }, esc(note)) : null, extra);
   }
   /** 片單上的一筆：片名、分數、看過的日期、短評（有雷的摺疊）。by = 動態裡是誰的紀錄 */
-  entryRow(e, onTap, onUser) {
-    const open = !e.sp || this.noteShown.indexOf(-e.at) >= 0;
-    return /* @__PURE__ */ h("div", { class: "nt" }, e.by ? /* @__PURE__ */ h("button", { class: "nt-by", onTap: () => onUser && onUser(e.by.name) }, this.avatar(e.by), /* @__PURE__ */ h("span", null, esc(e.by.name))) : null, /* @__PURE__ */ h("div", { class: "nt-head", role: "button", onTap }, /* @__PURE__ */ h("span", { class: "en-title" }, esc(e.title)), e.s ? /* @__PURE__ */ h("span", { class: "nt-score " + ratingTier("imdb", e.s) }, e.s, " 分") : null, e.priv ? /* @__PURE__ */ h("span", { class: "fb-tag" }, "只有自己看得到") : null, /* @__PURE__ */ h("span", { class: "nt-rep" }, "›")), /* @__PURE__ */ h("div", { class: "nt-meta" }, esc([seenLabel(e.seen), howLabel(e.how), `${noteDate(e.at)}記錄`].filter(Boolean).join("｜"))), e.x ? open ? /* @__PURE__ */ h("button", { class: "nt-text go", "aria-label": `到《${e.title}》的討論區`, onTap: () => {
+  /** 片單上幾筆紀錄的海報（先等一下，還沒好的讀好再補畫）。回傳 片名鍵 → 海報 */
+  diaryThumbs(list) {
+    return this.listThumbs(list.map((e) => ({ key: e.k, job: () => posterLight(e.title) })), 250);
+  }
+  /** 片單上的一筆：左邊海報，右邊 片名＋分數／哪天看的、怎麼看的／短評（最多兩行）。
+   *  own = 自己的片單：有雷的短評直接顯示（前面標「有雷」）；別人的要點一下才顯示 */
+  entryRow(e, onTap, thumb, own = false) {
+    const shown = own || !e.sp || this.noteShown.indexOf(-e.at) >= 0;
+    const fallback = "if(this.dataset.url&&this.src!==this.dataset.url){this.src=this.dataset.url}else{this.remove()}";
+    const meta = [seenLabel(e.seen), howLabel(e.how)].filter(Boolean).join("｜") || `${noteDate(e.at)}記錄`;
+    return /* @__PURE__ */ h("div", { class: "en" }, /* @__PURE__ */ h("button", { class: "en-poster", "aria-label": `《${e.title}》`, onTap }, thumb && thumb.pending && !thumb.src ? /* @__PURE__ */ h("span", { class: "thumb none" }) : /* @__PURE__ */ h(GenPoster, { cls: "thumb", title: e.title }, thumb && thumb.src ? /* @__PURE__ */ h("img", { src: thumb.src, "data-url": thumb.url && thumb.url !== thumb.src ? thumb.url : void 0, alt: "", loading: "lazy", onerror: fallback }) : null)), /* @__PURE__ */ h("div", { class: "en-body" }, /* @__PURE__ */ h("div", { class: "en-top", role: "button", onTap }, /* @__PURE__ */ h("span", { class: "en-title" }, esc(e.title)), e.s ? /* @__PURE__ */ h("span", { class: "nt-score " + ratingTier("imdb", e.s) }, e.s, " 分") : null, /* @__PURE__ */ h("span", { class: "nt-rep" }, "›")), /* @__PURE__ */ h("div", { class: "en-meta" }, esc(meta), e.priv ? /* @__PURE__ */ h("span", { class: "fb-tag" }, "只有自己看得到") : null), e.x ? shown ? /* @__PURE__ */ h("button", { class: "en-note", "aria-label": `到《${e.title}》的討論區`, onTap: () => {
       this.noteReset();
       this.noteFocus = { x: e.x, at: Date.now() };
       this.go(() => this.notesView(e.title), "讀取短評…");
-    } }, /* @__PURE__ */ h("span", null, esc(e.x)), /* @__PURE__ */ h("i", { "aria-hidden": "true" }, "💬 ›")) : /* @__PURE__ */ h("button", { class: "nt-cover", onTap: () => {
+    } }, e.sp ? /* @__PURE__ */ h("em", { class: "nt-sp" }, "有雷") : null, esc(e.x)) : /* @__PURE__ */ h("button", { class: "en-cover", onTap: () => {
       this.noteShown = [...this.noteShown, -e.at];
-    } }, "這則可能有雷，點一下顯示") : null);
+    } }, "有雷的短評，點一下顯示") : null));
+  }
+  /** 一份片單依月份分組（有觀影日期的照那一天，沒有的照記錄的時間）；新的月份在前 */
+  diaryGroups(list) {
+    const when = (e) => /^\d{4}-\d{2}-\d{2}$/.test(e.seen) ? e.seen : new Date(e.at + 8 * 36e5).toISOString().slice(0, 10);
+    const sorted = list.slice().sort((a, b) => when(b).localeCompare(when(a)) || b.at - a.at);
+    const out = [];
+    for (const e of sorted) {
+      const d = when(e), label = `${d.slice(0, 4)} 年 ${Number(d.slice(5, 7))} 月`;
+      if (!out.length || out[out.length - 1].label !== label) out.push({ label, rows: [] });
+      out[out.length - 1].rows.push(e);
+    }
+    return out;
   }
   /** 設定 → 我的片單：自己看過、評過的片（追蹤對象的動態、找人在底部的「社群」頁籤） */
   async diaryView() {
@@ -6134,7 +6171,9 @@ var App = class {
     let body = "";
     {
       const list = await this.myDiary().catch(() => null);
-      body = !list ? /* @__PURE__ */ h(Note, { kind: "warn", text: "片單暫時讀不到" }) : list.length ? /* @__PURE__ */ h(Section, { hint: "在電影頁評分、寫短評，或標記看過，就會出現在這裡。點一筆可以改看過的日期，或設成只有自己看得到。" }, /* @__PURE__ */ h("div", { class: "nt-list" }, list.map((e) => this.entryRow(e, () => this.go(() => this.entryView(e.title, e)))))) : /* @__PURE__ */ h(Section, null, /* @__PURE__ */ h(Note, { text: "片單還是空的。到任何一部電影的頁面評分或標記看過，就會記在這裡。" }));
+      const thumb = list && list.length ? await this.diaryThumbs(list) : () => void 0;
+      const groups = list ? this.diaryGroups(list) : [];
+      body = !list ? /* @__PURE__ */ h(Note, { kind: "warn", text: "片單暫時讀不到" }) : list.length ? /* @__PURE__ */ h(Fragment, null, groups.map((g) => /* @__PURE__ */ h(Section, { title: `${g.label}（${g.rows.length} 部）` }, /* @__PURE__ */ h("div", { class: "en-list" }, g.rows.map((e) => this.entryRow(e, () => this.go(() => this.entryView(e.title, e)), thumb(e.k), true))))), /* @__PURE__ */ h("p", { class: "hint" }, "在電影頁評分、寫短評，或標記看過，就會出現在這裡。點海報或片名可以改看過的日期，或設成只有自己看得到；點短評會到那部片的討論區。")) : /* @__PURE__ */ h(Section, null, /* @__PURE__ */ h(Note, { text: "片單還是空的。到任何一部電影的頁面評分或標記看過，就會記在這裡。" }));
     }
     return /* @__PURE__ */ h(Page, { title: "我的片單", onBack: () => this.back() }, /* @__PURE__ */ h(Section, null, user ? this.profileCard(user, me.counts, user.hidden ? "個人頁目前被站長停用，別人看不到。" : "", (kind) => this.go(() => this.profileListView("", kind), "讀取中…"), "", user.hidden ? { text: "已被停用", tone: "bad" } : user.pub ? { text: "公開", tone: "good" } : { text: "不公開", tone: "" }) : /* @__PURE__ */ h(Note, { kind: "warn", text: "還沒有設定暱稱：別人找不到你、不能追蹤你，短評也是匿名。你還是可以追蹤別人。" })), false ? /* @__PURE__ */ h(Section, null, /* @__PURE__ */ h(Item, { icon: "📥", title: "從 Letterboxd 匯入", subtitle: "把 Letterboxd 上的評分、觀影日期和影評搬過來", onTap: () => {
       this.lbx = null;
@@ -6568,6 +6607,7 @@ var App = class {
     const mu = p.mutual;
     const mutualLine = mu && mu.list.length ? /* @__PURE__ */ h("button", { class: "pf-mutual", onTap: () => this.go(() => this.profileListView(u.name, "followers"), "讀取中…") }, /* @__PURE__ */ h("span", { class: "pf-faces" }, mu.list.map((x) => this.avatar(x))), /* @__PURE__ */ h("span", null, esc(mu.list.map((x) => x.name).join("、")), mu.more ? ` 和另外 ${mu.more} 人` : "", mu.list.length + mu.more > 1 ? "都" : "也", "在追蹤")) : "";
     const list = p.list || [];
+    const pThumb = list.length ? await this.diaryThumbs(list) : () => void 0;
     return /* @__PURE__ */ h(Page, { title: u.name, subtitle: "個人頁", onBack: () => this.back() }, /* @__PURE__ */ h(Section, null, this.profileCard(u, p.counts || null, p.self ? "這是你的個人頁（別人看到的不含你設成只有自己看得到的那幾筆）" : "", (kind) => this.go(() => this.profileListView(u.name, kind), "讀取中…"), mutualLine), SOCIALS.some((x) => u[x.id]) ? /* @__PURE__ */ h("div", { class: "pf-pills" }, SOCIALS.filter((x) => u[x.id]).map((x) => /* @__PURE__ */ h("button", { class: "pf-pill", "aria-label": `${x.name}：@${u[x.id]}`, onTap: () => Safari.open(x.url(u[x.id])) }, socialIcon(x.id), /* @__PURE__ */ h("span", null, esc(u[x.id]))))) : null, /* @__PURE__ */ h("div", { class: "pf-btns" }, p.self ? /* @__PURE__ */ h("button", { class: "pf-btn", onTap: () => {
       this.profileDraft = null;
       this.go(() => this.profileEditView(u));
@@ -6587,7 +6627,7 @@ var App = class {
       }
       const sy = this.sync();
       if (sy) sy.login();
-    } }, "登入後追蹤"), /* @__PURE__ */ h("button", { class: "pf-btn", onTap: () => this.shareProfile(u.name, !!p.self, u.code) }, "分享"), p.self ? null : /* @__PURE__ */ h("button", { class: "pf-btn icon", "aria-label": "檢舉這個帳號", onTap: () => this.go(() => this.reportUserView(u.name)) }, "⚑"))), rated ? /* @__PURE__ */ h(Section, { title: `評分分布（${rated} 部）` }, /* @__PURE__ */ h("div", { class: "cm" }, /* @__PURE__ */ h("div", { class: "cm-hist wide", "aria-hidden": "true" }, /* @__PURE__ */ h("div", { class: "bars" }, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((v) => /* @__PURE__ */ h("i", { class: dist[v - 1] ? "" : "zero", style: `height:${Math.max(8, Math.round((dist[v - 1] || 0) / max * 100))}%` }))), /* @__PURE__ */ h("div", { class: "axis" }, /* @__PURE__ */ h("span", null, "1 分"), /* @__PURE__ */ h("span", null, "10 分"))))) : null, /* @__PURE__ */ h(Section, { title: `片單（${p.counts ? p.counts.films : list.length}）`, hint: list.length >= 50 ? "只列最近 50 筆。" : "" }, list.length ? /* @__PURE__ */ h("div", { class: "nt-list" }, list.map((e) => this.entryRow(e, () => this.openTitle(e.title)))) : /* @__PURE__ */ h(Note, { text: "還沒有公開的紀錄。" })));
+    } }, "登入後追蹤"), /* @__PURE__ */ h("button", { class: "pf-btn", onTap: () => this.shareProfile(u.name, !!p.self, u.code) }, "分享"), p.self ? null : /* @__PURE__ */ h("button", { class: "pf-btn icon", "aria-label": "檢舉這個帳號", onTap: () => this.go(() => this.reportUserView(u.name)) }, "⚑"))), rated ? /* @__PURE__ */ h(Section, { title: `評分分布（${rated} 部）` }, /* @__PURE__ */ h("div", { class: "cm" }, /* @__PURE__ */ h("div", { class: "cm-hist wide", "aria-hidden": "true" }, /* @__PURE__ */ h("div", { class: "bars" }, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((v) => /* @__PURE__ */ h("i", { class: dist[v - 1] ? "" : "zero", style: `height:${Math.max(8, Math.round((dist[v - 1] || 0) / max * 100))}%` }))), /* @__PURE__ */ h("div", { class: "axis" }, /* @__PURE__ */ h("span", null, "1 分"), /* @__PURE__ */ h("span", null, "10 分"))))) : null, /* @__PURE__ */ h(Section, { title: `片單（${p.counts ? p.counts.films : list.length}）`, hint: list.length >= 50 ? "只列最近 50 筆。" : "" }, list.length ? /* @__PURE__ */ h("div", { class: "en-list" }, list.map((e) => this.entryRow(e, () => this.openTitle(e.title), pThumb(e.k), !!p.self))) : /* @__PURE__ */ h(Note, { text: "還沒有公開的紀錄。" })));
   }
   reportUserView(name) {
     const WHY = [{ id: "name", label: "暱稱不雅或不當" }, { id: "fake", label: "冒用他人名義" }, { id: "abuse", label: "騷擾或其他不當行為" }];
@@ -6606,7 +6646,8 @@ var App = class {
     const k = communityKey(title);
     const list = await this.myDiary().catch(() => []);
     const e = list.find((x) => x.k === k) || (this.diaryMem ? null : known) || null;
-    return /* @__PURE__ */ h(Page, { title: "我的紀錄", subtitle: `《${title}》`, onBack: () => this.back() }, /* @__PURE__ */ h(Section, null, e && (e.s || e.x) ? /* @__PURE__ */ h("div", { class: "nt-list" }, this.entryRow(e, () => this.openTitle(title))) : /* @__PURE__ */ h(Note, { text: "還沒有評分。可以先記下什麼時候看的，之後再到電影頁評分、寫短評。" }), /* @__PURE__ */ h("div", { class: "pf-btns en-btns" }, /* @__PURE__ */ h("button", { class: "pf-btn", onTap: () => this.openTitle(title) }, "🎬 電影頁（改評分、短評）"))), /* @__PURE__ */ h(Section, { title: "觀影紀錄" }, /* @__PURE__ */ h("div", { class: "cm-tags en-watch" }, this.watchFields(title, e))), e ? /* @__PURE__ */ h(Section, { hint: "這一筆不會出現在你的個人頁和別人的動態裡，你在這部片的短評也會顯示成匿名。分數照樣算進這部片的平均。" }, /* @__PURE__ */ h(Item, { icon: e.priv ? "✅" : "⬜️", title: "只有自己看得到", chevron: false, onTap: () => this.saveWatch(title, { priv: !e.priv }, e.priv ? "這一筆恢復公開" : "這一筆只有你看得到了") })) : null);
+    const eThumb = e ? await this.diaryThumbs([e]) : () => void 0;
+    return /* @__PURE__ */ h(Page, { title: "我的紀錄", subtitle: `《${title}》`, onBack: () => this.back() }, /* @__PURE__ */ h(Section, null, e && (e.s || e.x) ? /* @__PURE__ */ h("div", { class: "en-list" }, this.entryRow(e, () => this.openTitle(title), eThumb(e.k), true)) : /* @__PURE__ */ h(Note, { text: "還沒有評分。可以先記下什麼時候看的，之後再到電影頁評分、寫短評。" }), /* @__PURE__ */ h("div", { class: "pf-btns en-btns" }, /* @__PURE__ */ h("button", { class: "pf-btn", onTap: () => this.openTitle(title) }, "🎬 電影頁（改評分、短評）"))), /* @__PURE__ */ h(Section, { title: "觀影紀錄" }, /* @__PURE__ */ h("div", { class: "cm-tags en-watch" }, this.watchFields(title, e))), e ? /* @__PURE__ */ h(Section, { hint: "這一筆不會出現在你的個人頁和別人的動態裡，你在這部片的短評也會顯示成匿名。分數照樣算進這部片的平均。" }, /* @__PURE__ */ h(Item, { icon: e.priv ? "✅" : "⬜️", title: "只有自己看得到", chevron: false, onTap: () => this.saveWatch(title, { priv: !e.priv }, e.priv ? "這一筆恢復公開" : "這一筆只有你看得到了") })) : null);
   }
   async adminUsersView() {
     const sy = this.sync();
@@ -6779,7 +6820,7 @@ var App = class {
         return;
       }
       try {
-        await sendFeedback(cat.id, text, false ? this.isStandalone() ? "web-app" : "web" : "scriptable", "2026.11.25-0821");
+        await sendFeedback(cat.id, text, false ? this.isStandalone() ? "web-app" : "web" : "scriptable", "2026.11.25-0827");
         this.fbDraft = "";
         this.fbCat = "";
         await this.ui.toast("已送出，謝謝你的回饋");
@@ -7137,7 +7178,7 @@ var App = class {
       this.settings.seenLog = CHANGELOG_LATEST;
       saveSettings(this.settings);
     }
-    return /* @__PURE__ */ h(Page, { title: "更新內容", subtitle: `目前版本 ${"2026.11.25-0821"}`, onBack: () => this.back() }, CHANGELOG.map((e) => /* @__PURE__ */ h(Section, { title: e.date }, e.items.map((it) => /* @__PURE__ */ h(Item, { title: it.text, tag: { text: it.kind === "new" ? "新功能" : "改進", tone: it.kind === "new" ? "now" : "soon" }, chevron: false })))), /* @__PURE__ */ h(Note, { text: "只列出比較有感的變動；修小錯、調整文字這類不會寫在這裡。" }));
+    return /* @__PURE__ */ h(Page, { title: "更新內容", subtitle: `目前版本 ${"2026.11.25-0827"}`, onBack: () => this.back() }, CHANGELOG.map((e) => /* @__PURE__ */ h(Section, { title: e.date }, e.items.map((it) => /* @__PURE__ */ h(Item, { title: it.text, tag: { text: it.kind === "new" ? "新功能" : "改進", tone: it.kind === "new" ? "now" : "soon" }, chevron: false })))), /* @__PURE__ */ h(Note, { text: "只列出比較有感的變動；修小錯、調整文字這類不會寫在這裡。" }));
   }
   async aboutView() {
     return /* @__PURE__ */ h(Page, { title: "關於", onBack: () => this.back() }, /* @__PURE__ */ h(Section, { hint: "連鎖影城的場次來自場次通（twshowtimes.com），感謝場次通的整理；其他來自開眼電影網，以及誠品、光點、樂聲、內惟戲院官網。實際場次以影城公告為準。" }, /* @__PURE__ */ h(Item, { icon: "ℹ️", title: "關於與資料來源", accent: true, chevron: false, onTap: () => Safari.open(ABOUT_URL) }), /* @__PURE__ */ h(Item, { icon: "🔒", title: "隱私權政策", accent: true, chevron: false, onTap: () => Safari.open(PRIVACY_URL) }), /* @__PURE__ */ h(Item, { icon: "🙏", title: "前往場次通", subtitle: "比較各影城場次、看上映場數排行", accent: true, chevron: false, onTap: () => Safari.open("https://twshowtimes.com/") })));
@@ -7171,11 +7212,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.25-0821"}`);
+          Pasteboard.copy(`版本 ${"2026.11.25-0827"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.25-0821"}`,
+      `版本 ${"2026.11.25-0827"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -7820,7 +7861,7 @@ var App = class {
     if (false) {
       if (!r) return /* @__PURE__ */ h(Note, { text: "（無法確認是否為最新版：連不到網站）" });
       if (r.isLatest) return /* @__PURE__ */ h(Note, { text: "✅ 已是最新版" });
-      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.25-0821"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
+      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.25-0827"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
         globalThis.location.reload();
       } }));
     }
