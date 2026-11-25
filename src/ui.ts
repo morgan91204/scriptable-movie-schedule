@@ -705,6 +705,17 @@ window.__render=function(html,to){var y=window.scrollY,root=document.getElementB
   if(typing&&composing){held=[html,to];return;} // 還在選字：選完再畫
   var kept=typing&&renderAround(root,cur,html);if(!kept)root.innerHTML=html;
   stripSync();autoMore();fitText();scrollKeep(to<0?y:to);jumpTo();var f=kept?null:document.querySelector('input[autofocus]');if(f)setTimeout(function(){f.focus()},50);syncHist();};
+// iPhone 的毛病：鍵盤收起來（或從別的 App 切回來）之後，畫面有時沒有歸位，整個版面比看得到的範圍高出一截，
+// 結果上面的標題列跑到螢幕外、底部的頁籤列浮在畫面中間。發現有這個落差、又沒有在打字時，輕輕捲一下逼它重新對齊
+(function(){var vv=window.visualViewport;if(!vv)return;
+  function fix(){var a=document.activeElement;if(a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName))return;
+    if(vv.offsetTop>1||Math.abs(vv.height-window.innerHeight)>1&&vv.scale===1){var y=window.scrollY;window.scrollTo(0,y+1);window.scrollTo(0,y);}}
+  function soon(){setTimeout(fix,60);setTimeout(fix,400);setTimeout(fix,1000);}
+  vv.addEventListener('resize',soon);
+  document.addEventListener('focusout',soon);
+  document.addEventListener('visibilitychange',function(){if(!document.hidden)soon();});
+  window.addEventListener('pageshow',soon);
+})();
 // 從螢幕左緣往右滑：回上一頁（等於點左上角的「返回」）。內容會跟著手指稍微移動，放開時滑得夠遠才算
 var sw=null;
 function swReset(now){sw=null;var c=document.querySelector('.content');if(c){c.style.transition=now?'none':'transform .15s';c.style.transform='';}}
