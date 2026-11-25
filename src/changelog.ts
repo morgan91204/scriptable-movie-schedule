@@ -7,6 +7,7 @@ export const CHANGELOG: ChangeEntry[] = [
     id: "2026-11-25",
     date: "2026/11/25",
     items: [
+      { kind: "better", text: "更新內容比較好找也比較好讀：有新的更新時首頁最上面會提醒；內容分成新功能和改進兩組，上次看過之後才多的會標「新」" },
       { kind: "better", text: "場次資料暫時讀不到時，首頁照常顯示，收藏、片單和社群都還能用；刪除帳號資料的說明完整顯示、標成紅字；開關改成一眼看得出開或關的樣式；底部頁籤列不再透出後面的字" },
       { kind: "better", text: "片單重新排版：每一筆左邊有海報，依月份分組，只留哪天看、怎麼看的和短評；自己片單上有雷的短評不用再點開" },
       { kind: "new", text: "可以匯出自己的資料（設定 → 我的片單 → 匯出我的資料，網頁版）：片單、分數、觀影日期、短評下載成表格檔，格式可以直接匯進 Letterboxd" },
@@ -54,4 +55,5 @@ export const CHANGELOG: ChangeEntry[] = [
   },
 ];
 /** 最新一段的代號（沒有內容時是空字串） */
-export const CHANGELOG_LATEST = CHANGELOG.length ? CHANGELOG[0].id : "";
+/** 「看到哪裡」的記號：最新一段的 id 加上那一段有幾項。同一天再補內容，項數變了，也會算成還沒看過 */
+export const CHANGELOG_LATEST = CHANGELOG.length ? CHANGELOG[0].id + "#" + CHANGELOG[0].items.length : "";

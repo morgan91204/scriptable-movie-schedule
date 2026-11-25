@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.25-0921
+// @movie-schedule-app 電影行程 v2026.11.25-0931
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/brand.ts
@@ -4331,6 +4331,27 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .steps{flex:none;display:flex;gap:3px;margin-left:10px;padding:3px;border-radius:10px;background:var(--chip)}
 .steps i{min-width:26px;padding:4px 5px;border-radius:7px;font-style:normal;font-size:13px;text-align:center;color:var(--fg2)}
 .steps i.on{background:var(--card);color:var(--fg);font-weight:700;box-shadow:0 1px 2px rgba(0,0,0,.15)}
+.newbar{display:flex;align-items:stretch;margin:8px 0 4px;border-radius:12px;background:rgba(10,132,255,.14);overflow:hidden}
+.newbar-main{flex:1;min-width:0;padding:9px 4px 9px 12px;text-align:left}
+.newbar-main b{display:block;font-size:14px;color:var(--accent)}
+.newbar-main b:after{content:" ›"}
+.newbar-main span{display:block;margin-top:1px;font-size:12.5px;color:var(--fg2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.newbar-x{flex:none;width:44px;color:var(--fg2);font-size:14px}
+.sec-title .cl-sum{margin-left:8px;font-weight:400;opacity:.8}
+.cl{padding:4px 16px 6px}
+.cl-g{padding:10px 0 6px}
+.cl-g+.cl-g{border-top:1px solid var(--line)}
+.cl-h{display:inline-block;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:700}
+.cl-h.new{background:rgba(48,209,88,.18);color:#1a8f3c}
+.cl-h.better{background:rgba(10,132,255,.15);color:var(--accent)}
+@media(prefers-color-scheme:dark){.cl-h.new{color:var(--green)}}
+.cl-list{margin:6px 0 0;padding:0;list-style:none}
+.cl-list li{position:relative;padding:6px 0 6px 14px;font-size:15px;line-height:1.5;color:var(--fg)}
+.cl-list li:before{content:"";position:absolute;left:2px;top:15px;width:5px;height:5px;border-radius:50%;background:var(--fg2);opacity:.6}
+.cl-list li.fresh:before{background:var(--accent);opacity:1}
+.cl-new{margin-right:6px;padding:1px 6px;border-radius:6px;background:var(--accent);color:#fff;font-style:normal;font-size:11px;font-weight:700;vertical-align:1px}
+.cl-more{display:block;width:100%;padding:11px 0;border-top:1px solid var(--line);color:var(--accent);font-size:14.5px;font-weight:600;text-align:center}
+.cl-more:first-child{border-top:0}
 .warnbar{display:flex;align-items:center;gap:10px;margin:8px 0 4px;padding:10px 12px;border-radius:12px;background:rgba(255,159,10,.16);font-size:13.5px;line-height:1.4}
 .warnbar span{flex:1;min-width:0}
 .warnbar-go{flex:none;padding:6px 14px;border-radius:999px;background:var(--accent);color:#fff;font-size:13.5px;font-weight:600}
@@ -5170,6 +5191,7 @@ var CHANGELOG = [
     id: "2026-11-25",
     date: "2026/11/25",
     items: [
+      { kind: "better", text: "更新內容比較好找也比較好讀：有新的更新時首頁最上面會提醒；內容分成新功能和改進兩組，上次看過之後才多的會標「新」" },
       { kind: "better", text: "場次資料暫時讀不到時，首頁照常顯示，收藏、片單和社群都還能用；刪除帳號資料的說明完整顯示、標成紅字；開關改成一眼看得出開或關的樣式；底部頁籤列不再透出後面的字" },
       { kind: "better", text: "片單重新排版：每一筆左邊有海報，依月份分組，只留哪天看、怎麼看的和短評；自己片單上有雷的短評不用再點開" },
       { kind: "new", text: "可以匯出自己的資料（設定 → 我的片單 → 匯出我的資料，網頁版）：片單、分數、觀影日期、短評下載成表格檔，格式可以直接匯進 Letterboxd" },
@@ -5216,7 +5238,7 @@ var CHANGELOG = [
     ]
   }
 ];
-var CHANGELOG_LATEST = CHANGELOG.length ? CHANGELOG[0].id : "";
+var CHANGELOG_LATEST = CHANGELOG.length ? CHANGELOG[0].id + "#" + CHANGELOG[0].items.length : "";
 
 // src/main.tsx
 var sleep = (ms) => new Promise((r) => Timer.schedule(ms, false, () => r()));
@@ -5335,6 +5357,10 @@ var App = class {
     this.notifyOffAsk = 0;
     // 按了「關閉通知」的時間：一分鐘內顯示「確定要關嗎」（過了就當沒按，免得下次進來還停在確認）
     this.notifyOpen = false;
+    /** 更新內容：依日期分段、新的在上。進來就算看過，紅點消失；不會主動跳出來打擾 */
+    this.logFresh = {};
+    // 這次點進更新內容時，哪一段的前幾項是上次看過之後才多的（段的 id → 幾項）
+    this.logOpen = [];
     // ── 依縣市找影院 ──
     // 搜尋欄直接放在這一頁最上面：有打字就即時顯示符合的影城（不另開一頁），清空就回到縣市清單
     this.query = "";
@@ -5504,7 +5530,7 @@ var App = class {
   }
   /** 最新版本是多少。網頁版問的是自己網站現在上線的版本（重新整理就會拿到的那一版），不是 GitHub 上的 */
   checkVersion() {
-    if (true) return checkLatest("2026.11.25-0921");
+    if (true) return checkLatest("2026.11.25-0931");
     return (async () => {
       try {
         let r = await globalThis.fetch("/version.json?t=" + Date.now(), { cache: "no-store" });
@@ -5512,7 +5538,7 @@ var App = class {
         const latest = String((await r.json()).version || "");
         if (!latest) return null;
         const num = (v) => Number(v.replace(/\D/g, "")) || 0;
-        return { latest, isLatest: num("2026.11.25-0921") >= num(latest) };
+        return { latest, isLatest: num("2026.11.25-0931") >= num(latest) };
       } catch (_) {
         return null;
       }
@@ -5906,7 +5932,7 @@ var App = class {
         this.homeQuery = t;
       } }), pendingGs ? null : this.searchTop(hits, q, tools), hits.cinemas.length ? /* @__PURE__ */ h(Section, null, head("cinemas", `影城（${hits.cinemas.length}）`), hits.cinemas.slice(0, lim("cinemas")).map((c) => this.cinemaItem(c)), more("cinemas", hits.cinemas.length, "間")) : null, hits.now.length ? /* @__PURE__ */ h(Section, null, head("now", `現正上映（${hits.now.length}）`), hits.now.slice(0, lim("now")).map((m) => /* @__PURE__ */ h(Item, { title: m.title, subtitle: movieLines(m).filter(Boolean).join("\n"), tag: { text: "上映中", tone: "now" }, onTap: () => this.go(() => this.movieView(m, ""), `讀取《${m.title}》的放映影城…`) })), more("now", hits.now.length, "部")) : null, hits.soon.length ? /* @__PURE__ */ h(Section, null, head("soon", `即將上映（${hits.soon.length}）`), hits.soon.slice(0, lim("soon")).map((e) => /* @__PURE__ */ h(Item, { title: e.title, subtitle: e.lines.filter(Boolean).join("\n"), onTap: e.m ? () => this.go(() => this.movieView(e.m, ""), `讀取《${e.title}》的放映影城…`) : e.u ? () => this.go(() => this.soonMovieView(e.u), `讀取《${e.title}》…`) : void 0 })), more("soon", hits.soon.length, "部")) : null, hits.year.length ? /* @__PURE__ */ h(Section, null, head("year", `歷年電影（${hits.year.length}）`), hits.year.slice(0, lim("year")).map((x) => /* @__PURE__ */ h(Item, { title: x.name, subtitle: [boxIsRerun(x) ? "重映" : boxHasLaterRun(x) ? "首映" : "", String(x.release || "").slice(0, 10).replace(/-/g, "/") + " 上映", `票房 ${money(x.total)}`].filter(Boolean).join("｜"), tag: { text: STATUS_LABEL[boxStatus(x)], tone: boxStatus(x) }, onTap: () => this.go(() => this.boxMovieView(x), `讀取《${x.name}》…`) })), more("year", hits.year.length, "部")) : null, hits.fest.length ? /* @__PURE__ */ h(Section, null, head("fest", `影展（${hits.fest.length}）`), hits.fest.slice(0, lim("fest")).map(({ f, film }) => /* @__PURE__ */ h(Item, { title: film.title, subtitle: `${f.start.slice(0, 4)} ${f.name}`, onTap: () => this.go(() => this.festivalFilmView(f, film)) })), more("fest", hits.fest.length, "部")) : null, pendingGs ? /* @__PURE__ */ h(Note, { text: "正在找電影…" }) : total ? null : /* @__PURE__ */ h(Empty, { icon: "🔎", text: "找不到相符的電影或影城，換個關鍵字試試。" }));
     }
-    return /* @__PURE__ */ h(Page, { title: "🎬 片刻", subtitle: srcDown ? "全台電影場次一次查" : `全台 ${this.cinemas.length} 間影城場次一次查` }, srcDown ? /* @__PURE__ */ h("div", { class: "warnbar" }, /* @__PURE__ */ h("span", null, "⚠️ 場次資料暫時讀不到，稍後再試。收藏、片單和社群不受影響。"), /* @__PURE__ */ h("button", { class: "warnbar-go", onTap: () => {
+    return /* @__PURE__ */ h(Page, { title: "🎬 片刻", subtitle: srcDown ? "全台電影場次一次查" : `全台 ${this.cinemas.length} 間影城場次一次查` }, this.logBar(), srcDown ? /* @__PURE__ */ h("div", { class: "warnbar" }, /* @__PURE__ */ h("span", null, "⚠️ 場次資料暫時讀不到，稍後再試。收藏、片單和社群不受影響。"), /* @__PURE__ */ h("button", { class: "warnbar-go", onTap: () => {
     } }, "重試")) : null, false ? /* @__PURE__ */ h("div", { class: "nb nb-top" }, /* @__PURE__ */ h("span", { class: "nb-i", "aria-hidden": "true" }, "📲"), /* @__PURE__ */ h("span", { class: "nb-t" }, "把片刻加到主畫面：像 App 一樣開啟，還能收到通知。"), /* @__PURE__ */ h("button", { class: "nb-go", onTap: () => this.go(() => this.installView()) }, "怎麼加"), /* @__PURE__ */ h("button", { class: "nb-x", "aria-label": "不再提醒", onTap: () => {
       this.settings.installOff = true;
       saveSettings(this.settings);
@@ -6840,7 +6866,7 @@ var App = class {
         return;
       }
       try {
-        await sendFeedback(cat.id, text, false ? this.isStandalone() ? "web-app" : "web" : "scriptable", "2026.11.25-0921");
+        await sendFeedback(cat.id, text, false ? this.isStandalone() ? "web-app" : "web" : "scriptable", "2026.11.25-0931");
         this.fbDraft = "";
         this.fbCat = "";
         await this.ui.toast("已送出，謝謝你的回饋");
@@ -7192,13 +7218,57 @@ var App = class {
   logUnread() {
     return !!CHANGELOG_LATEST && this.settings.seenLog !== CHANGELOG_LATEST;
   }
-  /** 更新內容：依日期分段、新的在上。進來就算看過，紅點消失；不會主動跳出來打擾 */
-  changelogView() {
+  // 更新內容裡，哪幾段已經展開成全部列出
+  /** 上次看過之後多了哪些：回傳 段的 id → 前面幾項是新的。舊的記法（只有日期、沒有項數）分不出同一天多了哪幾項，就不標 */
+  logNewItems() {
+    const [seenId, seenN] = String(this.settings.seenLog || "").split("#");
+    const out = {};
+    if (!seenId) return out;
+    for (const e of CHANGELOG) {
+      if (e.id > seenId) out[e.id] = e.items.length;
+      else if (e.id === seenId && seenN) out[e.id] = Math.max(0, e.items.length - Number(seenN));
+    }
+    return out;
+  }
+  /** 打開更新內容：先記下哪些是新的（頁面上標出來），再算成看過 */
+  openLog() {
+    this.logFresh = this.logUnread() ? this.logNewItems() : {};
+    this.logOpen = [];
     if (this.logUnread()) {
       this.settings.seenLog = CHANGELOG_LATEST;
       saveSettings(this.settings);
     }
-    return /* @__PURE__ */ h(Page, { title: "更新內容", subtitle: `目前版本 ${"2026.11.25-0921"}`, onBack: () => this.back() }, CHANGELOG.map((e) => /* @__PURE__ */ h(Section, { title: e.date }, e.items.map((it) => /* @__PURE__ */ h(Item, { title: it.text, tag: { text: it.kind === "new" ? "新功能" : "改進", tone: it.kind === "new" ? "now" : "soon" }, chevron: false })))), /* @__PURE__ */ h(Note, { text: "只列出比較有感的變動；修小錯、調整文字這類不會寫在這裡。" }));
+    this.go(() => this.changelogView());
+  }
+  /** 首頁最上面的一條：有還沒看過的更新才出現，點了看內容，× 是「知道了」 */
+  logBar() {
+    if (!this.logUnread() || !CHANGELOG.length) return "";
+    const fresh = this.logNewItems(), top = CHANGELOG[0];
+    const n = Object.keys(fresh).reduce((a, k) => a + fresh[k], 0);
+    return /* @__PURE__ */ h("div", { class: "newbar" }, /* @__PURE__ */ h("button", { class: "newbar-main", onTap: () => this.openLog() }, /* @__PURE__ */ h("b", null, n ? `片刻更新了 ${n} 項` : "片刻有更新"), /* @__PURE__ */ h("span", null, esc(top.items[0] ? top.items[0].text : ""))), /* @__PURE__ */ h("button", { class: "newbar-x", "aria-label": "知道了，不用看", onTap: () => {
+      this.settings.seenLog = CHANGELOG_LATEST;
+      saveSettings(this.settings);
+    } }, "✕"));
+  }
+  /** 更新內容：依日期分段、新的在上；每段分「新功能」「改進」兩組，項目多的先列幾項、其餘收起來；上次看過之後才多的標「新」 */
+  changelogView() {
+    const KEEP = 6;
+    return /* @__PURE__ */ h(Page, { title: "更新內容", subtitle: `目前版本 ${"2026.11.25-0931"}`, onBack: () => this.back() }, CHANGELOG.map((e, idx) => {
+      const freshN = this.logFresh[e.id] || 0;
+      const open = this.logOpen.indexOf(e.id) >= 0;
+      const all = e.items.map((it, i) => ({ ...it, fresh: i < freshN }));
+      const shown = open ? all : idx === 0 ? all.slice(0, Math.max(KEEP, freshN)) : [];
+      const rest = all.length - shown.length;
+      const group = (kind, label) => {
+        const list = shown.filter((it) => it.kind === kind);
+        return list.length ? /* @__PURE__ */ h("div", { class: "cl-g" }, /* @__PURE__ */ h("div", { class: "cl-h " + kind }, label), /* @__PURE__ */ h("ul", { class: "cl-list" }, list.map((it) => /* @__PURE__ */ h("li", { class: it.fresh ? "fresh" : "" }, it.fresh ? /* @__PURE__ */ h("i", { class: "cl-new" }, "新") : null, esc(it.text))))) : "";
+      };
+      const count = (kind) => all.filter((it) => it.kind === kind).length;
+      const sum = [count("new") ? `新功能 ${count("new")}` : "", count("better") ? `改進 ${count("better")}` : ""].filter(Boolean).join("・");
+      return /* @__PURE__ */ h("section", { class: "sec" }, /* @__PURE__ */ h("h2", { class: "sec-title" }, esc(e.date), /* @__PURE__ */ h("span", { class: "cl-sum" }, sum)), /* @__PURE__ */ h("div", { class: "group cl" }, group("new", "新功能"), group("better", "改進"), rest > 0 ? /* @__PURE__ */ h("button", { class: "cl-more", onTap: () => {
+        this.logOpen = [...this.logOpen, e.id];
+      } }, shown.length ? `再看 ${rest} 項 ⌄` : `展開 ${rest} 項 ⌄`) : null));
+    }), /* @__PURE__ */ h("p", { class: "hint" }, "只列出比較有感的變動；修小錯、調整文字這類不會寫在這裡。"));
   }
   async aboutView() {
     return /* @__PURE__ */ h(Page, { title: "關於", onBack: () => this.back() }, /* @__PURE__ */ h(Section, { hint: "連鎖影城的場次來自場次通（twshowtimes.com），感謝場次通的整理；其他來自開眼電影網，以及誠品、光點、樂聲、內惟戲院官網。實際場次以影城公告為準。" }, /* @__PURE__ */ h(Item, { icon: "ℹ️", title: "關於與資料來源", accent: true, chevron: false, onTap: () => Safari.open(ABOUT_URL) }), /* @__PURE__ */ h(Item, { icon: "🔒", title: "隱私權政策", accent: true, chevron: false, onTap: () => Safari.open(PRIVACY_URL) }), /* @__PURE__ */ h(Item, { icon: "🙏", title: "前往場次通", subtitle: "比較各影城場次、看上映場數排行", accent: true, chevron: false, onTap: () => Safari.open("https://twshowtimes.com/") })));
@@ -7227,16 +7297,16 @@ var App = class {
       this.fbDraft = "";
       this.fbForce = true;
       this.go(() => this.feedbackView(), "讀取中…");
-    } }), /* @__PURE__ */ h(Item, { icon: "📝", title: "更新內容", subtitle: this.logUnread() ? "有新的更新，點進來看看" : "最近改了什麼、多了什麼", right: this.logUnread() ? "● 新" : "", onTap: () => this.go(() => this.changelogView()) })), /* @__PURE__ */ h(
+    } }), /* @__PURE__ */ h(Item, { icon: "📝", title: "更新內容", subtitle: this.logUnread() ? "有新的更新，點進來看看" : "最近改了什麼、多了什麼", right: this.logUnread() ? "● 新" : "", onTap: () => this.openLog() })), /* @__PURE__ */ h(
       "p",
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.25-0921"}`);
+          Pasteboard.copy(`版本 ${"2026.11.25-0931"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.25-0921"}`,
+      `版本 ${"2026.11.25-0931"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -7881,7 +7951,7 @@ var App = class {
     if (false) {
       if (!r) return /* @__PURE__ */ h(Note, { text: "（無法確認是否為最新版：連不到網站）" });
       if (r.isLatest) return /* @__PURE__ */ h(Note, { text: "✅ 已是最新版" });
-      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.25-0921"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
+      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.25-0931"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
         globalThis.location.reload();
       } }));
     }

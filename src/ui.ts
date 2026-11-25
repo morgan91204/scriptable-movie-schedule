@@ -73,6 +73,27 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .steps{flex:none;display:flex;gap:3px;margin-left:10px;padding:3px;border-radius:10px;background:var(--chip)}
 .steps i{min-width:26px;padding:4px 5px;border-radius:7px;font-style:normal;font-size:13px;text-align:center;color:var(--fg2)}
 .steps i.on{background:var(--card);color:var(--fg);font-weight:700;box-shadow:0 1px 2px rgba(0,0,0,.15)}
+.newbar{display:flex;align-items:stretch;margin:8px 0 4px;border-radius:12px;background:rgba(10,132,255,.14);overflow:hidden}
+.newbar-main{flex:1;min-width:0;padding:9px 4px 9px 12px;text-align:left}
+.newbar-main b{display:block;font-size:14px;color:var(--accent)}
+.newbar-main b:after{content:" ›"}
+.newbar-main span{display:block;margin-top:1px;font-size:12.5px;color:var(--fg2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.newbar-x{flex:none;width:44px;color:var(--fg2);font-size:14px}
+.sec-title .cl-sum{margin-left:8px;font-weight:400;opacity:.8}
+.cl{padding:4px 16px 6px}
+.cl-g{padding:10px 0 6px}
+.cl-g+.cl-g{border-top:1px solid var(--line)}
+.cl-h{display:inline-block;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:700}
+.cl-h.new{background:rgba(48,209,88,.18);color:#1a8f3c}
+.cl-h.better{background:rgba(10,132,255,.15);color:var(--accent)}
+@media(prefers-color-scheme:dark){.cl-h.new{color:var(--green)}}
+.cl-list{margin:6px 0 0;padding:0;list-style:none}
+.cl-list li{position:relative;padding:6px 0 6px 14px;font-size:15px;line-height:1.5;color:var(--fg)}
+.cl-list li:before{content:"";position:absolute;left:2px;top:15px;width:5px;height:5px;border-radius:50%;background:var(--fg2);opacity:.6}
+.cl-list li.fresh:before{background:var(--accent);opacity:1}
+.cl-new{margin-right:6px;padding:1px 6px;border-radius:6px;background:var(--accent);color:#fff;font-style:normal;font-size:11px;font-weight:700;vertical-align:1px}
+.cl-more{display:block;width:100%;padding:11px 0;border-top:1px solid var(--line);color:var(--accent);font-size:14.5px;font-weight:600;text-align:center}
+.cl-more:first-child{border-top:0}
 .warnbar{display:flex;align-items:center;gap:10px;margin:8px 0 4px;padding:10px 12px;border-radius:12px;background:rgba(255,159,10,.16);font-size:13.5px;line-height:1.4}
 .warnbar span{flex:1;min-width:0}
 .warnbar-go{flex:none;padding:6px 14px;border-radius:999px;background:var(--accent);color:#fff;font-size:13.5px;font-weight:600}

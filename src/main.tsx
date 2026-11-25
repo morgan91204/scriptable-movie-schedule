@@ -624,6 +624,7 @@ class App {
     }
     return (
       <Page title="🎬 片刻" subtitle={srcDown ? "全台電影場次一次查" : `全台 ${this.cinemas.length} 間影城場次一次查`}>
+        {this.logBar()}
         {srcDown ? <div class="warnbar"><span>⚠️ 場次資料暫時讀不到，稍後再試。收藏、片單和社群不受影響。</span><button class="warnbar-go" onTap={() => {}}>重試</button></div> : null}
         {IS_WEB && !this.isStandalone() && !this.settings.installOff && !(globalThis as any).__installed ? (
           <div class="nb nb-top">
@@ -2358,16 +2359,71 @@ class App {
   /** 有沒有還沒看過的更新內容（設定分頁和那一列的小紅點） */
   logUnread(): boolean { return !!CHANGELOG_LATEST && this.settings.seenLog !== CHANGELOG_LATEST; }
   /** 更新內容：依日期分段、新的在上。進來就算看過，紅點消失；不會主動跳出來打擾 */
-  changelogView(): string {
+  logFresh: Record<string, number> = {}; // 這次點進更新內容時，哪一段的前幾項是上次看過之後才多的（段的 id → 幾項）
+  logOpen: string[] = []; // 更新內容裡，哪幾段已經展開成全部列出
+  /** 上次看過之後多了哪些：回傳 段的 id → 前面幾項是新的。舊的記法（只有日期、沒有項數）分不出同一天多了哪幾項，就不標 */
+  logNewItems(): Record<string, number> {
+    const [seenId, seenN] = String(this.settings.seenLog || "").split("#");
+    const out: Record<string, number> = {};
+    if (!seenId) return out;
+    for (const e of CHANGELOG) {
+      if (e.id > seenId) out[e.id] = e.items.length;
+      else if (e.id === seenId && seenN) out[e.id] = Math.max(0, e.items.length - Number(seenN));
+    }
+    return out;
+  }
+  /** 打開更新內容：先記下哪些是新的（頁面上標出來），再算成看過 */
+  openLog() {
+    this.logFresh = this.logUnread() ? this.logNewItems() : {};
+    this.logOpen = [];
     if (this.logUnread()) { this.settings.seenLog = CHANGELOG_LATEST; saveSettings(this.settings); }
+    this.go(() => this.changelogView());
+  }
+  /** 首頁最上面的一條：有還沒看過的更新才出現，點了看內容，× 是「知道了」 */
+  logBar(): string {
+    if (!this.logUnread() || !CHANGELOG.length) return "";
+    const fresh = this.logNewItems(), top = CHANGELOG[0];
+    const n = Object.keys(fresh).reduce((a, k) => a + fresh[k], 0);
+    return (
+      <div class="newbar">
+        <button class="newbar-main" onTap={() => this.openLog()}>
+          <b>{n ? `片刻更新了 ${n} 項` : "片刻有更新"}</b>
+          <span>{esc(top.items[0] ? top.items[0].text : "")}</span>
+        </button>
+        <button class="newbar-x" aria-label="知道了，不用看" onTap={() => { this.settings.seenLog = CHANGELOG_LATEST; saveSettings(this.settings); }}>✕</button>
+      </div>
+    );
+  }
+  /** 更新內容：依日期分段、新的在上；每段分「新功能」「改進」兩組，項目多的先列幾項、其餘收起來；上次看過之後才多的標「新」 */
+  changelogView(): string {
+    const KEEP = 6; // 一段先列幾項
     return (
       <Page title="更新內容" subtitle={`目前版本 ${APP_VERSION}`} onBack={() => this.back()}>
-        {CHANGELOG.map((e) => (
-          <Section title={e.date}>
-            {e.items.map((it) => <Item title={it.text} tag={{ text: it.kind === "new" ? "新功能" : "改進", tone: it.kind === "new" ? "now" : "soon" }} chevron={false} />)}
-          </Section>
-        ))}
-        <Note text="只列出比較有感的變動；修小錯、調整文字這類不會寫在這裡。" />
+        {CHANGELOG.map((e, idx) => {
+          const freshN = this.logFresh[e.id] || 0;
+          const open = this.logOpen.indexOf(e.id) >= 0;
+          const all = e.items.map((it, i) => ({ ...it, fresh: i < freshN }));
+          // 第一段先列幾項；更早的段先只留標題那一行
+          const shown = open ? all : idx === 0 ? all.slice(0, Math.max(KEEP, freshN)) : [];
+          const rest = all.length - shown.length;
+          const group = (kind: string, label: string) => {
+            const list = shown.filter((it) => it.kind === kind);
+            return list.length ? <div class="cl-g"><div class={"cl-h " + kind}>{label}</div><ul class="cl-list">{list.map((it) => <li class={it.fresh ? "fresh" : ""}>{it.fresh ? <i class="cl-new">新</i> : null}{esc(it.text)}</li>)}</ul></div> : "";
+          };
+          const count = (kind: string) => all.filter((it) => it.kind === kind).length;
+          const sum = [count("new") ? `新功能 ${count("new")}` : "", count("better") ? `改進 ${count("better")}` : ""].filter(Boolean).join("・");
+          return (
+            <section class="sec">
+              <h2 class="sec-title">{esc(e.date)}<span class="cl-sum">{sum}</span></h2>
+              <div class="group cl">
+                {group("new", "新功能")}
+                {group("better", "改進")}
+                {rest > 0 ? <button class="cl-more" onTap={() => { this.logOpen = [...this.logOpen, e.id]; }}>{shown.length ? `再看 ${rest} 項 ⌄` : `展開 ${rest} 項 ⌄`}</button> : null}
+              </div>
+            </section>
+          );
+        })}
+        <p class="hint">只列出比較有感的變動；修小錯、調整文字這類不會寫在這裡。</p>
       </Page>
     );
   }
@@ -2416,7 +2472,7 @@ class App {
           {IS_WEB && !this.isStandalone() ? <Item icon="📲" title="加到主畫面" subtitle="像 App 一樣從主畫面開啟，看圖示教學" onTap={() => this.go(() => this.installView())} /> : null}
           <Item icon="ℹ️" title="關於" subtitle="資料來源、隱私權政策、場次通" onTap={() => this.go(() => this.aboutView())} />
           <Item icon="💬" title="意見回饋" subtitle={fbNew ? "站長回覆你了，點進來看" : "回報問題、資料有誤，或建議新功能"} right={fbNew ? "● 新回覆" : ""} onTap={() => { this.fbCat = ""; this.fbDraft = ""; this.fbForce = true; this.go(() => this.feedbackView(), "讀取中…"); }} />
-          <Item icon="📝" title="更新內容" subtitle={this.logUnread() ? "有新的更新，點進來看看" : "最近改了什麼、多了什麼"} right={this.logUnread() ? "● 新" : ""} onTap={() => this.go(() => this.changelogView())} />
+          <Item icon="📝" title="更新內容" subtitle={this.logUnread() ? "有新的更新，點進來看看" : "最近改了什麼、多了什麼"} right={this.logUnread() ? "● 新" : ""} onTap={() => this.openLog()} />
         </Section>
         <p
           class="note version"
