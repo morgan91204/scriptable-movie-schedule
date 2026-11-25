@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.25-0931
+// @movie-schedule-app 電影行程 v2026.11.25-1309
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/brand.ts
@@ -5191,6 +5191,7 @@ var CHANGELOG = [
     id: "2026-11-25",
     date: "2026/11/25",
     items: [
+      { kind: "better", text: "通知更可靠：很多人同時要收到通知時不再排隊好幾個小時；這台的通知訂閱過期時會自動補上，補不了會提醒你重新開啟" },
       { kind: "better", text: "更新內容比較好找也比較好讀：有新的更新時首頁最上面會提醒；內容分成新功能和改進兩組，上次看過之後才多的會標「新」" },
       { kind: "better", text: "場次資料暫時讀不到時，首頁照常顯示，收藏、片單和社群都還能用；刪除帳號資料的說明完整顯示、標成紅字；開關改成一眼看得出開或關的樣式；底部頁籤列不再透出後面的字" },
       { kind: "better", text: "片單重新排版：每一筆左邊有海報，依月份分組，只留哪天看、怎麼看的和短評；自己片單上有雷的短評不用再點開" },
@@ -5357,6 +5358,7 @@ var App = class {
     this.notifyOffAsk = 0;
     // 按了「關閉通知」的時間：一分鐘內顯示「確定要關嗎」（過了就當沒按，免得下次進來還停在確認）
     this.notifyOpen = false;
+    this.pushJob = null;
     /** 更新內容：依日期分段、新的在上。進來就算看過，紅點消失；不會主動跳出來打擾 */
     this.logFresh = {};
     // 這次點進更新內容時，哪一段的前幾項是上次看過之後才多的（段的 id → 幾項）
@@ -5530,7 +5532,7 @@ var App = class {
   }
   /** 最新版本是多少。網頁版問的是自己網站現在上線的版本（重新整理就會拿到的那一版），不是 GitHub 上的 */
   checkVersion() {
-    if (true) return checkLatest("2026.11.25-0931");
+    if (true) return checkLatest("2026.11.25-1309");
     return (async () => {
       try {
         let r = await globalThis.fetch("/version.json?t=" + Date.now(), { cache: "no-store" });
@@ -5538,7 +5540,7 @@ var App = class {
         const latest = String((await r.json()).version || "");
         if (!latest) return null;
         const num = (v) => Number(v.replace(/\D/g, "")) || 0;
-        return { latest, isLatest: num("2026.11.25-0931") >= num(latest) };
+        return { latest, isLatest: num("2026.11.25-1309") >= num(latest) };
       } catch (_) {
         return null;
       }
@@ -6522,9 +6524,10 @@ var App = class {
   pushNudge() {
     const st = this.pushSt;
     if (!this.push() || !st || st === "on" || st === "unsupported") return "";
-    if (this.settings.notifyNudgeOff && this.socialTab !== "act") return "";
-    const text = st === "denied" ? "通知被關掉了。到 iPhone 的「設定 → 通知 → 片刻」打開，才收得到回覆和追蹤的通知。" : st === "needs-install" ? "把片刻加入主畫面，才能在有人回覆、追蹤你時收到通知。" : "還沒開通知：有人回覆、提到或追蹤你時，你不會馬上知道。";
-    return /* @__PURE__ */ h("div", { class: "nb" }, /* @__PURE__ */ h("span", { class: "nb-i", "aria-hidden": "true" }, "🔔"), /* @__PURE__ */ h("span", { class: "nb-t" }, text), st === "off" ? this.notifyButton("開啟", "nb-go") : st === "needs-install" ? /* @__PURE__ */ h("button", { class: "nb-go", onTap: () => this.go(() => this.notifyView(), "讀取中…") }, "怎麼做") : null, this.socialTab !== "act" ? /* @__PURE__ */ h("button", { class: "nb-x", "aria-label": "不再提醒", onTap: () => {
+    const lost = st === "off" && !!this.push().lost && this.push().lost();
+    if (this.settings.notifyNudgeOff && this.socialTab !== "act" && !lost) return "";
+    const text = lost ? "這台的通知失效了（系統偶爾會讓它過期），現在收不到通知。" : st === "denied" ? "通知被關掉了。到 iPhone 的「設定 → 通知 → 片刻」打開，才收得到回覆和追蹤的通知。" : st === "needs-install" ? "把片刻加入主畫面，才能在有人回覆、追蹤你時收到通知。" : "還沒開通知：有人回覆、提到或追蹤你時，你不會馬上知道。";
+    return /* @__PURE__ */ h("div", { class: "nb" }, /* @__PURE__ */ h("span", { class: "nb-i", "aria-hidden": "true" }, "🔔"), /* @__PURE__ */ h("span", { class: "nb-t" }, text), st === "off" ? this.notifyButton(lost ? "重新開啟" : "開啟", "nb-go") : st === "needs-install" ? /* @__PURE__ */ h("button", { class: "nb-go", onTap: () => this.go(() => this.notifyView(), "讀取中…") }, "怎麼做") : null, this.socialTab !== "act" && !lost ? /* @__PURE__ */ h("button", { class: "nb-x", "aria-label": "不再提醒", onTap: () => {
       this.settings.notifyNudgeOff = true;
       saveSettings(this.settings);
     } }, "✕") : null);
@@ -6780,6 +6783,7 @@ var App = class {
     if (!this.socialTab) this.socialTab = this.unread > 0 ? "act" : "feed";
     {
       const p = this.push();
+      if (this.pushJob) await Promise.race([this.pushJob, sleep(1500)]);
       this.pushSt = p ? await p.refresh().catch(() => "") : "";
     }
     if (this.socialTab === "feed") {
@@ -6866,7 +6870,7 @@ var App = class {
         return;
       }
       try {
-        await sendFeedback(cat.id, text, false ? this.isStandalone() ? "web-app" : "web" : "scriptable", "2026.11.25-0931");
+        await sendFeedback(cat.id, text, false ? this.isStandalone() ? "web-app" : "web" : "scriptable", "2026.11.25-1309");
         this.fbDraft = "";
         this.fbCat = "";
         await this.ui.toast("已送出，謝謝你的回饋");
@@ -7089,18 +7093,20 @@ var App = class {
   /** 收藏或通知種類變了：把最新的清單同步給通知伺服器（沒開通知時什麼都不做） */
   pushSync() {
     const p = this.push();
-    if (p) p.sync(notifyPayload(this.settings)).catch(() => null);
+    if (p) this.pushJob = p.sync(notifyPayload(this.settings)).catch(() => null);
   }
+  // 正在跟通知伺服器同步（包含訂閱過期時的自動補訂）：要顯示通知狀態的頁面先等它一下，免得補訂好了還顯示「失效」
   /** 設定頁的「收藏電影通知」：依裝置的狀況顯示開啟按鈕、各種通知的開關，或說明為什麼不能用 */
   /** 設定頁的一列：點進去才是完整的通知設定 */
   async notifyLink() {
     const p = this.push();
     if (!p) return "";
+    if (this.pushJob) await Promise.race([this.pushJob, sleep(1500)]);
     const state = await p.refresh().catch(() => "unsupported");
     const prefs = notifyPrefs(this.settings);
     const on = NOTIFY_KINDS.filter((k) => prefs[k.id] && (k.group !== "admin" || !!(this.meMem && this.meMem.data.admin))).map((k) => k.label.replace(/時$/, ""));
-    const note = state === "on" ? on.length ? on.length > 3 ? `${on.slice(0, 3).join("、")}等 ${on.length} 種` : on.join("、") : "每一種通知都關著" : state === "needs-install" ? "要先把「片刻」加到主畫面" : state === "unsupported" ? "這個瀏覽器不支援" : state === "denied" ? "系統設定裡沒有允許通知" : "開放場次、上映、快下檔、影展開始時通知你";
-    return /* @__PURE__ */ h(Section, { title: "通知" }, /* @__PURE__ */ h(Item, { icon: state === "on" ? "🔔" : "🔕", title: "通知設定", subtitle: note, right: state === "on" ? "已開啟" : "未開啟", onTap: () => this.go(() => this.notifyView()) }));
+    const note = state === "on" ? on.length ? on.length > 3 ? `${on.slice(0, 3).join("、")}等 ${on.length} 種` : on.join("、") : "每一種通知都關著" : state === "needs-install" ? "要先把「片刻」加到主畫面" : state === "unsupported" ? "這個瀏覽器不支援" : state === "denied" ? "系統設定裡沒有允許通知" : p.lost && p.lost() ? "這台的通知失效了，點進來重新開啟" : "開放場次、上映、快下檔、影展開始時通知你";
+    return /* @__PURE__ */ h(Section, { title: "通知" }, /* @__PURE__ */ h(Item, { icon: state === "on" ? "🔔" : "🔕", title: "通知設定", subtitle: note, right: state === "on" ? "已開啟" : p.lost && p.lost() ? "● 失效" : "未開啟", onTap: () => this.go(() => this.notifyView()) }));
   }
   /** 收藏的一部片：依它現在的狀態開對的頁面（有場次的電影頁、即將上映、影展片、票房資訊） */
   openFavRow(r) {
@@ -7253,7 +7259,7 @@ var App = class {
   /** 更新內容：依日期分段、新的在上；每段分「新功能」「改進」兩組，項目多的先列幾項、其餘收起來；上次看過之後才多的標「新」 */
   changelogView() {
     const KEEP = 6;
-    return /* @__PURE__ */ h(Page, { title: "更新內容", subtitle: `目前版本 ${"2026.11.25-0931"}`, onBack: () => this.back() }, CHANGELOG.map((e, idx) => {
+    return /* @__PURE__ */ h(Page, { title: "更新內容", subtitle: `目前版本 ${"2026.11.25-1309"}`, onBack: () => this.back() }, CHANGELOG.map((e, idx) => {
       const freshN = this.logFresh[e.id] || 0;
       const open = this.logOpen.indexOf(e.id) >= 0;
       const all = e.items.map((it, i) => ({ ...it, fresh: i < freshN }));
@@ -7302,11 +7308,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.25-0931"}`);
+          Pasteboard.copy(`版本 ${"2026.11.25-1309"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.25-0931"}`,
+      `版本 ${"2026.11.25-1309"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -7951,7 +7957,7 @@ var App = class {
     if (false) {
       if (!r) return /* @__PURE__ */ h(Note, { text: "（無法確認是否為最新版：連不到網站）" });
       if (r.isLatest) return /* @__PURE__ */ h(Note, { text: "✅ 已是最新版" });
-      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.25-0931"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
+      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.25-1309"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
         globalThis.location.reload();
       } }));
     }

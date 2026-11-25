@@ -345,6 +345,22 @@ const standalone = () => (window.matchMedia && window.matchMedia("(display-mode:
 const keyBytes = (s: string) => Uint8Array.from(atob(s.replace(/-/g, "+").replace(/_/g, "/")), (c) => c.charCodeAt(0));
 const post = (path: string, body: unknown) => fetch(path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }).then((r) => r.json());
 let pushState = "off";
+// 這台有沒有開過通知（記在這台裝置上）。系統有時會讓推送的訂閱過期：有這個記號、訂閱卻不見了，就是「失效」，要自動補訂
+const PUSH_FLAG = "ms:push-on";
+let pushLost = false;
+/** 重新向系統要一個推送位址並交給伺服器（已經有通知權限時不用使用者再按）。fresh = 先把舊的位址丟掉（伺服器說它失效了） */
+async function resubscribe(payload: Record<string, unknown>, fresh: boolean): Promise<boolean> {
+  try {
+    if (Notification.permission !== "granted") return false;
+    const reg = await navigator.serviceWorker.register("/sw.js");
+    await navigator.serviceWorker.ready;
+    if (fresh) { const old = await reg.pushManager.getSubscription(); if (old) await old.unsubscribe().catch(() => false); }
+    const { key } = await fetch("/api/push/key").then((r) => r.json());
+    const sub = (await reg.pushManager.getSubscription()) || (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(key) }));
+    const r = await post("/api/push/subscribe", { ...payload, token: lsGet(SY.token) || "", subscription: sub.toJSON() });
+    return !!(r && r.ok);
+  } catch (_) { return false; }
+}
 function logDB(): Promise<IDBDatabase> {
   return new Promise((ok, no) => {
     const q = indexedDB.open("notify-log", 1);
@@ -359,10 +375,14 @@ async function currentSub(): Promise<PushSubscription | null> {
 }
 g.__push = {
   state: () => pushState,
+  /** 這台之前開過通知，但現在收不到了（訂閱過期、補訂也沒成功）：畫面上要提醒使用者重新開啟 */
+  lost: () => pushLost && pushState === "off",
   async refresh(): Promise<string> {
     if (!pushOK()) return (pushState = isIOS() && !standalone() ? "needs-install" : "unsupported");
     if (Notification.permission === "denied") return (pushState = "denied");
     try { pushState = (await currentSub()) ? "on" : "off"; } catch (_) { pushState = "off"; }
+    if (pushState === "on") { pushLost = false; lsSet(PUSH_FLAG, "1"); } // 之前就開著的裝置：補上記號
+    else if (lsGet(PUSH_FLAG)) pushLost = true;
     return pushState;
   },
   /** 開啟：要權限（g.__notifyPermission 是按鈕按下的那一刻就先要的，見下面）→ 訂閱 → 把推送位址和要通知的片交給伺服器 */
@@ -376,7 +396,10 @@ g.__push = {
     const { key } = await fetch("/api/push/key").then((r) => r.json());
     const sub = (await reg.pushManager.getSubscription()) || (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(key) }));
     const r = await post("/api/push/subscribe", { ...payload, token: lsGet(SY.token) || "", subscription: sub.toJSON() });
-    if (!r || !r.ok) throw new Error("伺服器沒有收到訂閱，請稍後再試");
+    // 伺服器說這個位址已經失效：丟掉、換一個新的再交一次
+    if (r && r.gone && !(await resubscribe(payload, true))) throw new Error("通知的訂閱失效了，請再試一次");
+    else if (!r || (!r.ok && !r.gone)) throw new Error("伺服器沒有收到訂閱，請稍後再試");
+    lsSet(PUSH_FLAG, "1"); pushLost = false;
     return (pushState = "on");
   },
   /** 收藏或通知種類變了：把最新的清單同步給伺服器（沒開通知就什麼都不做） */
@@ -384,9 +407,20 @@ g.__push = {
     if (!pushOK()) return;
     // 剛開機時還不知道這台有沒有開通知（pushState 還是預設的 off）：先查一次，免得開機那次同步被跳過
     if (pushState !== "on") await this.refresh().catch(() => "off");
+    // 開過通知、訂閱卻不見了（系統讓它過期）：權限還在的話自動補訂，使用者不用做任何事
+    if (pushState === "off" && pushLost) {
+      if (await resubscribe(payload, false)) { pushState = "on"; pushLost = false; }
+      return;
+    }
     if (pushState !== "on") return;
     const sub = await currentSub();
-    if (sub) await post("/api/push/subscribe", { ...payload, token: lsGet(SY.token) || "", subscription: sub.toJSON() }).catch(() => null);
+    if (!sub) return;
+    const r = await post("/api/push/subscribe", { ...payload, token: lsGet(SY.token) || "", subscription: sub.toJSON() }).catch(() => null);
+    // 伺服器之前送的時候發現這個位址失效了：換一個新的；換不成就標成失效，畫面上會提醒
+    if (r && r.gone) {
+      if (await resubscribe(payload, true)) { pushState = "on"; pushLost = false; }
+      else { const s2 = await currentSub().catch(() => null); if (s2) await s2.unsubscribe().catch(() => false); pushState = "off"; pushLost = true; }
+    }
   },
   async disable(): Promise<string> {
     if (!pushOK()) return pushState;
@@ -395,6 +429,7 @@ g.__push = {
       await post("/api/push/unsubscribe", { endpoint: sub.endpoint }).catch(() => null); // 伺服器上的資料一起刪掉
       await sub.unsubscribe().catch(() => false);
     }
+    lsSet(PUSH_FLAG, ""); pushLost = false; // 自己關掉的：不算失效，不提醒
     return (pushState = "off");
   },
   /** 這台裝置收過的通知（背景程式 sw.js 收到時記下來的），新的在前 */

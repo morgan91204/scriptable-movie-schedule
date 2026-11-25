@@ -67,8 +67,11 @@ async function send(sub, note, env) {
   return r.status;
 }
 
-const okEndpoint = (u) => { try { const x = new URL(u); return x.protocol === "https:" && PUSH_HOSTS.some((re) => re.test(x.hostname)); } catch (_) { return false; } };
+// env.PUSH_TEST_ORIGIN：只有本機測試時設（假的推送服務的網址開頭）；正式環境沒有這個變數，只收上面那幾家推送服務
+const okEndpoint = (u, env) => { try { if (env && env.PUSH_TEST_ORIGIN && String(u).startsWith(env.PUSH_TEST_ORIGIN)) return true; const x = new URL(u); return x.protocol === "https:" && PUSH_HOSTS.some((re) => re.test(x.hostname)); } catch (_) { return false; } };
 const idOf = async (endpoint) => b64u(await crypto.subtle.digest("SHA-256", enc.encode(endpoint))).slice(0, 32);
+const GONE_KEEP = 7 * 864e5; // 失效位址的記號留幾天
+const FLUSH_MAX = 20; // 一輪最多補送幾則勿擾時段裡先記著的社交通知
 const todayTPE = () => new Date(Date.now() + 8 * 3600e3).toISOString().slice(0, 10);
 const hourTPE = () => new Date(Date.now() + 8 * 3600e3).getUTCHours();
 
@@ -218,8 +221,8 @@ export class PushHub {
     state.storage.sql.exec("CREATE TABLE IF NOT EXISTS usage_ids (day TEXT NOT NULL, id TEXT NOT NULL, PRIMARY KEY (day, id))");
   }
   async notifyData() {
-    if (this.data && Date.now() - this.dataAt < 10 * 60e3) return this.data;
-    const r = await fetch(NOTIFY_URL + "?t=" + Math.floor(Date.now() / 600e3));
+    if (this.data && Date.now() - this.dataAt < (this.env.NOTIFY_URL_TEST ? 0 : 10 * 60e3)) return this.data;
+    const r = await fetch((this.env.NOTIFY_URL_TEST || NOTIFY_URL) + "?t=" + Math.floor(Date.now() / 600e3)); // NOTIFY_URL_TEST：只有本機測試時設
     if (!r.ok) throw new Error("notify.json " + r.status);
     this.data = await r.json();
     this.dataAt = Date.now();
@@ -235,15 +238,17 @@ export class PushHub {
     if (path.startsWith("/feedback/")) return this.feedback(path, b || {});
     if (path.startsWith("/social/")) return social(this, path, b || {});
     const endpoint = String((b.subscription && b.subscription.endpoint) || b.endpoint || "");
-    if (!okEndpoint(endpoint) || endpoint.length > 1000) return json({ error: "bad endpoint" }, 400);
+    if (!okEndpoint(endpoint, this.env) || endpoint.length > 1000) return json({ error: "bad endpoint" }, 400);
     const id = "s:" + (await idOf(endpoint));
-    if (path === "/unsubscribe") { await this.state.storage.delete(id); return json({ ok: true }); }
+    if (path === "/unsubscribe") { await this.state.storage.delete(id); await this.state.storage.delete("x:" + id.slice(2)); return json({ ok: true }); }
+    // 這個推送位址之前送的時候已經被推送服務回報失效：不再收下（收了也送不到）。手機端看到 gone 會換一個新的位址再來
+    if (path === "/subscribe") { const dead = await this.state.storage.get("x:" + id.slice(2)); if (dead && Date.now() - dead < GONE_KEEP) return json({ ok: false, gone: true }); }
     if (path === "/test") {
       const sub = await this.state.storage.get(id);
       if (!sub) return json({ error: "not subscribed" }, 404);
       const status = await send(sub, { title: "「片刻」的通知設定好了", body: "收藏電影有新動態時，會像這樣通知你。", tag: "test", url: "/" }, this.env).catch(() => 0);
-      if (status === 404 || status === 410) await this.state.storage.delete(id);
-      return json({ ok: status >= 200 && status < 300, status });
+      if (status === 404 || status === 410) await this.dropSub(id);
+      return json({ ok: status >= 200 && status < 300, status, ...(status === 404 || status === 410 ? { gone: true } : {}) });
     }
     if (path !== "/subscribe") return json({ error: "not found" }, 404);
     const keys = (b.subscription && b.subscription.keys) || {};
@@ -395,6 +400,16 @@ export class PushHub {
   }
   /** 有人回覆、追蹤某個帳號：對那個帳號登入的每一台裝置推一則（那台有開這種通知才推）。
    *  在對方的勿擾時段就先記著（pq:…），等每小時的排程在勿擾時段過後一起送 */
+  /** 推送服務說這個位址失效了（404、410）：刪掉訂閱，另外留一個記號（x:…），同一個位址再來訂閱時告訴手機「這個已經失效，換一個」 */
+  async dropSub(id) {
+    await this.state.storage.delete(id);
+    await this.state.storage.put("x:" + id.slice(2), Date.now());
+    this.bump("push-gone");
+  }
+  /** 計時器：上一輪到上限還沒送完的，接著送下一輪（見 run 最後面） */
+  async alarm() {
+    try { await this.run(true); } catch (_) {}
+  }
   async socialPush(to, kind, note) {
     const ids = (await this.state.storage.get("pu:" + to)) || [];
     const h = hourTPE();
@@ -410,13 +425,13 @@ export class PushHub {
       }
       const status = await send(sub, note, this.env).catch(() => 0);
       if (status >= 200 && status < 300) this.bump(kind === "admin" ? "push-admin" : "push-social");
-      if (status === 404 || status === 410) await this.state.storage.delete(id);
+      if (status === 404 || status === 410) await this.dropSub(id);
     }
   }
   /** 每小時：把勿擾時段裡先記著的社交通知送出去（一台最多一則；累積好幾則就合成「你有 N 則新通知」） */
   async flushSocial() {
     const h = hourTPE();
-    const waiting = await this.state.storage.list({ prefix: "pq:", limit: 25 });
+    const waiting = await this.state.storage.list({ prefix: "pq:", limit: FLUSH_MAX });
     let sent = 0;
     for (const [k, list] of waiting) {
       const id = k.slice(3);
@@ -425,7 +440,7 @@ export class PushHub {
       if (!this.env.PUSH_ANY_HOUR && inQuiet(optConfig(sub.opt).quiet, h)) continue;
       const note = list.length === 1 ? list[0] : { title: `你有 ${list.length} 則新通知`, body: list.slice(-3).map((n) => n.title).join("\n"), tag: "social:digest", url: "/?tab=activity", badge: Math.max(...list.map((n) => Number(n.badge) || 0), list.length) };
       const status = await send(sub, note, this.env).catch(() => 0);
-      if (status === 404 || status === 410) await this.state.storage.delete(id);
+      if (status === 404 || status === 410) await this.dropSub(id);
       await this.state.storage.delete(k);
       sent++;
     }
@@ -529,16 +544,18 @@ export class PushHub {
     return json({ ok: true, list, open });
   }
   /** 每小時跑一次：條件新成立、使用者有開那一種通知、還沒發過 → 推送。晚上十點到早上九點不吵人（留到早上再發） */
-  async run() {
-    await this.flushSocial().catch(() => 0); // 勿擾時段裡先記著的「有人回覆／追蹤」
+  /** chained = 是計時器接著跑的下一輪（不是整點排程那一次） */
+  async run(chained = false) {
+    const flushed = await this.flushSocial().catch(() => 0); // 勿擾時段裡先記著的「有人回覆／追蹤」
     const h = hourTPE(), today = todayTPE();
     const data = await this.notifyData();
     if (!data || !data.movies || Date.now() - (data.updated || 0) > 6 * 3600e3) return { skipped: "stale data" }; // 資料太舊（排程停了）就不判斷，免得誤報
     const subs = await this.state.storage.list({ prefix: "s:" });
     let sentCount = 0, gone = 0, held = 0;
-    // 一輪最多送幾則：免費方案一次執行只能對外連 50 次（扣掉讀資料的），超過的會整批失敗。
-    // 到上限就先停，沒送的不記成送過，下一個小時接著送。付費方案可以在環境變數 PUSH_MAX 調高
-    let quota = Math.max(1, Number(this.env.PUSH_MAX) || 40);
+    // 一輪最多送幾則：免費方案一次執行只能對外連 50 次（扣掉讀資料的、上面補送社交通知的），超過的會整批失敗。
+    // 到上限就先停，沒送的不記成送過；最後面會設計時器，一秒後接著跑下一輪（每一輪都是新的一次執行，各有自己的 50 次）。
+    // 付費方案可以在環境變數 PUSH_MAX 把一輪的量調高
+    let quota = Math.max(1, (Number(this.env.PUSH_MAX) || 44) - flushed);
     const push = async (sub, payload) => { if (quota <= 0) { held++; return -1; } quota--; const st = await send(sub, payload, this.env).catch(() => 0); if (st >= 200 && st < 300) this.bump("push-fav"); return st; };
     // 每一輪從不同的人開始（照小時輪流），到上限時才不會永遠是排前面的人先收到
     const all = Array.from(subs);
@@ -574,7 +591,7 @@ export class PushHub {
           if (budget <= 0) continue;
           const msg = message(kind, fav, c, cfg);
           const status = await push(sub, { ...msg, tag: `${kind}:${fav.key}`, url: "/?fav=1" });
-          if (status === 404 || status === 410) { await this.state.storage.delete(id); gone++; budget = -1; changed = false; break; }
+          if (status === 404 || status === 410) { await this.dropSub(id); gone++; budget = -1; changed = false; break; }
           if (status >= 200 && status < 300) { done(true); budget--; sentCount++; }
         }
         if (budget < 0) break;
@@ -589,7 +606,7 @@ export class PushHub {
           if (!(f.n > 0) || bc.fl[fid] || f.end < today) continue;
           if (!sub.prefs.flist || budget <= 0) { if (!sub.prefs.flist) { bc.fl[fid] = 1; changed = true; } continue; }
           const status = await push(sub, { title: `${f.name}的片單公布了`, body: `共 ${f.n} 部，${md(f.start)}–${md(f.end)}。點這裡看片單。`, tag: `flist:${fid}`, url: "/?tab=fest" });
-          if (status === 404 || status === 410) { await this.state.storage.delete(id); gone++; budget = -1; changed = false; break; }
+          if (status === 404 || status === 410) { await this.dropSub(id); gone++; budget = -1; changed = false; break; }
           if (status >= 200 && status < 300) { bc.fl[fid] = 1; changed = true; budget--; sentCount++; }
         }
         for (const k of Object.keys(bc.fl)) if (!(data.fests || {})[k]) { delete bc.fl[k]; changed = true; }
@@ -603,7 +620,7 @@ export class PushHub {
           else if (budget > 0) {
             const where = mine.names.length > 1 ? `${mine.names[0]}等 ${mine.names.length} 間影城` : mine.names[0] || "你收藏的影城";
             const status = await push(sub, { title: `收藏影城本週新上 ${mine.titles.length} 部`, body: `${where}：${mine.titles.slice(0, 5).join("、")}${mine.titles.length > 5 ? "…" : ""}`, tag: `cweek:${wk}`, url: "/" });
-            if (status === 404 || status === 410) { await this.state.storage.delete(id); gone++; budget = -1; changed = false; }
+            if (status === 404 || status === 410) { await this.dropSub(id); gone++; budget = -1; changed = false; }
             else if (status >= 200 && status < 300) { bc.cweek = wk; changed = true; budget--; sentCount++; }
           }
         }
@@ -612,7 +629,7 @@ export class PushHub {
           if (!sub.prefs.week || !list.length) { bc.week = wk; changed = true; }
           else if (budget > 0) {
             const status = await push(sub, { title: `本週上映 ${list.length} 部新片`, body: list.slice(0, 5).join("、") + (list.length > 5 ? "…" : ""), tag: `week:${wk}`, url: "/?tab=soon" });
-            if (status === 404 || status === 410) { await this.state.storage.delete(id); gone++; budget = -1; changed = false; }
+            if (status === 404 || status === 410) { await this.dropSub(id); gone++; budget = -1; changed = false; }
             else if (status >= 200 && status < 300) { bc.week = wk; changed = true; sentCount++; }
           }
         }
@@ -620,7 +637,16 @@ export class PushHub {
       if (budget < 0) dead.add(id); // 這個人的推送位址失效、已經刪掉：第二趟不用再看
       else if (changed) await this.state.storage.put(id, sub);
     }
-    return { subs: subs.size, sent: sentCount, gone, ...(held ? { held } : {}) }; // held = 這一輪到上限、留到下一個小時的
+    // 還有沒送的（held）：設計時器接著跑下一輪。這一輪一則都沒送成（推送服務整個連不上之類）就不接了，等下一個小時；
+    // 一個小時最多接 PUSH_ROUNDS 輪（預設 150 輪，約 6,000 則），免得出錯時一直空轉
+    const round = chained ? (((await this.state.storage.get("rq")) || {}).n || 0) + 1 : 0;
+    const maxRounds = Math.max(0, Number(this.env.PUSH_ROUNDS) || 150);
+    const more = held > 0 && sentCount + gone > 0 && round < maxRounds;
+    if (more) { await this.state.storage.put("rq", { n: round, at: Date.now() }); await this.state.storage.setAlarm(Date.now() + 1000); }
+    else if (chained) await this.state.storage.delete("rq");
+    // 失效位址的記號留一個禮拜就夠了（手機下次打開就會換新的位址）
+    if (!chained) for (const [k, at] of await this.state.storage.list({ prefix: "x:", limit: 200 })) if (Date.now() - at > GONE_KEEP) await this.state.storage.delete(k);
+    return { subs: subs.size, sent: sentCount, gone, ...(held ? { held, more } : {}), ...(chained ? { round } : {}) }; // held = 這一輪到上限還沒送的；more = 已經排了下一輪
   }
 }
 

@@ -1418,16 +1418,18 @@ class App {
   pushNudge(): string {
     const st = this.pushSt;
     if (!this.push() || !st || st === "on" || st === "unsupported") return "";
-    if (this.settings.notifyNudgeOff && this.socialTab !== "act") return "";
-    const text = st === "denied" ? "通知被關掉了。到 iPhone 的「設定 → 通知 → 片刻」打開，才收得到回覆和追蹤的通知。"
+    const lost = st === "off" && !!this.push().lost && this.push().lost(); // 開過通知、但訂閱失效了：一定要提醒（按掉過也一樣）
+    if (this.settings.notifyNudgeOff && this.socialTab !== "act" && !lost) return "";
+    const text = lost ? "這台的通知失效了（系統偶爾會讓它過期），現在收不到通知。"
+      : st === "denied" ? "通知被關掉了。到 iPhone 的「設定 → 通知 → 片刻」打開，才收得到回覆和追蹤的通知。"
       : st === "needs-install" ? "把片刻加入主畫面，才能在有人回覆、追蹤你時收到通知。"
       : "還沒開通知：有人回覆、提到或追蹤你時，你不會馬上知道。";
     return (
       <div class="nb">
         <span class="nb-i" aria-hidden="true">🔔</span>
         <span class="nb-t">{text}</span>
-        {st === "off" ? this.notifyButton("開啟", "nb-go") : st === "needs-install" ? <button class="nb-go" onTap={() => this.go(() => this.notifyView(), "讀取中…")}>怎麼做</button> : null}
-        {this.socialTab !== "act" ? <button class="nb-x" aria-label="不再提醒" onTap={() => { this.settings.notifyNudgeOff = true; saveSettings(this.settings); }}>✕</button> : null}
+        {st === "off" ? this.notifyButton(lost ? "重新開啟" : "開啟", "nb-go") : st === "needs-install" ? <button class="nb-go" onTap={() => this.go(() => this.notifyView(), "讀取中…")}>怎麼做</button> : null}
+        {this.socialTab !== "act" && !lost ? <button class="nb-x" aria-label="不再提醒" onTap={() => { this.settings.notifyNudgeOff = true; saveSettings(this.settings); }}>✕</button> : null}
       </div>
     );
   }
@@ -1761,7 +1763,7 @@ class App {
         </Page>
       );
     if (!this.socialTab) this.socialTab = this.unread > 0 ? "act" : "feed";
-    { const p = this.push(); this.pushSt = p ? await p.refresh().catch(() => "") : ""; }
+    { const p = this.push(); if (this.pushJob) await Promise.race([this.pushJob, sleep(1500)]); this.pushSt = p ? await p.refresh().catch(() => "") : ""; }
     if (this.socialTab === "feed") {
       const r = await social<{ list: DiaryEntry[]; following: number }>("feed").catch(() => null);
       return (
@@ -2160,20 +2162,22 @@ class App {
   /** 收藏或通知種類變了：把最新的清單同步給通知伺服器（沒開通知時什麼都不做） */
   pushSync(): void {
     const p = this.push();
-    if (p) p.sync(notifyPayload(this.settings)).catch(() => null);
+    if (p) this.pushJob = p.sync(notifyPayload(this.settings)).catch(() => null);
   }
+  pushJob: Promise<unknown> | null = null; // 正在跟通知伺服器同步（包含訂閱過期時的自動補訂）：要顯示通知狀態的頁面先等它一下，免得補訂好了還顯示「失效」
   /** 設定頁的「收藏電影通知」：依裝置的狀況顯示開啟按鈕、各種通知的開關，或說明為什麼不能用 */
   /** 設定頁的一列：點進去才是完整的通知設定 */
   async notifyLink(): Promise<string> {
     const p = this.push();
     if (!p) return "";
+    if (this.pushJob) await Promise.race([this.pushJob, sleep(1500)]);
     const state: string = await p.refresh().catch(() => "unsupported");
     const prefs = notifyPrefs(this.settings);
     const on = NOTIFY_KINDS.filter((k) => prefs[k.id] && (k.group !== "admin" || !!(this.meMem && this.meMem.data.admin))).map((k) => k.label.replace(/時$/, ""));
-    const note = state === "on" ? (on.length ? (on.length > 3 ? `${on.slice(0, 3).join("、")}等 ${on.length} 種` : on.join("、")) : "每一種通知都關著") : state === "needs-install" ? "要先把「片刻」加到主畫面" : state === "unsupported" ? "這個瀏覽器不支援" : state === "denied" ? "系統設定裡沒有允許通知" : "開放場次、上映、快下檔、影展開始時通知你";
+    const note = state === "on" ? (on.length ? (on.length > 3 ? `${on.slice(0, 3).join("、")}等 ${on.length} 種` : on.join("、")) : "每一種通知都關著") : state === "needs-install" ? "要先把「片刻」加到主畫面" : state === "unsupported" ? "這個瀏覽器不支援" : state === "denied" ? "系統設定裡沒有允許通知" : p.lost && p.lost() ? "這台的通知失效了，點進來重新開啟" : "開放場次、上映、快下檔、影展開始時通知你";
     return (
       <Section title="通知">
-        <Item icon={state === "on" ? "🔔" : "🔕"} title="通知設定" subtitle={note} right={state === "on" ? "已開啟" : "未開啟"} onTap={() => this.go(() => this.notifyView())} />
+        <Item icon={state === "on" ? "🔔" : "🔕"} title="通知設定" subtitle={note} right={state === "on" ? "已開啟" : p.lost && p.lost() ? "● 失效" : "未開啟"} onTap={() => this.go(() => this.notifyView())} />
       </Section>
     );
   }
