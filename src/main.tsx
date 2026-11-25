@@ -1653,19 +1653,21 @@ class App {
   }
   /** 管理員：帳號管理。被檢舉的、被停用的帳號；可以停用個人頁、清掉檢舉、強制改暱稱 */
   adminUserQ = "";
+  adminUserAll = false; // 帳號管理：列全部帳號（不是只列被檢舉、被停用的）
   async adminUsersView(): Promise<string> {
     const sy = this.sync();
     type U = { name: string; color: string; pub: boolean; hidden: boolean; films: number; reports: Record<string, number> };
     const WHY: Record<string, string> = { name: "暱稱不當", fake: "冒名", abuse: "不當行為" };
     let list: U[] = [], users = 0, failed = "";
     const q = this.adminUserQ.trim();
-    try { const r = await sy.adm("users", q ? { op: "find", q } : { op: "list" }); list = r.list || []; users = r.users || 0; } catch (e) { failed = String((e as Error)?.message || e); }
+    try { const r = await sy.adm("users", q ? { op: "find", q } : { op: this.adminUserAll ? "all" : "list" }); list = r.list || []; users = r.users || 0; } catch (e) { failed = String((e as Error)?.message || e); }
     const act = (body: Record<string, unknown>, done: string) => async () => { try { await sy.adm("users", body); await this.ui.toast(done); } catch (e) { await this.ui.toast(String((e as Error)?.message || e)); } };
     return (
       <Page title="帳號管理" subtitle="管理員專區" onBack={() => this.back()}>
         <Search value={this.adminUserQ} placeholder="用暱稱找帳號" onInput={(t) => { this.adminUserQ = t; }} />
+        {q ? null : <Chips tabs><Chip label="有狀況的" muted={this.adminUserAll} onTap={() => { this.adminUserAll = false; }} /><Chip label="全部帳號" muted={!this.adminUserAll} onTap={() => { this.adminUserAll = true; }} /></Chips>}
         {failed ? <Note kind="warn" text={failed} /> : (
-          <Section title={q ? `符合「${q}」的帳號` : `被檢舉或被停用的帳號（${list.length}）`} hint={q ? "" : `目前共有 ${users} 個帳號設了暱稱。停用：個人頁別人看不到、短評變成匿名，對方的片單不會被刪。`}>
+          <Section title={q ? `符合「${q}」的帳號（${list.length}）` : this.adminUserAll ? `全部帳號（${users}）${users > list.length ? `，列出最新的 ${list.length} 個` : ""}` : `被檢舉或被停用的帳號（${list.length}）`} hint={q ? "" : `目前共有 ${users} 個帳號設了暱稱。停用：個人頁別人看不到、短評變成匿名，對方的片單不會被刪。`}>
             {list.length ? <div class="nt-list">{list.map((u) => {
               const why = Object.keys(u.reports || {}).map((w) => `${WHY[w] || w} ${u.reports[w]}`).join("、");
               return (
@@ -1680,7 +1682,7 @@ class App {
                   </div>
                 </div>
               );
-            })}</div> : <Note text={q ? "找不到。" : "目前沒有被檢舉或被停用的帳號。"} />}
+            })}</div> : <Note text={q ? "找不到。" : this.adminUserAll ? "還沒有帳號設暱稱。" : "目前沒有被檢舉或被停用的帳號。"} />}
           </Section>
         )}
       </Page>

@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.25-1309
+// @movie-schedule-app 電影行程 v2026.11.25-1744
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/brand.ts
@@ -5339,6 +5339,7 @@ var App = class {
     this.pushSt = "";
     /** 管理員：帳號管理。被檢舉的、被停用的帳號；可以停用個人頁、清掉檢舉、強制改暱稱 */
     this.adminUserQ = "";
+    this.adminUserAll = false;
     this.socialTab = "";
     // ── 意見回饋（使用者）──
     this.fbCat = "";
@@ -5532,7 +5533,7 @@ var App = class {
   }
   /** 最新版本是多少。網頁版問的是自己網站現在上線的版本（重新整理就會拿到的那一版），不是 GitHub 上的 */
   checkVersion() {
-    if (true) return checkLatest("2026.11.25-1309");
+    if (true) return checkLatest("2026.11.25-1744");
     return (async () => {
       try {
         let r = await globalThis.fetch("/version.json?t=" + Date.now(), { cache: "no-store" });
@@ -5540,7 +5541,7 @@ var App = class {
         const latest = String((await r.json()).version || "");
         if (!latest) return null;
         const num = (v) => Number(v.replace(/\D/g, "")) || 0;
-        return { latest, isLatest: num("2026.11.25-1309") >= num(latest) };
+        return { latest, isLatest: num("2026.11.25-1744") >= num(latest) };
       } catch (_) {
         return null;
       }
@@ -6698,13 +6699,14 @@ var App = class {
     const eThumb = e ? await this.diaryThumbs([e]) : () => void 0;
     return /* @__PURE__ */ h(Page, { title: "我的紀錄", subtitle: `《${title}》`, onBack: () => this.back() }, /* @__PURE__ */ h(Section, null, e && (e.s || e.x) ? /* @__PURE__ */ h("div", { class: "en-list" }, this.entryRow(e, () => this.openTitle(title), eThumb(e.k), true)) : /* @__PURE__ */ h(Note, { text: "還沒有評分。可以先記下什麼時候看的，之後再到電影頁評分、寫短評。" }), /* @__PURE__ */ h("div", { class: "pf-btns en-btns" }, /* @__PURE__ */ h("button", { class: "pf-btn", onTap: () => this.openTitle(title) }, "🎬 電影頁（改評分、短評）"))), /* @__PURE__ */ h(Section, { title: "觀影紀錄" }, /* @__PURE__ */ h("div", { class: "cm-tags en-watch" }, this.watchFields(title, e))), e ? /* @__PURE__ */ h(Section, { hint: "這一筆不會出現在你的個人頁和別人的動態裡，你在這部片的短評也會顯示成匿名。分數照樣算進這部片的平均。" }, /* @__PURE__ */ h(Item, { sw: !!e.priv, icon: "🔒", title: "只有自己看得到", chevron: false, onTap: () => this.saveWatch(title, { priv: !e.priv }, e.priv ? "這一筆恢復公開" : "這一筆只有你看得到了") })) : null);
   }
+  // 帳號管理：列全部帳號（不是只列被檢舉、被停用的）
   async adminUsersView() {
     const sy = this.sync();
     const WHY = { name: "暱稱不當", fake: "冒名", abuse: "不當行為" };
     let list = [], users = 0, failed = "";
     const q = this.adminUserQ.trim();
     try {
-      const r = await sy.adm("users", q ? { op: "find", q } : { op: "list" });
+      const r = await sy.adm("users", q ? { op: "find", q } : { op: this.adminUserAll ? "all" : "list" });
       list = r.list || [];
       users = r.users || 0;
     } catch (e) {
@@ -6720,10 +6722,14 @@ var App = class {
     };
     return /* @__PURE__ */ h(Page, { title: "帳號管理", subtitle: "管理員專區", onBack: () => this.back() }, /* @__PURE__ */ h(Search, { value: this.adminUserQ, placeholder: "用暱稱找帳號", onInput: (t) => {
       this.adminUserQ = t;
-    } }), failed ? /* @__PURE__ */ h(Note, { kind: "warn", text: failed }) : /* @__PURE__ */ h(Section, { title: q ? `符合「${q}」的帳號` : `被檢舉或被停用的帳號（${list.length}）`, hint: q ? "" : `目前共有 ${users} 個帳號設了暱稱。停用：個人頁別人看不到、短評變成匿名，對方的片單不會被刪。` }, list.length ? /* @__PURE__ */ h("div", { class: "nt-list" }, list.map((u) => {
+    } }), q ? null : /* @__PURE__ */ h(Chips, { tabs: true }, /* @__PURE__ */ h(Chip, { label: "有狀況的", muted: this.adminUserAll, onTap: () => {
+      this.adminUserAll = false;
+    } }), /* @__PURE__ */ h(Chip, { label: "全部帳號", muted: !this.adminUserAll, onTap: () => {
+      this.adminUserAll = true;
+    } })), failed ? /* @__PURE__ */ h(Note, { kind: "warn", text: failed }) : /* @__PURE__ */ h(Section, { title: q ? `符合「${q}」的帳號（${list.length}）` : this.adminUserAll ? `全部帳號（${users}）${users > list.length ? `，列出最新的 ${list.length} 個` : ""}` : `被檢舉或被停用的帳號（${list.length}）`, hint: q ? "" : `目前共有 ${users} 個帳號設了暱稱。停用：個人頁別人看不到、短評變成匿名，對方的片單不會被刪。` }, list.length ? /* @__PURE__ */ h("div", { class: "nt-list" }, list.map((u) => {
       const why = Object.keys(u.reports || {}).map((w) => `${WHY[w] || w} ${u.reports[w]}`).join("、");
       return /* @__PURE__ */ h("div", { class: "nt" }, /* @__PURE__ */ h("div", { class: "nt-head" }, this.avatar(u), /* @__PURE__ */ h("span", { class: "en-title" }, esc(u.name)), /* @__PURE__ */ h("span", { class: "nt-score" + (u.hidden ? " bad" : "") }, u.hidden ? "已停用" : u.pub ? "公開" : "不公開")), /* @__PURE__ */ h("div", { class: "nt-meta" }, u.films, " 部片", why ? `｜檢舉：${why}` : ""), /* @__PURE__ */ h("div", { class: "nt-acts" }, /* @__PURE__ */ h("button", { onTap: () => this.go(() => this.profileView(u.name), "讀取個人頁…") }, "看個人頁"), /* @__PURE__ */ h("button", { onTap: act({ op: "hide", name: u.name, on: !u.hidden }, u.hidden ? "已恢復" : "已停用") }, u.hidden ? "恢復" : "停用"), why ? /* @__PURE__ */ h("button", { onTap: act({ op: "clear", name: u.name }, "已清掉檢舉") }, "沒問題") : null, /* @__PURE__ */ h("button", { class: "danger", onTap: () => this.go(() => this.adminRenameView(u.name)) }, "改暱稱")));
-    })) : /* @__PURE__ */ h(Note, { text: q ? "找不到。" : "目前沒有被檢舉或被停用的帳號。" })));
+    })) : /* @__PURE__ */ h(Note, { text: q ? "找不到。" : this.adminUserAll ? "還沒有帳號設暱稱。" : "目前沒有被檢舉或被停用的帳號。" })));
   }
   adminRenameView(name) {
     const sy = this.sync();
@@ -6870,7 +6876,7 @@ var App = class {
         return;
       }
       try {
-        await sendFeedback(cat.id, text, false ? this.isStandalone() ? "web-app" : "web" : "scriptable", "2026.11.25-1309");
+        await sendFeedback(cat.id, text, false ? this.isStandalone() ? "web-app" : "web" : "scriptable", "2026.11.25-1744");
         this.fbDraft = "";
         this.fbCat = "";
         await this.ui.toast("已送出，謝謝你的回饋");
@@ -7259,7 +7265,7 @@ var App = class {
   /** 更新內容：依日期分段、新的在上；每段分「新功能」「改進」兩組，項目多的先列幾項、其餘收起來；上次看過之後才多的標「新」 */
   changelogView() {
     const KEEP = 6;
-    return /* @__PURE__ */ h(Page, { title: "更新內容", subtitle: `目前版本 ${"2026.11.25-1309"}`, onBack: () => this.back() }, CHANGELOG.map((e, idx) => {
+    return /* @__PURE__ */ h(Page, { title: "更新內容", subtitle: `目前版本 ${"2026.11.25-1744"}`, onBack: () => this.back() }, CHANGELOG.map((e, idx) => {
       const freshN = this.logFresh[e.id] || 0;
       const open = this.logOpen.indexOf(e.id) >= 0;
       const all = e.items.map((it, i) => ({ ...it, fresh: i < freshN }));
@@ -7308,11 +7314,11 @@ var App = class {
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.25-1309"}`);
+          Pasteboard.copy(`版本 ${"2026.11.25-1744"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.25-1309"}`,
+      `版本 ${"2026.11.25-1744"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -7957,7 +7963,7 @@ var App = class {
     if (false) {
       if (!r) return /* @__PURE__ */ h(Note, { text: "（無法確認是否為最新版：連不到網站）" });
       if (r.isLatest) return /* @__PURE__ */ h(Note, { text: "✅ 已是最新版" });
-      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.25-1309"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
+      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.25-1744"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
         globalThis.location.reload();
       } }));
     }

@@ -600,7 +600,7 @@ function withAuthors(sql, r, uid, m) {
   return { ...r, notes: (r.notes || []).map((n) => { const { a, ...rest } = n; return a && by[a] ? { ...rest, by: by[a] } : rest; }) };
 }
 
-/** 管理員：帳號管理。list 被檢舉的和被藏起來的／find 用暱稱找／hide 把個人頁藏起來或恢復／rename 強制改暱稱（暱稱不雅、冒名時用） */
+/** 管理員：帳號管理。list 被檢舉的和被藏起來的／all 全部帳號／find 用暱稱找（暱稱裡有出現就算）／hide 把個人頁藏起來或恢復／rename 強制改暱稱（暱稱不雅、冒名時用） */
 export function socialAdmin(hub, b) {
   const sql = hub.state.storage.sql;
   const row = (u) => ({ ...userOut(u), pub: !!u.pub, hidden: !!u.hidden, films: one(sql, "SELECT COUNT(*) AS c FROM entries WHERE uid = ?", u.uid).c, reports: all(sql, "SELECT why, COUNT(*) AS c FROM user_reports WHERE uid = ? GROUP BY why", u.uid).reduce((o, r) => ({ ...o, [r.why]: r.c }), {}) });
@@ -616,7 +616,9 @@ export function socialAdmin(hub, b) {
       sql.exec("UPDATE users SET name = ?, named = ? WHERE uid = ?", name, Date.now(), u.uid);
     }
   }
-  if (b.op === "find") return json({ ok: true, list: all(sql, "SELECT * FROM users WHERE name LIKE ? ESCAPE '\\' ORDER BY name LIMIT 30", String(b.q || "").replace(/[\\%_]/g, "\\$&") + "%").map(row) });
+  if (b.op === "find") return json({ ok: true, list: all(sql, "SELECT * FROM users WHERE name LIKE ? ESCAPE '\\' ORDER BY name LIMIT 50", "%" + String(b.q || "").replace(/[\\%_]/g, "\\$&") + "%").map(row) });
+  // all：全部有暱稱的帳號，新加入的在前（一次最多 200 個）
+  if (b.op === "all") return json({ ok: true, list: all(sql, "SELECT * FROM users ORDER BY at DESC LIMIT 200").map(row), users: one(sql, "SELECT COUNT(*) AS c FROM users").c });
   const list = all(sql, "SELECT u.* FROM users u WHERE u.hidden = 1 OR EXISTS (SELECT 1 FROM user_reports r WHERE r.uid = u.uid) ORDER BY u.name LIMIT 100").map(row);
   return json({ ok: true, list, users: one(sql, "SELECT COUNT(*) AS c FROM users").c });
 }
