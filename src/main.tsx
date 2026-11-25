@@ -1651,6 +1651,39 @@ class App {
       </Page>
     );
   }
+  /** 管理員：用量頁那幾個總數點進去的明細。帳號只有暱稱或一組匿名代號（伺服器沒有存 email、裝置型號） */
+  async adminUsageDetailView(kind: "accounts" | "sessions" | "diary" | "subs"): Promise<string> {
+    const sy = this.sync();
+    type Who = { id: string; name: string } | null;
+    type Acc = { id: string; name: string; pub: boolean; hidden: boolean; devices: number; last: number; synced: boolean; entries: number; notes: number; subs: number };
+    let d: { accounts: Acc[]; sessions: { who: Who; at: number }[]; subs: { who: Who; plat: string; favs: number; kinds: string[]; at: number }[] } | null = null, failed = "";
+    try { d = (await sy.adm("usage", { detail: true })).detail; } catch (e) { failed = String((e as Error)?.message || e); }
+    const when = (at: number) => (at > 1e12 ? new Date(at + 8 * 3600e3).toISOString().slice(0, 16).replace("T", " ").replace(/-/g, "/") : "時間不明");
+    const label = (w: Who | Acc) => (w ? (w.name ? w.name : `沒取暱稱的帳號 #${w.id}`) : "沒有登入");
+    const open = (w: Who | Acc) => (w && w.name ? () => this.go(() => this.profileView(w.name), "讀取個人頁…") : undefined);
+    const PLAT: Record<string, string> = { apple: "iPhone／iPad／Mac（Apple）", google: "Android／Chrome（Google）", firefox: "Firefox", windows: "Windows（Edge）", other: "其他" };
+    const kindLabel = (k: string) => { const f = NOTIFY_KINDS.find((x) => x.id === k); return f ? f.label.replace(/時$/, "") : k; };
+    const TITLE = { accounts: "登入過 Google 的帳號", sessions: "目前登入中的裝置", diary: "有片單的帳號", subs: "開了通知的裝置" };
+    let rows: string[] = [], hint = "";
+    if (d && kind === "accounts") {
+      rows = d.accounts.map((a) => <Item title={label(a)} tag={a.name ? { text: a.hidden ? "已停用" : a.pub ? "公開" : "不公開", tone: a.hidden ? "end" : a.pub ? "now" : "soon" } : undefined}
+        subtitle={[a.devices ? `登入中 ${a.devices} 台` : "目前沒有登入", a.entries ? `片單 ${a.entries} 筆` : "", a.subs ? `開通知 ${a.subs} 台` : "", a.synced ? "有同步設定" : ""].filter(Boolean).join("｜") + (a.last ? `\n最近一次登入 ${when(a.last)}` : "")} onTap={open(a)} chevron={!!a.name} />);
+      hint = "沒取暱稱的帳號只有一組匿名代號：伺服器不存 email 和 Google 名稱，認不出是誰。";
+    } else if (d && kind === "sessions") {
+      rows = d.sessions.map((x) => <Item title={label(x.who)} subtitle={`登入時間 ${when(x.at)}`} onTap={open(x.who)} chevron={!!(x.who && x.who.name)} />);
+      hint = "一個帳號可以同時登入好幾台。伺服器沒有記手機型號或瀏覽器。";
+    } else if (d && kind === "diary") {
+      rows = d.accounts.filter((a) => a.entries > 0).sort((a, b) => b.entries - a.entries).map((a) => <Item title={label(a)} subtitle={`${a.entries} 筆（有短評 ${a.notes}）`} right={a.name ? (a.hidden ? "已停用" : a.pub ? "公開" : "不公開") : ""} onTap={open(a)} chevron={!!a.name} />);
+    } else if (d && kind === "subs") {
+      rows = d.subs.map((x) => <Item title={label(x.who)} subtitle={`${PLAT[x.plat] || x.plat}｜收藏 ${x.favs} 部\n${x.kinds.length ? `開了 ${x.kinds.length} 種：${x.kinds.map(kindLabel).join("、")}` : "每一種都關著"}\n最近一次同步 ${when(x.at)}`} onTap={open(x.who)} chevron={!!(x.who && x.who.name)} />);
+      hint = "裝置類型是從推送服務看出來的（Apple 或 Google），不是手機型號。沒有登入的裝置認不出是誰。";
+    }
+    return (
+      <Page title={TITLE[kind]} subtitle="用量明細" onBack={() => this.back()}>
+        {failed ? <Note kind="warn" text={failed} /> : <Section title={`共 ${rows.length} 筆`} hint={hint}>{rows.length ? rows : <Note text="沒有資料。" />}</Section>}
+      </Page>
+    );
+  }
   /** 管理員：帳號管理。被檢舉的、被停用的帳號；可以停用個人頁、清掉檢舉、強制改暱稱 */
   adminUserQ = "";
   adminUserAll = false; // 帳號管理：列全部帳號（不是只列被檢舉、被停用的）
@@ -2016,11 +2049,11 @@ class App {
       <Page title="用量" subtitle="最近 14 天" onBack={() => this.back()}>
         {totals ? (
           <Section title="帳號總數" hint="登入過的帳號：目前登入中、同步過設定、取過暱稱或有片單的帳號合起來算（登出後又沒留任何資料的不算）。「每天有幾個登入的帳號打開」列在下面每一天裡，從這一版上線開始數。">
-            <Item kv title="登入過 Google 的帳號" right={`${num(totals.accounts)} 個`} chevron={false} />
-            <Item kv title="目前登入中的裝置" right={`${num(totals.sessions)} 台`} chevron={false} />
-            <Item kv title="取了暱稱" right={`${num(totals.named)} 個（公開 ${num(totals.pub)}）`} chevron={false} />
-            <Item kv title="有片單" right={`${num(totals.diary)} 個`} chevron={false} />
-            <Item kv title="開了通知的裝置" right={`${num(totals.subs)} 台（有登入 ${num(totals.linked)}）`} chevron={false} />
+            <Item kv title="登入過 Google 的帳號" right={`${num(totals.accounts)} 個`} onTap={() => this.go(() => this.adminUsageDetailView("accounts"), "讀取中…")} />
+            <Item kv title="目前登入中的裝置" right={`${num(totals.sessions)} 台`} onTap={() => this.go(() => this.adminUsageDetailView("sessions"), "讀取中…")} />
+            <Item kv title="取了暱稱" right={`${num(totals.named)} 個（公開 ${num(totals.pub)}）`} onTap={() => { this.adminUserAll = true; this.adminUserQ = ""; this.go(() => this.adminUsersView(), "讀取中…"); }} />
+            <Item kv title="有片單" right={`${num(totals.diary)} 個`} onTap={() => this.go(() => this.adminUsageDetailView("diary"), "讀取中…")} />
+            <Item kv title="開了通知的裝置" right={`${num(totals.subs)} 台（有登入 ${num(totals.linked)}）`} onTap={() => this.go(() => this.adminUsageDetailView("subs"), "讀取中…")} />
           </Section>
         ) : null}
         {totals && totals.size ? (

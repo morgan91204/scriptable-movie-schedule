@@ -328,7 +328,7 @@ export class PushHub {
     if (path === "/sync/who") return json({ ok: true, admin });
     if (path === "/sync/admins" || path === "/sync/fb" || path === "/sync/users" || path === "/sync/usage") {
       if (!admin) return json({ error: "forbidden" }, 403);
-      if (path === "/sync/usage") return json({ ok: true, ...(await this.usageRead()) });
+      if (path === "/sync/usage") return json(b.body && b.body.detail ? { ok: true, detail: await this.usageDetail() } : { ok: true, ...(await this.usageRead()) });
       if (path === "/sync/users") return socialAdmin(this, b.body || {});
       return path === "/sync/admins" ? this.adminList(b.body || {}, sess.adm) : this.adminFeedback(b.body || {});
     }
@@ -386,6 +386,28 @@ export class PushHub {
     const one = (q) => sql.exec(q).toArray()[0].c;
     const size = { bytes: Number(sql.databaseSize) || 0, entries: one("SELECT COUNT(*) AS c FROM entries"), follows: one("SELECT COUNT(*) AS c FROM follows"), reqs: one("SELECT COUNT(*) AS c FROM follow_reqs"), activity: one("SELECT COUNT(*) AS c FROM activity"), notes: one("SELECT COUNT(*) AS c FROM entries WHERE x != ''"), feedback: Number(await st.get("fn")) || 0 };
     return { size, accounts: ids.size, sessions, named: one("SELECT COUNT(*) AS c FROM users"), pub: one("SELECT COUNT(*) AS c FROM users WHERE pub = 1 AND hidden = 0"), diary: one("SELECT COUNT(DISTINCT uid) AS c FROM entries"), subs, linked };
+  }
+  /** 用量頁點進去的明細（只有管理員讀得到）。帳號只有暱稱或一組匿名代號（帳號識別碼的前六碼），伺服器本來就沒有存 email、裝置型號 */
+  async usageDetail() {
+    const sql = this.state.storage.sql, st = this.state.storage;
+    const scan = async (prefix, pick) => { let after; for (;;) { const page = await st.list({ prefix, limit: 1000, ...(after ? { startAfter: after } : {}) }); if (!page.size) break; for (const [k, v] of page) { after = k; pick(k, v); } if (page.size < 1000) break; } };
+    const acc = {};
+    const get = (uid) => acc[uid] || (acc[uid] = { id: String(uid).slice(0, 6), name: "", pub: false, hidden: false, devices: 0, last: 0, synced: false, entries: 0, notes: 0, subs: 0 });
+    const sessions = [], subs = [];
+    await scan("t:", (_k, v) => { if (!v || !v.uid) return; const a = get(v.uid); a.devices++; a.last = Math.max(a.last, Number(v.at) || 0); sessions.push({ uid: v.uid, at: Number(v.at) || 0 }); });
+    await scan("u:", (k) => { get(k.slice(2)).synced = true; });
+    for (const r of sql.exec("SELECT uid, name, pub, hidden FROM users").toArray()) Object.assign(get(r.uid), { name: r.name, pub: !!r.pub, hidden: !!r.hidden });
+    for (const r of sql.exec("SELECT uid, COUNT(*) AS c, SUM(x != '') AS n FROM entries GROUP BY uid").toArray()) Object.assign(get(r.uid), { entries: r.c, notes: r.n || 0 });
+    const plat = (ep) => { try { const h = new URL(ep).hostname; return /apple\.com$/.test(h) ? "apple" : /googleapis\.com$/.test(h) ? "google" : /mozilla\.com$/.test(h) ? "firefox" : /windows\.com$/.test(h) ? "windows" : "other"; } catch (_) { return "other"; } };
+    // 訂閱上記的是帳號識別碼的前 40 碼：對回完整的那一個
+    const full = (u) => Object.keys(acc).find((k) => k.slice(0, 40) === u) || u;
+    await scan("s:", (_k, v) => { if (!v) return; if (v.u) { v = { ...v, u: full(v.u) }; get(v.u).subs++; } subs.push({ uid: v.u || "", plat: plat(v.endpoint), favs: (v.favs || []).length, kinds: KINDS.filter((k) => v.prefs && v.prefs[k]), at: Number(v.at) || 0 }); });
+    const who = (uid) => (uid ? { id: acc[uid] ? acc[uid].id : String(uid).slice(0, 6), name: acc[uid] ? acc[uid].name : "" } : null);
+    return {
+      accounts: Object.values(acc).sort((a, b) => b.last - a.last || (a.name < b.name ? -1 : 1)),
+      sessions: sessions.sort((a, b) => b.at - a.at).slice(0, 500).map((x) => ({ who: who(x.uid), at: x.at })),
+      subs: subs.sort((a, b) => b.at - a.at).slice(0, 500).map((x) => ({ who: who(x.uid), plat: x.plat, favs: x.favs, kinds: x.kinds, at: x.at })),
+    };
   }
   async usageRead() {
     const sql = this.state.storage.sql, today = new Date().toISOString().slice(0, 10);
