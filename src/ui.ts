@@ -24,9 +24,9 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .page.with-tabs .content{padding-bottom:calc(max(env(safe-area-inset-bottom) - 12px,12px) + 104px)}
 .tabbar{position:fixed;left:50%;transform:translateX(-50%);bottom:max(calc(env(safe-area-inset-bottom) - 12px),12px);z-index:10;width:min(92vw,420px);
  display:flex;align-items:center;padding:5px;border-radius:999px;
- background:rgba(255,255,255,.55);-webkit-backdrop-filter:blur(28px) saturate(190%);backdrop-filter:blur(28px) saturate(190%);
+ background:rgba(255,255,255,.9);-webkit-backdrop-filter:blur(28px) saturate(190%);backdrop-filter:blur(28px) saturate(190%);
  border:1px solid rgba(255,255,255,.55);box-shadow:0 10px 36px rgba(0,0,0,.16),0 1px 2px rgba(0,0,0,.06),inset 0 1px 0 rgba(255,255,255,.7)}
-@media(prefers-color-scheme:dark){.tabbar{background:rgba(40,40,44,.55);border-color:rgba(255,255,255,.1);box-shadow:0 10px 36px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.08)}}
+@media(prefers-color-scheme:dark){.tabbar{background:rgba(40,40,44,.9);border-color:rgba(255,255,255,.1);box-shadow:0 10px 36px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.08)}}
 .tab{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:7px 4px 6px;border-radius:999px;color:var(--fg2);font-size:10.5px;font-weight:600;line-height:1;transition:background .2s,color .2s}
 .tab svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
 .tab.on{color:var(--accent);background:rgba(10,132,255,.14);box-shadow:inset 0 1px 0 rgba(255,255,255,.35)}
@@ -64,6 +64,18 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .item .title{font-size:16px;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
 .item .sub{font-size:13px;color:var(--fg2);margin-top:2px;white-space:pre-line;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
 .item .sub.one{display:block;white-space:nowrap}
+.item .sub.full{display:block;overflow:visible;-webkit-line-clamp:unset}
+.item.danger .title{color:var(--red)}
+.tg{flex:none;position:relative;width:46px;height:28px;margin-left:10px;border-radius:999px;background:var(--chip);transition:background .2s}
+.tg i{position:absolute;left:2px;top:2px;width:24px;height:24px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.3);transition:transform .2s}
+.tg.on{background:var(--green)}
+.tg.on i{transform:translateX(18px)}
+.steps{flex:none;display:flex;gap:3px;margin-left:10px;padding:3px;border-radius:10px;background:var(--chip)}
+.steps i{min-width:26px;padding:4px 5px;border-radius:7px;font-style:normal;font-size:13px;text-align:center;color:var(--fg2)}
+.steps i.on{background:var(--card);color:var(--fg);font-weight:700;box-shadow:0 1px 2px rgba(0,0,0,.15)}
+.warnbar{display:flex;align-items:center;gap:10px;margin:8px 0 4px;padding:10px 12px;border-radius:12px;background:rgba(255,159,10,.16);font-size:13.5px;line-height:1.4}
+.warnbar span{flex:1;min-width:0}
+.warnbar-go{flex:none;padding:6px 14px;border-radius:999px;background:var(--accent);color:#fff;font-size:13.5px;font-weight:600}
 .item .sub.dim{font-size:12px;opacity:.75;margin-top:1px}
 .item .right{font-size:14px;color:var(--fg2);flex:none;max-width:40%;text-align:right}
 .item .hi{flex:none;display:flex;flex-direction:column;align-items:flex-end;gap:1px;max-width:38%;text-align:right;color:var(--fg)}

@@ -248,12 +248,14 @@ class App {
   }
 
   errorView(e: unknown): string {
-    const msg = String((e as Error)?.message || e);
+    // 網址對使用者沒有意義：拿掉，只留說明
+    const msg = String((e as Error)?.message || e).replace(/[:：]?\s*https?:\/\/\S+/g, "").trim() || "暫時讀不到";
+    const root = this.stack.length <= 1; // 已經在這個頁籤的第一頁：「回上一頁」沒有地方可回，不顯示
     return (
-      <Page title="出了點問題" onBack={() => this.back()}>
-        <Empty icon="⚠️" text={msg} />
+      <Page title="出了點問題" onBack={root ? undefined : () => this.back()}>
+        <Empty icon="⚠️" text={msg + "，請稍後再試。"} />
         <Button label="重試" onTap={() => {}} />
-        <Button label="回首頁" kind="secondary" onTap={() => this.home()} />
+        {root ? null : <Button label="回上一頁" kind="secondary" onTap={() => this.back()} />}
       </Page>
     );
   }
@@ -535,7 +537,9 @@ class App {
   homeQuery = ""; // 首頁的全域搜尋
   gsJob: { q: string; job: Promise<GlobalHits> } | null = null; // 目前這個搜尋字的結果（重畫時不用再找一次）
   async homeView(): Promise<string> {
-    if (!this.cinemas.length) this.cinemas = await loadCinemas();
+    // 場次來源讀不到：首頁照常顯示（收藏、片單、社群都還能用），最上面放一條提醒和「重試」；重畫時會再讀一次
+    let srcDown = false;
+    if (!this.cinemas.length) try { this.cinemas = await loadCinemas(); } catch (_) { srcDown = true; }
     this.calendarName = (await currentCalendar(this.settings)).title;
     const favs = this.settings.favorites.map((id) => this.cinemas.find((c) => c.id === id)).filter(Boolean) as Cinema[];
     // 收藏電影：收合時只顯示有幾部（不用讀資料）；展開才查每部片現在的狀態
@@ -619,7 +623,8 @@ class App {
       );
     }
     return (
-      <Page title="🎬 片刻" subtitle={`全台 ${this.cinemas.length} 間影城場次一次查`}>
+      <Page title="🎬 片刻" subtitle={srcDown ? "全台電影場次一次查" : `全台 ${this.cinemas.length} 間影城場次一次查`}>
+        {srcDown ? <div class="warnbar"><span>⚠️ 場次資料暫時讀不到，稍後再試。收藏、片單和社群不受影響。</span><button class="warnbar-go" onTap={() => {}}>重試</button></div> : null}
         {IS_WEB && !this.isStandalone() && !this.settings.installOff && !(globalThis as any).__installed ? (
           <div class="nb nb-top">
             <span class="nb-i" aria-hidden="true">📲</span>
@@ -633,13 +638,13 @@ class App {
           <Item icon="🕘" title="現在有什麼可以看" subtitle="依時段找收藏、附近或各縣市的場次" onTap={() => this.go(() => this.nowView())} />
           <Item icon="🎞️" title="依電影找場次" subtitle="先選電影，再看哪些影城有放映" onTap={() => this.go(() => this.movieListView(), "讀取電影清單…")} />
           <Item icon="🧭" title="附近的影城" subtitle="依目前位置排序" onTap={() => this.go(() => this.nearbyView(), "取得目前位置…")} />
-          <Item icon="🎦" title="依縣市找影院" subtitle={`全台 ${this.cinemas.length} 間，也可以搜尋影城`} onTap={() => this.go(() => this.citiesView())} />
+          <Item icon="🎦" title="依縣市找影院" subtitle={srcDown ? "也可以搜尋影城" : `全台 ${this.cinemas.length} 間，也可以搜尋影城`} onTap={() => this.go(() => this.citiesView())} />
         </Section>
         {/* 三種收藏都固定顯示；還沒有收藏的，展開後是說明和一個直接帶過去的連結 */}
         {(
           <Section hint={this.favOpen && favs.length ? "在影城頁可以收藏或取消收藏影城。" : ""}>
             {/* 預設收合，只留這一列；點一下展開清單 */}
-            <Item head icon="★" title={favs.length ? `收藏影城（${favs.length} 間）` : "收藏影城（還沒有）"} subtitle={this.favOpen ? "點一下收合" : "點一下展開"} chevron={false} onTap={() => { this.favOpen = !this.favOpen; }} action={{ label: this.favOpen ? "▾" : "▸", hint: this.favOpen ? "收合收藏影城" : "展開收藏影城", onTap: () => { this.favOpen = !this.favOpen; } }} />
+            <Item head icon="★" title={favs.length ? `收藏影城（${favs.length} 間）` : srcDown && this.settings.favorites.length ? `收藏影城（${this.settings.favorites.length} 間）` : "收藏影城（還沒有）"} subtitle={this.favOpen ? "點一下收合" : "點一下展開"} chevron={false} onTap={() => { this.favOpen = !this.favOpen; }} action={{ label: this.favOpen ? "▾" : "▸", hint: this.favOpen ? "收合收藏影城" : "展開收藏影城", onTap: () => { this.favOpen = !this.favOpen; } }} />
             {(this.favOpen ? favs : []).map((c) => (
               <Item icon="★" title={c.name} subtitle={`${c.city} ${c.district}`} onTap={() => this.go(() => this.cinemaView(c), `讀取 ${c.name} 的場次…`)} />
             ))}
@@ -801,7 +806,7 @@ class App {
             }} />
             <Button label={u.pub ? "不要改，維持公開" : "不要改，維持不公開"} kind="secondary" onTap={() => { this.pubAsk = 0; }} />
           </div>
-        ) : <Item icon={u.pub ? "✅" : "⬜️"} title="公開個人頁" subtitle={u.pub ? "任何人都可以看你的片單、追蹤你；短評旁邊顯示暱稱" : "不公開：片單和短評只有你同意追蹤的人看得到"} chevron={false} onTap={() => { this.pubAsk = Date.now(); }} />) : null}
+        ) : <Item sw={!!u.pub} icon="🌐" title="公開個人頁" subtitle={u.pub ? "任何人都可以看你的片單、追蹤你；短評旁邊顯示暱稱" : "不公開：片單和短評只有你同意追蹤的人看得到"} chevron={false} onTap={() => { this.pubAsk = Date.now(); }} />) : null}
         <Item icon="🔄" title="同步與登出" subtitle="收藏和設定自動同步中" onTap={() => this.go(() => this.syncView())} />
         {me && me.admin ? <Item icon="🛡" title="管理員專區" subtitle="意見回饋、短評、帳號、管理員名單" right={todoN ? `● ${todoN} 件待處理` : ""} onTap={() => this.go(() => this.adminHomeView(), "讀取中…")} /> : null}
       </Section>
@@ -1637,7 +1642,7 @@ class App {
         </Section>
         {e ? (
           <Section hint="這一筆不會出現在你的個人頁和別人的動態裡，你在這部片的短評也會顯示成匿名。分數照樣算進這部片的平均。">
-            <Item icon={e.priv ? "✅" : "⬜️"} title="只有自己看得到" chevron={false} onTap={() => this.saveWatch(title, { priv: !e.priv }, e.priv ? "這一筆恢復公開" : "這一筆只有你看得到了")} />
+            <Item sw={!!e.priv} icon="🔒" title="只有自己看得到" chevron={false} onTap={() => this.saveWatch(title, { priv: !e.priv }, e.priv ? "這一筆恢復公開" : "這一筆只有你看得到了")} />
           </Section>
         ) : null}
       </Page>
@@ -2130,6 +2135,7 @@ class App {
         </Section>
       );
     return (
+      <div>
       <Section hint={this.syncNote || "已登入 Google，設定有變動會自動同步。通知要在每台裝置各自開啟。"}>
         <Item icon="✅" title="已登入，自動同步中" subtitle="點一下立刻同步一次" chevron={false} onTap={async () => {
           const r = await sy.pull();
@@ -2137,9 +2143,12 @@ class App {
           else await this.ui.toast((await sy.push(syncPick(this.settings))) ? "已同步" : "同步失敗，請稍後再試");
         }} />
         <Item icon="🚪" title="登出" subtitle="這台的收藏會留著，只是不再同步" chevron={false} onTap={async () => { await sy.logout(); forgetMyVotes(); this.syncWho = null; this.diaryMem = null; this.meMem = null; this.hasProfile = null; this.syncNote = ""; this.setUnread(0); this.pushSync(); await this.ui.toast("已登出"); }} />
-        {this.hasProfile !== false ? <Item icon="🧹" title="只刪除我的片單和個人檔案" subtitle="片單、暱稱、追蹤關係、用帳號評的分和短評會刪掉，救不回來；不會登出，收藏和設定的同步不受影響" chevron={false} onTap={() => this.go(() => this.wipeConfirmView())} /> : null}
-        <Item icon="🗑" title="刪除帳號裡的資料並登出" subtitle="伺服器上的設定、片單、暱稱和你用帳號評的分都會刪掉，所有裝置都會登出；這台的收藏會留著" chevron={false} onTap={async () => { await this.wipeSocial().catch(() => undefined); await sy.wipe(); this.syncWho = null; this.syncNote = ""; this.pushSync(); await this.ui.toast("已刪除並登出"); }} />
       </Section>
+      <Section title="刪除（救不回來）">
+        {this.hasProfile !== false ? <Item danger full icon="🧹" title="只刪除我的片單和個人檔案" subtitle="片單、暱稱、追蹤關係、用帳號評的分和短評會刪掉，救不回來；不會登出，收藏和設定的同步不受影響" chevron={false} onTap={() => this.go(() => this.wipeConfirmView())} /> : null}
+        <Item danger full icon="🗑" title="刪除帳號裡的資料並登出" subtitle="伺服器上的設定、片單、暱稱和你用帳號評的分都會刪掉，所有裝置都會登出；這台的收藏會留著" chevron={false} onTap={async () => { await this.wipeSocial().catch(() => undefined); await sy.wipe(); this.syncWho = null; this.syncNote = ""; this.pushSync(); await this.ui.toast("已刪除並登出"); }} />
+      </Section>
+      </div>
     );
   }
   pubAsk = 0; // 按了「公開個人頁」的時間：一分鐘內顯示確認（同 notifyOffAsk）
@@ -2391,7 +2400,7 @@ class App {
         ) : null}
         <Section title="加入行事曆時" hint={`廣告預告：${ADS_NOTE}`}>
           <Item icon="📅" title="寫入的行事曆" subtitle={this.calendarName} onTap={() => this.go(() => this.calendarView())} />
-          <Item icon="📺" title="廣告預告" subtitle={`預計散場時間會加上 ${this.settings.ads} 分鐘`} right="點一下切換" chevron={false} onTap={() => this.cycleAds()} />
+          <Item icon="📺" title="廣告預告" subtitle={`預計散場時間會加上 ${this.settings.ads} 分鐘`} steps={{ list: AD_STEPS.map(String), now: String(this.settings.ads) }} chevron={false} onTap={() => this.cycleAds()} />
           <Item icon="🗺" title="導航地圖" subtitle="點地址、分享、行程備註的導航連結" right={MAPS_LABEL[this.settings.maps || "apple"]} chevron={false} onTap={() => {
             this.settings.maps = this.settings.maps === "google" ? "apple" : "google";
             saveSettings(this.settings);
@@ -3177,7 +3186,7 @@ class App {
             right="修改"
             onTap={() => this.go(() => this.runtimeView())}
           />
-          <Item icon="📺" title="廣告預告" subtitle={`${this.settings.ads} 分鐘`} right="點一下切換" chevron={false} onTap={() => this.cycleAds()} />
+          <Item icon="📺" title="廣告預告" subtitle={`${this.settings.ads} 分鐘`} steps={{ list: AD_STEPS.map(String), now: String(this.settings.ads) }} chevron={false} onTap={() => this.cycleAds()} />
           <Item icon="💺" title="影廳／座位" subtitle={this.seat || "未填（選填）"} right="修改" onTap={() => this.go(() => this.seatView())} />
           <Item icon="📅" title="行事曆" subtitle={this.calendarName} right="更換" onTap={() => this.go(() => this.calendarView())} />
         </Section>

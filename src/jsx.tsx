@@ -217,8 +217,14 @@ export function Item(props: {
   tag?: { text: string; tone: string };
   /** 右邊的重點欄：目前排序依據的那個數字（評分、日期、影城數、票房），大字顯示；評分依高低變色，樣式跟電影頁的評分徽章同一套 */
   hi?: { kind: string; text: string; tier: string; note?: string };
+  /** 右邊畫一顆開關（true 開、false 關）：整列點了就切換 */
+  sw?: boolean;
+  /** 右邊列出幾個可選的值，亮的是目前的；整列點了換下一個 */
+  steps?: { list: string[]; now: string };
+  danger?: boolean; // 救不回來的動作：標題紅字
+  full?: boolean; // 說明不截斷，完整換行（刪除這類一定要看完後果的列）
 }): string {
-  const cls = ["item", props.head ? "head" : "", props.kv ? "kv" : "", props.onTap ? "tap" : "", props.muted ? "muted" : "", props.accent ? "accent" : "", props.onLongPress ? "long" : ""].join(" ");
+  const cls = ["item", props.danger ? "danger" : "", props.head ? "head" : "", props.kv ? "kv" : "", props.onTap ? "tap" : "", props.muted ? "muted" : "", props.accent ? "accent" : "", props.onLongPress ? "long" : ""].join(" ");
   const fallback = "if(this.dataset.url&&this.src!==this.dataset.url){this.src=this.dataset.url}else{this.remove()}";
   return (
     <div class={cls} onTap={props.onTap} onLongPress={props.onLongPress}>
@@ -237,10 +243,12 @@ export function Item(props: {
       <div class="body">
         <div class={props.tag && !props.kv ? "title tagged" : "title"}>{esc(props.title)}{props.tag && !props.kv ? <span class={"pill " + props.tag.tone}>{esc(props.tag.text)}</span> : null}</div>
         {/* 多行說明（用換行分開）：每行各自一行、太長就截斷，第二行起淡一階 */}
-        {props.subtitle ? (props.subtitle.includes("\n") ? props.subtitle.split("\n").map((l, i) => <div class={"sub one" + (i ? " dim" : "")}>{esc(l)}</div>) : <div class="sub">{esc(props.subtitle)}</div>) : null}
+        {props.subtitle ? (props.subtitle.includes("\n") ? props.subtitle.split("\n").map((l, i) => <div class={"sub one" + (i ? " dim" : "")}>{esc(l)}</div>) : <div class={props.full ? "sub full" : "sub"}>{esc(props.subtitle)}</div>) : null}
       </div>
       {props.badge ? <span class="badge">{esc(props.badge)}</span> : null}
       {props.right ? <span class="right">{esc(props.right)}</span> : null}
+      {props.steps ? <span class="steps" aria-label={"目前 " + props.steps.now + "，點一下換下一個"}>{props.steps.list.map((v) => <i class={v === props.steps!.now ? "on" : ""}>{esc(v)}</i>)}</span> : null}
+      {props.sw !== undefined ? <span class={"tg" + (props.sw ? " on" : "")} role="switch" aria-checked={props.sw ? "true" : "false"}><i /></span> : null}
       {props.tag && props.kv ? <span class="right"><span class={"pill " + props.tag.tone}>{esc(props.tag.text)}</span></span> : null}
       {props.hi ? (
         <span class={`hi ${props.hi.kind} ${props.hi.tier}`}>
