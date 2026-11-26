@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.26-1748
+// @movie-schedule-app 電影行程 v2026.11.26-1756
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/brand.ts
@@ -5208,6 +5208,7 @@ var CHANGELOG = [
     id: "2026-11-25",
     date: "2026/11/25",
     items: [
+      { kind: "better", text: "用量頁多了「評分」一區：有評分的片數、評分總人次、有短評的片數、短評總數（管理員專區）" },
       { kind: "better", text: "依「片刻評分」排序時，評分人數還不夠的片（未滿 3 人）排在「有足夠評分」和「還沒有評分」中間，照自己的分數排；也可以在排序設定裡切成跟足夠評分的片一起排" },
       { kind: "better", text: "進不了 Google 登入的裝置（例如公司網路擋了 Google），管理員可以用管理金鑰登入（限管理員，要先在伺服器設定金鑰）" },
       { kind: "better", text: "通知更可靠：很多人同時要收到通知時不再排隊好幾個小時；這台的通知訂閱過期時會自動補上，補不了會提醒你重新開啟" },
@@ -5552,7 +5553,7 @@ var App = class {
   }
   /** 最新版本是多少。網頁版問的是自己網站現在上線的版本（重新整理就會拿到的那一版），不是 GitHub 上的 */
   checkVersion() {
-    if (true) return checkLatest("2026.11.26-1748");
+    if (true) return checkLatest("2026.11.26-1756");
     return (async () => {
       try {
         let r = await globalThis.fetch("/version.json?t=" + Date.now(), { cache: "no-store" });
@@ -5560,7 +5561,7 @@ var App = class {
         const latest = String((await r.json()).version || "");
         if (!latest) return null;
         const num = (v) => Number(v.replace(/\D/g, "")) || 0;
-        return { latest, isLatest: num("2026.11.26-1748") >= num(latest) };
+        return { latest, isLatest: num("2026.11.26-1756") >= num(latest) };
       } catch (_) {
         return null;
       }
@@ -6949,7 +6950,7 @@ ${x.kinds.length ? `開了 ${x.kinds.length} 種：${x.kinds.map(kindLabel).join
         return;
       }
       try {
-        await sendFeedback(cat.id, text, false ? this.isStandalone() ? "web-app" : "web" : "scriptable", "2026.11.26-1748");
+        await sendFeedback(cat.id, text, false ? this.isStandalone() ? "web-app" : "web" : "scriptable", "2026.11.26-1756");
         this.fbDraft = "";
         this.fbCat = "";
         await this.ui.toast("已送出，謝謝你的回饋");
@@ -7022,14 +7023,15 @@ ${x.kinds.length ? `開了 ${x.kinds.length} 種：${x.kinds.map(kindLabel).join
   async adminUsageView() {
     const sy = this.sync();
     let days = [], today = "", failed = "", totals = null;
-    try {
-      const r = await sy.adm("usage", {});
+    let rstats = null;
+    const [uResult, rResult] = await Promise.allSettled([sy.adm("usage", {}), sy.admin({ op: "stats" })]);
+    if (uResult.status === "fulfilled") {
+      const r = uResult.value;
       days = r.days || [];
       today = r.today || "";
       totals = r.totals || null;
-    } catch (e) {
-      failed = String(e?.message || e);
-    }
+    } else failed = String(uResult.reason?.message || uResult.reason);
+    if (rResult.status === "fulfilled" && rResult.value && rResult.value.stats) rstats = rResult.value.stats;
     const LIMIT = 1e5;
     const NAMES = [["fetch", "查場次"], ["social", "社群／短評"], ["sync", "同步／登入"], ["push", "通知"], ["version", "檢查更新"], ["page", "頁面"], ["feedback", "回饋"], ["api", "其他"]];
     const num = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+$)/g, ",");
@@ -7057,7 +7059,7 @@ ${x.kinds.length ? `開了 ${x.kinds.length} 種：${x.kinds.map(kindLabel).join
       this.adminUserAll = true;
       this.adminUserQ = "";
       this.go(() => this.adminUsersView(), "讀取中…");
-    } }), /* @__PURE__ */ h(Item, { kv: true, title: "有片單", right: `${num(totals.diary)} 個`, onTap: () => this.go(() => this.adminUsageDetailView("diary"), "讀取中…") }), /* @__PURE__ */ h(Item, { kv: true, title: "開了通知的裝置", right: `${num(totals.subs)} 台（有登入 ${num(totals.linked)}）`, onTap: () => this.go(() => this.adminUsageDetailView("subs"), "讀取中…") })) : null, totals && totals.size ? /* @__PURE__ */ h(Section, { title: "資料量", hint: "儲存空間的免費額度是 5 GB（所有帳號、片單、追蹤、通知都算在這裡；各部片的評分和短評存在另一支伺服器，量很小）。" }, /* @__PURE__ */ h(Item, { kv: true, title: "儲存空間", right: `${totals.size.bytes >= 1048576 ? (totals.size.bytes / 1048576).toFixed(1) + " MB" : Math.max(1, Math.round(totals.size.bytes / 1024)) + " KB"}（${(totals.size.bytes / 5368709120 * 100).toFixed(2)}%）`, chevron: false }), /* @__PURE__ */ h(Item, { kv: true, title: "片單紀錄", right: `${num(totals.size.entries)} 筆（有短評 ${num(totals.size.notes)}）`, chevron: false }), /* @__PURE__ */ h(Item, { kv: true, title: "追蹤關係", right: `${num(totals.size.follows)} 筆（等待同意 ${num(totals.size.reqs)}）`, chevron: false }), /* @__PURE__ */ h(Item, { kv: true, title: "通知紀錄", right: `${num(totals.size.activity)} 筆`, chevron: false }), /* @__PURE__ */ h(Item, { kv: true, title: "意見回饋", right: `${num(totals.size.feedback)} 則`, chevron: false })) : null, failed ? /* @__PURE__ */ h(Section, null, /* @__PURE__ */ h(Note, { kind: "warn", text: failed })) : !days.length ? /* @__PURE__ */ h(Section, null, /* @__PURE__ */ h(Note, { text: "還沒有資料。這個統計從上線那一刻開始數，過幾分鐘再來看。" })) : /* @__PURE__ */ h(Section, { hint: "百分比是跟 Cloudflare 免費方案的每日 100,000 個請求比（只算網頁版這一支，評分伺服器另外算，量很小）。日期用世界標準時間：每天台灣時間早上 8 點換日，額度也是那時候重算。數字是約略值，會比 Cloudflare 後台略少。裝置數靠每天隨機更換的匿名代號估算，不含還沒更新到新版的人。" }, /* @__PURE__ */ h("div", { class: "us-days" }, days.map(row))));
+    } }), /* @__PURE__ */ h(Item, { kv: true, title: "有片單", right: `${num(totals.diary)} 個`, onTap: () => this.go(() => this.adminUsageDetailView("diary"), "讀取中…") }), /* @__PURE__ */ h(Item, { kv: true, title: "開了通知的裝置", right: `${num(totals.subs)} 台（有登入 ${num(totals.linked)}）`, onTap: () => this.go(() => this.adminUsageDetailView("subs"), "讀取中…") })) : null, totals && totals.size ? /* @__PURE__ */ h(Section, { title: "資料量", hint: "儲存空間的免費額度是 5 GB（所有帳號、片單、追蹤、通知都算在這裡；各部片的評分和短評存在另一支伺服器，量很小）。" }, /* @__PURE__ */ h(Item, { kv: true, title: "儲存空間", right: `${totals.size.bytes >= 1048576 ? (totals.size.bytes / 1048576).toFixed(1) + " MB" : Math.max(1, Math.round(totals.size.bytes / 1024)) + " KB"}（${(totals.size.bytes / 5368709120 * 100).toFixed(2)}%）`, chevron: false }), /* @__PURE__ */ h(Item, { kv: true, title: "片單紀錄", right: `${num(totals.size.entries)} 筆（有短評 ${num(totals.size.notes)}）`, chevron: false }), /* @__PURE__ */ h(Item, { kv: true, title: "追蹤關係", right: `${num(totals.size.follows)} 筆（等待同意 ${num(totals.size.reqs)}）`, chevron: false }), /* @__PURE__ */ h(Item, { kv: true, title: "通知紀錄", right: `${num(totals.size.activity)} 筆`, chevron: false }), /* @__PURE__ */ h(Item, { kv: true, title: "意見回饋", right: `${num(totals.size.feedback)} 則`, chevron: false })) : null, rstats ? /* @__PURE__ */ h(Section, { title: "評分（評分伺服器）", hint: "各部片的評分和短評存在另一支伺服器（movie-ratings），資料量很小，跟上面的 5 GB 分開算。一台裝置對一部片只能投一票。" }, /* @__PURE__ */ h(Item, { kv: true, title: "有評分的片", right: `${num(rstats.movies)} 部`, chevron: false }), /* @__PURE__ */ h(Item, { kv: true, title: "評分總人次", right: `${num(rstats.votes)} 次${rstats.movies ? `（平均每部 ${(rstats.votes / rstats.movies).toFixed(1)} 人）` : ""}`, chevron: false }), /* @__PURE__ */ h(Item, { kv: true, title: "有短評的片", right: `${num(rstats.noteMovies)} 部`, chevron: false }), /* @__PURE__ */ h(Item, { kv: true, title: "短評總數", right: `${num(rstats.notes)} 則`, chevron: false })) : null, failed ? /* @__PURE__ */ h(Section, null, /* @__PURE__ */ h(Note, { kind: "warn", text: failed })) : !days.length ? /* @__PURE__ */ h(Section, null, /* @__PURE__ */ h(Note, { text: "還沒有資料。這個統計從上線那一刻開始數，過幾分鐘再來看。" })) : /* @__PURE__ */ h(Section, { hint: "百分比是跟 Cloudflare 免費方案的每日 100,000 個請求比（只算網頁版這一支，評分伺服器另外算，量很小）。日期用世界標準時間：每天台灣時間早上 8 點換日，額度也是那時候重算。數字是約略值，會比 Cloudflare 後台略少。裝置數靠每天隨機更換的匿名代號估算，不含還沒更新到新版的人。" }, /* @__PURE__ */ h("div", { class: "us-days" }, days.map(row))));
   }
   async adminListView() {
     const sy = this.sync();
@@ -7368,7 +7370,7 @@ ${x.kinds.length ? `開了 ${x.kinds.length} 種：${x.kinds.map(kindLabel).join
   /** 更新內容：依日期分段、新的在上；每段分「新功能」「改進」兩組，項目多的先列幾項、其餘收起來；上次看過之後才多的標「新」 */
   changelogView() {
     const KEEP = 6;
-    return /* @__PURE__ */ h(Page, { title: "更新內容", subtitle: `目前版本 ${"2026.11.26-1748"}`, onBack: () => this.back() }, CHANGELOG.map((e, idx) => {
+    return /* @__PURE__ */ h(Page, { title: "更新內容", subtitle: `目前版本 ${"2026.11.26-1756"}`, onBack: () => this.back() }, CHANGELOG.map((e, idx) => {
       const freshN = this.logFresh[e.id] || 0;
       const open = this.logOpen.indexOf(e.id) >= 0;
       const all = e.items.map((it, i) => ({ ...it, fresh: i < freshN }));
@@ -7417,11 +7419,11 @@ ${x.kinds.length ? `開了 ${x.kinds.length} 種：${x.kinds.map(kindLabel).join
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.26-1748"}`);
+          Pasteboard.copy(`版本 ${"2026.11.26-1756"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.26-1748"}`,
+      `版本 ${"2026.11.26-1756"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -8066,7 +8068,7 @@ ${x.kinds.length ? `開了 ${x.kinds.length} 種：${x.kinds.map(kindLabel).join
     if (false) {
       if (!r) return /* @__PURE__ */ h(Note, { text: "（無法確認是否為最新版：連不到網站）" });
       if (r.isLatest) return /* @__PURE__ */ h(Note, { text: "✅ 已是最新版" });
-      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.26-1748"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
+      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.26-1756"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
         globalThis.location.reload();
       } }));
     }

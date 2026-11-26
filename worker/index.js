@@ -71,6 +71,7 @@ async function adminOp(env, b) {
   const op = String((b && b.op) || "");
   const index = env.INDEX.get(env.INDEX.idFromName("all"));
   if (op === "flagged") return { flagged: await index.flagged() };
+  if (op === "stats") return { stats: await index.stats() };
   if (op === "recent") {
     const list = [];
     for (const [k, notes] of Object.entries(await index.allNotes())) for (const n of notes) list.push({ m: k, ...n });
@@ -141,7 +142,7 @@ export class AccountRpc extends WorkerEntrypoint {
 export class AdminRpc extends WorkerEntrypoint {
   async admin(body) {
     const op = String((body && body.op) || "");
-    if (["flagged", "recent", "hide", "restore", "delete"].indexOf(op) < 0) return { error: "bad op" };
+    if (["flagged", "recent", "hide", "restore", "delete", "stats"].indexOf(op) < 0) return { error: "bad op" };
     return adminOp(this.env, body);
   }
 }
@@ -667,6 +668,17 @@ export class Index extends DurableObject {
     const out = {};
     for (const r of this.sql.exec("SELECT k, d FROM summary ORDER BY k")) out[r.k] = String(r.d).split(",").map(Number);
     return out;
+  }
+  /** 給用量頁看的評分統計：有評分的片數、總票數（一台裝置一部片一票）、平均每部幾人、有短評的片數、短評總數 */
+  stats() {
+    let movies = 0, votes = 0;
+    for (const r of this.sql.exec("SELECT d FROM summary")) {
+      const n = String(r.d).split(",").reduce((a, x) => a + (Number(x) || 0), 0);
+      if (n > 0) { movies++; votes += n; }
+    }
+    let noteMovies = 0, notes = 0;
+    for (const r of this.sql.exec("SELECT v FROM notes WHERE v != '[]'")) { try { const l = JSON.parse(r.v).length; if (l) { noteMovies++; notes += l; } } catch (_) {} }
+    return { movies, votes, noteMovies, notes };
   }
 }
 

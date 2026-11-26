@@ -2012,7 +2012,11 @@ class App {
     type Day = { day: string; devices: number; accounts?: number; n: Record<string, number> };
     type Totals = { accounts: number; sessions: number; named: number; pub: number; diary: number; subs: number; linked: number; size?: { bytes: number; entries: number; follows: number; reqs: number; activity: number; notes: number; feedback: number } };
     let days: Day[] = [], today = "", failed = "", totals: Totals | null = null;
-    try { const r = await sy.adm("usage", {}); days = r.days || []; today = r.today || ""; totals = r.totals || null; } catch (e) { failed = String((e as Error)?.message || e); }
+    type RStats = { movies: number; votes: number; noteMovies: number; notes: number };
+    let rstats: RStats | null = null;
+    const [uResult, rResult] = await Promise.allSettled([sy.adm("usage", {}), sy.admin({ op: "stats" })]);
+    if (uResult.status === "fulfilled") { const r = uResult.value; days = r.days || []; today = r.today || ""; totals = r.totals || null; } else failed = String((uResult.reason as Error)?.message || uResult.reason);
+    if (rResult.status === "fulfilled" && rResult.value && rResult.value.stats) rstats = rResult.value.stats;
     const LIMIT = 100000;
     const NAMES: [string, string][] = [["fetch", "查場次"], ["social", "社群／短評"], ["sync", "同步／登入"], ["push", "通知"], ["version", "檢查更新"], ["page", "頁面"], ["feedback", "回饋"], ["api", "其他"]];
     const num = (n: number) => String(Math.round(n)).replace(/\B(?=(\d{3})+$)/g, ",");
@@ -2070,6 +2074,14 @@ class App {
             <Item kv title="追蹤關係" right={`${num(totals.size.follows)} 筆（等待同意 ${num(totals.size.reqs)}）`} chevron={false} />
             <Item kv title="通知紀錄" right={`${num(totals.size.activity)} 筆`} chevron={false} />
             <Item kv title="意見回饋" right={`${num(totals.size.feedback)} 則`} chevron={false} />
+          </Section>
+        ) : null}
+        {rstats ? (
+          <Section title="評分（評分伺服器）" hint="各部片的評分和短評存在另一支伺服器（movie-ratings），資料量很小，跟上面的 5 GB 分開算。一台裝置對一部片只能投一票。">
+            <Item kv title="有評分的片" right={`${num(rstats.movies)} 部`} chevron={false} />
+            <Item kv title="評分總人次" right={`${num(rstats.votes)} 次${rstats.movies ? `（平均每部 ${(rstats.votes / rstats.movies).toFixed(1)} 人）` : ""}`} chevron={false} />
+            <Item kv title="有短評的片" right={`${num(rstats.noteMovies)} 部`} chevron={false} />
+            <Item kv title="短評總數" right={`${num(rstats.notes)} 則`} chevron={false} />
           </Section>
         ) : null}
         {failed ? <Section><Note kind="warn" text={failed} /></Section> : !days.length ? <Section><Note text="還沒有資料。這個統計從上線那一刻開始數，過幾分鐘再來看。" /></Section> : (
