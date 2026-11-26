@@ -72,6 +72,13 @@ const okEndpoint = (u, env) => { try { if (env && env.PUSH_TEST_ORIGIN && String
 const idOf = async (endpoint) => b64u(await crypto.subtle.digest("SHA-256", enc.encode(endpoint))).slice(0, 32);
 const GONE_KEEP = 7 * 864e5; // 失效位址的記號留幾天
 const FLUSH_MAX = 20; // 一輪最多補送幾則勿擾時段裡先記著的社交通知
+/** 固定時間比對兩個字串（避免用回應快慢猜金鑰）：長度不同直接不相等，相同長度時每個字元都比完才回 */
+function timingSafeEqual(a, b) {
+  if (typeof a !== "string" || typeof b !== "string" || a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
 const todayTPE = () => new Date(Date.now() + 8 * 3600e3).toISOString().slice(0, 10);
 const hourTPE = () => new Date(Date.now() + 8 * 3600e3).getUTCHours();
 
@@ -296,6 +303,25 @@ export class PushHub {
   }
   /** 同步設定：login 用 Google 的身分憑證換一張登入憑證；get／put 讀寫設定；logout 登出這台；wipe 刪掉伺服器上的設定並登出所有裝置 */
   async sync(path, b) {
+    // 管理金鑰登入：給「進不了 Google 登入的那台裝置」用的第二條管理員入口。公開寫在程式裡、可稽核、隨時能關：
+    // 只有在 Cloudflare 的密鑰 ADMIN_KEY 有設定時才啟用（沒設＝這條路整個不存在）；比對用固定時間，不會因為前幾個字對了就比較快回應。
+    // 金鑰只換到「管理員權限」，不是任何人的帳號：uid 是這條路專用的、固定的一組，不會動到真的使用者資料。
+    if (path === "/sync/admin-key") {
+      const want = String(this.env.ADMIN_KEY || "");
+      if (want.length < 16) return json({ error: "not available" }, 404); // 沒設、或設得太短（不安全）：當作沒有這條路
+      const got = String(b.key || "");
+      if (!timingSafeEqual(got, want)) { this.bump("admin-key-bad"); return json({ error: "金鑰不對" }, 401); }
+      const roots = this.rootAdmins();
+      if (!roots.length) return json({ error: "伺服器沒有設管理員" }, 500);
+      const email = roots[0];
+      const uid = await sha256hex("片刻|管理金鑰");
+      const raw = new Uint8Array(32); crypto.getRandomValues(raw);
+      const token = Array.from(raw).map((x) => x.toString(16).padStart(2, "0")).join("");
+      await this.state.storage.put("t:" + (await sha256hex(token)), { uid, at: Date.now(), adm: email, byKey: true });
+      this.bump("admin-key");                                        // 記一筆：用量頁看得到今天用金鑰登入過幾次
+      await this.state.storage.put("ak:last", Date.now());           // 最後一次用金鑰登入的時間
+      return json({ ok: true, token, admin: true });
+    }
     if (path === "/sync/login") {
       let claims;
       try { claims = await verifyGoogle(b.id_token, String(b.nonce || ""), this.env.GOOGLE_KEYS_TEST ? () => JSON.parse(this.env.GOOGLE_KEYS_TEST) : null, true); } catch (e) { return json({ error: "登入沒有通過驗證" }, 401); }

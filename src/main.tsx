@@ -762,6 +762,7 @@ class App {
       return (
         <Section title="帳號" hint="登入後：收藏和設定會跟著帳號走；評過的片會記成片單；可以取暱稱、公開個人頁、追蹤別人。不登入也能照常使用。">
           <Item icon="👤" title="用 Google 登入" subtitle="同步收藏、記錄片單、追蹤朋友" accent onTap={() => sy.login()} />
+          {IS_WEB ? <button class="key-link" onTap={() => this.adminKeyLogin()}>用管理金鑰登入</button> : null}
         </Section>
       );
     if (!this.meMem || Date.now() - this.meMem.at > 60e3) {
@@ -2162,6 +2163,22 @@ class App {
         )}
       </Page>
     );
+  }
+  /** 管理金鑰登入：進不了 Google 登入的裝置（例如公司網路擋了 Google）用這條路拿到管理員權限。
+   *  金鑰只存在伺服器的密鑰 ADMIN_KEY 裡，沒設就沒有這條路；每次用都會在用量頁記一筆 */
+  async adminKeyLogin(): Promise<void> {
+    const sy = this.sync();
+    const ask = (globalThis as any).prompt;
+    const key = typeof ask === "function" ? ask("輸入管理金鑰") : "";
+    if (!key) return;
+    try {
+      const ok = await sy.adminKey(String(key).trim());
+      if (!ok) return void (await this.ui.toast("金鑰不對，或這台伺服器沒有開放管理金鑰"));
+      this.syncWho = { admin: true };
+      this.meMem = null; this.hasProfile = null; this.syncNote = "";
+      await this.ui.toast("已用管理金鑰登入");
+      this.back();
+    } catch (e) { await this.ui.toast(String((e as Error)?.message || e)); }
   }
   syncSection(): string {
     const sy = this.sync();

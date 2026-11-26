@@ -39,6 +39,8 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .sec-title{margin:0 0 6px 12px;font-size:13px;font-weight:600;color:var(--fg2);text-transform:uppercase;letter-spacing:.3px}
 .group{background:var(--card);border-radius:14px;overflow:hidden}
 .hint{margin:8px 12px 0;font-size:13px;color:var(--fg2)}
+.key-link{display:block;margin:14px auto 2px;padding:6px 10px;font-size:12.5px;color:var(--fg2);opacity:.65;text-align:center}
+.key-link:active{opacity:1}
 .item{display:flex;align-items:center;gap:10px;padding:11px 14px;border-bottom:1px solid var(--line);min-height:46px}
 .group .item:last-child{border-bottom:0}
 .item.tap:active{background:var(--line)}

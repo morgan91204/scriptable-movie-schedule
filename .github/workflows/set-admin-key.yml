@@ -1,0 +1,32 @@
+# 把管理金鑰交給網頁版伺服器（只能手動執行；換新的金鑰時再跑一次）。
+# 用途：進不了 Google 登入的裝置（例如公司網路擋了 Google）用這把金鑰在設定頁換到管理員權限（見 web/push.js 的 /sync/admin-key）。
+# 做法：先在 GitHub 這個程式庫的 Settings → Secrets and variables → Actions 建一個叫 ADMIN_KEY 的 secret（你自己取的一長串，至少 16 個字），再跑這個流程轉存到 Cloudflare。
+# 金鑰全程不會顯示在畫面或紀錄裡，也不會經過任何人的對話。沒設這個 secret、或想關掉時，到 Cloudflare 把 ADMIN_KEY 這個 Worker 密鑰刪掉即可，這條登入路就不存在。
+name: 把管理金鑰交給網頁版伺服器
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  set:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: 先確認金鑰夠長
+        env:
+          KEY: ${{ secrets.ADMIN_KEY }}
+        run: |
+          if [ -z "$KEY" ]; then echo "還沒有 ADMIN_KEY 這個 secret"; exit 1; fi
+          if [ "${#KEY}" -lt 16 ]; then echo "金鑰太短（至少 16 個字），為了安全請換長一點"; exit 1; fi
+          echo "長度沒問題"
+      - name: 存成 Cloudflare 的加密設定
+        working-directory: web
+        env:
+          KEY: ${{ secrets.ADMIN_KEY }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: 817e94b26f15cb4cedfde46021b6f0fe
+        run: printf '%s' "$KEY" | npx wrangler@4 secret put ADMIN_KEY > /dev/null && echo "已存好"

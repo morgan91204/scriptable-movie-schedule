@@ -284,6 +284,16 @@ g.__sync = {
     lsSet(SY.nonce, nonce);
     location.href = "https://accounts.google.com/o/oauth2/v2/auth?" + new URLSearchParams({ client_id: GOOGLE_CLIENT_ID, redirect_uri: location.origin + "/api/auth/google", response_type: "id_token", scope: "openid email profile", nonce, prompt: "select_account" }).toString();
   },
+  /** 管理金鑰登入：給進不了 Google 登入的裝置用。成功後這台就有管理員權限（不帶 email／名稱，只是一張管理憑證） */
+  async adminKey(key: string): Promise<boolean> {
+    const r = await syncPost("admin-key", { key: String(key || "") }).catch(() => null);
+    if (!r || !r.token) return false;
+    lsSet(SY.token, r.token);
+    lsSet(SY.email, "");
+    lsSet(SY.name, "管理員");
+    lsSet(SY.at, "");
+    return true;
+  },
   /** 剛從 Google 回來的話，把登入完成：回傳 "ok"／"fail"；不是剛回來回傳 "" */
   async finish(): Promise<string> {
     const h = new URLSearchParams(location.hash.replace(/^#/, ""));
