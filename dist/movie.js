@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.26-1528
+// @movie-schedule-app 電影行程 v2026.11.26-1726
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/brand.ts
@@ -2370,7 +2370,7 @@ function boxOfficeFooter(b, by, years, week) {
   return by === "total" ? `${scope}${src}` : `${scope}${boxOfficeNote(b)}${src}`;
 }
 var RATE_SOURCES = [{ id: "imdb", label: "IMDb" }, { id: "tomato", label: "番茄指數（影評）" }, { id: "popcorn", label: "爆米花指數（觀眾）" }, { id: "community", label: "片刻評分（本 App）" }];
-var COMMUNITY_MIN = 5;
+var COMMUNITY_MIN = 3;
 function loadBoxFor(scope, sort, week) {
   return scope === "year" ? loadBoxOfficeFull() : sort === "week" && week ? loadBoxOfficeWeeks() : loadBoxOffice();
 }
@@ -5545,7 +5545,7 @@ var App = class {
   }
   /** 最新版本是多少。網頁版問的是自己網站現在上線的版本（重新整理就會拿到的那一版），不是 GitHub 上的 */
   checkVersion() {
-    if (true) return checkLatest("2026.11.26-1528");
+    if (true) return checkLatest("2026.11.26-1726");
     return (async () => {
       try {
         let r = await globalThis.fetch("/version.json?t=" + Date.now(), { cache: "no-store" });
@@ -5553,7 +5553,7 @@ var App = class {
         const latest = String((await r.json()).version || "");
         if (!latest) return null;
         const num = (v) => Number(v.replace(/\D/g, "")) || 0;
-        return { latest, isLatest: num("2026.11.26-1528") >= num(latest) };
+        return { latest, isLatest: num("2026.11.26-1726") >= num(latest) };
       } catch (_) {
         return null;
       }
@@ -6942,7 +6942,7 @@ ${x.kinds.length ? `開了 ${x.kinds.length} 種：${x.kinds.map(kindLabel).join
         return;
       }
       try {
-        await sendFeedback(cat.id, text, false ? this.isStandalone() ? "web-app" : "web" : "scriptable", "2026.11.26-1528");
+        await sendFeedback(cat.id, text, false ? this.isStandalone() ? "web-app" : "web" : "scriptable", "2026.11.26-1726");
         this.fbDraft = "";
         this.fbCat = "";
         await this.ui.toast("已送出，謝謝你的回饋");
@@ -7361,7 +7361,7 @@ ${x.kinds.length ? `開了 ${x.kinds.length} 種：${x.kinds.map(kindLabel).join
   /** 更新內容：依日期分段、新的在上；每段分「新功能」「改進」兩組，項目多的先列幾項、其餘收起來；上次看過之後才多的標「新」 */
   changelogView() {
     const KEEP = 6;
-    return /* @__PURE__ */ h(Page, { title: "更新內容", subtitle: `目前版本 ${"2026.11.26-1528"}`, onBack: () => this.back() }, CHANGELOG.map((e, idx) => {
+    return /* @__PURE__ */ h(Page, { title: "更新內容", subtitle: `目前版本 ${"2026.11.26-1726"}`, onBack: () => this.back() }, CHANGELOG.map((e, idx) => {
       const freshN = this.logFresh[e.id] || 0;
       const open = this.logOpen.indexOf(e.id) >= 0;
       const all = e.items.map((it, i) => ({ ...it, fresh: i < freshN }));
@@ -7410,11 +7410,11 @@ ${x.kinds.length ? `開了 ${x.kinds.length} 種：${x.kinds.map(kindLabel).join
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.26-1528"}`);
+          Pasteboard.copy(`版本 ${"2026.11.26-1726"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.26-1528"}`,
+      `版本 ${"2026.11.26-1726"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -8059,7 +8059,7 @@ ${x.kinds.length ? `開了 ${x.kinds.length} 種：${x.kinds.map(kindLabel).join
     if (false) {
       if (!r) return /* @__PURE__ */ h(Note, { text: "（無法確認是否為最新版：連不到網站）" });
       if (r.isLatest) return /* @__PURE__ */ h(Note, { text: "✅ 已是最新版" });
-      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.26-1528"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
+      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.26-1726"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
         globalThis.location.reload();
       } }));
     }

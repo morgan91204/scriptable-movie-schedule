@@ -2036,8 +2036,8 @@ export function boxOfficeFooter(b: BoxOffice, by: BoxSort, years?: string[], wee
 // 依票房排的時候，還在上映但沒進榜的片接在榜單後面（rest），所以上映中的片不會漏。
 /** 依評分排時可以選的評分來源 */
 export const RATE_SOURCES = [{ id: "imdb", label: "IMDb" }, { id: "tomato", label: "番茄指數（影評）" }, { id: "popcorn", label: "爆米花指數（觀眾）" }, { id: "community", label: "片刻評分（本 App）" }];
-/** 片刻評分至少要幾個人評過才列入排序 */
-export const COMMUNITY_MIN = 5;
+/** 片刻評分至少要幾個人評過才列入排序（還擋得住「一個人打 10 分就衝第一」；人變多後可以再往上調） */
+export const COMMUNITY_MIN = 3;
 export type MovieScope = "now" | "year";
 export type MovieSort = "week" | "total" | "date" | "rating" | "cinemas" | "tickets" | "price";
 /** 清單的一列：x = 票房資料（沒進榜是 null），m = 場次通的電影（已下檔是 null） */

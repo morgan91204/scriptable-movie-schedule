@@ -2554,7 +2554,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     return by === "total" ? `${scope}${src}` : `${scope}${boxOfficeNote(b)}${src}`;
   }
   var RATE_SOURCES = [{ id: "imdb", label: "IMDb" }, { id: "tomato", label: "番茄指數（影評）" }, { id: "popcorn", label: "爆米花指數（觀眾）" }, { id: "community", label: "片刻評分（本 App）" }];
-  var COMMUNITY_MIN = 5;
+  var COMMUNITY_MIN = 3;
   function loadBoxFor(scope, sort, week) {
     return scope === "year" ? loadBoxOfficeFull() : sort === "week" && week ? loadBoxOfficeWeeks() : loadBoxOffice();
   }
@@ -4462,7 +4462,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   var extra = { boxOffice, filmList, soonList, nowShowing, nowShowingMulti, movieBoard: movieBoard2, festivalBoard, festivalFilm, nearby, patchSettings, fillMovie, formatList };
   var BRIDGE_LEVEL = 2;
   globalThis.MS = {
-    version: "2026.11.26-1528",
+    version: "2026.11.26-1726",
     level: BRIDGE_LEVEL,
     init(saved) {
       cache = saved || {};
