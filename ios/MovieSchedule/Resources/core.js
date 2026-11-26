@@ -2586,7 +2586,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     const rate = rates.some((r) => r.id === opt.rate) ? opt.rate : "imdb";
     const fewLast = opt.fewLast !== false;
     const rangeSummary = scope === "year" ? `${yearSummary} 年上映` : "上映中";
-    const base = { rangeSummary, fewLast, fewOption: order === "rating" && rate === "imdb", asc, dirs, rate, rates: order === "rating" ? rates : [], rateSummary: rates.find((r) => r.id === rate).label, scope, scopes, sort, order, orders, years: yearOptions, selYears, weeks: [], selWeek: wk.id, restTitle: "", restFooter: "", weekSummary: "", yearSummary };
+    const base = { rangeSummary, fewLast, fewOption: order === "rating" && (rate === "imdb" || rate === "community"), asc, dirs, rate, rates: order === "rating" ? rates : [], rateSummary: rates.find((r) => r.id === rate).label, scope, scopes, sort, order, orders, years: yearOptions, selYears, weeks: [], selWeek: wk.id, restTitle: "", restFooter: "", weekSummary: "", yearSummary };
     const landText = (land2, total) => land2.length ? land2.join("、") : `全部（${total} 部）`;
     const priceOf = (x) => x.tickets ? x.total / x.tickets : 0;
     const moneyKey = (x) => sort === "tickets" ? x.tickets ? { tier: 1, v: x.tickets, hi: { kind: "tickets", text: ticketsText(x.tickets), tier: "none", note: "張票" } } : { tier: 0, v: 0, hi: { kind: "tickets", text: "–", tier: "none" } } : x.tickets ? { tier: 1, v: priceOf(x), hi: { kind: "price", text: `${Math.round(priceOf(x))} 元`, tier: "none", note: "平均票價" } } : { tier: 0, v: 0, hi: { kind: "price", text: "–", tier: "none" } };
@@ -2625,7 +2625,11 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
         if (sort === "rating") {
           if (rate === "community") {
             const c = opt.community && opt.community[communityKey(x.name)] ? fromDist(opt.community[communityKey(x.name)], 0) : null;
-            return c && c.n >= COMMUNITY_MIN ? { tier: 2, v: c.avg, hi: { kind: "community", text: c.avg.toFixed(1), tier: ratingTier("imdb", c.avg), note: `${c.n} 人` } } : { tier: 0, v: 0, hi: noneHi("community", c && c.n ? `${c.n} 人，未滿 ${COMMUNITY_MIN} 人` : "") };
+            if (!c || !c.n) return { tier: 0, v: 0, hi: noneHi("community", "還沒有人評分") };
+            {
+              const few = c.n < COMMUNITY_MIN;
+              return { tier: few && fewLast ? 1 : 2, v: c.avg, hi: { kind: "community", text: c.avg.toFixed(1), tier: ratingTier("imdb", c.avg), note: few ? `${c.n} 人・未滿 ${COMMUNITY_MIN}` : `${c.n} 人` } };
+            }
           }
           const r = yr[yearRatingKey(x.name, x.release)];
           const i = r && r.i ? { s: r.i, few: (r.v || 0) < 500 } : m && m.score ? { s: m.score, few: !!m.scoreFew } : null;
@@ -2676,7 +2680,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
         statusSel: st,
         statusPicks: [{ id: "", label: "全部", count: keyedAll.length }, { id: "now", label: "上映中", count: stCount.now }, { id: "few", label: "少數戲院", count: stCount.few }, { id: "off", label: "已下檔", count: stCount.off }],
         title: (st ? STATUS_LABEL[st] + "｜" : "") + (sort === "total" ? `${yt} 年票房排行（截至 ${md(b.end)}）${dirTag}` : `${yt} 年上映 ${entries2.length} 部｜${sort === "date" ? asc ? "最早上映在前" : "最新上映在前" : sort === "rating" ? `${rateName2}${asc ? "低到高" : "高到低"}` : sort === "tickets" ? `累計票數${asc ? "少到多" : "多到少"}` : sort === "price" ? `平均票價${asc ? "低到高" : "高到低"}` : `累計院數${asc ? "少到多" : "多到少"}`}`) + boxCountryTag(land2) + issuerTag(firm2),
-        footer: sort === "total" ? boxOfficeFooter(b, "year", selYears, wk.id) : `${yt} 年上映、有票房紀錄的電影（已經下檔的也在裡面）${sort === "date" ? "依上映日期排序" : sort === "tickets" ? "依累計票數排序（上映以來賣出的票數）" : sort === "price" ? "依平均票價排序（累計票房 ÷ 累計票數；特殊廳、演唱會轉播的票價較高）" : sort === "rating" ? `依${rateName2}排序。${rate === "community" ? `評分不到 ${COMMUNITY_MIN} 人的不列入。` : cov}` : `依累計院數排序：上映以來放映過的戲院數（官方票房資料，算到 ${md(b.end)}）。還在上映的片，今天有場次的影城如果比官方的數字多，就用今天的數字，所以上映中和已下檔的片算法相同`}。${src}`.replace("。。", "。"),
+        footer: sort === "total" ? boxOfficeFooter(b, "year", selYears, wk.id) : `${yt} 年上映、有票房紀錄的電影（已經下檔的也在裡面）${sort === "date" ? "依上映日期排序" : sort === "tickets" ? "依累計票數排序（上映以來賣出的票數）" : sort === "price" ? "依平均票價排序（累計票房 ÷ 累計票數；特殊廳、演唱會轉播的票價較高）" : sort === "rating" ? `依${rateName2}排序。${rate === "community" ? fewLast ? `未滿 ${COMMUNITY_MIN} 人的排在中間。` : `未滿 ${COMMUNITY_MIN} 人的也照分數一起排。` : cov}` : `依累計院數排序：上映以來放映過的戲院數（官方票房資料，算到 ${md(b.end)}）。還在上映的片，今天有場次的影城如果比官方的數字多，就用今天的數字，所以上映中和已下檔的片算法相同`}。${src}`.replace("。。", "。"),
         restTitle: "",
         restFooter: "",
         paged: true
@@ -2740,7 +2744,9 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
       if (rate === "popcorn") return m.popcorn !== void 0 ? { tier: 2, v: m.popcorn, hi: { kind: "popcorn", text: `${m.popcorn}%`, tier: popcornTier(m.popcorn, m.popcornCert), note: popcornLabel(m.popcorn, m.popcornCert) } } : { tier: 0, v: 0, hi: none("popcorn") };
       if (rate === "community") {
         const c = opt.community && opt.community[communityKey(m.title)] ? fromDist(opt.community[communityKey(m.title)], 0) : null;
-        return c && c.n >= COMMUNITY_MIN ? { tier: 2, v: c.avg, hi: { kind: "community", text: c.avg.toFixed(1), tier: ratingTier("imdb", c.avg), note: `${c.n} 人` } } : { tier: 0, v: 0, hi: none("community", c && c.n ? `${c.n} 人，未滿 ${COMMUNITY_MIN} 人` : "") };
+        if (!c || !c.n) return { tier: 0, v: 0, hi: none("community", "還沒有人評分") };
+        const few = c.n < COMMUNITY_MIN;
+        return { tier: few && fewLast ? 1 : 2, v: c.avg, hi: { kind: "community", text: c.avg.toFixed(1), tier: ratingTier("imdb", c.avg), note: few ? `${c.n} 人・未滿 ${COMMUNITY_MIN}` : `${c.n} 人` } };
       }
       return m.score ? { tier: m.scoreFew && fewLast ? 1 : 2, v: m.score, hi: { kind: "imdb", text: m.score.toFixed(1), tier: ratingTier("imdb", m.score), ...m.scoreFew ? { note: "評分人數少" } : {} } } : { tier: 0, v: 0, hi: none("imdb") };
     };
@@ -2757,7 +2763,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
       return { key: m.slug, rank, name: m.title, x, m, lines: [first, x ? boxOfficeLines(x, "week")[0] : m.en || ""], light: false, hi: k2.hi };
     });
     const rateName = rates.find((r) => r.id === rate).label;
-    const how = sort === "date" ? `依上映日期排序，${asc ? "最早上映的在前" : "新上映的在前"}；不知道日期的在最後` : sort === "rating" ? `依${rateName}排序，${asc ? "低到高" : "高到低"}；${rate === "imdb" ? fewLast ? "評分人數不到 500 人的分數不太準，排在後面，" : "評分人數不到 500 人的也照分數一起排（會標「評分人數少」），" : rate === "community" ? `評分不到 ${COMMUNITY_MIN} 人的不列入，` : ""}沒有這項評分的在最後` : `依今天放映的影城數排序，${asc ? "少到多" : "多到少"}；今天沒有場次、過幾天才有的在最後`;
+    const how = sort === "date" ? `依上映日期排序，${asc ? "最早上映的在前" : "新上映的在前"}；不知道日期的在最後` : sort === "rating" ? `依${rateName}排序，${asc ? "低到高" : "高到低"}；${rate === "imdb" ? fewLast ? "評分人數不到 500 人的分數不太準，排在後面，" : "評分人數不到 500 人的也照分數一起排（會標「評分人數少」），" : rate === "community" ? fewLast ? `未滿 ${COMMUNITY_MIN} 人的排在中間（在滿人數的和沒有評分的之間），` : `未滿 ${COMMUNITY_MIN} 人的也照分數一起排，` : ""}沒有這項評分的在最後` : `依今天放映的影城數排序，${asc ? "少到多" : "多到少"}；今天沒有場次、過幾天才有的在最後`;
     return {
       ...base,
       sorts: sortsAll,
@@ -4462,7 +4468,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   var extra = { boxOffice, filmList, soonList, nowShowing, nowShowingMulti, movieBoard: movieBoard2, festivalBoard, festivalFilm, nearby, patchSettings, fillMovie, formatList };
   var BRIDGE_LEVEL = 2;
   globalThis.MS = {
-    version: "2026.11.26-1726",
+    version: "2026.11.26-1748",
     level: BRIDGE_LEVEL,
     init(saved) {
       cache = saved || {};

@@ -3853,7 +3853,7 @@ class App {
               </Chips>
             ) : null}
             {/* 評分人數少的片（分數不太準）要不要排在後面：點一下切換，不用展開 */}
-            {board.fewOption ? <Item kv title="評分人數少的片" right={board.fewLast ? "排在後面 ⇄" : "照分數一起排 ⇄"} chevron={false} onTap={() => { this.boxFewLast = !this.boxFewLast; }} /> : null}
+            {board.fewOption ? <Item kv title={board.rate === "community" ? "未滿人數的片" : "評分人數少的片"} right={board.fewLast ? (board.rate === "community" ? "排在中間 ⇄" : "排在後面 ⇄") : "照分數一起排 ⇄"} chevron={false} onTap={() => { this.boxFewLast = !this.boxFewLast; }} /> : null}
             {board.weeks.length > 1 ? fold("week", "週次", board.weekSummary) : null}
             {board.weeks.length > 1 && this.boxOpen === "week" ? (
               <Chips>

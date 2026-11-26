@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.26-1726
+// @movie-schedule-app 電影行程 v2026.11.26-1748
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/brand.ts
@@ -2402,7 +2402,7 @@ function movieBoard(b, movies, opt = {}) {
   const rate = rates.some((r) => r.id === opt.rate) ? opt.rate : "imdb";
   const fewLast = opt.fewLast !== false;
   const rangeSummary = scope === "year" ? `${yearSummary} 年上映` : "上映中";
-  const base = { rangeSummary, fewLast, fewOption: order === "rating" && rate === "imdb", asc, dirs, rate, rates: order === "rating" ? rates : [], rateSummary: rates.find((r) => r.id === rate).label, scope, scopes, sort, order, orders, years: yearOptions, selYears, weeks: [], selWeek: wk.id, restTitle: "", restFooter: "", weekSummary: "", yearSummary };
+  const base = { rangeSummary, fewLast, fewOption: order === "rating" && (rate === "imdb" || rate === "community"), asc, dirs, rate, rates: order === "rating" ? rates : [], rateSummary: rates.find((r) => r.id === rate).label, scope, scopes, sort, order, orders, years: yearOptions, selYears, weeks: [], selWeek: wk.id, restTitle: "", restFooter: "", weekSummary: "", yearSummary };
   const landText = (land2, total) => land2.length ? land2.join("、") : `全部（${total} 部）`;
   const priceOf = (x) => x.tickets ? x.total / x.tickets : 0;
   const moneyKey = (x) => sort === "tickets" ? x.tickets ? { tier: 1, v: x.tickets, hi: { kind: "tickets", text: ticketsText(x.tickets), tier: "none", note: "張票" } } : { tier: 0, v: 0, hi: { kind: "tickets", text: "–", tier: "none" } } : x.tickets ? { tier: 1, v: priceOf(x), hi: { kind: "price", text: `${Math.round(priceOf(x))} 元`, tier: "none", note: "平均票價" } } : { tier: 0, v: 0, hi: { kind: "price", text: "–", tier: "none" } };
@@ -2441,7 +2441,11 @@ function movieBoard(b, movies, opt = {}) {
       if (sort === "rating") {
         if (rate === "community") {
           const c = opt.community && opt.community[communityKey(x.name)] ? fromDist(opt.community[communityKey(x.name)], 0) : null;
-          return c && c.n >= COMMUNITY_MIN ? { tier: 2, v: c.avg, hi: { kind: "community", text: c.avg.toFixed(1), tier: ratingTier("imdb", c.avg), note: `${c.n} 人` } } : { tier: 0, v: 0, hi: noneHi("community", c && c.n ? `${c.n} 人，未滿 ${COMMUNITY_MIN} 人` : "") };
+          if (!c || !c.n) return { tier: 0, v: 0, hi: noneHi("community", "還沒有人評分") };
+          {
+            const few = c.n < COMMUNITY_MIN;
+            return { tier: few && fewLast ? 1 : 2, v: c.avg, hi: { kind: "community", text: c.avg.toFixed(1), tier: ratingTier("imdb", c.avg), note: few ? `${c.n} 人・未滿 ${COMMUNITY_MIN}` : `${c.n} 人` } };
+          }
         }
         const r = yr[yearRatingKey(x.name, x.release)];
         const i = r && r.i ? { s: r.i, few: (r.v || 0) < 500 } : m && m.score ? { s: m.score, few: !!m.scoreFew } : null;
@@ -2492,7 +2496,7 @@ function movieBoard(b, movies, opt = {}) {
       statusSel: st,
       statusPicks: [{ id: "", label: "全部", count: keyedAll.length }, { id: "now", label: "上映中", count: stCount.now }, { id: "few", label: "少數戲院", count: stCount.few }, { id: "off", label: "已下檔", count: stCount.off }],
       title: (st ? STATUS_LABEL[st] + "｜" : "") + (sort === "total" ? `${yt} 年票房排行（截至 ${md(b.end)}）${dirTag}` : `${yt} 年上映 ${entries2.length} 部｜${sort === "date" ? asc ? "最早上映在前" : "最新上映在前" : sort === "rating" ? `${rateName2}${asc ? "低到高" : "高到低"}` : sort === "tickets" ? `累計票數${asc ? "少到多" : "多到少"}` : sort === "price" ? `平均票價${asc ? "低到高" : "高到低"}` : `累計院數${asc ? "少到多" : "多到少"}`}`) + boxCountryTag(land2) + issuerTag(firm2),
-      footer: sort === "total" ? boxOfficeFooter(b, "year", selYears, wk.id) : `${yt} 年上映、有票房紀錄的電影（已經下檔的也在裡面）${sort === "date" ? "依上映日期排序" : sort === "tickets" ? "依累計票數排序（上映以來賣出的票數）" : sort === "price" ? "依平均票價排序（累計票房 ÷ 累計票數；特殊廳、演唱會轉播的票價較高）" : sort === "rating" ? `依${rateName2}排序。${rate === "community" ? `評分不到 ${COMMUNITY_MIN} 人的不列入。` : cov}` : `依累計院數排序：上映以來放映過的戲院數（官方票房資料，算到 ${md(b.end)}）。還在上映的片，今天有場次的影城如果比官方的數字多，就用今天的數字，所以上映中和已下檔的片算法相同`}。${src}`.replace("。。", "。"),
+      footer: sort === "total" ? boxOfficeFooter(b, "year", selYears, wk.id) : `${yt} 年上映、有票房紀錄的電影（已經下檔的也在裡面）${sort === "date" ? "依上映日期排序" : sort === "tickets" ? "依累計票數排序（上映以來賣出的票數）" : sort === "price" ? "依平均票價排序（累計票房 ÷ 累計票數；特殊廳、演唱會轉播的票價較高）" : sort === "rating" ? `依${rateName2}排序。${rate === "community" ? fewLast ? `未滿 ${COMMUNITY_MIN} 人的排在中間。` : `未滿 ${COMMUNITY_MIN} 人的也照分數一起排。` : cov}` : `依累計院數排序：上映以來放映過的戲院數（官方票房資料，算到 ${md(b.end)}）。還在上映的片，今天有場次的影城如果比官方的數字多，就用今天的數字，所以上映中和已下檔的片算法相同`}。${src}`.replace("。。", "。"),
       restTitle: "",
       restFooter: "",
       paged: true
@@ -2556,7 +2560,9 @@ function movieBoard(b, movies, opt = {}) {
     if (rate === "popcorn") return m.popcorn !== void 0 ? { tier: 2, v: m.popcorn, hi: { kind: "popcorn", text: `${m.popcorn}%`, tier: popcornTier(m.popcorn, m.popcornCert), note: popcornLabel(m.popcorn, m.popcornCert) } } : { tier: 0, v: 0, hi: none("popcorn") };
     if (rate === "community") {
       const c = opt.community && opt.community[communityKey(m.title)] ? fromDist(opt.community[communityKey(m.title)], 0) : null;
-      return c && c.n >= COMMUNITY_MIN ? { tier: 2, v: c.avg, hi: { kind: "community", text: c.avg.toFixed(1), tier: ratingTier("imdb", c.avg), note: `${c.n} 人` } } : { tier: 0, v: 0, hi: none("community", c && c.n ? `${c.n} 人，未滿 ${COMMUNITY_MIN} 人` : "") };
+      if (!c || !c.n) return { tier: 0, v: 0, hi: none("community", "還沒有人評分") };
+      const few = c.n < COMMUNITY_MIN;
+      return { tier: few && fewLast ? 1 : 2, v: c.avg, hi: { kind: "community", text: c.avg.toFixed(1), tier: ratingTier("imdb", c.avg), note: few ? `${c.n} 人・未滿 ${COMMUNITY_MIN}` : `${c.n} 人` } };
     }
     return m.score ? { tier: m.scoreFew && fewLast ? 1 : 2, v: m.score, hi: { kind: "imdb", text: m.score.toFixed(1), tier: ratingTier("imdb", m.score), ...m.scoreFew ? { note: "評分人數少" } : {} } } : { tier: 0, v: 0, hi: none("imdb") };
   };
@@ -2573,7 +2579,7 @@ function movieBoard(b, movies, opt = {}) {
     return { key: m.slug, rank, name: m.title, x, m, lines: [first, x ? boxOfficeLines(x, "week")[0] : m.en || ""], light: false, hi: k2.hi };
   });
   const rateName = rates.find((r) => r.id === rate).label;
-  const how = sort === "date" ? `依上映日期排序，${asc ? "最早上映的在前" : "新上映的在前"}；不知道日期的在最後` : sort === "rating" ? `依${rateName}排序，${asc ? "低到高" : "高到低"}；${rate === "imdb" ? fewLast ? "評分人數不到 500 人的分數不太準，排在後面，" : "評分人數不到 500 人的也照分數一起排（會標「評分人數少」），" : rate === "community" ? `評分不到 ${COMMUNITY_MIN} 人的不列入，` : ""}沒有這項評分的在最後` : `依今天放映的影城數排序，${asc ? "少到多" : "多到少"}；今天沒有場次、過幾天才有的在最後`;
+  const how = sort === "date" ? `依上映日期排序，${asc ? "最早上映的在前" : "新上映的在前"}；不知道日期的在最後` : sort === "rating" ? `依${rateName}排序，${asc ? "低到高" : "高到低"}；${rate === "imdb" ? fewLast ? "評分人數不到 500 人的分數不太準，排在後面，" : "評分人數不到 500 人的也照分數一起排（會標「評分人數少」），" : rate === "community" ? fewLast ? `未滿 ${COMMUNITY_MIN} 人的排在中間（在滿人數的和沒有評分的之間），` : `未滿 ${COMMUNITY_MIN} 人的也照分數一起排，` : ""}沒有這項評分的在最後` : `依今天放映的影城數排序，${asc ? "少到多" : "多到少"}；今天沒有場次、過幾天才有的在最後`;
   return {
     ...base,
     sorts: sortsAll,
@@ -5202,7 +5208,7 @@ var CHANGELOG = [
     id: "2026-11-25",
     date: "2026/11/25",
     items: [
-      { kind: "better", text: "依「片刻評分」排序時，達標的片變多了（評分人數門檻從 5 人降到 3 人），高到低、低到高也看得出差別" },
+      { kind: "better", text: "依「片刻評分」排序時，評分人數還不夠的片（未滿 3 人）排在「有足夠評分」和「還沒有評分」中間，照自己的分數排；也可以在排序設定裡切成跟足夠評分的片一起排" },
       { kind: "better", text: "進不了 Google 登入的裝置（例如公司網路擋了 Google），管理員可以用管理金鑰登入（限管理員，要先在伺服器設定金鑰）" },
       { kind: "better", text: "通知更可靠：很多人同時要收到通知時不再排隊好幾個小時；這台的通知訂閱過期時會自動補上，補不了會提醒你重新開啟" },
       { kind: "better", text: "更新內容比較好找也比較好讀：有新的更新時首頁最上面會提醒；內容分成新功能和改進兩組，上次看過之後才多的會標「新」" },
@@ -5546,7 +5552,7 @@ var App = class {
   }
   /** 最新版本是多少。網頁版問的是自己網站現在上線的版本（重新整理就會拿到的那一版），不是 GitHub 上的 */
   checkVersion() {
-    if (true) return checkLatest("2026.11.26-1726");
+    if (true) return checkLatest("2026.11.26-1748");
     return (async () => {
       try {
         let r = await globalThis.fetch("/version.json?t=" + Date.now(), { cache: "no-store" });
@@ -5554,7 +5560,7 @@ var App = class {
         const latest = String((await r.json()).version || "");
         if (!latest) return null;
         const num = (v) => Number(v.replace(/\D/g, "")) || 0;
-        return { latest, isLatest: num("2026.11.26-1726") >= num(latest) };
+        return { latest, isLatest: num("2026.11.26-1748") >= num(latest) };
       } catch (_) {
         return null;
       }
@@ -6943,7 +6949,7 @@ ${x.kinds.length ? `開了 ${x.kinds.length} 種：${x.kinds.map(kindLabel).join
         return;
       }
       try {
-        await sendFeedback(cat.id, text, false ? this.isStandalone() ? "web-app" : "web" : "scriptable", "2026.11.26-1726");
+        await sendFeedback(cat.id, text, false ? this.isStandalone() ? "web-app" : "web" : "scriptable", "2026.11.26-1748");
         this.fbDraft = "";
         this.fbCat = "";
         await this.ui.toast("已送出，謝謝你的回饋");
@@ -7362,7 +7368,7 @@ ${x.kinds.length ? `開了 ${x.kinds.length} 種：${x.kinds.map(kindLabel).join
   /** 更新內容：依日期分段、新的在上；每段分「新功能」「改進」兩組，項目多的先列幾項、其餘收起來；上次看過之後才多的標「新」 */
   changelogView() {
     const KEEP = 6;
-    return /* @__PURE__ */ h(Page, { title: "更新內容", subtitle: `目前版本 ${"2026.11.26-1726"}`, onBack: () => this.back() }, CHANGELOG.map((e, idx) => {
+    return /* @__PURE__ */ h(Page, { title: "更新內容", subtitle: `目前版本 ${"2026.11.26-1748"}`, onBack: () => this.back() }, CHANGELOG.map((e, idx) => {
       const freshN = this.logFresh[e.id] || 0;
       const open = this.logOpen.indexOf(e.id) >= 0;
       const all = e.items.map((it, i) => ({ ...it, fresh: i < freshN }));
@@ -7411,11 +7417,11 @@ ${x.kinds.length ? `開了 ${x.kinds.length} 種：${x.kinds.map(kindLabel).join
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.26-1726"}`);
+          Pasteboard.copy(`版本 ${"2026.11.26-1748"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.26-1726"}`,
+      `版本 ${"2026.11.26-1748"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -8060,7 +8066,7 @@ ${x.kinds.length ? `開了 ${x.kinds.length} 種：${x.kinds.map(kindLabel).join
     if (false) {
       if (!r) return /* @__PURE__ */ h(Note, { text: "（無法確認是否為最新版：連不到網站）" });
       if (r.isLatest) return /* @__PURE__ */ h(Note, { text: "✅ 已是最新版" });
-      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.26-1726"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
+      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.26-1748"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
         globalThis.location.reload();
       } }));
     }
@@ -8341,7 +8347,7 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
       }
     } }))), /* @__PURE__ */ h("span", { class: "more-hint", "aria-hidden": "true" }, "›")) : null, board.weeks.length > 1 || countries.length > 1 || board.rates.length > 1 || board.issuers.length > 1 ? /* @__PURE__ */ h(Section, { hint: this.boxOpen === "week" ? "可以回頭看過去幾週的排行。" : this.boxOpen === "rate" ? "番茄指數是影評的分數、爆米花指數是觀眾的分數（都來自爛番茄）；片刻評分是這個 App 的使用者打的。" : "" }, board.scope === "year" && years.length > 1 ? /* @__PURE__ */ h(Item, { kv: true, title: "年份", right: selYears.length === years.length ? `全部（${years[years.length - 1]}–${years[0]}）` : selYears.length > 4 ? `已選 ${selYears.length} 年` : selYears.join("、"), onTap: () => this.go(() => this.boxPickView("year")) }) : null, board.rates.length > 1 ? fold("rate", "評分來源", board.rateSummary) : null, board.rates.length > 1 && this.boxOpen === "rate" ? /* @__PURE__ */ h(Chips, { scroll: true }, board.rates.map((r) => /* @__PURE__ */ h(Chip, { label: r.label, muted: board.rate !== r.id, onTap: () => {
       this.boxRate = r.id;
-    } }))) : null, board.fewOption ? /* @__PURE__ */ h(Item, { kv: true, title: "評分人數少的片", right: board.fewLast ? "排在後面 ⇄" : "照分數一起排 ⇄", chevron: false, onTap: () => {
+    } }))) : null, board.fewOption ? /* @__PURE__ */ h(Item, { kv: true, title: board.rate === "community" ? "未滿人數的片" : "評分人數少的片", right: board.fewLast ? board.rate === "community" ? "排在中間 ⇄" : "排在後面 ⇄" : "照分數一起排 ⇄", chevron: false, onTap: () => {
       this.boxFewLast = !this.boxFewLast;
     } }) : null, board.weeks.length > 1 ? fold("week", "週次", board.weekSummary) : null, board.weeks.length > 1 && this.boxOpen === "week" ? /* @__PURE__ */ h(Chips, null, board.weeks.map((o) => /* @__PURE__ */ h(Chip, { label: o.label, sub: o.note, muted: board.selWeek !== o.id, onTap: () => {
       this.boxWeek = o.note === "最新" ? "" : o.id;

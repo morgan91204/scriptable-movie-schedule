@@ -2098,7 +2098,7 @@ export function movieBoard(b: BoxOffice | null, movies: TwMovie[], opt: { scope?
   const rate = rates.some((r) => r.id === opt.rate) ? (opt.rate as string) : "imdb";
   const fewLast = opt.fewLast !== false;
   const rangeSummary = scope === "year" ? `${yearSummary} 年上映` : "上映中";
-  const base = { rangeSummary, fewLast, fewOption: order === "rating" && rate === "imdb", asc, dirs, rate, rates: order === "rating" ? rates : [], rateSummary: rates.find((r) => r.id === rate)!.label, scope, scopes, sort, order, orders, years: yearOptions, selYears, weeks: [] as MovieBoard["weeks"], selWeek: wk.id, restTitle: "", restFooter: "", weekSummary: "", yearSummary };
+  const base = { rangeSummary, fewLast, fewOption: order === "rating" && (rate === "imdb" || rate === "community"), asc, dirs, rate, rates: order === "rating" ? rates : [], rateSummary: rates.find((r) => r.id === rate)!.label, scope, scopes, sort, order, orders, years: yearOptions, selYears, weeks: [] as MovieBoard["weeks"], selWeek: wk.id, restTitle: "", restFooter: "", weekSummary: "", yearSummary };
   const landText = (land: string[], total: number) => (land.length ? land.join("、") : `全部（${total} 部）`);
   // 票數、平均票價（票房 ÷ 票數）：沒有票數資料的排在最後
   const priceOf = (x: BoxOfficeItem) => (x.tickets ? x.total / x.tickets : 0);
@@ -2143,7 +2143,9 @@ export function movieBoard(b: BoxOffice | null, movies: TwMovie[], opt: { scope?
       if (sort === "rating") {
         if (rate === "community") {
           const c = opt.community && opt.community[communityKey(x.name)] ? fromDist(opt.community[communityKey(x.name)], 0) : null;
-          return c && c.n >= COMMUNITY_MIN ? { tier: 2, v: c.avg, hi: { kind: "community", text: c.avg.toFixed(1), tier: ratingTier("imdb", c.avg), note: `${c.n} 人` } } : { tier: 0, v: 0, hi: noneHi("community", c && c.n ? `${c.n} 人，未滿 ${COMMUNITY_MIN} 人` : "") };
+          if (!c || !c.n) return { tier: 0, v: 0, hi: noneHi("community", "還沒有人評分") };
+          { const few = c.n < COMMUNITY_MIN;
+            return { tier: few && fewLast ? 1 : 2, v: c.avg, hi: { kind: "community", text: c.avg.toFixed(1), tier: ratingTier("imdb", c.avg), note: few ? `${c.n} 人・未滿 ${COMMUNITY_MIN}` : `${c.n} 人` } }; }
         }
         // 伺服器慢慢查好的年度評分；還沒查到、但片還在上映的，用上映中那份的分數
         const r = yr[yearRatingKey(x.name, x.release)];
@@ -2181,7 +2183,7 @@ export function movieBoard(b: BoxOffice | null, movies: TwMovie[], opt: { scope?
       statusSel: st, statusPicks: [{ id: "", label: "全部", count: keyedAll.length }, { id: "now", label: "上映中", count: stCount.now }, { id: "few", label: "少數戲院", count: stCount.few }, { id: "off", label: "已下檔", count: stCount.off }],
       title: (st ? STATUS_LABEL[st] + "｜" : "") + (sort === "total" ? `${yt} 年票房排行（截至 ${md(b.end)}）${dirTag}` : `${yt} 年上映 ${entries.length} 部｜${sort === "date" ? (asc ? "最早上映在前" : "最新上映在前") : sort === "rating" ? `${rateName}${asc ? "低到高" : "高到低"}` : sort === "tickets" ? `累計票數${asc ? "少到多" : "多到少"}` : sort === "price" ? `平均票價${asc ? "低到高" : "高到低"}` : `累計院數${asc ? "少到多" : "多到少"}`}`) + boxCountryTag(land) + issuerTag(firm),
       footer: sort === "total" ? boxOfficeFooter(b, "year", selYears, wk.id)
-        : `${yt} 年上映、有票房紀錄的電影（已經下檔的也在裡面）${sort === "date" ? "依上映日期排序" : sort === "tickets" ? "依累計票數排序（上映以來賣出的票數）" : sort === "price" ? "依平均票價排序（累計票房 ÷ 累計票數；特殊廳、演唱會轉播的票價較高）" : sort === "rating" ? `依${rateName}排序。${rate === "community" ? `評分不到 ${COMMUNITY_MIN} 人的不列入。` : cov}` : `依累計院數排序：上映以來放映過的戲院數（官方票房資料，算到 ${md(b.end)}）。還在上映的片，今天有場次的影城如果比官方的數字多，就用今天的數字，所以上映中和已下檔的片算法相同`}。${src}`.replace("。。", "。"),
+        : `${yt} 年上映、有票房紀錄的電影（已經下檔的也在裡面）${sort === "date" ? "依上映日期排序" : sort === "tickets" ? "依累計票數排序（上映以來賣出的票數）" : sort === "price" ? "依平均票價排序（累計票房 ÷ 累計票數；特殊廳、演唱會轉播的票價較高）" : sort === "rating" ? `依${rateName}排序。${rate === "community" ? (fewLast ? `未滿 ${COMMUNITY_MIN} 人的排在中間。` : `未滿 ${COMMUNITY_MIN} 人的也照分數一起排。`) : cov}` : `依累計院數排序：上映以來放映過的戲院數（官方票房資料，算到 ${md(b.end)}）。還在上映的片，今天有場次的影城如果比官方的數字多，就用今天的數字，所以上映中和已下檔的片算法相同`}。${src}`.replace("。。", "。"),
       restTitle: "", restFooter: "", paged: true,
     };
   }
@@ -2240,8 +2242,10 @@ export function movieBoard(b: BoxOffice | null, movies: TwMovie[], opt: { scope?
     if (rate === "popcorn") return m.popcorn !== undefined ? { tier: 2, v: m.popcorn, hi: { kind: "popcorn", text: `${m.popcorn}%`, tier: popcornTier(m.popcorn, m.popcornCert), note: popcornLabel(m.popcorn, m.popcornCert) } } : { tier: 0, v: 0, hi: none("popcorn") };
     if (rate === "community") {
       const c = opt.community && opt.community[communityKey(m.title)] ? fromDist(opt.community[communityKey(m.title)], 0) : null;
-      // 票數太少的不列入排序：不然一個人打 10 分就排第一
-      return c && c.n >= COMMUNITY_MIN ? { tier: 2, v: c.avg, hi: { kind: "community", text: c.avg.toFixed(1), tier: ratingTier("imdb", c.avg), note: `${c.n} 人` } } : { tier: 0, v: 0, hi: none("community", c && c.n ? `${c.n} 人，未滿 ${COMMUNITY_MIN} 人` : "") };
+      if (!c || !c.n) return { tier: 0, v: 0, hi: none("community", "還沒有人評分") };
+      // 未滿門檻的（評分人數少、容易被一兩個人左右）：預設排在「有滿人數」和「沒有評分」中間；選了「照分數一起排」就跟滿人數的一起
+      const few = c.n < COMMUNITY_MIN;
+      return { tier: few && fewLast ? 1 : 2, v: c.avg, hi: { kind: "community", text: c.avg.toFixed(1), tier: ratingTier("imdb", c.avg), note: few ? `${c.n} 人・未滿 ${COMMUNITY_MIN}` : `${c.n} 人` } };
     }
     // IMDb：評分人數還很少的（剛上映的片常常只有幾十人評、分數偏高）排在評分人數夠的後面
     return m.score ? { tier: m.scoreFew && fewLast ? 1 : 2, v: m.score, hi: { kind: "imdb", text: m.score.toFixed(1), tier: ratingTier("imdb", m.score), ...(m.scoreFew ? { note: "評分人數少" } : {}) } } : { tier: 0, v: 0, hi: none("imdb") };
@@ -2263,7 +2267,7 @@ export function movieBoard(b: BoxOffice | null, movies: TwMovie[], opt: { scope?
   });
   const rateName = rates.find((r) => r.id === rate)!.label;
   const how = sort === "date" ? `依上映日期排序，${asc ? "最早上映的在前" : "新上映的在前"}；不知道日期的在最後`
-    : sort === "rating" ? `依${rateName}排序，${asc ? "低到高" : "高到低"}；${rate === "imdb" ? (fewLast ? "評分人數不到 500 人的分數不太準，排在後面，" : "評分人數不到 500 人的也照分數一起排（會標「評分人數少」），") : rate === "community" ? `評分不到 ${COMMUNITY_MIN} 人的不列入，` : ""}沒有這項評分的在最後`
+    : sort === "rating" ? `依${rateName}排序，${asc ? "低到高" : "高到低"}；${rate === "imdb" ? (fewLast ? "評分人數不到 500 人的分數不太準，排在後面，" : "評分人數不到 500 人的也照分數一起排（會標「評分人數少」），") : rate === "community" ? (fewLast ? `未滿 ${COMMUNITY_MIN} 人的排在中間（在滿人數的和沒有評分的之間），` : `未滿 ${COMMUNITY_MIN} 人的也照分數一起排，`) : ""}沒有這項評分的在最後`
     : `依今天放映的影城數排序，${asc ? "少到多" : "多到少"}；今天沒有場次、過幾天才有的在最後`;
   return {
     ...base, sorts: sortsAll, countries, selCountries: land, everyone: pool.length, countrySummary: landText(land, pool.length), entries, rest: [],
