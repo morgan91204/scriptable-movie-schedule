@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.26-1518
+// @movie-schedule-app 電影行程 v2026.11.26-1528
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/brand.ts
@@ -4297,8 +4297,6 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .sec-title{margin:0 0 6px 12px;font-size:13px;font-weight:600;color:var(--fg2);text-transform:uppercase;letter-spacing:.3px}
 .group{background:var(--card);border-radius:14px;overflow:hidden}
 .hint{margin:8px 12px 0;font-size:13px;color:var(--fg2)}
-.key-link{display:block;margin:14px auto 2px;padding:6px 10px;font-size:12.5px;color:var(--fg2);opacity:.65;text-align:center}
-.key-link:active{opacity:1}
 .item{display:flex;align-items:center;gap:10px;padding:11px 14px;border-bottom:1px solid var(--line);min-height:46px}
 .group .item:last-child{border-bottom:0}
 .item.tap:active{background:var(--line)}
@@ -5204,7 +5202,7 @@ var CHANGELOG = [
     id: "2026-11-25",
     date: "2026/11/25",
     items: [
-      { kind: "better", text: "進不了 Google 登入的裝置（例如公司網路擋了 Google），可以用管理金鑰登入管理員帳號（限管理員，要先在伺服器設定金鑰）" },
+      { kind: "better", text: "進不了 Google 登入的裝置（例如公司網路擋了 Google），管理員可以用管理金鑰登入（限管理員，要先在伺服器設定金鑰）" },
       { kind: "better", text: "通知更可靠：很多人同時要收到通知時不再排隊好幾個小時；這台的通知訂閱過期時會自動補上，補不了會提醒你重新開啟" },
       { kind: "better", text: "更新內容比較好找也比較好讀：有新的更新時首頁最上面會提醒；內容分成新功能和改進兩組，上次看過之後才多的會標「新」" },
       { kind: "better", text: "場次資料暫時讀不到時，首頁照常顯示，收藏、片單和社群都還能用；刪除帳號資料的說明完整顯示、標成紅字；開關改成一眼看得出開或關的樣式；底部頁籤列不再透出後面的字" },
@@ -5547,7 +5545,7 @@ var App = class {
   }
   /** 最新版本是多少。網頁版問的是自己網站現在上線的版本（重新整理就會拿到的那一版），不是 GitHub 上的 */
   checkVersion() {
-    if (true) return checkLatest("2026.11.26-1518");
+    if (true) return checkLatest("2026.11.26-1528");
     return (async () => {
       try {
         let r = await globalThis.fetch("/version.json?t=" + Date.now(), { cache: "no-store" });
@@ -5555,7 +5553,7 @@ var App = class {
         const latest = String((await r.json()).version || "");
         if (!latest) return null;
         const num = (v) => Number(v.replace(/\D/g, "")) || 0;
-        return { latest, isLatest: num("2026.11.26-1518") >= num(latest) };
+        return { latest, isLatest: num("2026.11.26-1528") >= num(latest) };
       } catch (_) {
         return null;
       }
@@ -5580,6 +5578,15 @@ var App = class {
     } else if (startTab) {
       this.movieMode = startTab;
       this.switchTab("movies");
+    }
+    if (false) {
+      try {
+        const L = globalThis.location, H = globalThis.history;
+        H.replaceState(null, "", L.pathname);
+      } catch (_) {
+      }
+      this.switchTab("settings");
+      if (!signedIn()) globalThis.setTimeout(() => this.adminKeyLogin().catch(() => void 0), 300);
     }
     if (false) {
       try {
@@ -6069,7 +6076,7 @@ var App = class {
     const sy = this.sync();
     if (!sy) return "";
     if (!sy.on())
-      return /* @__PURE__ */ h(Section, { title: "帳號", hint: "登入後：收藏和設定會跟著帳號走；評過的片會記成片單；可以取暱稱、公開個人頁、追蹤別人。不登入也能照常使用。" }, /* @__PURE__ */ h(Item, { icon: "👤", title: "用 Google 登入", subtitle: "同步收藏、記錄片單、追蹤朋友", accent: true, onTap: () => sy.login() }), false ? /* @__PURE__ */ h("button", { class: "key-link", onTap: () => this.adminKeyLogin() }, "用管理金鑰登入") : null);
+      return /* @__PURE__ */ h(Section, { title: "帳號", hint: "登入後：收藏和設定會跟著帳號走；評過的片會記成片單；可以取暱稱、公開個人頁、追蹤別人。不登入也能照常使用。" }, /* @__PURE__ */ h(Item, { icon: "👤", title: "用 Google 登入", subtitle: "同步收藏、記錄片單、追蹤朋友", accent: true, onTap: () => sy.login() }));
     if (!this.meMem || Date.now() - this.meMem.at > 6e4) {
       const job = social("me").then((d) => {
         this.meMem = { at: Date.now(), data: d };
@@ -6935,7 +6942,7 @@ ${x.kinds.length ? `開了 ${x.kinds.length} 種：${x.kinds.map(kindLabel).join
         return;
       }
       try {
-        await sendFeedback(cat.id, text, false ? this.isStandalone() ? "web-app" : "web" : "scriptable", "2026.11.26-1518");
+        await sendFeedback(cat.id, text, false ? this.isStandalone() ? "web-app" : "web" : "scriptable", "2026.11.26-1528");
         this.fbDraft = "";
         this.fbCat = "";
         await this.ui.toast("已送出，謝謝你的回饋");
@@ -7128,12 +7135,18 @@ ${x.kinds.length ? `開了 ${x.kinds.length} 種：${x.kinds.map(kindLabel).join
     try {
       const ok = await sy.adminKey(String(key).trim());
       if (!ok) return void await this.ui.toast("金鑰不對，或這台伺服器沒有開放管理金鑰");
+      try {
+        const G = globalThis;
+        G.sessionStorage.setItem("ms:reload-tab", "settings");
+        G.location.reload();
+        return;
+      } catch (_) {
+      }
       this.syncWho = { admin: true };
       this.meMem = null;
       this.hasProfile = null;
       this.syncNote = "";
       await this.ui.toast("已用管理金鑰登入");
-      this.back();
     } catch (e) {
       await this.ui.toast(String(e?.message || e));
     }
@@ -7348,7 +7361,7 @@ ${x.kinds.length ? `開了 ${x.kinds.length} 種：${x.kinds.map(kindLabel).join
   /** 更新內容：依日期分段、新的在上；每段分「新功能」「改進」兩組，項目多的先列幾項、其餘收起來；上次看過之後才多的標「新」 */
   changelogView() {
     const KEEP = 6;
-    return /* @__PURE__ */ h(Page, { title: "更新內容", subtitle: `目前版本 ${"2026.11.26-1518"}`, onBack: () => this.back() }, CHANGELOG.map((e, idx) => {
+    return /* @__PURE__ */ h(Page, { title: "更新內容", subtitle: `目前版本 ${"2026.11.26-1528"}`, onBack: () => this.back() }, CHANGELOG.map((e, idx) => {
       const freshN = this.logFresh[e.id] || 0;
       const open = this.logOpen.indexOf(e.id) >= 0;
       const all = e.items.map((it, i) => ({ ...it, fresh: i < freshN }));
@@ -7397,11 +7410,11 @@ ${x.kinds.length ? `開了 ${x.kinds.length} 種：${x.kinds.map(kindLabel).join
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.26-1518"}`);
+          Pasteboard.copy(`版本 ${"2026.11.26-1528"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.26-1518"}`,
+      `版本 ${"2026.11.26-1528"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -8046,7 +8059,7 @@ ${x.kinds.length ? `開了 ${x.kinds.length} 種：${x.kinds.map(kindLabel).join
     if (false) {
       if (!r) return /* @__PURE__ */ h(Note, { text: "（無法確認是否為最新版：連不到網站）" });
       if (r.isLatest) return /* @__PURE__ */ h(Note, { text: "✅ 已是最新版" });
-      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.26-1518"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
+      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.26-1528"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
         globalThis.location.reload();
       } }));
     }

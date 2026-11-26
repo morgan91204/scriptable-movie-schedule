@@ -153,6 +153,13 @@ class App {
     if (startTab === "activity") { if (this.sync()) { this.switchTab("activity"); this.socialTab = "act"; } }
     else if (startTab === "admin") { this.switchTab("settings"); if (this.sync()) this.go(() => this.adminHomeView(), "讀取中…"); } // 從「有新的檢舉／回饋」的通知點進來
     else if (startTab) { this.movieMode = startTab as "soon" | "fest"; this.switchTab("movies"); }
+    // 管理金鑰登入入口：不放在畫面上（一般使用者不會看到），用網址 ?admin-key 開啟輸入框。
+    // 只是「開輸入框」，真正的認證還是靠伺服器的密鑰 ADMIN_KEY，沒設一樣進不去；開完就把參數從網址拿掉
+    if (IS_WEB && /[?&]admin-key\b/.test(String((globalThis as any).location?.search || ""))) {
+      try { const L = (globalThis as any).location, H = (globalThis as any).history; H.replaceState(null, "", L.pathname); } catch (_) {}
+      this.switchTab("settings");
+      if (!signedIn()) (globalThis as any).setTimeout(() => this.adminKeyLogin().catch(() => undefined), 300);
+    }
     // 連點頁籤重新整理之後：回到剛才那個頁籤
     if (IS_WEB) { try { const G = globalThis as any; const t = G.sessionStorage.getItem("ms:reload-tab"); if (t) { G.sessionStorage.removeItem("ms:reload-tab"); if (/^(movies|cinemas|settings|activity)$/.test(t)) this.switchTab(t); } } catch (_) {} }
     // 登入的人：開機時看一下有沒有新通知（頁籤上的紅點），不等它
@@ -762,7 +769,6 @@ class App {
       return (
         <Section title="帳號" hint="登入後：收藏和設定會跟著帳號走；評過的片會記成片單；可以取暱稱、公開個人頁、追蹤別人。不登入也能照常使用。">
           <Item icon="👤" title="用 Google 登入" subtitle="同步收藏、記錄片單、追蹤朋友" accent onTap={() => sy.login()} />
-          {IS_WEB ? <button class="key-link" onTap={() => this.adminKeyLogin()}>用管理金鑰登入</button> : null}
         </Section>
       );
     if (!this.meMem || Date.now() - this.meMem.at > 60e3) {
@@ -2174,10 +2180,11 @@ class App {
     try {
       const ok = await sy.adminKey(String(key).trim());
       if (!ok) return void (await this.ui.toast("金鑰不對，或這台伺服器沒有開放管理金鑰"));
+      // 跟 Google 登入一樣用重新整理回到設定頁：重畫一次就會帶出管理員專區（這段是在啟動時觸發的，不在點擊的重繪流程裡）
+      try { const G = globalThis as any; G.sessionStorage.setItem("ms:reload-tab", "settings"); G.location.reload(); return; } catch (_) {}
       this.syncWho = { admin: true };
       this.meMem = null; this.hasProfile = null; this.syncNote = "";
       await this.ui.toast("已用管理金鑰登入");
-      this.back();
     } catch (e) { await this.ui.toast(String((e as Error)?.message || e)); }
   }
   syncSection(): string {
