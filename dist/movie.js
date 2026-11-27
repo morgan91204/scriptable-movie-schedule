@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.27-1529
+// @movie-schedule-app 電影行程 v2026.11.27-1646
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/brand.ts
@@ -2839,6 +2839,7 @@ var GENRES = {
   10752: "戰爭",
   37: "西部"
 };
+var GENRE_LIST = Object.keys(GENRES).map((c) => ({ code: Number(c), label: GENRES[Number(c)] }));
 var genreNames = (g) => Array.isArray(g) ? g.map((n) => GENRES[n]).filter(Boolean).slice(0, 3) : [];
 async function movieGenres(title, release) {
   const me = await metaOf(title, release);
@@ -3896,6 +3897,13 @@ async function communityStats(title) {
   saveMyVote(k, c, false);
   return c;
 }
+async function reportGenres(title, codes) {
+  const k = communityKey(title);
+  const r = await platform().fetchText(`${COMMUNITY_API}/v2/genre-report`, { accept: "application/json", "content-type": "application/json" }, { method: "POST", body: JSON.stringify({ m: k, d: deviceId(), g: codes }) });
+  if (r.status === 429) throw new Error("操作太頻繁，請稍後再試");
+  if (r.status !== 200) throw new Error("回報沒有送出，請稍後再試");
+  return JSON.parse(r.body).mine || [];
+}
 async function communityVote(title, score) {
   const k = communityKey(title);
   const r = signedIn() ? await socialCall("vote", { m: k, title: baseTitle(title), s: score }).then((x) => ({ status: x.status, body: JSON.stringify(x.data) })) : await platform().fetchText(
@@ -4437,6 +4445,13 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .cl-new{margin-right:6px;padding:1px 6px;border-radius:6px;background:var(--accent);color:#fff;font-style:normal;font-size:11px;font-weight:700;vertical-align:1px}
 .cl-more{display:block;width:100%;padding:11px 0;border-top:1px solid var(--line);color:var(--accent);font-size:14.5px;font-weight:600;text-align:center}
 .cl-more:first-child{border-top:0}
+.gr-link{display:block;margin:2px auto 0;padding:6px 10px;font-size:12.5px;color:var(--accent);text-align:center}
+.gr-link:active{opacity:.6}
+.gr-row{display:flex;align-items:center;gap:10px;padding:7px 0}
+.gr-row+.gr-row{border-top:1px solid var(--line)}
+.gr-g{flex:1;min-width:0;font-size:14.5px;color:var(--fg)}
+.gr-g i{margin-left:8px;font-style:normal;font-size:12.5px;color:var(--fg2)}
+.gr-apply{flex:none;padding:5px 16px;border-radius:999px;background:var(--accent);color:#fff;font-size:13.5px;font-weight:600}
 .warnbar{display:flex;align-items:center;gap:10px;margin:8px 0 4px;padding:10px 12px;border-radius:12px;background:rgba(255,159,10,.16);font-size:13.5px;line-height:1.4}
 .warnbar span{flex:1;min-width:0}
 .warnbar-go{flex:none;padding:6px 14px;border-radius:999px;background:var(--accent);color:#fff;font-size:13.5px;font-weight:600}
@@ -5290,6 +5305,7 @@ var CHANGELOG = [
     id: "2026-11-25",
     date: "2026/11/25",
     items: [
+      { kind: "new", text: "可以回報電影類別：電影頁點「回報」勾選正確的類別，沒有類別的片也會邀請你幫忙補；管理員審核核可後就更新" },
       { kind: "new", text: "電影頁會顯示類別，「電影」清單也可以依類別篩選（劇情、恐怖、驚悚…，資料來自 TMDB）；上映中和近期的片先有，歷年老片會慢慢補上" },
       { kind: "better", text: "寫短評、回覆、意見回饋等輸入框會隨著內容自動變高，不用在小框框裡捲動" },
       { kind: "better", text: "修正同名電影（例如 2024 動畫版和 2026 真人版《驀然回首》）在電影頁互相顯示到另一部的評分、海報、預告的問題：改用「片名＋上映年」和 IMDb 編號分辨" },
@@ -5562,6 +5578,8 @@ var App = class {
     this.movieFormats = [];
     // 空 = 全部
     this.movieFavOnly = false;
+    // 只看收藏影城
+    this.genreDraft = null;
     // ── 位置 ──
     this.me = null;
     // ── 現在有什麼可以看 ──
@@ -5640,7 +5658,7 @@ var App = class {
   }
   /** 最新版本是多少。網頁版問的是自己網站現在上線的版本（重新整理就會拿到的那一版），不是 GitHub 上的 */
   checkVersion() {
-    if (true) return checkLatest("2026.11.27-1529");
+    if (true) return checkLatest("2026.11.27-1646");
     return (async () => {
       try {
         let r = await globalThis.fetch("/version.json?t=" + Date.now(), { cache: "no-store" });
@@ -5648,7 +5666,7 @@ var App = class {
         const latest = String((await r.json()).version || "");
         if (!latest) return null;
         const num = (v) => Number(v.replace(/\D/g, "")) || 0;
-        return { latest, isLatest: num("2026.11.27-1529") >= num(latest) };
+        return { latest, isLatest: num("2026.11.27-1646") >= num(latest) };
       } catch (_) {
         return null;
       }
@@ -6143,17 +6161,18 @@ var App = class {
   async loadAdminTodo(force = false) {
     if (!force && this.adminTodo && Date.now() - this.adminTodo.at < 18e4) return this.adminTodo;
     const sy = this.sync();
-    const [n, f, u] = await Promise.all([
+    const [n, f, u, g] = await Promise.all([
       sy.admin({ op: "flagged" }).then((r) => Object.keys(r.flagged || {}).reduce((a, k) => a + (r.flagged[k] || []).filter((x) => !x.keep).length, 0), () => 0),
       // 按過「沒問題」的不算
       sy.adm("fb", { op: "list" }).then((r) => Number(r.open) || 0, () => 0),
-      sy.adm("users", { op: "list" }).then((r) => (r.list || []).length, () => 0)
+      sy.adm("users", { op: "list" }).then((r) => (r.list || []).length, () => 0),
+      sy.admin({ op: "genres" }).then((r) => (r.list || []).length, () => 0)
     ]);
-    this.adminTodo = { at: Date.now(), notes: n, fb: f, users: u };
+    this.adminTodo = { at: Date.now(), notes: n, fb: f, users: u, genres: g };
     return this.adminTodo;
   }
   async adminHomeView() {
-    const t = await this.loadAdminTodo(true).catch(() => ({ notes: 0, fb: 0, users: 0 }));
+    const t = await this.loadAdminTodo(true).catch(() => ({ notes: 0, fb: 0, users: 0, genres: 0 }));
     const due = (n, unit) => n ? `● ${n} ${unit}` : "";
     return /* @__PURE__ */ h(Page, { title: "管理員專區", onBack: () => this.back() }, /* @__PURE__ */ h(Section, { hint: "只有管理員名單裡的 Google 帳號登入後才看得到這一區。右邊的紅點數字是還沒處理的。" }, /* @__PURE__ */ h(Item, { icon: "💬", title: "意見回饋", subtitle: "看使用者的回饋、回覆、標處理狀態", right: due(t.fb, "則待處理"), onTap: () => {
       this.adminFbTab = "open";
@@ -6161,7 +6180,7 @@ var App = class {
     } }), /* @__PURE__ */ h(Item, { icon: "🛡", title: "短評管理", subtitle: "複查被檢舉的短評，或巡一遍最近的短評", right: due(t.notes, "則待複查"), onTap: () => {
       this.adminTab = "flagged";
       this.go(() => this.adminNotesView(), "讀取短評…");
-    } }), /* @__PURE__ */ h(Item, { icon: "🪪", title: "帳號管理", subtitle: "被檢舉的帳號：停用個人頁、強制改暱稱", right: due(t.users, "個被檢舉"), onTap: () => {
+    } }), /* @__PURE__ */ h(Item, { icon: "🏷", title: "類別回報", subtitle: "審核使用者回報的電影類別，核可後生效", right: due(t.genres || 0, "部待審"), onTap: () => this.go(() => this.adminGenreView(), "讀取中…") }), /* @__PURE__ */ h(Item, { icon: "🪪", title: "帳號管理", subtitle: "被檢舉的帳號：停用個人頁、強制改暱稱", right: due(t.users, "個被檢舉"), onTap: () => {
       this.adminUserQ = "";
       this.go(() => this.adminUsersView(), "讀取帳號…");
     } }), /* @__PURE__ */ h(Item, { icon: "📈", title: "用量", subtitle: "每天幾台裝置在用、各類請求幾次、離免費額度多遠", onTap: () => this.go(() => this.adminUsageView(), "讀取用量…") }), /* @__PURE__ */ h(Item, { icon: "👥", title: "管理員名單", subtitle: "新增或移除其他管理員", onTap: () => this.go(() => this.adminListView(), "讀取名單…") })));
@@ -6184,7 +6203,7 @@ var App = class {
     }
     const me = this.meMem ? this.meMem.data : null;
     if (me && me.admin && (!this.adminTodo || Date.now() - this.adminTodo.at > 18e4)) this.late.push(this.loadAdminTodo().then(() => void 0, () => void 0));
-    const todoN = me && me.admin && this.adminTodo ? this.adminTodo.notes + this.adminTodo.fb + this.adminTodo.users : 0;
+    const todoN = me && me.admin && this.adminTodo ? this.adminTodo.notes + this.adminTodo.fb + this.adminTodo.users + this.adminTodo.genres : 0;
     const email = String(sy.email && sy.email() || "");
     const open = () => {
       this.diaryTab = "mine";
@@ -6816,6 +6835,27 @@ var App = class {
     const eThumb = e ? await this.diaryThumbs([e]) : () => void 0;
     return /* @__PURE__ */ h(Page, { title: "我的紀錄", subtitle: `《${title}》`, onBack: () => this.back() }, /* @__PURE__ */ h(Section, null, e && (e.s || e.x) ? /* @__PURE__ */ h("div", { class: "en-list" }, this.entryRow(e, () => this.openTitle(title), eThumb(e.k), true)) : /* @__PURE__ */ h(Note, { text: "還沒有評分。可以先記下什麼時候看的，之後再到電影頁評分、寫短評。" }), /* @__PURE__ */ h("div", { class: "pf-btns en-btns" }, /* @__PURE__ */ h("button", { class: "pf-btn", onTap: () => this.openTitle(title) }, "🎬 電影頁（改評分、短評）"))), /* @__PURE__ */ h(Section, { title: "觀影紀錄" }, /* @__PURE__ */ h("div", { class: "cm-tags en-watch" }, this.watchFields(title, e))), e ? /* @__PURE__ */ h(Section, { hint: "這一筆不會出現在你的個人頁和別人的動態裡，你在這部片的短評也會顯示成匿名。分數照樣算進這部片的平均。" }, /* @__PURE__ */ h(Item, { sw: !!e.priv, icon: "🔒", title: "只有自己看得到", chevron: false, onTap: () => this.saveWatch(title, { priv: !e.priv }, e.priv ? "這一筆恢復公開" : "這一筆只有你看得到了") })) : null);
   }
+  /** 管理員：審核使用者回報的電影類別。把相同的勾選組聚在一起、數人頭，可以套用某一組或忽略 */
+  async adminGenreView() {
+    const sy = this.sync();
+    let list = [], failed = "";
+    try {
+      list = (await sy.admin({ op: "genres" })).list || [];
+    } catch (e) {
+      failed = String(e?.message || e);
+    }
+    const act = (body, done) => async () => {
+      try {
+        await sy.admin(body);
+        await this.ui.toast(done);
+        this.go(() => this.adminGenreView(), "讀取中…");
+      } catch (e) {
+        await this.ui.toast(String(e?.message || e));
+      }
+    };
+    const names = (g) => g.map((c) => GENRES[c]).filter(Boolean).join("・") || "（清空）";
+    return /* @__PURE__ */ h(Page, { title: "類別回報", subtitle: "管理員專區", onBack: () => this.back() }, failed ? /* @__PURE__ */ h(Note, { kind: "warn", text: failed }) : !list.length ? /* @__PURE__ */ h(Note, { text: "目前沒有待審的類別回報。" }) : /* @__PURE__ */ h(Section, { hint: "每一部片把相同的勾選組聚在一起、標人數。「套用」會把這部片的類別改成那一組（蓋過 TMDB 的）；「忽略」清掉回報、不改類別。" }, list.map((r) => /* @__PURE__ */ h("div", { class: "nt" }, /* @__PURE__ */ h("div", { class: "nt-head" }, /* @__PURE__ */ h("span", { class: "en-title" }, esc(r.m)), /* @__PURE__ */ h("span", { class: "nt-score" }, r.n, " 筆回報")), /* @__PURE__ */ h("div", { class: "nt-meta" }, "目前：", r.override.length ? names(r.override) + "（已覆蓋）" : "用 TMDB 的分類"), r.reports.map((rep) => /* @__PURE__ */ h("div", { class: "gr-row" }, /* @__PURE__ */ h("span", { class: "gr-g" }, esc(names(rep.g)), /* @__PURE__ */ h("i", null, rep.n, " 人")), /* @__PURE__ */ h("button", { class: "gr-apply", onTap: act({ op: "genre-apply", m: r.m, g: rep.g }, "已套用") }, "套用"))), /* @__PURE__ */ h("div", { class: "nt-acts" }, /* @__PURE__ */ h("button", { onTap: act({ op: "genre-clear", m: r.m }, "已忽略") }, "忽略這部片的回報"))))));
+  }
   /** 管理員：用量頁那幾個總數點進去的明細。帳號只有暱稱或一組匿名代號（伺服器沒有存 email、裝置型號） */
   async adminUsageDetailView(kind) {
     const sy = this.sync();
@@ -7038,7 +7078,7 @@ ${x.kinds.length ? `開了 ${x.kinds.length} 種：${x.kinds.map(kindLabel).join
         return;
       }
       try {
-        await sendFeedback(cat.id, text, false ? this.isStandalone() ? "web-app" : "web" : "scriptable", "2026.11.27-1529");
+        await sendFeedback(cat.id, text, false ? this.isStandalone() ? "web-app" : "web" : "scriptable", "2026.11.27-1646");
         this.fbDraft = "";
         this.fbCat = "";
         await this.ui.toast("已送出，謝謝你的回饋");
@@ -7458,7 +7498,7 @@ ${x.kinds.length ? `開了 ${x.kinds.length} 種：${x.kinds.map(kindLabel).join
   /** 更新內容：依日期分段、新的在上；每段分「新功能」「改進」兩組，項目多的先列幾項、其餘收起來；上次看過之後才多的標「新」 */
   changelogView() {
     const KEEP = 6;
-    return /* @__PURE__ */ h(Page, { title: "更新內容", subtitle: `目前版本 ${"2026.11.27-1529"}`, onBack: () => this.back() }, CHANGELOG.map((e, idx) => {
+    return /* @__PURE__ */ h(Page, { title: "更新內容", subtitle: `目前版本 ${"2026.11.27-1646"}`, onBack: () => this.back() }, CHANGELOG.map((e, idx) => {
       const freshN = this.logFresh[e.id] || 0;
       const open = this.logOpen.indexOf(e.id) >= 0;
       const all = e.items.map((it, i) => ({ ...it, fresh: i < freshN }));
@@ -7507,11 +7547,11 @@ ${x.kinds.length ? `開了 ${x.kinds.length} 種：${x.kinds.map(kindLabel).join
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.27-1529"}`);
+          Pasteboard.copy(`版本 ${"2026.11.27-1646"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.27-1529"}`,
+      `版本 ${"2026.11.27-1646"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -8157,7 +8197,7 @@ ${x.kinds.length ? `開了 ${x.kinds.length} 種：${x.kinds.map(kindLabel).join
     if (false) {
       if (!r) return /* @__PURE__ */ h(Note, { text: "（無法確認是否為最新版：連不到網站）" });
       if (r.isLatest) return /* @__PURE__ */ h(Note, { text: "✅ 已是最新版" });
-      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.27-1529"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
+      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.27-1646"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
         globalThis.location.reload();
       } }));
     }
@@ -8552,7 +8592,40 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
     const soonAbout = movieAbout(u);
     return /* @__PURE__ */ h(Page, { title: u.title, subtitle: `${date} 上映`, onBack: () => this.back() }, this.hero(e, u.title, [u.en, [`${date} ${u.approx ? "當週" : ""}上映`, u.rating, u.runtime ? `${u.runtime} 分` : ""].filter(Boolean).join("｜")].filter(Boolean), { en: u.en, poster: u.poster }), soonAbout.text || soonAbout.credits ? /* @__PURE__ */ h(Section, { title: soonAbout.text ? "劇情簡介" : "導演與演員", hint: "資料來自 TMDB。" }, /* @__PURE__ */ h(Para, { text: soonAbout.text || soonAbout.credits, dim: soonAbout.text ? soonAbout.credits : "" })) : null, /* @__PURE__ */ h(Note, { text: "戲院還沒有排這部片的場次。通常上映前一到兩週會開放，到時候這裡會自動變成可以查場次。上映日期可能再調整。" }), /* @__PURE__ */ h(Button, { label: "🌐 開眼電影網的介紹", kind: "secondary", onTap: () => Safari.open(u.url) }));
   }
-  // 只看收藏影城
+  // 類別回報頁勾選到一半的（null = 用目前的類別）
+  /** 電影頁類別那一區的回報入口：有類別就「回報」、沒類別就提示幫忙補 */
+  genreReportEntry(title, current2) {
+    const codes = current2.map((nm) => (GENRE_LIST.find((g) => g.label === nm) || { code: 0 }).code).filter(Boolean);
+    const open = () => {
+      this.genreDraft = null;
+      this.go(() => this.genreReportView(title, codes));
+    };
+    if (!current2.length)
+      return /* @__PURE__ */ h(Section, null, /* @__PURE__ */ h(Item, { icon: "🏷", title: "還沒有類別", subtitle: "幫忙補一個？大家一起讓分類更準（管理員審核後生效）", right: "回報 ›", chevron: false, onTap: open }));
+    return /* @__PURE__ */ h("button", { class: "key-link gr-link", onTap: open }, "類別不對？回報");
+  }
+  /** 類別回報頁：勾選正確的類別組，送出後等管理員核可 */
+  genreReportView(title, current2) {
+    const sel = this.genreDraft || current2;
+    const toggle = (code) => {
+      const s = this.genreDraft || current2.slice();
+      this.genreDraft = s.indexOf(code) < 0 ? [...s, code] : s.filter((c) => c !== code);
+    };
+    const send = async () => {
+      try {
+        await reportGenres(title, sel);
+        this.genreDraft = null;
+        await this.ui.toast("已送出，謝謝！管理員審核後就會更新");
+        this.back();
+      } catch (e) {
+        await this.ui.toast(String(e?.message || e));
+      }
+    };
+    return /* @__PURE__ */ h(Page, { title: "回報類別", subtitle: esc(title), onBack: () => {
+      this.genreDraft = null;
+      this.back();
+    } }, /* @__PURE__ */ h(Section, { hint: "勾選這部片正確的類別（可以複選）。送出後由管理員審核，核可才會更新。" }, /* @__PURE__ */ h(Chips, null, GENRE_LIST.map((g) => /* @__PURE__ */ h(Chip, { label: g.label, muted: sel.indexOf(g.code) < 0, onTap: () => toggle(g.code) })))), /* @__PURE__ */ h("div", { class: "nt-form" }, /* @__PURE__ */ h(Button, { label: sel.length ? `送出（已選 ${sel.length} 個）` : "送出（清空這部片的類別）", onTap: send })));
+  }
   async movieView(m, date) {
     if (this.movieFor !== m.slug) {
       this.movieFor = m.slug;
@@ -8592,6 +8665,8 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
     if (!runtime) runtime = await this.fillRuntime(m, 1500);
     const shownCities = cities.filter((ct) => rows.some((r) => r.cinema.city === ct));
     const about = movieAbout(d);
+    const og = x.c && typeof x.c === "object" ? x.c.og : void 0;
+    const genreList = og && og.length ? genreNames(og) : x.genres;
     const boxJob = boxInfoBy(m.title).catch(() => null);
     const boxGot = await Promise.race([boxJob, sleep(this.rerendering ? 0 : 400).then(() => void 0)]);
     if (boxGot === void 0) this.late = [...this.late || [], boxJob];
@@ -8601,7 +8676,7 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
       if (rr) this.late = [...this.late || [], rr];
     }
     const status = m.comingSoon ? "soon" : "now";
-    return /* @__PURE__ */ h(Page, { title: m.title, subtitle: [m.rating || d.rating, runtime ? `${runtime} 分鐘` : "", `${d.cinemas.length} 間影城`].filter(Boolean).join("｜"), onBack: () => this.back() }, this.hero(x, m.title, [x.genres.length ? x.genres.join("・") : "", m.en, [m.rating || d.rating, runtime ? `${runtime} 分鐘` : ""].filter(Boolean).join("｜"), releaseLabel(d.release || m.release || releaseOf(m.title)), `${d.cinemas.length} 間影城有放映`]), about.text || about.credits ? /* @__PURE__ */ h(Section, { title: "劇情簡介", hint: "簡介來自場次通。" }, /* @__PURE__ */ h(Para, { text: about.text || about.credits, dim: about.text ? about.credits : "" })) : null, /* @__PURE__ */ h(Section, { hint: box ? this.infoOpen ? `資料來源：國家電影及視聽文化中心「全國電影票房統計」，官方每週更新一次。` : "點「票房資訊」可以展開，看票數、院數、發行商等更多資訊。" : "" }, /* @__PURE__ */ h(Item, { kv: true, title: "狀態", tag: { text: STATUS_LABEL[status], tone: status } }), box ? /* @__PURE__ */ h(Item, { kv: true, title: "票房資訊", right: `${money(box.x.total)}｜${this.infoOpen ? "收合 ▾" : "展開 ▸"}`, chevron: false, onTap: () => {
+    return /* @__PURE__ */ h(Page, { title: m.title, subtitle: [m.rating || d.rating, runtime ? `${runtime} 分鐘` : "", `${d.cinemas.length} 間影城`].filter(Boolean).join("｜"), onBack: () => this.back() }, this.hero(x, m.title, [genreList.length ? genreList.join("・") : "", m.en, [m.rating || d.rating, runtime ? `${runtime} 分鐘` : ""].filter(Boolean).join("｜"), releaseLabel(d.release || m.release || releaseOf(m.title)), `${d.cinemas.length} 間影城有放映`]), this.genreReportEntry(m.title, genreList), about.text || about.credits ? /* @__PURE__ */ h(Section, { title: "劇情簡介", hint: "簡介來自場次通。" }, /* @__PURE__ */ h(Para, { text: about.text || about.credits, dim: about.text ? about.credits : "" })) : null, /* @__PURE__ */ h(Section, { hint: box ? this.infoOpen ? `資料來源：國家電影及視聽文化中心「全國電影票房統計」，官方每週更新一次。` : "點「票房資訊」可以展開，看票數、院數、發行商等更多資訊。" : "" }, /* @__PURE__ */ h(Item, { kv: true, title: "狀態", tag: { text: STATUS_LABEL[status], tone: status } }), box ? /* @__PURE__ */ h(Item, { kv: true, title: "票房資訊", right: `${money(box.x.total)}｜${this.infoOpen ? "收合 ▾" : "展開 ▸"}`, chevron: false, onTap: () => {
       this.infoOpen = !this.infoOpen;
     } }) : /* @__PURE__ */ h(Item, { kv: true, title: "票房資訊", right: "官方資料還沒列入" }), box && this.infoOpen ? boxInfoRows(box.x, box.info).map(([label, value]) => /* @__PURE__ */ h(Item, { kv: true, title: label, right: value })) : null), box && this.infoOpen ? this.runsSection(box.x) : null, /* @__PURE__ */ h(Section, { title: "日期", hint: "日期、縣市、特殊廳都可以複選。" }, /* @__PURE__ */ h(Chips, null, allDates.map((dt) => /* @__PURE__ */ h(Chip, { label: dateLabel(dt).replace(/（.）.*$/, ""), sub: dt === todayTPE() ? "今天" : dateLabel(dt).match(/（(.)）/)?.[1] || "", muted: selDates.indexOf(dt) < 0, onTap: () => {
       this.movieDates = toggle(selDates, dt, true);

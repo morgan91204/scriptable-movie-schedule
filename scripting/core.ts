@@ -2535,6 +2535,8 @@ export const GENRES: Record<number, string> = {
   10749: "愛情", 878: "科幻", 10770: "電視電影", 53: "驚悚", 10752: "戰爭", 37: "西部",
 };
 /** 類別代號陣列 → 中文名稱陣列（最多 3 個，認得的才留） */
+/** 類別選單用：依固定順序列出代號和名稱 */
+export const GENRE_LIST: { code: number; label: string }[] = Object.keys(GENRES).map((c) => ({ code: Number(c), label: GENRES[Number(c)] }));
 export const genreNames = (g?: number[]): string[] => (Array.isArray(g) ? g.map((n) => GENRES[n]).filter(Boolean).slice(0, 3) : []);
 /** 一部片的類別：上映中用 meta、下檔用年度總表（都靠 title＋year 分辨同名片）。回傳中文名稱（最多 3 個） */
 export async function movieGenres(title: string, release?: string): Promise<string[]> {
@@ -3626,6 +3628,7 @@ export interface Community {
   tags?: Record<string, number>; // 心得標籤：代號 → 幾人選
   myTags?: string[]; // 這支手機選的心得標籤
   notes?: number; // 看得到的短評有幾則
+  og?: number[]; // 管理員核可的類別覆蓋（TMDB 代號）：有的話電影頁優先用它，蓋過 TMDB 的自動分類
 }
 /** 心得標籤：評完分可以點選的看片心得（推薦程度選一個；亮點、氛圍各最多 3 個；觀影提醒不限）。只有固定的選項、不能打字，所以不會暴雷。
  *  代號送到伺服器統計，名稱只在 App 裡；要改名稱直接改這裡，代號不要動（動了舊的統計就對不上） */
@@ -3848,6 +3851,14 @@ export async function communityStats(title: string): Promise<Community> {
   communityMem[k] = { ...c, at: Date.now() };
   saveMyVote(k, c, false);
   return c;
+}
+/** 回報這部片的類別（勾選正確的類別組；審核制，送出後等管理員核可才生效）。回傳伺服器記下的這台的回報 */
+export async function reportGenres(title: string, codes: number[]): Promise<number[]> {
+  const k = communityKey(title);
+  const r = await platform().fetchText(`${COMMUNITY_API}/v2/genre-report`, { accept: "application/json", "content-type": "application/json" }, { method: "POST", body: JSON.stringify({ m: k, d: deviceId(), g: codes }) });
+  if (r.status === 429) throw new Error("操作太頻繁，請稍後再試");
+  if (r.status !== 200) throw new Error("回報沒有送出，請稍後再試");
+  return (JSON.parse(r.body).mine || []) as number[];
 }
 /** 投票：score 1～5；0 = 取消。回傳更新後的統計 */
 export async function communityVote(title: string, score: number): Promise<Community> {

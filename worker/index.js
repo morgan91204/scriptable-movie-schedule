@@ -72,6 +72,13 @@ async function adminOp(env, b) {
   const index = env.INDEX.get(env.INDEX.idFromName("all"));
   if (op === "flagged") return { flagged: await index.flagged() };
   if (op === "stats") return { stats: await index.stats() };
+  if (op === "genres") {
+    const pending = await index.genrePending();
+    const list = [];
+    for (const k of Object.keys(pending)) { const r = await env.MOVIE.get(env.MOVIE.idFromName(k)).genreReport(); list.push({ m: k, n: pending[k], ...r }); }
+    list.sort((a, c) => c.n - a.n);
+    return { list };
+  }
   if (op === "recent") {
     const list = [];
     for (const [k, notes] of Object.entries(await index.allNotes())) for (const n of notes) list.push({ m: k, ...n });
@@ -85,6 +92,8 @@ async function adminOp(env, b) {
     return movie.moderate(op, Number(b.id), b.m);
   }
   if (op === "import" && Array.isArray(b.notes)) return movie.importNotes(b.notes.slice(0, 500), b.m);
+  if (op === "genre-apply") return movie.applyGenre(b.g, b.m);
+  if (op === "genre-clear") return movie.clearGenre(b.m);
   return { error: "bad op" };
 }
 /** 給網頁版伺服器用的帳號入口：登入的人評分、選標籤、寫短評、檢舉，都由網頁版伺服器驗過登入後從這裡進來。
@@ -142,7 +151,7 @@ export class AccountRpc extends WorkerEntrypoint {
 export class AdminRpc extends WorkerEntrypoint {
   async admin(body) {
     const op = String((body && body.op) || "");
-    if (["flagged", "recent", "hide", "restore", "delete", "stats"].indexOf(op) < 0) return { error: "bad op" };
+    if (["flagged", "recent", "hide", "restore", "delete", "stats", "genres", "genre-apply", "genre-clear"].indexOf(op) < 0) return { error: "bad op" };
     return adminOp(this.env, body);
   }
 }
@@ -159,6 +168,9 @@ async function sameText(a, b) {
 // 2026-11-23 改成 10 分制時，站長決定把在那之前的評分全部清掉、重新開始（不讓舊的 5 星換算結果影響新制）。
 // 這個時間點以前投的票：每部片第一次被讀到時刪掉，總表也清空一次。之後投的不受影響
 const RESET_BEFORE = 1795418236644;
+// 有效的 TMDB 電影類別代號（跟 App 的 GENRES 一致）：回報時只收這些
+const GENRE_CODES = new Set([28, 12, 16, 35, 80, 99, 18, 10751, 14, 36, 27, 10402, 9648, 10749, 878, 10770, 53, 10752, 37]);
+const cleanGenres = (a) => Array.from(new Set((Array.isArray(a) ? a : []).map(Number).filter((n) => GENRE_CODES.has(n)))).slice(0, 5).sort((x, y) => x - y);
 
 // 所有公開接口：同一個 IP 一分鐘最多 180 次（計數放在記憶體裡，不花額外的請求；正常使用碰不到，擋的是程式狂打）
 const READ_MAX = 180, READ_WINDOW = 60e3;
@@ -222,6 +234,16 @@ export default {
         const ip = req.headers.get("cf-connecting-ip") || "unknown";
         if (!(await env.LIMIT.get(env.LIMIT.idFromName(ip)).hit(LIMIT_MAX, LIMIT_WINDOW))) return json({ error: "too many votes, try later" }, 429);
         return json(shape(await env.MOVIE.get(env.MOVIE.idFromName(m)).vote(d, v === "1" ? s * 2 : s, m)));
+      }
+
+      if (v === "2" && path === "/genre-report" && req.method === "POST") {
+        let b;
+        try { b = await req.json(); } catch (_) { return json({ error: "bad json" }, 400); }
+        const m = b && b.m, d = b && b.d;
+        if (!okMovie(m) || !okDevice(d) || !Array.isArray(b.g)) return json({ error: "bad request" }, 400);
+        const ip = req.headers.get("cf-connecting-ip") || "unknown";
+        if (!(await env.LIMIT.get(env.LIMIT.idFromName(ip)).hit(LIMIT_MAX, LIMIT_WINDOW))) return json({ error: "too many requests, try later" }, 429);
+        return json(await env.MOVIE.get(env.MOVIE.idFromName(m)).reportGenres(d, b.g, m));
       }
 
       if (v === "2" && path === "/tags" && req.method === "POST") {
@@ -373,6 +395,8 @@ export class Movie extends DurableObject {
     }
     // 推和噓：一個人對一則只有一筆，v = 1 推、-1 噓
     this.sql.exec("CREATE TABLE IF NOT EXISTS note_votes (id INTEGER NOT NULL, dev TEXT NOT NULL, v INTEGER NOT NULL, PRIMARY KEY (id, dev))");
+    // 類別回報：一台裝置一部片一筆（g = 逗號隔開的 TMDB 類別代號，排序過）。管理員核可的覆蓋放在 meta 的 og
+    this.sql.exec("CREATE TABLE IF NOT EXISTS genre_reports (dev TEXT PRIMARY KEY, g TEXT NOT NULL, at INTEGER NOT NULL)");
   }
   /** 心得標籤的欄位（後來才加的）：第一次用到時補上 */
   ensureTags() {
@@ -397,7 +421,8 @@ export class Movie extends DurableObject {
   async stats(dev, key) {
     const out = this.count(dev);
     await this.sync(key, out.dist, out.tags); // 跟總表對一次（有變才送）：有評分的補進去，清空了的從總表拿掉
-    return out;
+    const og = this.genreOverride();
+    return og.length ? { ...out, og } : out;
   }
   /** 心得標籤：要先評過分；回傳 null = 還沒評分 */
   async setTags(dev, tags, key) {
@@ -593,6 +618,43 @@ export class Movie extends DurableObject {
       if (must) throw e;
     }
   }
+  // ── 類別回報（審核制）──
+  /** 管理員核可的類別覆蓋（代號陣列；沒有就空） */
+  genreOverride() {
+    const r = this.sql.exec("SELECT v FROM meta WHERE k = 'og'").toArray()[0];
+    return r && r.v ? r.v.split(",").map(Number).filter((n) => n > 0) : [];
+  }
+  /** 使用者回報這部片的類別（勾選正確的類別組）：一台裝置一筆、可改。空陣列 = 收回自己的回報 */
+  async reportGenres(dev, codes, key) {
+    const g = cleanGenres(codes);
+    if (g.length) this.sql.exec("INSERT INTO genre_reports (dev, g, at) VALUES (?, ?, ?) ON CONFLICT(dev) DO UPDATE SET g = excluded.g, at = excluded.at", dev, g.join(","), Date.now());
+    else this.sql.exec("DELETE FROM genre_reports WHERE dev = ?", dev);
+    const n = this.sql.exec("SELECT COUNT(*) AS c FROM genre_reports").toArray()[0].c;
+    try { const idx = this.env.INDEX.get(this.env.INDEX.idFromName("all")); if (n) await idx.bumpGenre(key, n); else await idx.clearGenre(key); } catch (_) {}
+    return { ok: true, og: this.genreOverride(), mine: g };
+  }
+  /** 管理員：這部片的待審回報（把相同的勾選組聚在一起、數人頭）和目前的覆蓋 */
+  genreReport() {
+    const groups = {};
+    for (const r of this.sql.exec("SELECT g FROM genre_reports")) groups[r.g] = (groups[r.g] || 0) + 1;
+    const reports = Object.keys(groups).map((g) => ({ g: g.split(",").map(Number), n: groups[g] })).sort((a, c) => c.n - a.n);
+    return { override: this.genreOverride(), reports };
+  }
+  /** 管理員：套用一組類別當覆蓋，清掉這部片的回報 */
+  async applyGenre(codes, key) {
+    const g = cleanGenres(codes);
+    if (g.length) this.sql.exec("INSERT INTO meta (k, v) VALUES ('og', ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v", g.join(","));
+    else this.sql.exec("DELETE FROM meta WHERE k = 'og'");
+    this.sql.exec("DELETE FROM genre_reports");
+    try { await this.env.INDEX.get(this.env.INDEX.idFromName("all")).clearGenre(key); } catch (_) {}
+    return { ok: true, override: g };
+  }
+  /** 管理員：忽略這部片的回報（清掉回報，覆蓋不動） */
+  async clearGenre(key) {
+    this.sql.exec("DELETE FROM genre_reports");
+    try { await this.env.INDEX.get(this.env.INDEX.idFromName("all")).clearGenre(key); } catch (_) {}
+    return { ok: true };
+  }
   count(dev) {
     const dist = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
     for (const r of this.sql.exec("SELECT score, COUNT(*) AS c FROM votes GROUP BY score")) if (r.score >= 1 && r.score <= 10) dist[r.score - 1] = r.c;
@@ -617,6 +679,7 @@ export class Index extends DurableObject {
     super(ctx, env);
     this.sql = ctx.storage.sql;
     this.sql.exec("CREATE TABLE IF NOT EXISTS summary (k TEXT PRIMARY KEY, d TEXT NOT NULL)");
+    this.sql.exec("CREATE TABLE IF NOT EXISTS genre_pending (k TEXT PRIMARY KEY, n INTEGER NOT NULL, at INTEGER NOT NULL)"); // 哪幾部片有待審的類別回報
     // 改制時把總表清空一次（舊評分全部不算）；之後有人投票，那部片會再同步進來
     this.sql.exec("CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT NOT NULL)");
     if (!this.sql.exec("SELECT v FROM meta WHERE k = 'reset'").toArray().length) {
@@ -669,6 +732,10 @@ export class Index extends DurableObject {
     for (const r of this.sql.exec("SELECT k, d FROM summary ORDER BY k")) out[r.k] = String(r.d).split(",").map(Number);
     return out;
   }
+  async bumpGenre(key, n) { this.sql.exec("INSERT INTO genre_pending (k, n, at) VALUES (?, ?, ?) ON CONFLICT(k) DO UPDATE SET n = excluded.n, at = excluded.at", key, n, Date.now()); }
+  async clearGenre(key) { this.sql.exec("DELETE FROM genre_pending WHERE k = ?", key); }
+  /** 有待審類別回報的片：片名鍵 → 回報人數（最近的在前） */
+  genrePending() { const out = {}; for (const r of this.sql.exec("SELECT k, n FROM genre_pending ORDER BY at DESC LIMIT 300")) out[r.k] = r.n; return out; }
   /** 給用量頁看的評分統計：有評分的片數、總票數（一台裝置一部片一票）、平均每部幾人、有短評的片數、短評總數 */
   stats() {
     let movies = 0, votes = 0;

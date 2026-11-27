@@ -94,6 +94,13 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .cl-new{margin-right:6px;padding:1px 6px;border-radius:6px;background:var(--accent);color:#fff;font-style:normal;font-size:11px;font-weight:700;vertical-align:1px}
 .cl-more{display:block;width:100%;padding:11px 0;border-top:1px solid var(--line);color:var(--accent);font-size:14.5px;font-weight:600;text-align:center}
 .cl-more:first-child{border-top:0}
+.gr-link{display:block;margin:2px auto 0;padding:6px 10px;font-size:12.5px;color:var(--accent);text-align:center}
+.gr-link:active{opacity:.6}
+.gr-row{display:flex;align-items:center;gap:10px;padding:7px 0}
+.gr-row+.gr-row{border-top:1px solid var(--line)}
+.gr-g{flex:1;min-width:0;font-size:14.5px;color:var(--fg)}
+.gr-g i{margin-left:8px;font-style:normal;font-size:12.5px;color:var(--fg2)}
+.gr-apply{flex:none;padding:5px 16px;border-radius:999px;background:var(--accent);color:#fff;font-size:13.5px;font-weight:600}
 .warnbar{display:flex;align-items:center;gap:10px;margin:8px 0 4px;padding:10px 12px;border-radius:12px;background:rgba(255,159,10,.16);font-size:13.5px;line-height:1.4}
 .warnbar span{flex:1;min-width:0}
 .warnbar-go{flex:none;padding:6px 14px;border-radius:999px;background:var(--accent);color:#fff;font-size:13.5px;font-weight:600}

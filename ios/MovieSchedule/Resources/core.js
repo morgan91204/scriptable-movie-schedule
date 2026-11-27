@@ -32,6 +32,7 @@
     FESTIVAL_URL: () => FESTIVAL_URL,
     FORMATS: () => FORMATS,
     GENRES: () => GENRES,
+    GENRE_LIST: () => GENRE_LIST,
     MAPS_LABEL: () => MAPS_LABEL,
     META_URL: () => META_URL,
     NOTE_FOLD_AT: () => NOTE_FOLD_AT,
@@ -247,6 +248,7 @@
     ratingsOfIdent: () => ratingsOfIdent,
     releaseLabel: () => releaseLabel,
     releaseOf: () => releaseOf,
+    reportGenres: () => reportGenres,
     reportNote: () => reportNote,
     rerunByName: () => rerunByName,
     rerunDataReady: () => rerunDataReady,
@@ -3026,6 +3028,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     10752: "戰爭",
     37: "西部"
   };
+  var GENRE_LIST = Object.keys(GENRES).map((c) => ({ code: Number(c), label: GENRES[Number(c)] }));
   var genreNames = (g) => Array.isArray(g) ? g.map((n) => GENRES[n]).filter(Boolean).slice(0, 3) : [];
   async function movieGenres(title, release) {
     const me = await metaOf(title, release);
@@ -4106,6 +4109,13 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     saveMyVote(k, c, false);
     return c;
   }
+  async function reportGenres(title, codes) {
+    const k = communityKey(title);
+    const r = await platform().fetchText(`${COMMUNITY_API}/v2/genre-report`, { accept: "application/json", "content-type": "application/json" }, { method: "POST", body: JSON.stringify({ m: k, d: deviceId(), g: codes }) });
+    if (r.status === 429) throw new Error("操作太頻繁，請稍後再試");
+    if (r.status !== 200) throw new Error("回報沒有送出，請稍後再試");
+    return JSON.parse(r.body).mine || [];
+  }
   async function communityVote(title, score) {
     const k = communityKey(title);
     const r = signedIn() ? await socialCall("vote", { m: k, title: baseTitle(title), s: score }).then((x) => ({ status: x.status, body: JSON.stringify(x.data) })) : await platform().fetchText(
@@ -4550,7 +4560,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   var extra = { boxOffice, filmList, soonList, nowShowing, nowShowingMulti, movieBoard: movieBoard2, festivalBoard, festivalFilm, nearby, patchSettings, fillMovie, formatList };
   var BRIDGE_LEVEL = 2;
   globalThis.MS = {
-    version: "2026.11.27-1529",
+    version: "2026.11.27-1646",
     level: BRIDGE_LEVEL,
     init(saved) {
       cache = saved || {};

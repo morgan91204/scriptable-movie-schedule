@@ -16,7 +16,7 @@ import {
   todayTPE, nowHM, addDays, isLate, dateLabel, tpeDate, fmt, byShowtime,
   loadSettings, saveSettings, settingsStored, setSettingsSavedHook, syncPick, syncApply, syncMerge, loadCinemas, datesOf, moviesOf, loadMovies, movieDay, communityKey, globalSearch, issuerRecent, favSnapGet, favSnapSet, boxIsRerun, boxHasLaterRun, boxRunRows, boxRunsName, loadIntro, rerunDataReady, SITE_URL, TW,
   FORMATS, formatsOf, filterVersions, filterVersionsAny, movieRows, movieDays, nearest, kmLabel, WINDOWS, findShowtimes, findShowtimesMulti, multiLabel, multiDetail, groupByMovie, fillMovieDay, movieDayFilled, movieCinemaVersions, showDay, lateIsTonight, shareText,
-  hallOf, tmdbTest, movieExtras, moviePoster, movieRuntime, posterSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxCountries, boxByCountry, boxInfo, boxInfoRows, boxCountryText, BOX_COUNTRY_NOTE, boxCountryTag, boxCountriesPicked, loadMovieBoard, loadSoonBoard, notifyPrefs, notifyPayload, notifyEndScope, notifyEndPick, notifyQuiet, NOTIFY_PRE_STEPS, NOTIFY_KINDS, boxStatus, STATUS_LABEL, boxInfoBy, isFavMovie, toggleFavMovie, favMovieRows, favMovieBox, soonGroups, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityCached, communityVote, communityTags, agoLabel, social, signedIn, profileInk, PROFILE_EMOJI, WATCH_HOW, howLabel, profileSkipped, setProfileSkipped, setAccount, setSiteBase, setNotesViaSite, adoptRatings, forgetMyVotes, noteMax, profileColor, seenLabel, PROFILE_COLORS, sendFeedback, loadMyFeedback, feedbackSent, feedbackUnread, feedbackMarkSeen, feedbackCat, FEEDBACK_CATS, FEEDBACK_STATUS, FEEDBACK_MAX, loadNotes, notesCached, addNote, deleteNote, spoilNote, voteNote, noteHot, NOTE_FOLD_AT, reportNote, noteLooksSpoiler, noteDate, NOTE_MAX, NOTE_PLACEHOLDER, NOTE_RULES, REPORT_REASONS, reviewTagsToggle, REVIEW_TAGS, reviewTagsFull, REVIEW_TAGS_NOTE, reviewTagLabel, topReviewTags, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalsReady, festivalNote, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, festivalDefaultDate, festivalStateLabel, festivalState, festivalFooter, linkMovies, nowGroupLine, nowFilter, festivalPick, movieAbout, festivalSearch, festivalSearchLines, festivalTrailer, festivalYears, festivalsAny, festivalGroups, festivalChipNote, festivalStatusLine, movieRatings, movieGenres, ratingTier, tomatoTier, popcornTier, popcornCount,
+  hallOf, tmdbTest, movieExtras, moviePoster, movieRuntime, posterSrc, cachePoster, prefetchPosters, movieLines, releaseLabel, releaseOf, boxOfficeLines, boxOfficeNote, boxOfficeBy, boxOfficeTitle, boxOfficeFooter, boxCountries, boxByCountry, boxInfo, boxInfoRows, boxCountryText, BOX_COUNTRY_NOTE, boxCountryTag, boxCountriesPicked, loadMovieBoard, loadSoonBoard, notifyPrefs, notifyPayload, notifyEndScope, notifyEndPick, notifyQuiet, NOTIFY_PRE_STEPS, NOTIFY_KINDS, boxStatus, STATUS_LABEL, boxInfoBy, isFavMovie, toggleFavMovie, favMovieRows, favMovieBox, soonGroups, boxSorts, boxYears, boxYearsPicked, boxMatcher, posterLight, BOX_PAGE, foregroundTask, communityStats, communityCached, communityVote, communityTags, agoLabel, social, signedIn, profileInk, PROFILE_EMOJI, WATCH_HOW, howLabel, profileSkipped, setProfileSkipped, setAccount, setSiteBase, setNotesViaSite, adoptRatings, forgetMyVotes, noteMax, profileColor, seenLabel, PROFILE_COLORS, sendFeedback, loadMyFeedback, feedbackSent, feedbackUnread, feedbackMarkSeen, feedbackCat, FEEDBACK_CATS, FEEDBACK_STATUS, FEEDBACK_MAX, loadNotes, notesCached, addNote, deleteNote, spoilNote, voteNote, noteHot, NOTE_FOLD_AT, reportNote, noteLooksSpoiler, noteDate, NOTE_MAX, NOTE_PLACEHOLDER, NOTE_RULES, REPORT_REASONS, reviewTagsToggle, REVIEW_TAGS, reviewTagsFull, REVIEW_TAGS_NOTE, reviewTagLabel, topReviewTags, loadBoxOffice, loadBoxOfficeFull, loadBoxOfficeWeeks, boxWeekOptions, boxWeekPicked, money, matchBoxOffice, boxOfficeLabel, mapsUrl, MAPS_LABEL, TMDB_LINKS, extractTmdbKey, cinemaApp, bookingUrl, checkLatest, ABOUT_URL, PRIVACY_URL, ADS_NOTE, loadFestivals, festivalsReady, festivalNote, festivalDates, festivalDay, festivalLines, festivalFilmSessions, festivalPlace, festivalCinema, festivalDefaultDate, festivalStateLabel, festivalState, festivalFooter, linkMovies, nowGroupLine, nowFilter, festivalPick, movieAbout, festivalSearch, festivalSearchLines, festivalTrailer, festivalYears, festivalsAny, festivalGroups, festivalChipNote, festivalStatusLine, movieRatings, movieGenres, genreNames, GENRES, GENRE_LIST, reportGenres, ratingTier, tomatoTier, popcornTier, popcornCount,
 } from "./core";
 import type { Activity, Profile, DiaryEntry, SocialCounts, Feedback, ReviewNote, MovieExtras, Ratings, Community, BoxOfficeItem, BoxSort, MovieEntry, SoonEntry, UpcomingFilm, FavMovie, FavRow, NotifyPrefs, NotifyKind, SyncData, GlobalHits, Festival, FestivalFilm, FestivalSession } from "./core";
 import { setTabBar, setBackGuard, esc } from "./jsx";
@@ -732,27 +732,29 @@ class App {
   /** 設定頁的一列：點進去才是登入、同步、登出這些選項 */
   /** 管理員專區（設定頁「同步與登出」下面那一列點進來）：只有管理員名單裡的 Google 帳號登入後才看得到那一列；
    *  就算有人硬開這一頁，裡面每個動作伺服器都會再驗一次身分 */
-  adminTodo: { at: number; notes: number; fb: number; users: number } | null = null; // 管理員待處理的數量（幾分鐘內不重讀）
+  adminTodo: { at: number; notes: number; fb: number; users: number; genres: number } | null = null; // 管理員待處理的數量（幾分鐘內不重讀）
   /** 管理員待處理的數量：被檢舉或被隱藏的短評、還沒處理的意見回饋、被檢舉的帳號。讀不到的那一項當 0 */
-  async loadAdminTodo(force = false): Promise<{ notes: number; fb: number; users: number }> {
+  async loadAdminTodo(force = false): Promise<{ notes: number; fb: number; users: number; genres: number }> {
     if (!force && this.adminTodo && Date.now() - this.adminTodo.at < 180e3) return this.adminTodo;
     const sy = this.sync();
-    const [n, f, u] = await Promise.all([
+    const [n, f, u, g] = await Promise.all([
       sy.admin({ op: "flagged" }).then((r: any) => Object.keys(r.flagged || {}).reduce((a, k) => a + (r.flagged[k] || []).filter((x: any) => !x.keep).length, 0), () => 0), // 按過「沒問題」的不算
       sy.adm("fb", { op: "list" }).then((r: any) => Number(r.open) || 0, () => 0),
       sy.adm("users", { op: "list" }).then((r: any) => (r.list || []).length, () => 0),
+      sy.admin({ op: "genres" }).then((r: any) => (r.list || []).length, () => 0),
     ]);
-    this.adminTodo = { at: Date.now(), notes: n, fb: f, users: u };
+    this.adminTodo = { at: Date.now(), notes: n, fb: f, users: u, genres: g };
     return this.adminTodo;
   }
   async adminHomeView(): Promise<string> {
-    const t = await this.loadAdminTodo(true).catch(() => ({ notes: 0, fb: 0, users: 0 }));
+    const t = await this.loadAdminTodo(true).catch(() => ({ notes: 0, fb: 0, users: 0, genres: 0 }));
     const due = (n: number, unit: string) => (n ? `● ${n} ${unit}` : "");
     return (
       <Page title="管理員專區" onBack={() => this.back()}>
         <Section hint="只有管理員名單裡的 Google 帳號登入後才看得到這一區。右邊的紅點數字是還沒處理的。">
             <Item icon="💬" title="意見回饋" subtitle="看使用者的回饋、回覆、標處理狀態" right={due(t.fb, "則待處理")} onTap={() => { this.adminFbTab = "open"; this.go(() => this.adminFeedbackView(), "讀取回饋…"); }} />
             <Item icon="🛡" title="短評管理" subtitle="複查被檢舉的短評，或巡一遍最近的短評" right={due(t.notes, "則待複查")} onTap={() => { this.adminTab = "flagged"; this.go(() => this.adminNotesView(), "讀取短評…"); }} />
+            <Item icon="🏷" title="類別回報" subtitle="審核使用者回報的電影類別，核可後生效" right={due(t.genres || 0, "部待審")} onTap={() => this.go(() => this.adminGenreView(), "讀取中…")} />
             <Item icon="🪪" title="帳號管理" subtitle="被檢舉的帳號：停用個人頁、強制改暱稱" right={due(t.users, "個被檢舉")} onTap={() => { this.adminUserQ = ""; this.go(() => this.adminUsersView(), "讀取帳號…"); }} />
             <Item icon="📈" title="用量" subtitle="每天幾台裝置在用、各類請求幾次、離免費額度多遠" onTap={() => this.go(() => this.adminUsageView(), "讀取用量…")} />
             <Item icon="👥" title="管理員名單" subtitle="新增或移除其他管理員" onTap={() => this.go(() => this.adminListView(), "讀取名單…")} />
@@ -780,7 +782,7 @@ class App {
     const me = this.meMem ? this.meMem.data : null;
     // 管理員：設定頁外面就看得到還有幾件沒處理（背景讀，讀好補畫上去；三分鐘內不重讀）
     if (me && me.admin && (!this.adminTodo || Date.now() - this.adminTodo.at > 180e3)) this.late.push(this.loadAdminTodo().then(() => undefined, () => undefined));
-    const todoN = me && me.admin && this.adminTodo ? this.adminTodo.notes + this.adminTodo.fb + this.adminTodo.users : 0;
+    const todoN = me && me.admin && this.adminTodo ? this.adminTodo.notes + this.adminTodo.fb + this.adminTodo.users + this.adminTodo.genres : 0;
     const email = String((sy.email && sy.email()) || "");
     const open = () => { this.diaryTab = "mine"; this.diaryMem = null; this.go(() => this.diaryView(), "讀取片單…"); };
     const u = me && me.user;
@@ -1655,6 +1657,36 @@ class App {
             <Item sw={!!e.priv} icon="🔒" title="只有自己看得到" chevron={false} onTap={() => this.saveWatch(title, { priv: !e.priv }, e.priv ? "這一筆恢復公開" : "這一筆只有你看得到了")} />
           </Section>
         ) : null}
+      </Page>
+    );
+  }
+  /** 管理員：審核使用者回報的電影類別。把相同的勾選組聚在一起、數人頭，可以套用某一組或忽略 */
+  async adminGenreView(): Promise<string> {
+    const sy = this.sync();
+    type Rep = { m: string; n: number; override: number[]; reports: { g: number[]; n: number }[] };
+    let list: Rep[] = [], failed = "";
+    try { list = (await sy.admin({ op: "genres" })).list || []; } catch (e) { failed = String((e as Error)?.message || e); }
+    const act = (body: Record<string, unknown>, done: string) => async () => { try { await sy.admin(body); await this.ui.toast(done); this.go(() => this.adminGenreView(), "讀取中…"); } catch (e) { await this.ui.toast(String((e as Error)?.message || e)); } };
+    const names = (g: number[]) => g.map((c) => GENRES[c]).filter(Boolean).join("・") || "（清空）";
+    return (
+      <Page title="類別回報" subtitle="管理員專區" onBack={() => this.back()}>
+        {failed ? <Note kind="warn" text={failed} /> : !list.length ? <Note text="目前沒有待審的類別回報。" /> : (
+          <Section hint="每一部片把相同的勾選組聚在一起、標人數。「套用」會把這部片的類別改成那一組（蓋過 TMDB 的）；「忽略」清掉回報、不改類別。">
+            {list.map((r) => (
+              <div class="nt">
+                <div class="nt-head"><span class="en-title">{esc(r.m)}</span><span class="nt-score">{r.n} 筆回報</span></div>
+                <div class="nt-meta">目前：{r.override.length ? names(r.override) + "（已覆蓋）" : "用 TMDB 的分類"}</div>
+                {r.reports.map((rep) => (
+                  <div class="gr-row">
+                    <span class="gr-g">{esc(names(rep.g))}<i>{rep.n} 人</i></span>
+                    <button class="gr-apply" onTap={act({ op: "genre-apply", m: r.m, g: rep.g }, "已套用")}>套用</button>
+                  </div>
+                ))}
+                <div class="nt-acts"><button onTap={act({ op: "genre-clear", m: r.m }, "已忽略")}>忽略這部片的回報</button></div>
+              </div>
+            ))}
+          </Section>
+        )}
       </Page>
     );
   }
@@ -4049,6 +4081,36 @@ class App {
   movieCities: string[] = []; // 空 = 全部
   movieFormats: string[] = []; // 空 = 全部
   movieFavOnly = false; // 只看收藏影城
+  genreDraft: number[] | null = null; // 類別回報頁勾選到一半的（null = 用目前的類別）
+  /** 電影頁類別那一區的回報入口：有類別就「回報」、沒類別就提示幫忙補 */
+  genreReportEntry(title: string, current: string[]): string {
+    const codes = current.map((nm) => (GENRE_LIST.find((g) => g.label === nm) || { code: 0 }).code).filter(Boolean);
+    const open = () => { this.genreDraft = null; this.go(() => this.genreReportView(title, codes)); };
+    if (!current.length)
+      return <Section><Item icon="🏷" title="還沒有類別" subtitle="幫忙補一個？大家一起讓分類更準（管理員審核後生效）" right="回報 ›" chevron={false} onTap={open} /></Section>;
+    return <button class="key-link gr-link" onTap={open}>類別不對？回報</button>;
+  }
+  /** 類別回報頁：勾選正確的類別組，送出後等管理員核可 */
+  genreReportView(title: string, current: number[]): string {
+    const sel = this.genreDraft || current;
+    const toggle = (code: number) => { const s = this.genreDraft || current.slice(); this.genreDraft = s.indexOf(code) < 0 ? [...s, code] : s.filter((c) => c !== code); };
+    const send = async () => {
+      try { await reportGenres(title, sel); this.genreDraft = null; await this.ui.toast("已送出，謝謝！管理員審核後就會更新"); this.back(); }
+      catch (e) { await this.ui.toast(String((e as Error)?.message || e)); }
+    };
+    return (
+      <Page title="回報類別" subtitle={esc(title)} onBack={() => { this.genreDraft = null; this.back(); }}>
+        <Section hint="勾選這部片正確的類別（可以複選）。送出後由管理員審核，核可才會更新。">
+          <Chips>
+            {GENRE_LIST.map((g) => <Chip label={g.label} muted={sel.indexOf(g.code) < 0} onTap={() => toggle(g.code)} />)}
+          </Chips>
+        </Section>
+        <div class="nt-form">
+          <Button label={sel.length ? `送出（已選 ${sel.length} 個）` : "送出（清空這部片的類別）"} onTap={send} />
+        </div>
+      </Page>
+    );
+  }
   async movieView(m: TwMovie, date: string): Promise<string> {
     if (this.movieFor !== m.slug) {
       this.movieFor = m.slug;
@@ -4091,6 +4153,8 @@ class App {
     if (!runtime) runtime = await this.fillRuntime(m, 1500); // 來源沒給片長：查 TMDB／開眼補上
     const shownCities = cities.filter((ct) => rows.some((r) => r.cinema.city === ct));
     const about = movieAbout(d);
+    const og = x.c && typeof x.c === "object" ? x.c.og : undefined;
+    const genreList = og && og.length ? genreNames(og) : x.genres;
     // 票房資訊（出品國別、發行、票房、票數…）：跟歷年電影那一頁同一份官方資料；票房資料還沒列入的片只顯示狀態
     const boxJob = boxInfoBy(m.title).catch(() => null);
     const boxGot = await Promise.race([boxJob, sleep(this.rerendering ? 0 : 400).then(() => undefined)]);
@@ -4101,7 +4165,8 @@ class App {
     const status = m.comingSoon ? "soon" : "now";
     return (
       <Page title={m.title} subtitle={[m.rating || d.rating, runtime ? `${runtime} 分鐘` : "", `${d.cinemas.length} 間影城`].filter(Boolean).join("｜")} onBack={() => this.back()}>
-        {this.hero(x, m.title, [x.genres.length ? x.genres.join("・") : "", m.en, [m.rating || d.rating, runtime ? `${runtime} 分鐘` : ""].filter(Boolean).join("｜"), releaseLabel(d.release || m.release || releaseOf(m.title)), `${d.cinemas.length} 間影城有放映`])}
+        {this.hero(x, m.title, [genreList.length ? genreList.join("・") : "", m.en, [m.rating || d.rating, runtime ? `${runtime} 分鐘` : ""].filter(Boolean).join("｜"), releaseLabel(d.release || m.release || releaseOf(m.title)), `${d.cinemas.length} 間影城有放映`])}
+        {this.genreReportEntry(m.title, genreList)}
         {about.text || about.credits ? (
           <Section title="劇情簡介" hint="簡介來自場次通。">
             <Para text={about.text || about.credits} dim={about.text ? about.credits : ""} />
