@@ -498,7 +498,7 @@ class App {
   issuerQuery = ""; // 發行商頁的搜尋字
   /** 開某一家發行商歷年發行的片：歷年電影、全部年份、只看這一家、新的在前 */
   openIssuer(id: string) {
-    this.movieMode = "year"; this.boxYears = Array.from({ length: new Date().getFullYear() - 2014 }, (_, i) => String(2016 + i)); this.boxIssuer = [id]; this.boxCountry = []; this.boxStatus = ""; this.movieQuery = ""; this.sortBy.year = "date"; this.ascBy.year = false;
+    this.movieMode = "year"; this.boxYears = Array.from({ length: new Date().getFullYear() - 2014 }, (_, i) => String(2016 + i)); this.boxIssuer = [id]; this.boxCountry = []; this.boxGenre = []; this.boxStatus = ""; this.movieQuery = ""; this.sortBy.year = "date"; this.ascBy.year = false;
     this.go(() => this.movieListView(), `讀取${id}發行的片…`);
   }
   /** 發行商頁：管理收藏發行商的地方。上面是已經收藏的，下面是全部的發行商（2016 年至今、依發行的片數排），可以搜尋。
@@ -3725,9 +3725,9 @@ class App {
   boxRate = ""; // 依評分排時用哪一種評分（空 = IMDb）
   pickQuery = ""; // 「選出品國別／發行商」那一頁的搜尋字
   /** 出品國別／發行商的選擇頁：一列一個、標出部數，可以搜尋、可以複選；選好按返回 */
-  async boxPickView(kind: "country" | "issuer" | "year"): Promise<string> {
+  async boxPickView(kind: "country" | "issuer" | "year" | "genre"): Promise<string> {
     const sc = this.movieMode === "year" ? "year" : "now";
-    const board = await loadMovieBoard({ scope: sc, sort: this.sortBy[sc], years: this.boxYears, week: this.boxWeek, countries: this.boxCountry, query: this.movieQuery.trim().toLowerCase(), asc: this.ascBy[sc], rate: this.boxRate, fewLast: this.boxFewLast, issuers: this.boxIssuer, status: this.boxStatus });
+    const board = await loadMovieBoard({ scope: sc, sort: this.sortBy[sc], years: this.boxYears, week: this.boxWeek, countries: this.boxCountry, genres: this.boxGenre, query: this.movieQuery.trim().toLowerCase(), asc: this.ascBy[sc], rate: this.boxRate, fewLast: this.boxFewLast, issuers: this.boxIssuer, status: this.boxStatus });
     if (kind === "year") {
       // 年份：新的在上面；至少要留一年
       const ys = board.years, on = board.selYears;
@@ -3743,26 +3743,26 @@ class App {
         </Page>
       );
     }
-    const isC = kind === "country";
-    const all = isC ? board.countries : board.issuers;
-    const sel = isC ? board.selCountries : board.selIssuers;
-    const set = (next: string[]) => { if (isC) this.boxCountry = next; else this.boxIssuer = next; };
+    const isC = kind === "country", isG = kind === "genre";
+    const all = isC ? board.countries : isG ? board.genres : board.issuers;
+    const sel = isC ? board.selCountries : isG ? board.selGenres : board.selIssuers;
+    const set = (next: string[]) => { if (isC) this.boxCountry = next; else if (isG) this.boxGenre = next; else this.boxIssuer = next; };
     const k = this.pickQuery.trim().toLowerCase();
     // 已經選的排最前面，其餘照部數多到少
     const favI = this.settings.favIssuers || [];
-    const isFav = (id: string) => !isC && favI.indexOf(id) >= 0;
+    const isFav = (id: string) => kind === "issuer" && favI.indexOf(id) >= 0;
     const toggleFavI = (id: string) => { this.settings.favIssuers = isFav(id) ? favI.filter((z) => z !== id) : [...favI, id]; saveSettings(this.settings); };
     const list = all.filter((c) => !k || c.id.toLowerCase().includes(k)).sort((a, b) => Number(sel.indexOf(b.id) >= 0) - Number(sel.indexOf(a.id) >= 0) || Number(isFav(b.id)) - Number(isFav(a.id)) || b.count - a.count);
     const favHere = all.filter((c) => isFav(c.id)).map((c) => c.id);
-    const name = isC ? "出品國別" : "發行商";
+    const name = isC ? "出品國別" : isG ? "類別" : "發行商";
     return (
       <Page title={`選${name}`} subtitle={sel.length ? `已選 ${sel.length} 個｜${board.entries.length + board.rest.length} 部` : `全部（${board.everyone} 部）`} onBack={() => this.back()}>
         <Search value={this.pickQuery} placeholder={`搜尋${name}（共 ${all.length} 個）`} onInput={(t) => { this.pickQuery = t; }} />
-        <Section hint={isC ? BOX_COUNTRY_NOTE : "發行商來自官方票房資料；聯合發行的片算第一家。"}>
+        <Section hint={isC ? BOX_COUNTRY_NOTE : isG ? "類別來自 TMDB，資料還在慢慢補；查不到類別的片不會出現在篩選結果裡。" : "發行商來自官方票房資料；聯合發行的片算第一家。"}>
           <Item icon={sel.length ? "⬜️" : "✅"} title="全部" subtitle={sel.length ? "點這裡清除已選的" : ""} right={`${board.everyone} 部`} chevron={false} onTap={() => set([])} />
           {favHere.length ? <Item icon="★" title="只看收藏發行商" subtitle={favHere.join("、")} right={`${favHere.length} 家`} chevron={false} onTap={() => set(favHere)} /> : null}
         </Section>
-        <Section title={`可以選好幾個${k ? `｜符合「${this.pickQuery.trim()}」的 ${list.length} 個` : ""}`} hint={isC ? "選好之後按左上角的返回。" : "點右邊的星號可以收藏發行商（★ 已收藏），收藏的會排在前面，首頁也會多一個「收藏發行商」。選好之後按左上角的返回。"}>
+        <Section title={`可以選好幾個${k ? `｜符合「${this.pickQuery.trim()}」的 ${list.length} 個` : ""}`} hint={isC || isG ? "選好之後按左上角的返回。" : "點右邊的星號可以收藏發行商（★ 已收藏），收藏的會排在前面，首頁也會多一個「收藏發行商」。選好之後按左上角的返回。"}>
           {list.map((c) => <Item icon={sel.indexOf(c.id) >= 0 ? "✅" : "⬜️"} title={c.id} right={`${c.count} 部`} chevron={false} onTap={() => set(sel.indexOf(c.id) < 0 ? [...sel, c.id] : sel.filter((z) => z !== c.id))} action={isC ? undefined : { label: isFav(c.id) ? "★" : "☆", hint: isFav(c.id) ? "取消收藏這家發行商" : "收藏這家發行商", onTap: () => toggleFavI(c.id) }} />)}
         </Section>
         {list.length ? null : <Empty icon="🔎" text={`找不到相符的${name}`} />}
@@ -3779,6 +3779,7 @@ class App {
   boxYears: string[] = []; // 年度排行選了哪幾年（空 = 最新的一年）
   boxWeek = ""; // 週票房看哪一週（空 = 最新）
   boxCountry: string[] = []; // 只看哪幾個出品國別（可以複選；空 = 全部）
+  boxGenre: string[] = []; // 只看哪幾個類別（可以複選；空 = 全部）
   boxLimit = 100; // 年度排行目前顯示幾列
   boxPageKey = "";
   /** 「電影」清單：上映中與票房排行合成一份（範圍、排序、出品國別都在這裡選） */
@@ -3786,7 +3787,7 @@ class App {
     // 票房、片單（依片刻評分排時再加評分總表）一次讀好；票房讀不到時清單照樣出來，只是少了依票房排的選項
     const k = this.movieQuery.trim().toLowerCase();
     const sc = this.movieMode === "year" ? "year" : "now"; // 看哪些片由頁籤決定
-    const board = await loadMovieBoard({ scope: sc, sort: this.sortBy[sc], years: this.boxYears, week: this.boxWeek, countries: this.boxCountry, query: k, asc: this.ascBy[sc], rate: this.boxRate, fewLast: this.boxFewLast, issuers: this.boxIssuer, status: this.boxStatus });
+    const board = await loadMovieBoard({ scope: sc, sort: this.sortBy[sc], years: this.boxYears, week: this.boxWeek, countries: this.boxCountry, genres: this.boxGenre, query: k, asc: this.ascBy[sc], rate: this.boxRate, fewLast: this.boxFewLast, issuers: this.boxIssuer, status: this.boxStatus });
     const { years, countries } = board;
     const selYears = board.selYears, country = board.selCountries;
     // 年度排行一年有六百部左右、全選是好幾千部：先畫 100 列，快滑到底時自動接著載入（不用按）。換了排法、年份或搜尋字就從頭開始
@@ -3882,6 +3883,7 @@ class App {
             {/* 出品國別、發行商選項很多：點了進一頁清單（可搜尋、可複選），不用橫向滑 */}
             {countries.length > 1 ? <Item kv title="出品國別" right={board.countrySummary} onTap={() => { this.pickQuery = ""; this.go(() => this.boxPickView("country")); }} /> : null}
             {board.issuers.length > 1 ? <Item kv title="發行商" right={board.issuerSummary} onTap={() => { this.pickQuery = ""; this.go(() => this.boxPickView("issuer")); }} /> : null}
+            {board.genres.length ? <Item kv title="類別" right={board.genreSummary} onTap={() => { this.pickQuery = ""; this.go(() => this.boxPickView("genre")); }} /> : null}
           </Section>
         ) : null}
         {every.length ? null : <Empty icon="🎞" text="找不到相符的電影" />}
