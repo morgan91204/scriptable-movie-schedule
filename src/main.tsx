@@ -2750,9 +2750,9 @@ class App {
 
   /** 海報、預告與評分：最多等 0.4 秒就先畫頁面（有快取的會直接出現），其餘讀好後各自補上。海報網址另外快查（不等預告） */
   async extras(title: string, slug?: string, en?: string, release?: string): Promise<Extras> {
-    const px = foregroundTask(movieExtras(title, slug).catch(() => null));
+    const px = foregroundTask(movieExtras(title, slug, release).catch(() => null));
     const pr = foregroundTask(movieRatings(title, en, slug, release).catch(() => null));
-    const pp = foregroundTask(moviePoster(title, slug, en).catch(() => ""));
+    const pp = foregroundTask(moviePoster(title, slug, en, release).catch(() => ""));
     // 片刻評分：剛投過票或 5 秒內讀過就直接用；失敗回傳 false（顯示讀不到）
     const pc = communityStats(title).catch(() => false as const);
     const wait = this.rerendering ? 0 : 400;

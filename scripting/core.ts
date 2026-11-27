@@ -1012,7 +1012,7 @@ async function metaOf(title: string): Promise<MetaEntry | null> {
   return (m && (m.movies[normTitle(title)] || m.movies[normTitle(baseTitle(title))])) || null;
 }
 
-export async function movieExtras(title: string, slug?: string): Promise<MovieExtras> {
+export async function movieExtras(title: string, slug?: string, release?: string): Promise<MovieExtras> {
   // 找過的海報／預告網址記在手機上（找到的 7 天、沒找到的 1 天），之後不用再查；填了金鑰要重新查
   const hasToken = !!((await loadSettings()).tmdbToken || "").trim();
   const k = (hasToken ? "t|" : "n|") + (slug || "") + "|" + title;
@@ -1046,9 +1046,13 @@ export async function movieExtras(title: string, slug?: string): Promise<MovieEx
     all[ck] = { ...keep, at: Date.now() - (flaky ? 23 * 3600e3 : 0), v: EXTRAS_V } as MovieExtras & { at: number };
     cacheSet("extras.json", JSON.stringify(all));
     return out;
-  })()).then((r) => {
-    // 年度排行那邊伺服器確認過這部片的海報：電影頁也用同一張（清單和點進去看到的才會一樣）
-    const sure = yearPosterSeen[normTitle(title)];
+  })()).then(async (r) => {
+    // 年度排行那邊伺服器確認過這部片的海報：電影頁也用同一張（清單和點進去看到的才會一樣）。
+    // 帶了上映年就用「片名|年」精準對，避免同名的別部片把海報蓋掉
+    const nk = normTitle(title);
+    const yy = release && /\d{4}/.test(release) ? release.slice(0, 4) : "";
+    const serverSure = yy ? (await yearPosters())[nk + "|" + yy] : "";
+    const sure = serverSure && /^\/[\w.-]+$/.test(serverSure) ? "https://image.tmdb.org/t/p/w342" + serverSure : (yy ? "" : yearPosterSeen[nk]);
     return sure ? { ...r, poster: sure, posterKind: "poster" as const } : r;
   });
 }
@@ -1345,12 +1349,16 @@ export function posterLight(title: string, release?: string): Promise<string> {
     return (posterDone[k] = u);
   }));
 }
-export function moviePoster(title: string, slug?: string, en?: string): Promise<string> {
+export function moviePoster(title: string, slug?: string, en?: string, release?: string): Promise<string> {
   const sure = yearPosterSeen[normTitle(title)]; // 年度排行那邊伺服器確認過的海報
-  if (sure && !slug) return Promise.resolve(sure);
-  const k = (slug || "") + "|" + title;
+  if (sure && !slug && !release) return Promise.resolve(sure);
+  // 帶了上映年：同名片用「片名|年」區分，快取也分開（不然兩部同名片會共用一張）
+  const yy = release && /\d{4}/.test(release) ? release.slice(0, 4) : "";
+  const k = (slug || "") + "|" + title + (yy ? "|" + yy : "");
   return (posterOnly[k] ||= (async () => {
     const nk = normTitle(title);
+    // 伺服器海報對照表有這部片（片名|年）確認過的海報：最準，不用再上網猜，也不會對到同名的別部片
+    if (yy) { const sv = (await yearPosters())[nk + "|" + yy]; if (sv && /^\/[\w.-]+$/.test(sv)) return "https://image.tmdb.org/t/p/w342" + sv; }
     const all = readExtras();
     const hit = all["t|" + nk] || all["n|" + nk];
     const isThumb = (u: string) => /ytimg\.com/.test(u); // 預告縮圖只是暫代：一天後再找一次真的海報

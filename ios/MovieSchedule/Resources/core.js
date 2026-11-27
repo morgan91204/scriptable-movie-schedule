@@ -1667,7 +1667,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     const m = await loadMeta();
     return m && (m.movies[normTitle(title)] || m.movies[normTitle(baseTitle(title))]) || null;
   }
-  async function movieExtras(title, slug) {
+  async function movieExtras(title, slug, release) {
     const hasToken = !!((await loadSettings()).tmdbToken || "").trim();
     const k = (hasToken ? "t|" : "n|") + (slug || "") + "|" + title;
     return (extrasCache[k] ||= (async () => {
@@ -1687,8 +1687,11 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
       all[ck] = { ...keep, at: Date.now() - (flaky ? 23 * 36e5 : 0), v: EXTRAS_V };
       cacheSet("extras.json", JSON.stringify(all));
       return out;
-    })()).then((r) => {
-      const sure = yearPosterSeen[normTitle(title)];
+    })()).then(async (r) => {
+      const nk = normTitle(title);
+      const yy = release && /\d{4}/.test(release) ? release.slice(0, 4) : "";
+      const serverSure = yy ? (await yearPosters())[nk + "|" + yy] : "";
+      const sure = serverSure && /^\/[\w.-]+$/.test(serverSure) ? "https://image.tmdb.org/t/p/w342" + serverSure : yy ? "" : yearPosterSeen[nk];
       return sure ? { ...r, poster: sure, posterKind: "poster" } : r;
     });
   }
@@ -1943,12 +1946,17 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
       return posterDone[k] = u;
     });
   }
-  function moviePoster(title, slug, en) {
+  function moviePoster(title, slug, en, release) {
     const sure = yearPosterSeen[normTitle(title)];
-    if (sure && !slug) return Promise.resolve(sure);
-    const k = (slug || "") + "|" + title;
+    if (sure && !slug && !release) return Promise.resolve(sure);
+    const yy = release && /\d{4}/.test(release) ? release.slice(0, 4) : "";
+    const k = (slug || "") + "|" + title + (yy ? "|" + yy : "");
     return posterOnly[k] ||= (async () => {
       const nk = normTitle(title);
+      if (yy) {
+        const sv = (await yearPosters())[nk + "|" + yy];
+        if (sv && /^\/[\w.-]+$/.test(sv)) return "https://image.tmdb.org/t/p/w342" + sv;
+      }
       const all = readExtras();
       const hit = all["t|" + nk] || all["n|" + nk];
       const isThumb = (u) => /ytimg\.com/.test(u);
@@ -4470,7 +4478,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   var extra = { boxOffice, filmList, soonList, nowShowing, nowShowingMulti, movieBoard: movieBoard2, festivalBoard, festivalFilm, nearby, patchSettings, fillMovie, formatList };
   var BRIDGE_LEVEL = 2;
   globalThis.MS = {
-    version: "2026.11.27-0818",
+    version: "2026.11.27-0822",
     level: BRIDGE_LEVEL,
     init(saved) {
       cache = saved || {};

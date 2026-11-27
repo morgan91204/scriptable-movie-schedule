@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.27-0818
+// @movie-schedule-app 電影行程 v2026.11.27-0822
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/brand.ts
@@ -1522,7 +1522,7 @@ async function metaOf(title) {
   const m = await loadMeta();
   return m && (m.movies[normTitle(title)] || m.movies[normTitle(baseTitle(title))]) || null;
 }
-async function movieExtras(title, slug) {
+async function movieExtras(title, slug, release) {
   const hasToken = !!((await loadSettings()).tmdbToken || "").trim();
   const k = (hasToken ? "t|" : "n|") + (slug || "") + "|" + title;
   return (extrasCache[k] ||= (async () => {
@@ -1542,8 +1542,11 @@ async function movieExtras(title, slug) {
     all[ck] = { ...keep, at: Date.now() - (flaky ? 23 * 36e5 : 0), v: EXTRAS_V };
     cacheSet("extras.json", JSON.stringify(all));
     return out;
-  })()).then((r) => {
-    const sure = yearPosterSeen[normTitle(title)];
+  })()).then(async (r) => {
+    const nk = normTitle(title);
+    const yy = release && /\d{4}/.test(release) ? release.slice(0, 4) : "";
+    const serverSure = yy ? (await yearPosters())[nk + "|" + yy] : "";
+    const sure = serverSure && /^\/[\w.-]+$/.test(serverSure) ? "https://image.tmdb.org/t/p/w342" + serverSure : yy ? "" : yearPosterSeen[nk];
     return sure ? { ...r, poster: sure, posterKind: "poster" } : r;
   });
 }
@@ -1783,12 +1786,17 @@ function posterLight(title, release) {
     return posterDone[k] = u;
   });
 }
-function moviePoster(title, slug, en) {
+function moviePoster(title, slug, en, release) {
   const sure = yearPosterSeen[normTitle(title)];
-  if (sure && !slug) return Promise.resolve(sure);
-  const k = (slug || "") + "|" + title;
+  if (sure && !slug && !release) return Promise.resolve(sure);
+  const yy = release && /\d{4}/.test(release) ? release.slice(0, 4) : "";
+  const k = (slug || "") + "|" + title + (yy ? "|" + yy : "");
   return posterOnly[k] ||= (async () => {
     const nk = normTitle(title);
+    if (yy) {
+      const sv = (await yearPosters())[nk + "|" + yy];
+      if (sv && /^\/[\w.-]+$/.test(sv)) return "https://image.tmdb.org/t/p/w342" + sv;
+    }
     const all = readExtras();
     const hit = all["t|" + nk] || all["n|" + nk];
     const isThumb = (u) => /ytimg\.com/.test(u);
@@ -5210,7 +5218,7 @@ var CHANGELOG = [
     id: "2026-11-25",
     date: "2026/11/25",
     items: [
-      { kind: "better", text: "修正同名電影（例如兩部《驀然回首》）在電影頁可能顯示到另一部片評分的問題：評分改用「片名＋上映年」對應，跟清單一致" },
+      { kind: "better", text: "修正同名電影（例如兩部《驀然回首》）在電影頁可能顯示到另一部片的評分或海報的問題：評分和海報都改用「片名＋上映年」對應，跟清單一致" },
       { kind: "better", text: "用量頁多了「評分」一區：有評分的片數、評分總人次、有短評的片數、短評總數（管理員專區）" },
       { kind: "better", text: "依「片刻評分」排序時，評分人數還不夠的片（未滿 3 人）排在「有足夠評分」和「還沒有評分」中間，照自己的分數排；也可以在排序設定裡切成跟足夠評分的片一起排" },
       { kind: "better", text: "進不了 Google 登入的裝置（例如公司網路擋了 Google），管理員可以用管理金鑰登入（限管理員，要先在伺服器設定金鑰）" },
@@ -5556,7 +5564,7 @@ var App = class {
   }
   /** 最新版本是多少。網頁版問的是自己網站現在上線的版本（重新整理就會拿到的那一版），不是 GitHub 上的 */
   checkVersion() {
-    if (true) return checkLatest("2026.11.27-0818");
+    if (true) return checkLatest("2026.11.27-0822");
     return (async () => {
       try {
         let r = await globalThis.fetch("/version.json?t=" + Date.now(), { cache: "no-store" });
@@ -5564,7 +5572,7 @@ var App = class {
         const latest = String((await r.json()).version || "");
         if (!latest) return null;
         const num = (v) => Number(v.replace(/\D/g, "")) || 0;
-        return { latest, isLatest: num("2026.11.27-0818") >= num(latest) };
+        return { latest, isLatest: num("2026.11.27-0822") >= num(latest) };
       } catch (_) {
         return null;
       }
@@ -6953,7 +6961,7 @@ ${x.kinds.length ? `開了 ${x.kinds.length} 種：${x.kinds.map(kindLabel).join
         return;
       }
       try {
-        await sendFeedback(cat.id, text, false ? this.isStandalone() ? "web-app" : "web" : "scriptable", "2026.11.27-0818");
+        await sendFeedback(cat.id, text, false ? this.isStandalone() ? "web-app" : "web" : "scriptable", "2026.11.27-0822");
         this.fbDraft = "";
         this.fbCat = "";
         await this.ui.toast("已送出，謝謝你的回饋");
@@ -7373,7 +7381,7 @@ ${x.kinds.length ? `開了 ${x.kinds.length} 種：${x.kinds.map(kindLabel).join
   /** 更新內容：依日期分段、新的在上；每段分「新功能」「改進」兩組，項目多的先列幾項、其餘收起來；上次看過之後才多的標「新」 */
   changelogView() {
     const KEEP = 6;
-    return /* @__PURE__ */ h(Page, { title: "更新內容", subtitle: `目前版本 ${"2026.11.27-0818"}`, onBack: () => this.back() }, CHANGELOG.map((e, idx) => {
+    return /* @__PURE__ */ h(Page, { title: "更新內容", subtitle: `目前版本 ${"2026.11.27-0822"}`, onBack: () => this.back() }, CHANGELOG.map((e, idx) => {
       const freshN = this.logFresh[e.id] || 0;
       const open = this.logOpen.indexOf(e.id) >= 0;
       const all = e.items.map((it, i) => ({ ...it, fresh: i < freshN }));
@@ -7422,11 +7430,11 @@ ${x.kinds.length ? `開了 ${x.kinds.length} 種：${x.kinds.map(kindLabel).join
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.27-0818"}`);
+          Pasteboard.copy(`版本 ${"2026.11.27-0822"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.27-0818"}`,
+      `版本 ${"2026.11.27-0822"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -7551,9 +7559,9 @@ ${x.kinds.length ? `開了 ${x.kinds.length} 種：${x.kinds.map(kindLabel).join
   }
   /** 海報、預告與評分：最多等 0.4 秒就先畫頁面（有快取的會直接出現），其餘讀好後各自補上。海報網址另外快查（不等預告） */
   async extras(title, slug, en, release) {
-    const px = foregroundTask(movieExtras(title, slug).catch(() => null));
+    const px = foregroundTask(movieExtras(title, slug, release).catch(() => null));
     const pr = foregroundTask(movieRatings(title, en, slug, release).catch(() => null));
-    const pp = foregroundTask(moviePoster(title, slug, en).catch(() => ""));
+    const pp = foregroundTask(moviePoster(title, slug, en, release).catch(() => ""));
     const pc = communityStats(title).catch(() => false);
     const wait = this.rerendering ? 0 : 400;
     const quick = (p2) => Promise.race([p2, sleep(wait).then(() => void 0)]);
@@ -8071,7 +8079,7 @@ ${x.kinds.length ? `開了 ${x.kinds.length} 種：${x.kinds.map(kindLabel).join
     if (false) {
       if (!r) return /* @__PURE__ */ h(Note, { text: "（無法確認是否為最新版：連不到網站）" });
       if (r.isLatest) return /* @__PURE__ */ h(Note, { text: "✅ 已是最新版" });
-      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.27-0818"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
+      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.27-0822"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
         globalThis.location.reload();
       } }));
     }
