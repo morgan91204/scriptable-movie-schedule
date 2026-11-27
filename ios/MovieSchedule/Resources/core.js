@@ -31,6 +31,7 @@
     FEEDBACK_STATUS: () => FEEDBACK_STATUS,
     FESTIVAL_URL: () => FESTIVAL_URL,
     FORMATS: () => FORMATS,
+    GENRES: () => GENRES,
     MAPS_LABEL: () => MAPS_LABEL,
     META_URL: () => META_URL,
     NOTE_FOLD_AT: () => NOTE_FOLD_AT,
@@ -160,6 +161,7 @@
     foregroundTask: () => foregroundTask,
     forgetMyVotes: () => forgetMyVotes,
     formatsOf: () => formatsOf,
+    genreNames: () => genreNames,
     globalSearch: () => globalSearch,
     groupByMovie: () => groupByMovie,
     hallOf: () => hallOf,
@@ -202,6 +204,7 @@
     movieDayFilled: () => movieDayFilled,
     movieDays: () => movieDays,
     movieExtras: () => movieExtras,
+    movieGenres: () => movieGenres,
     movieLines: () => movieLines,
     moviePoster: () => moviePoster,
     movieRatings: () => movieRatings,
@@ -2971,6 +2974,38 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     return soonBoard(movies, upcoming, query, opt);
   }
   var YEAR_RATINGS_URL = "https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/data/ratings-years.json";
+  var GENRES = {
+    28: "動作",
+    12: "冒險",
+    16: "動畫",
+    35: "喜劇",
+    80: "犯罪",
+    99: "紀錄片",
+    18: "劇情",
+    10751: "家庭",
+    14: "奇幻",
+    36: "歷史",
+    27: "恐怖",
+    10402: "音樂",
+    9648: "懸疑",
+    10749: "愛情",
+    878: "科幻",
+    10770: "電視電影",
+    53: "驚悚",
+    10752: "戰爭",
+    37: "西部"
+  };
+  var genreNames = (g) => Array.isArray(g) ? g.map((n) => GENRES[n]).filter(Boolean).slice(0, 3) : [];
+  async function movieGenres(title, release) {
+    const me = await metaOf(title, release);
+    if (me && me.g && me.g.length) return genreNames(me.g);
+    const yr = yearRatingsLatest || await loadYearRatings().catch(() => null);
+    if (yr && release && /\d{4}/.test(release)) {
+      const rec = yr.ratings[yearRatingKey(title, release)];
+      if (rec && rec.g) return genreNames(rec.g);
+    }
+    return [];
+  }
   var yearRatingKey = (name, release) => `${normTitle(name)}|${String(release || "").slice(0, 4)}`;
   var yearRatingsMem = null;
   function loadYearRatings() {
@@ -4484,7 +4519,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   var extra = { boxOffice, filmList, soonList, nowShowing, nowShowingMulti, movieBoard: movieBoard2, festivalBoard, festivalFilm, nearby, patchSettings, fillMovie, formatList };
   var BRIDGE_LEVEL = 2;
   globalThis.MS = {
-    version: "2026.11.27-1453",
+    version: "2026.11.27-1524",
     level: BRIDGE_LEVEL,
     init(saved) {
       cache = saved || {};

@@ -65,6 +65,12 @@ if (todo.length < 20) throw new Error("片單太短（" + todo.length + "），�
 
 // TMDB 金鑰（GitHub Actions 的密鑰 TMDB_TOKEN）：只用來查片長，只放在送給 TMDB 的請求標頭裡，不印出來、不寫進任何檔案
 const TMDB_TOKEN = (process.env.TMDB_TOKEN || "").trim();
+// 模組層級的 TMDB 查詢（類別補查用；tmdbIdentify 裡另有一個同樣的，只是作用域不同）
+const tmdbGet = async (path) => {
+  const r = await fetch("https://api.themoviedb.org/3" + path, { headers: { accept: "application/json", Authorization: "Bearer " + TMDB_TOKEN }, signal: AbortSignal.timeout(25000) });
+  if (!r.ok) throw new Error("TMDB " + r.status);
+  return r.json();
+};
 /** 用 TMDB 確認「這是哪一部片」：中文片名要完全相同才算（不拿搜尋結果第一筆），寧可沒有也不要配錯。
  *  同名的有好幾部時（《冠軍之路》：2023 美國片和 2025 台灣紀錄片），挑年份最接近已知上映年的那一部。
  *  回傳 IMDb 編號、英文片名、年份（查評分用）、片長、海報；找不到回傳 null */
@@ -100,6 +106,7 @@ async function tmdbIdentify(title, en, releaseYear) {
       year: yearOf(d) || yearOf(hit),
       runtime: rt >= 20 && rt <= 400 ? rt : 0,
       poster: /^\/[\w.-]+$/.test(img) ? "https://image.tmdb.org/t/p/w500" + img : "",
+      g: (Array.isArray(d.genres) ? d.genres.map((x) => Number(x && x.id)) : []).filter((n) => Number.isInteger(n) && n > 0).slice(0, 6), // 類別代號
     };
   }
   return null;
@@ -125,8 +132,18 @@ async function refresh(m) {
       if (who) {
         if (who.id) e.im = { id: who.id, name: who.name, year: who.year };
         if (who.poster) e.imp = who.poster;
+        if (who.g && who.g.length) { e.g = who.g; delete e.gq; } else { delete e.g; e.gq = 1; }
         if (who.runtime && !m.runtime && !e.rt) { e.rt = who.runtime; e.rf = "TMDB"; stat.tmdb = (stat.tmdb || 0) + 1; }
       }
+    } catch (_) { stat.fail++; }
+  }
+  // 類別是後來才加的：已經確認過是哪一部片（有 IMDb 編號）、但還沒有類別的，用編號問 TMDB 一次補上
+  if (TMDB_TOKEN && e.im && e.im.id && !e.g && !e.gq) {
+    try {
+      const d = await tmdbGet(`/find/${e.im.id}?external_source=imdb_id&language=zh-TW`);
+      const hit = (d.movie_results || [])[0];
+      const g = (hit && Array.isArray(hit.genre_ids) ? hit.genre_ids.map(Number) : []).filter((n) => Number.isInteger(n) && n > 0).slice(0, 6);
+      if (g.length) e.g = g; else e.gq = 1;
     } catch (_) { stat.fail++; }
   }
   // 海報／預告：都有的 3 天查一次，缺的 6 小時再試

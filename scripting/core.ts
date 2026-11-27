@@ -969,6 +969,7 @@ export interface MetaEntry {
   ra?: number;
   rt?: number; // 片長（分鐘）
   rf?: string; // 片長來源
+  g?: number[]; // TMDB 類別代號
   rta?: number;
   rd?: string; // 上映日期 YYYY-MM-DD（場次通電影頁）
   rda?: number;
@@ -2505,8 +2506,27 @@ export async function loadSoonBoard(query?: string, opt: SoonOpt = {}): Promise<
 // ───────────────────────── 年度排行的三大評分（伺服器慢慢建立的總表） ─────────────────────────
 export const YEAR_RATINGS_URL = "https://raw.githubusercontent.com/morgan91204/scriptable-movie-schedule/data/ratings-years.json";
 /** 一部片的紀錄：i = IMDb 分數、v = 評分人數、t = 番茄指數、c = 1 新鮮認證、p = 爆米花指數、id = IMDb 編號、u = 爛番茄網址的片名代稱 */
-export interface YearRating { id?: string; i?: number; v?: number; t?: number; c?: number; p?: number; h?: number /* 1 = 爆米花認證熱門 */; u?: string; y?: number /* 這部片原本是哪一年的（TMDB 的首映年） */ }
+export interface YearRating { id?: string; i?: number; v?: number; t?: number; c?: number; p?: number; h?: number /* 1 = 爆米花認證熱門 */; u?: string; y?: number /* 這部片原本是哪一年的（TMDB 的首映年） */; g?: number[] /* TMDB 類別代號 */ }
 export interface YearRatings { total: number; missed: number; ratings: Record<string, YearRating> }
+/** TMDB 的電影類別代號 → 中文（固定的 19 種，不會變）。查到的只存代號，顯示時才換成中文 */
+export const GENRES: Record<number, string> = {
+  28: "動作", 12: "冒險", 16: "動畫", 35: "喜劇", 80: "犯罪", 99: "紀錄片", 18: "劇情",
+  10751: "家庭", 14: "奇幻", 36: "歷史", 27: "恐怖", 10402: "音樂", 9648: "懸疑",
+  10749: "愛情", 878: "科幻", 10770: "電視電影", 53: "驚悚", 10752: "戰爭", 37: "西部",
+};
+/** 類別代號陣列 → 中文名稱陣列（最多 3 個，認得的才留） */
+export const genreNames = (g?: number[]): string[] => (Array.isArray(g) ? g.map((n) => GENRES[n]).filter(Boolean).slice(0, 3) : []);
+/** 一部片的類別：上映中用 meta、下檔用年度總表（都靠 title＋year 分辨同名片）。回傳中文名稱（最多 3 個） */
+export async function movieGenres(title: string, release?: string): Promise<string[]> {
+  const me = await metaOf(title, release);
+  if (me && me.g && me.g.length) return genreNames(me.g);
+  const yr = yearRatingsLatest || (await loadYearRatings().catch(() => null));
+  if (yr && release && /\d{4}/.test(release)) {
+    const rec = yr.ratings[yearRatingKey(title, release)];
+    if (rec && rec.g) return genreNames(rec.g);
+  }
+  return [];
+}
 /** 總表的鍵：去掉標點空白的片名｜上映年（跟 tools/ratings-years.mjs 同一把） */
 export const yearRatingKey = (name: string, release: string): string => `${normTitle(name)}|${String(release || "").slice(0, 4)}`;
 let yearRatingsMem: { at: number; job: Promise<YearRatings | null> } | null = null;

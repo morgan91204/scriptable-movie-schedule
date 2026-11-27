@@ -86,7 +86,9 @@ async function identify(title, releaseYear) {
     const hit = near.length && (votes(byVotes(near)) >= 1 || !famousOther) ? byVotes(near) : byVotes(hits);
     const d = await tmdb(`/movie/${hit.id}?language=en-US&append_to_response=external_ids`);
     const id = /^tt\d+$/.test((d.external_ids || {}).imdb_id || "") ? d.external_ids.imdb_id : "";
-    return id ? { id, name: String(d.title || d.original_title || ""), year: yearOf(d) || yearOf(hit) } : null;
+    // 類別（TMDB 的類別代號，例如 27 恐怖、18 劇情）：同一個回應裡就有，順手記下來
+    const g = (Array.isArray(d.genres) ? d.genres.map((x) => Number(x && x.id)) : []).filter((n) => Number.isInteger(n) && n > 0).slice(0, 6);
+    return id ? { id, name: String(d.title || d.original_title || ""), year: yearOf(d) || yearOf(hit), g } : null;
   }
   return null;
 }
@@ -110,6 +112,7 @@ await Promise.all(Array.from({ length: LANES }, async (_, lane) => {
       if (r.err && !(r.imdb || r.tomato || r.popcorn)) { failed++; streak++; continue; } // 連線問題：不記，下次再查
       streak = 0;
       const rec = { id: who.id, a: today, x: 1, ...(who.year ? { y: who.year } : {}) }; // y = 這部片原本是哪一年的（重映片看得出來）
+      if (who.g && who.g.length) rec.g = who.g; else rec.gq = 1; // g = 類別代號；gq = 問過、TMDB 沒有分類
       if (r.imdb) { rec.i = r.imdb.score; rec.v = r.imdb.votes; }
       if (r.tomato) { rec.t = r.tomato.score; if (r.tomato.certified) rec.c = 1; }
       if (r.popcorn) { rec.p = r.popcorn.score; if (r.popcorn.certified) rec.h = 1; }
@@ -131,9 +134,10 @@ const INTRO_DIR = process.env.INTRO_DIR || "";
 const intros = {}; // 年 → { 片名鍵|年 : 簡介 }
 const introOf = (year) => (intros[year] ||= (INTRO_DIR ? read(`${INTRO_DIR}/intro-${year}.json`, {}) : {}));
 {
-  const need = Object.keys(ratings).filter((k) => ratings[k].id && ((!ratings[k].y && !ratings[k].yq) || (INTRO_DIR && ratings[k].o !== 2)));
+  // 類別（g）也是後來才加的：沒有 g、也沒問過（gq）的一起補，同一次 /find 的回應裡就有 genre_ids，不用多問
+  const need = Object.keys(ratings).filter((k) => ratings[k].id && ((!ratings[k].y && !ratings[k].yq) || (INTRO_DIR && ratings[k].o !== 2) || (!ratings[k].g && !ratings[k].gq)));
   const until = Date.now() + 8 * 60e3;
-  let years = 0, texts = 0, people = 0, asked = 0;
+  let years = 0, texts = 0, people = 0, asked = 0, kinds = 0;
   for (const k of need) {
     if (Date.now() > until) break;
     const rec = ratings[k];
@@ -145,7 +149,11 @@ const introOf = (year) => (intros[year] ||= (INTRO_DIR ? read(`${INTRO_DIR}/intr
         const y = hit ? Number(String(hit.release_date || hit.first_air_date || "").slice(0, 4)) || 0 : 0;
         if (y) { rec.y = y; years++; } else rec.yq = 1;
       }
-      if (INTRO_DIR) {
+      if (!rec.g && !rec.gq) {
+        const g = (hit && Array.isArray(hit.genre_ids) ? hit.genre_ids.map(Number) : []).filter((n) => Number.isInteger(n) && n > 0).slice(0, 6);
+        if (g.length) { rec.g = g; kinds++; } else rec.gq = 1;
+      }
+      if (INTRO_DIR && rec.o !== 2) {
         const text = cleanIntro(hit ? hit.overview : ""); // 太短、不是中文、簡體字寫的都不收（見 tools/intro-text.mjs）
         // 導演、演員：電影才有（TMDB 上被歸成影集的不查）
         const isMovie = hit && (d.movie_results || [])[0] === hit;
@@ -158,7 +166,7 @@ const introOf = (year) => (intros[year] ||= (INTRO_DIR ? read(`${INTRO_DIR}/intr
     } catch (_) { /* 連線出錯：下一輪再補 */ }
     await new Promise((r) => setTimeout(r, 40));
   }
-  if (need.length) console.log(`補首映年與簡介：還缺 ${need.length} 部，這一輪問了 ${asked} 部；補上年份 ${years}、簡介 ${texts}、導演演員 ${people}`);
+  if (need.length) console.log(`補首映年與簡介：還缺 ${need.length} 部，這一輪問了 ${asked} 部；補上年份 ${years}、簡介 ${texts}、導演演員 ${people}、類別 ${kinds}`);
   if (INTRO_DIR) {
     fs.mkdirSync(INTRO_DIR, { recursive: true });
     for (const year of Object.keys(intros)) {
