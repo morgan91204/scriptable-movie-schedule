@@ -3493,9 +3493,13 @@ function ratingsFromYear(r: YearRating): Ratings {
   if (r.p !== undefined && rt) out.popcorn = { score: r.p, url: rt, ...(r.h ? { certified: true } : {}) };
   return out;
 }
-export function movieRatings(title: string, en?: string, slug?: string): Promise<Ratings> {
+export function movieRatings(title: string, en?: string, slug?: string, release?: string): Promise<Ratings> {
   const k = normTitle(title);
-  return (ratingsMem[k] ||= (async () => {
+  // 同名、不同年的其實是不同電影（例如《驀然回首》2024 的 Look Back 和 2026 的另一部）。
+  // 帶上映年時，快取和年度評分總表都用「片名|年」當鍵，才不會兩部互相覆蓋或對到別部的分數
+  const yy = release && /\d{4}/.test(release) ? release.slice(0, 4) : "";
+  const yk = yy ? k + "|" + yy : k;
+  return (ratingsMem[yk] ||= (async () => {
     const read = (): Record<string, Ratings & { at: number }> => {
       try {
         return JSON.parse(cacheGet("ratings.json") || "{}") || {};
@@ -3503,7 +3507,7 @@ export function movieRatings(title: string, en?: string, slug?: string): Promise
         return {};
       }
     };
-    const hit = read()[k] as (Ratings & { at: number; v?: number }) | undefined;
+    const hit = read()[yk] as (Ratings & { at: number; v?: number }) | undefined;
     const has = (x: Ratings) => !!(x.imdb || x.tomato || x.popcorn);
     // 有分數記 7 天；查過但沒有任何評分（新片、演唱會）記 1 天，不用每次進電影頁都重查。
     // 舊版（比對規則改了，例如加了年份檢查）記下的一律重查，避免手機上留著對錯片的分數
@@ -3511,10 +3515,11 @@ export function movieRatings(title: string, en?: string, slug?: string): Promise
     // 伺服器查的時間比手機記的新：一律用伺服器的（伺服器修正過配錯的片時，手機上記著的舊分數才會跟著換掉）
     if (hit && hit.v === RATINGS_V && Date.now() - hit.at < (has(hit) ? 7 : 1) * 86400e3 && !(me && me.r && me.ra && me.ra > hit.at)) return hit;
     if (me && me.r && me.ra) return me.r; // 伺服器已經查好評分（空物件 = 查過、沒有評分）
-    // 已經下檔的片（伺服器的片單上沒有）：年度評分總表裡有就直接用，不用手機再去 IMDb、爛番茄各查一次
+    // 已經下檔的片（伺服器的片單上沒有）：年度評分總表裡有就直接用，不用手機再去 IMDb、爛番茄各查一次。
+    // 帶了上映年就用「片名|年」精準對（同名片不會對錯）；沒帶才退回只用片名找
     if (!me) {
       const yr = yearRatingsLatest || (await Promise.race([loadYearRatings().catch(() => null), delay(1500).then(() => null)]));
-      const rec = yr ? yearRatingByTitle(yr, k) : null;
+      const rec = yr ? ((yy && yr.ratings[yearRatingKey(title, release!)]) || yearRatingByTitle(yr, k)) : null;
       if (rec) return ratingsFromYear(rec);
     }
     const r = await findRatings(title, en, slug);
@@ -3523,14 +3528,14 @@ export function movieRatings(title: string, en?: string, slug?: string): Promise
       const all = read();
       for (const [key, v] of Object.entries(all)) if (Date.now() - v.at > 7 * 86400e3) delete all[key];
       const { err: _e, ...keep } = r;
-      all[k] = { ...keep, at: Date.now(), v: RATINGS_V } as Ratings & { at: number };
+      all[yk] = { ...keep, at: Date.now(), v: RATINGS_V } as Ratings & { at: number };
       cacheSet("ratings.json", JSON.stringify(all));
     }
     return r;
   })());
 }
 /** ratings.json 紀錄的版本：比對規則改了就加 1，讓舊紀錄重查 */
-const RATINGS_V = 3;
+const RATINGS_V = 4; // 加了「片名|年」區分同名片：舊的快取重查
 
 /** 評分顏色等級：good（綠）／mid（黃）／bad（紅） */
 /** 番茄指數照爛番茄自己的三級：認證新鮮（爛番茄給的標章，綠）／新鮮（60% 以上，黃）／腐爛（低於 60%，紅） */

@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.26-1756
+// @movie-schedule-app 電影行程 v2026.11.27-0818
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/brand.ts
@@ -3561,9 +3561,11 @@ function ratingsFromYear(r) {
   if (r.p !== void 0 && rt) out.popcorn = { score: r.p, url: rt, ...r.h ? { certified: true } : {} };
   return out;
 }
-function movieRatings(title, en, slug) {
+function movieRatings(title, en, slug, release) {
   const k = normTitle(title);
-  return ratingsMem[k] ||= (async () => {
+  const yy = release && /\d{4}/.test(release) ? release.slice(0, 4) : "";
+  const yk = yy ? k + "|" + yy : k;
+  return ratingsMem[yk] ||= (async () => {
     const read = () => {
       try {
         return JSON.parse(cacheGet("ratings.json") || "{}") || {};
@@ -3571,14 +3573,14 @@ function movieRatings(title, en, slug) {
         return {};
       }
     };
-    const hit = read()[k];
+    const hit = read()[yk];
     const has = (x) => !!(x.imdb || x.tomato || x.popcorn);
     const me = await metaOf(title);
     if (hit && hit.v === RATINGS_V && Date.now() - hit.at < (has(hit) ? 7 : 1) * 864e5 && !(me && me.r && me.ra && me.ra > hit.at)) return hit;
     if (me && me.r && me.ra) return me.r;
     if (!me) {
       const yr = yearRatingsLatest || await Promise.race([loadYearRatings().catch(() => null), delay(1500).then(() => null)]);
-      const rec = yr ? yearRatingByTitle(yr, k) : null;
+      const rec = yr ? yy && yr.ratings[yearRatingKey(title, release)] || yearRatingByTitle(yr, k) : null;
       if (rec) return ratingsFromYear(rec);
     }
     const r = await findRatings(title, en, slug);
@@ -3586,13 +3588,13 @@ function movieRatings(title, en, slug) {
       const all = read();
       for (const [key, v] of Object.entries(all)) if (Date.now() - v.at > 7 * 864e5) delete all[key];
       const { err: _e, ...keep } = r;
-      all[k] = { ...keep, at: Date.now(), v: RATINGS_V };
+      all[yk] = { ...keep, at: Date.now(), v: RATINGS_V };
       cacheSet("ratings.json", JSON.stringify(all));
     }
     return r;
   })();
 }
-var RATINGS_V = 3;
+var RATINGS_V = 4;
 function tomatoTier(score, certified) {
   return score < 60 ? "bad" : certified ? "good" : "mid";
 }
@@ -5208,6 +5210,7 @@ var CHANGELOG = [
     id: "2026-11-25",
     date: "2026/11/25",
     items: [
+      { kind: "better", text: "修正同名電影（例如兩部《驀然回首》）在電影頁可能顯示到另一部片評分的問題：評分改用「片名＋上映年」對應，跟清單一致" },
       { kind: "better", text: "用量頁多了「評分」一區：有評分的片數、評分總人次、有短評的片數、短評總數（管理員專區）" },
       { kind: "better", text: "依「片刻評分」排序時，評分人數還不夠的片（未滿 3 人）排在「有足夠評分」和「還沒有評分」中間，照自己的分數排；也可以在排序設定裡切成跟足夠評分的片一起排" },
       { kind: "better", text: "進不了 Google 登入的裝置（例如公司網路擋了 Google），管理員可以用管理金鑰登入（限管理員，要先在伺服器設定金鑰）" },
@@ -5553,7 +5556,7 @@ var App = class {
   }
   /** 最新版本是多少。網頁版問的是自己網站現在上線的版本（重新整理就會拿到的那一版），不是 GitHub 上的 */
   checkVersion() {
-    if (true) return checkLatest("2026.11.26-1756");
+    if (true) return checkLatest("2026.11.27-0818");
     return (async () => {
       try {
         let r = await globalThis.fetch("/version.json?t=" + Date.now(), { cache: "no-store" });
@@ -5561,7 +5564,7 @@ var App = class {
         const latest = String((await r.json()).version || "");
         if (!latest) return null;
         const num = (v) => Number(v.replace(/\D/g, "")) || 0;
-        return { latest, isLatest: num("2026.11.26-1756") >= num(latest) };
+        return { latest, isLatest: num("2026.11.27-0818") >= num(latest) };
       } catch (_) {
         return null;
       }
@@ -6950,7 +6953,7 @@ ${x.kinds.length ? `開了 ${x.kinds.length} 種：${x.kinds.map(kindLabel).join
         return;
       }
       try {
-        await sendFeedback(cat.id, text, false ? this.isStandalone() ? "web-app" : "web" : "scriptable", "2026.11.26-1756");
+        await sendFeedback(cat.id, text, false ? this.isStandalone() ? "web-app" : "web" : "scriptable", "2026.11.27-0818");
         this.fbDraft = "";
         this.fbCat = "";
         await this.ui.toast("已送出，謝謝你的回饋");
@@ -7370,7 +7373,7 @@ ${x.kinds.length ? `開了 ${x.kinds.length} 種：${x.kinds.map(kindLabel).join
   /** 更新內容：依日期分段、新的在上；每段分「新功能」「改進」兩組，項目多的先列幾項、其餘收起來；上次看過之後才多的標「新」 */
   changelogView() {
     const KEEP = 6;
-    return /* @__PURE__ */ h(Page, { title: "更新內容", subtitle: `目前版本 ${"2026.11.26-1756"}`, onBack: () => this.back() }, CHANGELOG.map((e, idx) => {
+    return /* @__PURE__ */ h(Page, { title: "更新內容", subtitle: `目前版本 ${"2026.11.27-0818"}`, onBack: () => this.back() }, CHANGELOG.map((e, idx) => {
       const freshN = this.logFresh[e.id] || 0;
       const open = this.logOpen.indexOf(e.id) >= 0;
       const all = e.items.map((it, i) => ({ ...it, fresh: i < freshN }));
@@ -7419,11 +7422,11 @@ ${x.kinds.length ? `開了 ${x.kinds.length} 種：${x.kinds.map(kindLabel).join
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.26-1756"}`);
+          Pasteboard.copy(`版本 ${"2026.11.27-0818"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.26-1756"}`,
+      `版本 ${"2026.11.27-0818"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -7547,9 +7550,9 @@ ${x.kinds.length ? `開了 ${x.kinds.length} 種：${x.kinds.map(kindLabel).join
     return m.runtime;
   }
   /** 海報、預告與評分：最多等 0.4 秒就先畫頁面（有快取的會直接出現），其餘讀好後各自補上。海報網址另外快查（不等預告） */
-  async extras(title, slug, en) {
+  async extras(title, slug, en, release) {
     const px = foregroundTask(movieExtras(title, slug).catch(() => null));
-    const pr = foregroundTask(movieRatings(title, en, slug).catch(() => null));
+    const pr = foregroundTask(movieRatings(title, en, slug, release).catch(() => null));
     const pp = foregroundTask(moviePoster(title, slug, en).catch(() => ""));
     const pc = communityStats(title).catch(() => false);
     const wait = this.rerendering ? 0 : 400;
@@ -8068,7 +8071,7 @@ ${x.kinds.length ? `開了 ${x.kinds.length} 種：${x.kinds.map(kindLabel).join
     if (false) {
       if (!r) return /* @__PURE__ */ h(Note, { text: "（無法確認是否為最新版：連不到網站）" });
       if (r.isLatest) return /* @__PURE__ */ h(Note, { text: "✅ 已是最新版" });
-      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.26-1756"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
+      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.27-0818"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
         globalThis.location.reload();
       } }));
     }
@@ -8495,7 +8498,7 @@ ${p.cinema.name}${this.seat ? "｜" + this.seat : ""}` }), /* @__PURE__ */ h(Sec
       if (i < 0) return [...list, id];
       return min1 && list.length === 1 ? list : list.filter((x2) => x2 !== id);
     };
-    const x = await this.extras(m.title, m.slug, m.en);
+    const x = await this.extras(m.title, m.slug, m.en, d.release || m.release || releaseOf(m.title));
     if (!runtime) runtime = await this.fillRuntime(m, 1500);
     const shownCities = cities.filter((ct) => rows.some((r) => r.cinema.city === ct));
     const about = movieAbout(d);

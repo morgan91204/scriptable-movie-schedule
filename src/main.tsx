@@ -2749,9 +2749,9 @@ class App {
   }
 
   /** 海報、預告與評分：最多等 0.4 秒就先畫頁面（有快取的會直接出現），其餘讀好後各自補上。海報網址另外快查（不等預告） */
-  async extras(title: string, slug?: string, en?: string): Promise<Extras> {
+  async extras(title: string, slug?: string, en?: string, release?: string): Promise<Extras> {
     const px = foregroundTask(movieExtras(title, slug).catch(() => null));
-    const pr = foregroundTask(movieRatings(title, en, slug).catch(() => null));
+    const pr = foregroundTask(movieRatings(title, en, slug, release).catch(() => null));
     const pp = foregroundTask(moviePoster(title, slug, en).catch(() => ""));
     // 片刻評分：剛投過票或 5 秒內讀過就直接用；失敗回傳 false（顯示讀不到）
     const pc = communityStats(title).catch(() => false as const);
@@ -4084,7 +4084,7 @@ class App {
       if (i < 0) return [...list, id];
       return min1 && list.length === 1 ? list : list.filter((x) => x !== id);
     };
-    const x = await this.extras(m.title, m.slug, m.en);
+    const x = await this.extras(m.title, m.slug, m.en, d.release || m.release || releaseOf(m.title));
     if (!runtime) runtime = await this.fillRuntime(m, 1500); // 來源沒給片長：查 TMDB／開眼補上
     const shownCities = cities.filter((ct) => rows.some((r) => r.cinema.city === ct));
     const about = movieAbout(d);

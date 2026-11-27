@@ -3768,9 +3768,11 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     if (r.p !== void 0 && rt) out.popcorn = { score: r.p, url: rt, ...r.h ? { certified: true } : {} };
     return out;
   }
-  function movieRatings(title, en, slug) {
+  function movieRatings(title, en, slug, release) {
     const k = normTitle(title);
-    return ratingsMem[k] ||= (async () => {
+    const yy = release && /\d{4}/.test(release) ? release.slice(0, 4) : "";
+    const yk = yy ? k + "|" + yy : k;
+    return ratingsMem[yk] ||= (async () => {
       const read = () => {
         try {
           return JSON.parse(cacheGet("ratings.json") || "{}") || {};
@@ -3778,14 +3780,14 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
           return {};
         }
       };
-      const hit = read()[k];
+      const hit = read()[yk];
       const has = (x) => !!(x.imdb || x.tomato || x.popcorn);
       const me = await metaOf(title);
       if (hit && hit.v === RATINGS_V && Date.now() - hit.at < (has(hit) ? 7 : 1) * 864e5 && !(me && me.r && me.ra && me.ra > hit.at)) return hit;
       if (me && me.r && me.ra) return me.r;
       if (!me) {
         const yr = yearRatingsLatest || await Promise.race([loadYearRatings().catch(() => null), delay(1500).then(() => null)]);
-        const rec = yr ? yearRatingByTitle(yr, k) : null;
+        const rec = yr ? yy && yr.ratings[yearRatingKey(title, release)] || yearRatingByTitle(yr, k) : null;
         if (rec) return ratingsFromYear(rec);
       }
       const r = await findRatings(title, en, slug);
@@ -3793,13 +3795,13 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
         const all = read();
         for (const [key, v] of Object.entries(all)) if (Date.now() - v.at > 7 * 864e5) delete all[key];
         const { err: _e, ...keep } = r;
-        all[k] = { ...keep, at: Date.now(), v: RATINGS_V };
+        all[yk] = { ...keep, at: Date.now(), v: RATINGS_V };
         cacheSet("ratings.json", JSON.stringify(all));
       }
       return r;
     })();
   }
-  var RATINGS_V = 3;
+  var RATINGS_V = 4;
   function tomatoTier(score, certified) {
     return score < 60 ? "bad" : certified ? "good" : "mid";
   }
@@ -4468,7 +4470,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   var extra = { boxOffice, filmList, soonList, nowShowing, nowShowingMulti, movieBoard: movieBoard2, festivalBoard, festivalFilm, nearby, patchSettings, fillMovie, formatList };
   var BRIDGE_LEVEL = 2;
   globalThis.MS = {
-    version: "2026.11.26-1756",
+    version: "2026.11.27-0818",
     level: BRIDGE_LEVEL,
     init(saved) {
       cache = saved || {};
