@@ -1663,9 +1663,15 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
     metaMem = { at: Date.now(), job };
     return job;
   }
-  async function metaOf(title) {
+  async function metaOf(title, release) {
     const m = await loadMeta();
-    return m && (m.movies[normTitle(title)] || m.movies[normTitle(baseTitle(title))]) || null;
+    const e = m && (m.movies[normTitle(title)] || m.movies[normTitle(baseTitle(title))]) || null;
+    if (e && release && /\d{4}/.test(release) && yearRatingsLatest) {
+      const rec = yearRatingsLatest.ratings[yearRatingKey(title, release)];
+      const metaId = (String(e.r && e.r.imdb && e.r.imdb.url || "").match(/tt\d+/) || [])[0] || "";
+      if (rec && rec.id && metaId && rec.id !== metaId) return null;
+    }
+    return e;
   }
   async function movieExtras(title, slug, release) {
     const hasToken = !!((await loadSettings()).tmdbToken || "").trim();
@@ -1676,7 +1682,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
       const hit = read()[ck];
       const stale = hit && hit.v !== EXTRAS_V && true;
       const ttl = stale ? 0 : hit?.poster && hit?.trailerName ? 7 * 864e5 : 864e5;
-      const me = await metaOf(title);
+      const me = await metaOf(title, release);
       if (me && me.tn && me.t) return { poster: normImageUrl(me.p || (hit && !(me.xa && me.xa > hit.at) ? hit.poster : "") || ""), trailer: me.t, trailerName: me.tn };
       if (hit && Date.now() - hit.at < ttl) return { poster: hit.poster, trailer: hit.trailer, trailerName: hit.trailerName };
       const out = await findExtras(title, slug);
@@ -1915,7 +1921,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
       const hit = hits.find((x) => !/ytimg\.com/.test(x.poster));
       if (hit) return normImageUrl(hit.poster);
       const thumb = hits.length ? normImageUrl(hits[0].poster) : "";
-      const me = await metaOf(title);
+      const me = await metaOf(title, release);
       if (me && me.p) return normImageUrl(me.p);
       const own = all["l|" + nk];
       if (own && Date.now() - own.at < (own.poster ? 30 : own.v === 3 ? 3 : 0) * 864e5) return own.poster || thumb;
@@ -1960,7 +1966,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
       const all = readExtras();
       const hit = all["t|" + nk] || all["n|" + nk];
       const isThumb = (u) => /ytimg\.com/.test(u);
-      const me = await metaOf(title);
+      const me = await metaOf(title, release);
       if (me && me.p && !isThumb(me.p)) return normImageUrl(me.p);
       const stale = (at) => !!(me && me.xa && me.xa > at);
       if (hit?.poster && !isThumb(hit.poster) && !stale(hit.at || 0)) return normImageUrl(hit.poster);
@@ -3790,7 +3796,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
       };
       const hit = read()[yk];
       const has = (x) => !!(x.imdb || x.tomato || x.popcorn);
-      const me = await metaOf(title);
+      const me = await metaOf(title, release);
       if (hit && hit.v === RATINGS_V && Date.now() - hit.at < (has(hit) ? 7 : 1) * 864e5 && !(me && me.r && me.ra && me.ra > hit.at)) return hit;
       if (me && me.r && me.ra) return me.r;
       if (!me) {
@@ -4478,7 +4484,7 @@ var hs=${JSON.stringify(htmls)};try{return JSON.stringify({ok:true,v:hs.map(func
   var extra = { boxOffice, filmList, soonList, nowShowing, nowShowingMulti, movieBoard: movieBoard2, festivalBoard, festivalFilm, nearby, patchSettings, fillMovie, formatList };
   var BRIDGE_LEVEL = 2;
   globalThis.MS = {
-    version: "2026.11.27-0822",
+    version: "2026.11.27-0835",
     level: BRIDGE_LEVEL,
     init(saved) {
       cache = saved || {};

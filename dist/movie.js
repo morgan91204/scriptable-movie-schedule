@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.27-0822
+// @movie-schedule-app 電影行程 v2026.11.27-0835
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/brand.ts
@@ -1518,9 +1518,15 @@ function loadMeta() {
   metaMem = { at: Date.now(), job };
   return job;
 }
-async function metaOf(title) {
+async function metaOf(title, release) {
   const m = await loadMeta();
-  return m && (m.movies[normTitle(title)] || m.movies[normTitle(baseTitle(title))]) || null;
+  const e = m && (m.movies[normTitle(title)] || m.movies[normTitle(baseTitle(title))]) || null;
+  if (e && release && /\d{4}/.test(release) && yearRatingsLatest) {
+    const rec = yearRatingsLatest.ratings[yearRatingKey(title, release)];
+    const metaId = (String(e.r && e.r.imdb && e.r.imdb.url || "").match(/tt\d+/) || [])[0] || "";
+    if (rec && rec.id && metaId && rec.id !== metaId) return null;
+  }
+  return e;
 }
 async function movieExtras(title, slug, release) {
   const hasToken = !!((await loadSettings()).tmdbToken || "").trim();
@@ -1531,7 +1537,7 @@ async function movieExtras(title, slug, release) {
     const hit = read()[ck];
     const stale = hit && hit.v !== EXTRAS_V && true;
     const ttl = stale ? 0 : hit?.poster && hit?.trailerName ? 7 * 864e5 : 864e5;
-    const me = await metaOf(title);
+    const me = await metaOf(title, release);
     if (me && me.tn && me.t) return { poster: normImageUrl(me.p || (hit && !(me.xa && me.xa > hit.at) ? hit.poster : "") || ""), trailer: me.t, trailerName: me.tn };
     if (hit && Date.now() - hit.at < ttl) return { poster: hit.poster, trailer: hit.trailer, trailerName: hit.trailerName };
     const out = await findExtras(title, slug);
@@ -1755,7 +1761,7 @@ function posterLight(title, release) {
     const hit = hits.find((x) => !/ytimg\.com/.test(x.poster));
     if (hit) return normImageUrl(hit.poster);
     const thumb = hits.length ? normImageUrl(hits[0].poster) : "";
-    const me = await metaOf(title);
+    const me = await metaOf(title, release);
     if (me && me.p) return normImageUrl(me.p);
     const own = all["l|" + nk];
     if (own && Date.now() - own.at < (own.poster ? 30 : own.v === 3 ? 3 : 0) * 864e5) return own.poster || thumb;
@@ -1800,7 +1806,7 @@ function moviePoster(title, slug, en, release) {
     const all = readExtras();
     const hit = all["t|" + nk] || all["n|" + nk];
     const isThumb = (u) => /ytimg\.com/.test(u);
-    const me = await metaOf(title);
+    const me = await metaOf(title, release);
     if (me && me.p && !isThumb(me.p)) return normImageUrl(me.p);
     const stale = (at) => !!(me && me.xa && me.xa > at);
     if (hit?.poster && !isThumb(hit.poster) && !stale(hit.at || 0)) return normImageUrl(hit.poster);
@@ -3583,7 +3589,7 @@ function movieRatings(title, en, slug, release) {
     };
     const hit = read()[yk];
     const has = (x) => !!(x.imdb || x.tomato || x.popcorn);
-    const me = await metaOf(title);
+    const me = await metaOf(title, release);
     if (hit && hit.v === RATINGS_V && Date.now() - hit.at < (has(hit) ? 7 : 1) * 864e5 && !(me && me.r && me.ra && me.ra > hit.at)) return hit;
     if (me && me.r && me.ra) return me.r;
     if (!me) {
@@ -5218,7 +5224,7 @@ var CHANGELOG = [
     id: "2026-11-25",
     date: "2026/11/25",
     items: [
-      { kind: "better", text: "修正同名電影（例如兩部《驀然回首》）在電影頁可能顯示到另一部片的評分或海報的問題：評分和海報都改用「片名＋上映年」對應，跟清單一致" },
+      { kind: "better", text: "修正同名電影（例如 2024 動畫版和 2026 真人版《驀然回首》）在電影頁互相顯示到另一部的評分、海報、預告的問題：改用「片名＋上映年」和 IMDb 編號分辨" },
       { kind: "better", text: "用量頁多了「評分」一區：有評分的片數、評分總人次、有短評的片數、短評總數（管理員專區）" },
       { kind: "better", text: "依「片刻評分」排序時，評分人數還不夠的片（未滿 3 人）排在「有足夠評分」和「還沒有評分」中間，照自己的分數排；也可以在排序設定裡切成跟足夠評分的片一起排" },
       { kind: "better", text: "進不了 Google 登入的裝置（例如公司網路擋了 Google），管理員可以用管理金鑰登入（限管理員，要先在伺服器設定金鑰）" },
@@ -5564,7 +5570,7 @@ var App = class {
   }
   /** 最新版本是多少。網頁版問的是自己網站現在上線的版本（重新整理就會拿到的那一版），不是 GitHub 上的 */
   checkVersion() {
-    if (true) return checkLatest("2026.11.27-0822");
+    if (true) return checkLatest("2026.11.27-0835");
     return (async () => {
       try {
         let r = await globalThis.fetch("/version.json?t=" + Date.now(), { cache: "no-store" });
@@ -5572,7 +5578,7 @@ var App = class {
         const latest = String((await r.json()).version || "");
         if (!latest) return null;
         const num = (v) => Number(v.replace(/\D/g, "")) || 0;
-        return { latest, isLatest: num("2026.11.27-0822") >= num(latest) };
+        return { latest, isLatest: num("2026.11.27-0835") >= num(latest) };
       } catch (_) {
         return null;
       }
@@ -6961,7 +6967,7 @@ ${x.kinds.length ? `開了 ${x.kinds.length} 種：${x.kinds.map(kindLabel).join
         return;
       }
       try {
-        await sendFeedback(cat.id, text, false ? this.isStandalone() ? "web-app" : "web" : "scriptable", "2026.11.27-0822");
+        await sendFeedback(cat.id, text, false ? this.isStandalone() ? "web-app" : "web" : "scriptable", "2026.11.27-0835");
         this.fbDraft = "";
         this.fbCat = "";
         await this.ui.toast("已送出，謝謝你的回饋");
@@ -7381,7 +7387,7 @@ ${x.kinds.length ? `開了 ${x.kinds.length} 種：${x.kinds.map(kindLabel).join
   /** 更新內容：依日期分段、新的在上；每段分「新功能」「改進」兩組，項目多的先列幾項、其餘收起來；上次看過之後才多的標「新」 */
   changelogView() {
     const KEEP = 6;
-    return /* @__PURE__ */ h(Page, { title: "更新內容", subtitle: `目前版本 ${"2026.11.27-0822"}`, onBack: () => this.back() }, CHANGELOG.map((e, idx) => {
+    return /* @__PURE__ */ h(Page, { title: "更新內容", subtitle: `目前版本 ${"2026.11.27-0835"}`, onBack: () => this.back() }, CHANGELOG.map((e, idx) => {
       const freshN = this.logFresh[e.id] || 0;
       const open = this.logOpen.indexOf(e.id) >= 0;
       const all = e.items.map((it, i) => ({ ...it, fresh: i < freshN }));
@@ -7430,11 +7436,11 @@ ${x.kinds.length ? `開了 ${x.kinds.length} 種：${x.kinds.map(kindLabel).join
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.27-0822"}`);
+          Pasteboard.copy(`版本 ${"2026.11.27-0835"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.27-0822"}`,
+      `版本 ${"2026.11.27-0835"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -8079,7 +8085,7 @@ ${x.kinds.length ? `開了 ${x.kinds.length} 種：${x.kinds.map(kindLabel).join
     if (false) {
       if (!r) return /* @__PURE__ */ h(Note, { text: "（無法確認是否為最新版：連不到網站）" });
       if (r.isLatest) return /* @__PURE__ */ h(Note, { text: "✅ 已是最新版" });
-      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.27-0822"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
+      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.27-0835"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
         globalThis.location.reload();
       } }));
     }

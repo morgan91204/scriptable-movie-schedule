@@ -1007,9 +1007,17 @@ function loadMeta(): Promise<MetaFile | null> {
   return job;
 }
 /** 這部片在伺服器資料裡的紀錄（沒有回傳 null） */
-async function metaOf(title: string): Promise<MetaEntry | null> {
+async function metaOf(title: string, release?: string): Promise<MetaEntry | null> {
   const m = await loadMeta();
-  return (m && (m.movies[normTitle(title)] || m.movies[normTitle(baseTitle(title))])) || null;
+  const e = (m && (m.movies[normTitle(title)] || m.movies[normTitle(baseTitle(title))])) || null;
+  // meta 只用片名、沒有年份：同名的別部片會共用這一筆（例如 2024 動畫《驀然回首》和 2026 真人版）。
+  // 帶了上映年、而且年度評分總表那一年的 IMDb 編號跟 meta 這筆不一樣，代表 meta 是另一部，不要用，改走年份對應的資料
+  if (e && release && /\d{4}/.test(release) && yearRatingsLatest) {
+    const rec = yearRatingsLatest.ratings[yearRatingKey(title, release)];
+    const metaId = (String((e.r && e.r.imdb && e.r.imdb.url) || "").match(/tt\d+/) || [])[0] || "";
+    if (rec && rec.id && metaId && rec.id !== metaId) return null;
+  }
+  return e;
 }
 
 export async function movieExtras(title: string, slug?: string, release?: string): Promise<MovieExtras> {
@@ -1029,7 +1037,7 @@ export async function movieExtras(title: string, slug?: string, release?: string
     const ttl = stale ? 0 : hit?.poster && hit?.trailerName ? 7 * 86400e3 : 86400e3;
     // 伺服器查好的預告優先，手機自己以前搜到的排後面：這樣每個版本、每支手機看到的都是同一支，
     // 不會因為各自搜尋的結果不同而不一樣
-    const me = await metaOf(title);
+    const me = await metaOf(title, release);
     // 海報也一樣：伺服器有就用伺服器的；伺服器查得比手機新、卻沒有海報，手機記的那張就不用（可能是已經被修正掉的錯圖）
     if (me && me.tn && me.t) return { poster: normImageUrl(me.p || (hit && !(me.xa && me.xa > hit.at) ? hit.poster : "") || ""), trailer: me.t, trailerName: me.tn };
     // 伺服器沒有的：手機自己搜，用同一套嚴格規則（標題要有台灣片名、看得出是預告）。
@@ -1310,7 +1318,7 @@ export function posterLight(title: string, release?: string): Promise<string> {
     const hit = hits.find((x) => !/ytimg\.com/.test(x.poster));
     if (hit) return normImageUrl(hit.poster);
     const thumb = hits.length ? normImageUrl(hits[0].poster) : ""; // 電影頁只找到預告縮圖：清單自己也找不到時就用它（跟電影頁顯示同一張）
-    const me = await metaOf(title);
+    const me = await metaOf(title, release);
     if (me && me.p) return normImageUrl(me.p);
     const own = all["l|" + nk] as (MovieExtras & { at: number; v?: number }) | undefined;
     // 找到的記 30 天；沒找到的記 3 天，但舊規則（重映片也比年份）記下的「沒找到」一律重查
@@ -1364,7 +1372,7 @@ export function moviePoster(title: string, slug?: string, en?: string, release?:
     const isThumb = (u: string) => /ytimg\.com/.test(u); // 預告縮圖只是暫代：一天後再找一次真的海報
     // 伺服器有海報就用伺服器的；伺服器查的時間比手機記的新，手機記的就不算數
     //（伺服器修正過配錯的海報時，各版本下次讀資料就會換掉，不會一直顯示手機上記著的那張舊的）
-    const me = await metaOf(title);
+    const me = await metaOf(title, release);
     if (me && me.p && !isThumb(me.p)) return normImageUrl(me.p);
     const stale = (at: number) => !!(me && me.xa && me.xa > at);
     if (hit?.poster && !isThumb(hit.poster) && !stale((hit as { at?: number }).at || 0)) return normImageUrl(hit.poster);
@@ -3519,7 +3527,7 @@ export function movieRatings(title: string, en?: string, slug?: string, release?
     const has = (x: Ratings) => !!(x.imdb || x.tomato || x.popcorn);
     // 有分數記 7 天；查過但沒有任何評分（新片、演唱會）記 1 天，不用每次進電影頁都重查。
     // 舊版（比對規則改了，例如加了年份檢查）記下的一律重查，避免手機上留著對錯片的分數
-    const me = await metaOf(title);
+    const me = await metaOf(title, release);
     // 伺服器查的時間比手機記的新：一律用伺服器的（伺服器修正過配錯的片時，手機上記著的舊分數才會跟著換掉）
     if (hit && hit.v === RATINGS_V && Date.now() - hit.at < (has(hit) ? 7 : 1) * 86400e3 && !(me && me.r && me.ra && me.ra > hit.at)) return hit;
     if (me && me.r && me.ra) return me.r; // 伺服器已經查好評分（空物件 = 查過、沒有評分）
