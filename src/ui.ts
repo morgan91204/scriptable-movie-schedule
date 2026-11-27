@@ -288,7 +288,7 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .nt-acts{display:flex;gap:8px;margin-top:9px}
 .nt-acts button{padding:7px 14px;border-radius:9px;background:var(--chip);color:var(--accent);font-size:14px;font-weight:600}
 .nt-acts button.danger{color:#ff3b30;margin-left:auto}
-.fb-area{display:block;width:100%;min-height:120px;padding:12px 14px;border:0;border-radius:12px;background:var(--chip);color:var(--fg);font:inherit;font-size:16px;line-height:1.5;margin-top:10px;outline:none;resize:vertical;-webkit-appearance:none;appearance:none}
+.fb-area{display:block;width:100%;box-sizing:border-box;min-height:120px;padding:12px 14px;border:0;border-radius:12px;background:var(--chip);color:var(--fg);font:inherit;font-size:16px;line-height:1.5;margin-top:10px;outline:none;overflow-y:hidden;resize:none;-webkit-appearance:none;appearance:none}
 .wt-pick{position:relative;display:flex;align-items:center;gap:10px;padding:11px 14px;border-radius:12px;background:var(--chip);color:var(--fg);overflow:hidden}
 .wt-pick.on{box-shadow:0 0 0 1.5px var(--accent) inset}
 .wt-ico{flex:none;font-size:18px;line-height:1}
@@ -679,7 +679,10 @@ function liveGo(el){clearTimeout(liveT);var go=function(){if(composing||!documen
 function isLive(el){return !!(el&&el.getAttribute&&el.getAttribute('data-live'));}
 document.addEventListener('compositionstart',function(){composing=true;});
 document.addEventListener('compositionend',function(e){composing=false;if(held){var x=held;held=null;window.__render(x[0],x[1]);}if(isLive(e.target))liveGo(e.target);});
-document.addEventListener('input',function(e){if(isLive(e.target)&&!composing)liveGo(e.target);});
+// 多行輸入框（短評、回覆、意見回饋…）：打字時自動長高到裝得下內容，最高到半個畫面，超過才內部捲動
+function growArea(el){if(!el||el.tagName!=='TEXTAREA'||!el.classList.contains('fb-area'))return;el.style.height='auto';var max=Math.round((window.visualViewport?window.visualViewport.height:window.innerHeight)*0.5);var h=el.scrollHeight;if(h>max){el.style.height=max+'px';el.style.overflowY='auto';}else{el.style.height=h+'px';el.style.overflowY='hidden';}}
+function growAreas(){var a=document.querySelectorAll('textarea.fb-area');for(var i=0;i<a.length;i++)growArea(a[i]);}
+document.addEventListener('input',function(e){if(isLive(e.target)&&!composing)liveGo(e.target);if(e.target&&e.target.tagName==='TEXTAREA')growArea(e.target);});
 // 選檔案（data-file）：把選的檔案讀進記憶體放在 window.__files，再通知 App（檔案只留在這一頁裡，不會上傳）
 document.addEventListener('change',function(e){var el=e.target;if(!el||el.type!=='file'||!el.getAttribute||!el.getAttribute('data-file'))return;
   var id=el.getAttribute('data-file'),fs=[].slice.call(el.files||[],0,8);if(!fs.length)return;
@@ -704,7 +707,7 @@ function jumpTo(){var t=document.querySelector('[data-jump]');if(!t){jumped=null
 window.__render=function(html,to){var y=window.scrollY,root=document.getElementById('root'),cur=document.activeElement,typing=isLive(cur)&&root.contains(cur);
   if(typing&&composing){held=[html,to];return;} // 還在選字：選完再畫
   var kept=typing&&renderAround(root,cur,html);if(!kept)root.innerHTML=html;
-  stripSync();autoMore();fitText();scrollKeep(to<0?y:to);jumpTo();var f=kept?null:document.querySelector('input[autofocus]');if(f)setTimeout(function(){f.focus()},50);syncHist();};
+  stripSync();autoMore();fitText();growAreas();scrollKeep(to<0?y:to);jumpTo();var f=kept?null:document.querySelector('input[autofocus]');if(f)setTimeout(function(){f.focus()},50);syncHist();};
 // iPhone 的毛病：鍵盤收起來（或從別的 App 切回來）之後，畫面有時沒有歸位，整個版面比看得到的範圍高出一截，
 // 結果上面的標題列跑到螢幕外、底部的頁籤列浮在畫面中間。發現有這個落差、又沒有在打字時，輕輕捲一下逼它重新對齊
 (function(){var vv=window.visualViewport;if(!vv)return;

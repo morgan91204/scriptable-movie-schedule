@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-purple; icon-glyph: film; share-sheet-inputs: url, plain-text;
-// @movie-schedule-app 電影行程 v2026.11.27-0835
+// @movie-schedule-app 電影行程 v2026.11.27-1453
 // 由 src/main.tsx 編譯產生（esbuild），請改原始碼後重新編譯。
 
 // src/brand.ts
@@ -4568,7 +4568,7 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;te
 .nt-acts{display:flex;gap:8px;margin-top:9px}
 .nt-acts button{padding:7px 14px;border-radius:9px;background:var(--chip);color:var(--accent);font-size:14px;font-weight:600}
 .nt-acts button.danger{color:#ff3b30;margin-left:auto}
-.fb-area{display:block;width:100%;min-height:120px;padding:12px 14px;border:0;border-radius:12px;background:var(--chip);color:var(--fg);font:inherit;font-size:16px;line-height:1.5;margin-top:10px;outline:none;resize:vertical;-webkit-appearance:none;appearance:none}
+.fb-area{display:block;width:100%;box-sizing:border-box;min-height:120px;padding:12px 14px;border:0;border-radius:12px;background:var(--chip);color:var(--fg);font:inherit;font-size:16px;line-height:1.5;margin-top:10px;outline:none;overflow-y:hidden;resize:none;-webkit-appearance:none;appearance:none}
 .wt-pick{position:relative;display:flex;align-items:center;gap:10px;padding:11px 14px;border-radius:12px;background:var(--chip);color:var(--fg);overflow:hidden}
 .wt-pick.on{box-shadow:0 0 0 1.5px var(--accent) inset}
 .wt-ico{flex:none;font-size:18px;line-height:1}
@@ -4958,7 +4958,10 @@ function liveGo(el){clearTimeout(liveT);var go=function(){if(composing||!documen
 function isLive(el){return !!(el&&el.getAttribute&&el.getAttribute('data-live'));}
 document.addEventListener('compositionstart',function(){composing=true;});
 document.addEventListener('compositionend',function(e){composing=false;if(held){var x=held;held=null;window.__render(x[0],x[1]);}if(isLive(e.target))liveGo(e.target);});
-document.addEventListener('input',function(e){if(isLive(e.target)&&!composing)liveGo(e.target);});
+// 多行輸入框（短評、回覆、意見回饋…）：打字時自動長高到裝得下內容，最高到半個畫面，超過才內部捲動
+function growArea(el){if(!el||el.tagName!=='TEXTAREA'||!el.classList.contains('fb-area'))return;el.style.height='auto';var max=Math.round((window.visualViewport?window.visualViewport.height:window.innerHeight)*0.5);var h=el.scrollHeight;if(h>max){el.style.height=max+'px';el.style.overflowY='auto';}else{el.style.height=h+'px';el.style.overflowY='hidden';}}
+function growAreas(){var a=document.querySelectorAll('textarea.fb-area');for(var i=0;i<a.length;i++)growArea(a[i]);}
+document.addEventListener('input',function(e){if(isLive(e.target)&&!composing)liveGo(e.target);if(e.target&&e.target.tagName==='TEXTAREA')growArea(e.target);});
 // 選檔案（data-file）：把選的檔案讀進記憶體放在 window.__files，再通知 App（檔案只留在這一頁裡，不會上傳）
 document.addEventListener('change',function(e){var el=e.target;if(!el||el.type!=='file'||!el.getAttribute||!el.getAttribute('data-file'))return;
   var id=el.getAttribute('data-file'),fs=[].slice.call(el.files||[],0,8);if(!fs.length)return;
@@ -4983,7 +4986,7 @@ function jumpTo(){var t=document.querySelector('[data-jump]');if(!t){jumped=null
 window.__render=function(html,to){var y=window.scrollY,root=document.getElementById('root'),cur=document.activeElement,typing=isLive(cur)&&root.contains(cur);
   if(typing&&composing){held=[html,to];return;} // 還在選字：選完再畫
   var kept=typing&&renderAround(root,cur,html);if(!kept)root.innerHTML=html;
-  stripSync();autoMore();fitText();scrollKeep(to<0?y:to);jumpTo();var f=kept?null:document.querySelector('input[autofocus]');if(f)setTimeout(function(){f.focus()},50);syncHist();};
+  stripSync();autoMore();fitText();growAreas();scrollKeep(to<0?y:to);jumpTo();var f=kept?null:document.querySelector('input[autofocus]');if(f)setTimeout(function(){f.focus()},50);syncHist();};
 // iPhone 的毛病：鍵盤收起來（或從別的 App 切回來）之後，畫面有時沒有歸位，整個版面比看得到的範圍高出一截，
 // 結果上面的標題列跑到螢幕外、底部的頁籤列浮在畫面中間。發現有這個落差、又沒有在打字時，輕輕捲一下逼它重新對齊
 (function(){var vv=window.visualViewport;if(!vv)return;
@@ -5224,6 +5227,7 @@ var CHANGELOG = [
     id: "2026-11-25",
     date: "2026/11/25",
     items: [
+      { kind: "better", text: "寫短評、回覆、意見回饋等輸入框會隨著內容自動變高，不用在小框框裡捲動" },
       { kind: "better", text: "修正同名電影（例如 2024 動畫版和 2026 真人版《驀然回首》）在電影頁互相顯示到另一部的評分、海報、預告的問題：改用「片名＋上映年」和 IMDb 編號分辨" },
       { kind: "better", text: "用量頁多了「評分」一區：有評分的片數、評分總人次、有短評的片數、短評總數（管理員專區）" },
       { kind: "better", text: "依「片刻評分」排序時，評分人數還不夠的片（未滿 3 人）排在「有足夠評分」和「還沒有評分」中間，照自己的分數排；也可以在排序設定裡切成跟足夠評分的片一起排" },
@@ -5570,7 +5574,7 @@ var App = class {
   }
   /** 最新版本是多少。網頁版問的是自己網站現在上線的版本（重新整理就會拿到的那一版），不是 GitHub 上的 */
   checkVersion() {
-    if (true) return checkLatest("2026.11.27-0835");
+    if (true) return checkLatest("2026.11.27-1453");
     return (async () => {
       try {
         let r = await globalThis.fetch("/version.json?t=" + Date.now(), { cache: "no-store" });
@@ -5578,7 +5582,7 @@ var App = class {
         const latest = String((await r.json()).version || "");
         if (!latest) return null;
         const num = (v) => Number(v.replace(/\D/g, "")) || 0;
-        return { latest, isLatest: num("2026.11.27-0835") >= num(latest) };
+        return { latest, isLatest: num("2026.11.27-1453") >= num(latest) };
       } catch (_) {
         return null;
       }
@@ -6967,7 +6971,7 @@ ${x.kinds.length ? `開了 ${x.kinds.length} 種：${x.kinds.map(kindLabel).join
         return;
       }
       try {
-        await sendFeedback(cat.id, text, false ? this.isStandalone() ? "web-app" : "web" : "scriptable", "2026.11.27-0835");
+        await sendFeedback(cat.id, text, false ? this.isStandalone() ? "web-app" : "web" : "scriptable", "2026.11.27-1453");
         this.fbDraft = "";
         this.fbCat = "";
         await this.ui.toast("已送出，謝謝你的回饋");
@@ -7387,7 +7391,7 @@ ${x.kinds.length ? `開了 ${x.kinds.length} 種：${x.kinds.map(kindLabel).join
   /** 更新內容：依日期分段、新的在上；每段分「新功能」「改進」兩組，項目多的先列幾項、其餘收起來；上次看過之後才多的標「新」 */
   changelogView() {
     const KEEP = 6;
-    return /* @__PURE__ */ h(Page, { title: "更新內容", subtitle: `目前版本 ${"2026.11.27-0835"}`, onBack: () => this.back() }, CHANGELOG.map((e, idx) => {
+    return /* @__PURE__ */ h(Page, { title: "更新內容", subtitle: `目前版本 ${"2026.11.27-1453"}`, onBack: () => this.back() }, CHANGELOG.map((e, idx) => {
       const freshN = this.logFresh[e.id] || 0;
       const open = this.logOpen.indexOf(e.id) >= 0;
       const all = e.items.map((it, i) => ({ ...it, fresh: i < freshN }));
@@ -7436,11 +7440,11 @@ ${x.kinds.length ? `開了 ${x.kinds.length} 種：${x.kinds.map(kindLabel).join
       {
         class: "note version",
         onTap: async () => {
-          Pasteboard.copy(`版本 ${"2026.11.27-0835"}`);
+          Pasteboard.copy(`版本 ${"2026.11.27-1453"}`);
           await this.ui.toast("已複製版本號");
         }
       },
-      `版本 ${"2026.11.27-0835"}`,
+      `版本 ${"2026.11.27-1453"}`,
       "（點一下複製）"
     ), await this.versionNote());
   }
@@ -8085,7 +8089,7 @@ ${x.kinds.length ? `開了 ${x.kinds.length} 種：${x.kinds.map(kindLabel).join
     if (false) {
       if (!r) return /* @__PURE__ */ h(Note, { text: "（無法確認是否為最新版：連不到網站）" });
       if (r.isLatest) return /* @__PURE__ */ h(Note, { text: "✅ 已是最新版" });
-      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.27-0835"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
+      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h(Note, { kind: "warn", text: `🆕 有新版 ${r.latest}（你現在開的是 ${"2026.11.27-1453"}）` }), /* @__PURE__ */ h(Button, { label: "重新整理以更新", kind: "secondary", onTap: () => {
         globalThis.location.reload();
       } }));
     }
